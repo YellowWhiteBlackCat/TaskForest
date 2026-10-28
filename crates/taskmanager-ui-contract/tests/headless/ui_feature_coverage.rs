@@ -5,7 +5,10 @@
 //! tests pin its size, prove every feature carries a precise semantic
 //! specification, and keep every frontend fold honest.
 
+use super::declaration::feature_coverage_report_over;
 use super::*;
+use crate::capabilities::CapabilitySupport;
+use crate::keybindings::FrontendShape;
 
 fn entry(feature: FeatureId, support: CapabilitySupport) -> FeatureCoverageEntry {
     FeatureCoverageEntry { feature, support }
@@ -33,21 +36,21 @@ fn full_declaration(
 /// five-item baseline.
 const fn area_census(area: FeatureArea) -> usize {
     match area {
-        FeatureArea::ProcessLifecycle => 5,
-        FeatureArea::MemoryForensics => 6,
-        FeatureArea::HandleDescriptorAudit => 5,
-        FeatureArea::ThreadTopology => 5,
-        FeatureArea::NetworkSockets => 5,
-        FeatureArea::StorageFilesystemIo => 5,
-        FeatureArea::HardwareTopologyNuma => 5,
-        FeatureArea::AcceleratorTelemetry => 5,
-        FeatureArea::PowerThermal => 5,
-        FeatureArea::SecurityIsolation => 5,
-        FeatureArea::ServicesInit => 5,
-        FeatureArea::PressureSaturation => 5,
-        FeatureArea::IpcDbus => 5,
-        FeatureArea::DynamicTracing => 5,
-        FeatureArea::HistoryTimeTravel => 5,
+        FeatureArea::ProcessLifecycle => 15,
+        FeatureArea::MemoryForensics => 16,
+        FeatureArea::HandleDescriptorAudit => 15,
+        FeatureArea::ThreadTopology => 15,
+        FeatureArea::NetworkSockets => 15,
+        FeatureArea::StorageFilesystemIo => 15,
+        FeatureArea::HardwareTopologyNuma => 15,
+        FeatureArea::AcceleratorTelemetry => 15,
+        FeatureArea::PowerThermal => 15,
+        FeatureArea::SecurityIsolation => 15,
+        FeatureArea::ServicesInit => 15,
+        FeatureArea::PressureSaturation => 14,
+        FeatureArea::IpcDbus => 15,
+        FeatureArea::DynamicTracing => 15,
+        FeatureArea::HistoryTimeTravel => 15,
     }
 }
 
@@ -56,7 +59,51 @@ const fn area_census(area: FeatureArea) -> usize {
 /// a conscious registry change.
 #[test]
 fn all_covers_features_exactly_once() {
-    assert_eq!(FeatureId::ALL.len(), 76);
+    assert_eq!(FeatureId::ALL.len(), 225);
+    let wave = FeatureId::ALL
+        .iter()
+        .filter(|feature| feature.origin() == FeatureOrigin::Wave3Wave4)
+        .count();
+    assert_eq!(
+        wave, 10,
+        "ten registered features are Wave 3/4 deliverables"
+    );
+    let dispositions = BlueprintDispositionTable::committed();
+    assert!(
+        dispositions.findings().is_empty(),
+        "{:?}",
+        dispositions.findings()
+    );
+    assert_eq!(dispositions.rows().len(), BLUEPRINT_ITEM_COUNT);
+    assert_eq!(dispositions.adopted_count(), 225);
+    assert_eq!(dispositions.unsupported_count(), 0);
+    assert_eq!(
+        dispositions.adopted_count() + dispositions.unsupported_count(),
+        BLUEPRINT_ITEM_COUNT,
+        "every blueprint slot carries exactly one disposition"
+    );
+    for feature in FeatureId::ALL
+        .iter()
+        .filter(|feature| feature.origin() == FeatureOrigin::Wave3Wave4)
+    {
+        let slot = feature
+            .blueprint_slot()
+            .unwrap_or_else(|| panic!("{} must adopt a blueprint slot", feature.id()));
+        assert_eq!(
+            dispositions.slot(slot).map(|row| row.disposition),
+            Some(BlueprintDisposition::Adopted(*feature)),
+            "the ten Wave deliveries are adopted slots, not an extra axis"
+        );
+    }
+    let extras: Vec<_> = FeatureId::ALL
+        .iter()
+        .filter(|feature| feature.blueprint_slot().is_none())
+        .collect();
+    assert_eq!(
+        extras,
+        vec![&FeatureId::MemoryProcessSwapCharge],
+        "only the deliberate per-process swap extra sits outside the 225 slots"
+    );
     let mut ids: Vec<_> = FeatureId::ALL.iter().map(|feature| feature.id()).collect();
     let count = ids.len();
     ids.sort_unstable();
@@ -68,10 +115,10 @@ fn all_covers_features_exactly_once() {
             .all(|feature| !feature.id().is_empty()),
         "every feature names a stable machine id"
     );
-    // The gate set is a per-area census, not a fixed 15 x 5 grid: it grows one
-    // blueprint area at a time toward the 225-item matrix. The exact per-area
-    // counts and their sum live in `feature_areas_are_well_formed_and_total`;
-    // this test pins the total and the id discipline only.
+    // The typed gate set is the adopted subset of the 225-slot matrix; the
+    // complete census lives in `BlueprintDispositionTable`. The exact per-area
+    // typed counts and their sum live in `feature_areas_are_well_formed_and_total`;
+    // this test pins the typed total, the census counts and the id discipline.
 }
 
 /// Every feature carries one explicit, non-empty, toolkit-neutral semantic
@@ -265,6 +312,9 @@ fn bounded_expansion_features_keep_their_blueprint_areas() {
             &[
                 FeatureId::PressureLoadAverageNormalized,
                 FeatureId::UnresponsiveAppDetection,
+                FeatureId::PressureSaturationGrade,
+                FeatureId::PressureDStateRatio,
+                FeatureId::PressureNativeAlertIntegration,
             ],
         ),
         (
@@ -280,6 +330,7 @@ fn bounded_expansion_features_keep_their_blueprint_areas() {
             &[
                 FeatureId::TelemetryPercentileAggregation,
                 FeatureId::HistoryChartImageExport,
+                FeatureId::HistoryLttbDownsampling,
             ],
         ),
     ];
@@ -301,7 +352,7 @@ fn bounded_expansion_features_keep_their_blueprint_areas() {
             );
         }
     }
-    assert_eq!(registered, 30);
+    assert_eq!(registered, 34);
 }
 
 /// All 10 Wave 3 / Wave 4 core deliverables are registered and tagged in the

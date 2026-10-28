@@ -434,12 +434,12 @@ async fn services_search_typing_is_isolated_per_window(cx: &mut TestAppContext) 
     cx.simulate_input(win_b.into(), "networkd");
     settle_search_debounce(cx).await;
     assert_eq!(
-        view_b.read_with(cx, |view, _cx| view.services_state.query.clone()),
+        view_b.read_with(cx, |view, _cx| view.shell.services.query().to_owned()),
         "networkd",
         "typing in B's services search must update B's query"
     );
     assert_eq!(
-        view_a.read_with(cx, |view, _cx| view.services_state.query.clone()),
+        view_a.read_with(cx, |view, _cx| view.shell.services.query().to_owned()),
         "",
         "B's typing must never write into A's services query"
     );
@@ -448,12 +448,12 @@ async fn services_search_typing_is_isolated_per_window(cx: &mut TestAppContext) 
     cx.simulate_input(win_a.into(), "cron");
     settle_search_debounce(cx).await;
     assert_eq!(
-        view_a.read_with(cx, |view, _cx| view.services_state.query.clone()),
+        view_a.read_with(cx, |view, _cx| view.shell.services.query().to_owned()),
         "cron",
         "typing in A's services search must update A's query"
     );
     assert_eq!(
-        view_b.read_with(cx, |view, _cx| view.services_state.query.clone()),
+        view_b.read_with(cx, |view, _cx| view.shell.services.query().to_owned()),
         "networkd",
         "A's typing must never disturb B's services query"
     );

@@ -16,9 +16,11 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+    ProcessMetadataObservation, ProcessMetadataObservations,
 };
 use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_shell::SearchSlot;
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
@@ -89,7 +91,6 @@ pub(super) fn apply_capture_overrides(app: &mut TuiApp) {
         Some(
             "smart-self-test-confirm"
                 | "telemetry-paused"
-                | "sidebar-hidden"
                 | "about"
                 | "system-about"
                 | "system-hardware"
@@ -485,7 +486,8 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "services-search-highlight" => {
             app.shell.application.active_page = AppPage::Services;
-            app.shell.query = "Network".into();
+            app.shell.set_services_query("Network");
+            app.shell.open_search_for(SearchSlot::Services);
         }
         "apps-search-highlight" => {
             app.shell.application.active_page = AppPage::Applications;
@@ -506,18 +508,36 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "apps-identity-matrix" => {
             app.shell.application.active_page = AppPage::Applications;
+            let selected_pid = app
+                .shell
+                .visible_processes()
+                .first()
+                .map(|process| process.pid);
             if let Some(processes) = app.shell.projection().processes.as_ref() {
                 let mut procs = (**processes).clone();
                 seed_capture_identity_matrix(&mut procs);
+                if let Some(pid) = selected_pid
+                    && let Some(process) = procs.iter_mut().find(|process| process.pid == pid)
+                {
+                    process.cmdline = "/usr/bin/identity-matrix".into();
+                    process.apply_metadata_observations(ProcessMetadataObservations {
+                        executable_path: ProcessMetadataObservation::available(
+                            "/usr/bin/identity-matrix-real".into(),
+                            1,
+                        ),
+                        ..Default::default()
+                    });
+                }
                 seed_projection_fact(&mut app.shell, ProjectionSeedFact::Processes(Some(procs)));
+            }
+            if !app.shell.visible_processes().is_empty() {
+                let _ = app.shell.select_row(0);
+                app.reconcile_applications_cursor();
             }
         }
         "telemetry-paused" => {
             app.shell.application.active_page = AppPage::Performance;
             let _ = app.shell.apply_action(AppAction::TogglePause);
-        }
-        "sidebar-hidden" => {
-            app.shell.application.active_page = AppPage::Performance;
         }
         "system-npu" => {
             // Paint clamps this intent to the last legal viewport, exercising the

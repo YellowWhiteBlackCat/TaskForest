@@ -21,3 +21,18 @@ fn input_mode_transitions_are_exclusive_and_branch_matched() {
     app.toggle_search_focus();
     assert_eq!(app.input_mode(), ShellInputMode::Content);
 }
+
+#[test]
+fn tab_search_focus_follows_the_searchable_page() {
+    let mut app = ShellApp::new();
+    app.application.active_page = AppPage::Services;
+    app.open_search_for(SearchSlot::Services);
+    app.close_search();
+    app.application.active_page = AppPage::Applications;
+
+    app.toggle_search_focus();
+    assert_eq!(app.search_slot(), SearchSlot::Applications);
+    app.push_search_char('a');
+    assert_eq!(app.query, "a");
+    assert_eq!(app.services_query, "");
+}

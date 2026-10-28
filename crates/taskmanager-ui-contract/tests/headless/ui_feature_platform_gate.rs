@@ -667,14 +667,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        200,
+        220,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 50usize),
-        (FrontendShape::Iced, 50),
-        (FrontendShape::Tui, 50),
-        (FrontendShape::Bevy, 50),
+        (FrontendShape::Gpui, 55usize),
+        (FrontendShape::Iced, 55),
+        (FrontendShape::Tui, 55),
+        (FrontendShape::Bevy, 55),
     ] {
         assert_eq!(
             table
@@ -694,6 +694,9 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     // must again be committed as an explicit `pending` row, and the pending
     // shape stays covered by the parser counterexamples and the synthetic
     // evidence-closure witness below.
+    // The Track A batch (2026-10-28) closed the last three surveyed
+    // history/pressure features on all four shapes with real frontend tests
+    // (and a Bevy deduction-bill row that the survey proved was missing).
     assert_eq!(
         table.pending_count(),
         0,
@@ -806,10 +809,22 @@ fn g2_refuses_the_un_anchored_remainder_even_with_the_committed_table() {
         .iter()
         .filter(|cell| matches!(cell.status, FeaturePlatformStatus::Ready) && cell.has_evidence())
         .count();
+    let delivery_anchors = PLATFORM_GATE_POLICY
+        .feature_evidence()
+        .rows()
+        .iter()
+        .filter(|row| row.is_anchored())
+        .filter(|row| {
+            matches!(
+                row.feature.platform_binding(),
+                PlatformBinding::Requires(capabilities) if !capabilities.is_empty()
+            )
+        })
+        .count();
     assert_eq!(
         admitted,
-        PLATFORM_GATE_POLICY.feature_evidence().anchored_count() * PlatformAxis::ALL.len(),
-        "every committed anchor materializes on every complete platform axis"
+        delivery_anchors * PlatformAxis::ALL.len(),
+        "every committed anchor on a platform-delivery binding materializes on every complete platform axis"
     );
     let refused = ledger
         .iter()
@@ -824,17 +839,19 @@ fn g2_refuses_the_un_anchored_remainder_even_with_the_committed_table() {
 
 /// The parser is not a rubber stamp: an unknown feature or frontend id, a
 /// placeholder anchor, a pending row with a test id or without a note, a
-/// duplicated cell, and an anchor on a non-delivery binding are all findings.
+/// duplicated cell, and an anchor on a vocabulary-gap binding are all findings.
+/// A shared-projection (`NotApplicable`) delivery may anchor.
 #[test]
 fn the_evidence_table_parser_rejects_malformed_rows() {
     let header = "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n";
     let legal = FeatureEvidenceTable::parse(concat!(
         "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
         "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\tgpui_app::tests::co_anchor\n",
+        "history.multi-format-export\tgpui\tgpui_app::tests::export\tanchored\t-\t-\n",
         "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\t-\n",
     ));
     assert!(legal.findings().is_empty(), "{:?}", legal.findings());
-    assert_eq!(legal.anchored_count(), 1);
+    assert_eq!(legal.anchored_count(), 2);
     assert_eq!(legal.pending_count(), 1);
     assert_eq!(
         legal.co_anchor(FeatureId::HandleEnumeration, FrontendShape::Gpui),
@@ -888,7 +905,7 @@ fn the_evidence_table_parser_rejects_malformed_rows() {
         (
             concat!(
                 "feature_id\tfrontend\ttest_id\tstatus\tnote\tco_test_id\n",
-                "memory.leak-trend\tgpui\tgpui_app::tests::anchor\tanchored\t-\t-\n",
+                "tracing.cpu-flame-graph\tgpui\tgpui_app::tests::anchor\tanchored\t-\t-\n",
             ),
             |finding| {
                 matches!(

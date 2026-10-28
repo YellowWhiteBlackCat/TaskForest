@@ -217,7 +217,7 @@ fn apply_inventory_capture(
     }
     if view.capture_evidence.services_search_highlight_requested() {
         view.page = TopPage::Services;
-        view.services_state.query = "4".to_owned();
+        view.shell.services.set_query("4");
         if let Some(input) = view.services_search.as_ref().cloned() {
             input.update(cx, |state, cx| state.set_value("4", cx));
         }

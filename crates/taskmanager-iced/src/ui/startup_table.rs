@@ -220,7 +220,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                         source_index,
                                         startup.name.clone(),
                                     );
-                                    crate::ui::components::Popover::new(
+                                    crate::ui::components::Popover::context_menu(
                                         row,
                                         panel,
                                         Message::CloseStartupRowMenu,

@@ -61,7 +61,7 @@ impl IcedApp {
             Message::FocusSearch => self.shell.open_search(),
             Message::CloseSearch => self.shell.close_search(),
             Message::ServicesSearchChanged(query) => {
-                self.process_presentation.services_query = query
+                self.shell.set_services_query(query);
             }
             Message::SelectDetailsSection(section) => {
                 self.process_presentation.details_section = section;

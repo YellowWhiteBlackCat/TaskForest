@@ -10,6 +10,7 @@
 //! Ctrl-held mirror). Collocating the display copy with the policy accessors
 //! keeps every frontend's status line and refresh cadence in one audited
 //! place.
+use super::input_mode::SearchSlot;
 use super::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP, ShellApp, SystemProjectionStore,
 };
@@ -273,12 +274,16 @@ impl ShellApp {
     pub(super) fn apply_ui_effect(&mut self, effect: UiEffect) {
         match effect {
             UiEffect::FocusSearch => {
-                // Ctrl+F focuses the process search field, which lives on the
-                // Applications page — switch there first so the field is
-                // visible (mirrors GPUI; applies to every frontend via the
-                // shared reducer).
-                self.application.active_page = AppPage::Applications;
-                self.open_search();
+                // Each searchable page owns its query. On Services the shared
+                // field edits that page's slot and the page does not switch;
+                // every other page routes to the process search (mirrors
+                // GPUI, applies to every frontend via the shared reducer).
+                if self.application.active_page == AppPage::Services {
+                    self.open_search_for(SearchSlot::Services);
+                } else {
+                    self.application.active_page = AppPage::Applications;
+                    self.open_search_for(SearchSlot::Applications);
+                }
             }
             UiEffect::MoveFocus(FocusDirection::Next | FocusDirection::Previous) => {
                 self.toggle_search_focus();

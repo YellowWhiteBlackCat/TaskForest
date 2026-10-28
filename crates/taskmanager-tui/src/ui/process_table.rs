@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -39,22 +40,6 @@ pub(super) const SPARKLINE_MIN_AREA_WIDTH: u16 = 160;
 /// so a terminal narrower than this cannot afford it and the last columns
 /// would be truncated — the gutter yields to content below the threshold.
 pub(super) const COLUMN_GUTTER_WIDE_WIDTH: u16 = 190;
-
-/// The fixed cell width of one reorderable tail column. The default order and
-/// these widths reproduce the historical layout byte for byte; a reorder only
-/// permutes the same widths. The identity/CPU prefix never appears in the
-/// order, so its arms are inert placeholders that are never painted.
-const fn reorderable_column_width(column: SortCol) -> u16 {
-    match column {
-        SortCol::Memory | SortCol::Pss | SortCol::Swap => 10,
-        SortCol::User => 12,
-        SortCol::State | SortCol::Threads => 7,
-        SortCol::Fds | SortCol::Nice => 5,
-        SortCol::StartTime => 11,
-        SortCol::CpuTime | SortCol::DiskRead | SortCol::DiskWrite | SortCol::Network => 9,
-        SortCol::Pid | SortCol::Name | SortCol::Cpu => 0,
-    }
-}
 
 /// The Applications page's three vertical bands. This is shared by the
 /// renderer and `table_hit`, so pointer coordinates always address the same
@@ -119,7 +104,6 @@ pub(super) fn render_processes(
     // plan (the field's own target), not a second search_active read; the
     // match counter below stays a data read of the live query.
     let search_focused = focus.search_field_focused();
-    let cursor = if search_focused { "▌" } else { "" };
     // A confirmed zero swap total means the host has no swap device and the
     // Swap column is intentionally hidden. An unknown total keeps the column
     // visible so an unavailable value cannot be mistaken for an absent one.
@@ -174,22 +158,28 @@ pub(super) fn render_processes(
         } else {
             String::new()
         };
+        let query_cursor = app.query_cursor();
+        let (query_before, query_after) = app.query.split_at(query_cursor);
+        let mut search_spans = vec![Span::raw(format!("{} ", theme.glyph(IconId::Search)))];
+        search_spans.push(Span::raw(query_before));
+        if search_focused {
+            search_spans.push(Span::styled(
+                "▌",
+                Style::new().fg(theme.color(Color::White)),
+            ));
+        }
+        search_spans.push(Span::raw(query_after));
         frame.render_widget(
-            Paragraph::new(format!(
-                "{} {}{}",
-                theme.glyph(IconId::Search),
-                app.query,
-                cursor
-            ))
-            .style(if search_focused {
-                Style::new().fg(theme.color(Color::White))
-            } else {
-                Style::new().fg(theme.dim)
-            })
-            .block(panel(
-                &format!("{}{}", t("tui.search_title"), match_counter),
-                theme,
-            )),
+            Paragraph::new(Line::from(search_spans))
+                .style(if search_focused {
+                    Style::new().fg(theme.color(Color::White))
+                } else {
+                    Style::new().fg(theme.dim)
+                })
+                .block(panel(
+                    &format!("{}{}", t("tui.search_title"), match_counter),
+                    theme,
+                )),
             search,
         );
         let anchor_pid = visible
@@ -203,6 +193,7 @@ pub(super) fn render_processes(
             sparkline_visible,
             &app.hidden_columns,
             &app.column_order,
+            |column| app.column_width(column),
         );
         let columns = process_details::ColumnVisibility {
             swap_visible,
@@ -227,7 +218,7 @@ pub(super) fn render_processes(
                 .order
                 .iter()
                 .filter(|column| column_visible(**column))
-                .map(|column| Constraint::Length(reorderable_column_width(*column))),
+                .map(|column| Constraint::Length(app.column_width(*column))),
         );
         // Fail-closed re-bound of the plan's committed window against the
         // cached id slice (the same math the render boundary has always
@@ -387,6 +378,7 @@ fn fit_process_columns(
     sparkline_visible: bool,
     user_hidden: &HashSet<SortCol>,
     user_order: &[SortCol],
+    column_width: impl Fn(SortCol) -> u16,
 ) -> Vec<SortCol> {
     let mut order = Vec::with_capacity(user_order.len());
     let prefix_columns = 3 + usize::from(sparkline_visible);
@@ -415,7 +407,7 @@ fn fit_process_columns(
         if !accepting_tail {
             continue;
         }
-        let next_width = column_spacing.saturating_add(reorderable_column_width(column));
+        let next_width = column_spacing.saturating_add(column_width(column));
         if used_width.saturating_add(next_width) <= available_width {
             used_width = used_width.saturating_add(next_width);
             order.push(column);

@@ -14,6 +14,8 @@ mod icon;
 mod keybindings;
 mod message;
 pub mod navigation;
+mod overlay;
+mod text_edit;
 
 pub use accessibility::AlertRuleInput;
 pub use accessibility::{
@@ -32,21 +34,22 @@ pub use capabilities::{
     capability_drift, capability_findings, capability_report,
 };
 pub use columns::{
-    COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN, PROCESS_COLUMNS,
-    ProcessColumnSpec, find,
+    COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN, ColumnResizePolicy,
+    PROCESS_COLUMNS, ProcessColumnSpec, find,
 };
 pub use command::{CommandDescriptor, descriptor};
 pub use conformance::ContractTag;
 pub use feature_coverage::{
-    FEATURE_INDEPENDENT_CAPABILITIES, FeatureArea, FeatureCoverageDeclaration,
-    FeatureCoverageEntry, FeatureCoverageFinding, FeatureCoverageFindingKind,
-    FeatureCoverageStatus, FeatureId, FeatureOrigin, FeaturePlatformCell, FeaturePlatformLedger,
-    FeaturePlatformStatus, FeatureSemanticSpec, MISSING_DECLARATION_REASON,
-    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY,
-    PartialCause, PlatformBinding, PlatformGateBaseline, PlatformGateFinding, PlatformGatePolicy,
-    PlatformGateRule, PlatformUnavailability, classify, feature_coverage_drift,
-    feature_coverage_findings, feature_coverage_report, feature_platform_cell_findings,
-    feature_platform_gate_findings, feature_platform_report,
+    BLUEPRINT_ITEM_COUNT, BlueprintDisposition, BlueprintDispositionFinding,
+    BlueprintDispositionRow, BlueprintDispositionTable, FEATURE_INDEPENDENT_CAPABILITIES,
+    FeatureArea, FeatureCoverageDeclaration, FeatureCoverageEntry, FeatureCoverageFinding,
+    FeatureCoverageFindingKind, FeatureCoverageStatus, FeatureId, FeatureOrigin,
+    FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, FeatureSemanticSpec,
+    MISSING_DECLARATION_REASON, MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PLATFORM_GATE_BASELINE,
+    PLATFORM_GATE_POLICY, PartialCause, PlatformBinding, PlatformGateBaseline, PlatformGateFinding,
+    PlatformGatePolicy, PlatformGateRule, PlatformUnavailability, blueprint_disposition_findings,
+    classify, feature_coverage_drift, feature_coverage_findings, feature_coverage_report,
+    feature_platform_cell_findings, feature_platform_gate_findings, feature_platform_report,
 };
 pub use focus::{FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, ModalFocusPolicy};
 pub use functional::{
@@ -58,9 +61,15 @@ pub use functional::{
 pub use icon::IconId;
 pub use keybindings::{
     Binding, BindingCoverageStatus, BindingEntry, FrontendBindingDeclaration, FrontendShape,
-    coverage_report, drift_findings,
+    coverage_report, drift_findings, empty_binding_tokens,
 };
 pub use message::MessageKey;
 pub use navigation::{
     PageDescriptor, page_descriptor, page_descriptors, page_key_chord, page_shortcut,
+};
+pub use overlay::{
+    OverlayDismissCause, OverlayDismissContext, OverlayDismissOutcome, OverlayKind, dismiss_outcome,
+};
+pub use text_edit::{
+    TextEditState, TextMotion, char_boundary_at_or_before, line_range, word_range,
 };

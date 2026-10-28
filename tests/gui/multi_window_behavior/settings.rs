@@ -33,7 +33,11 @@ fn click_settings_pill(cx: &mut TestAppContext, win: WindowHandle<RootView>, id:
 
 /// Focus `win`'s own refresh-interval slider (real tab stop) and step it by
 /// `keystrokes` through the real key pipeline.
-fn step_settings_slider(cx: &mut TestAppContext, win: WindowHandle<RootView>, keystrokes: &str) {
+fn step_settings_slider(
+    cx: &mut TestAppContext,
+    win: WindowHandle<RootView>,
+    keystrokes: &'static str,
+) {
     win.update(cx, |root, window, cx| {
         let handle = root
             .settings_slider

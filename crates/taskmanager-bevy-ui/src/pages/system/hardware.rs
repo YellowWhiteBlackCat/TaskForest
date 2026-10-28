@@ -54,6 +54,31 @@ pub(super) fn hardware_fact_rows(hardware: &HardwareInfo) -> Vec<SystemFactRow> 
         label: t("system.firmware").to_owned(),
         value: optional(hardware.firmware_vendor.as_deref()),
     });
+    if let Some(version) = hardware.firmware_version.as_deref() {
+        rows.push(SystemFactRow {
+            group: SystemFactGroup::Hardware,
+            label: t("system.field.firmware_version").to_owned(),
+            value: version.to_owned(),
+        });
+    }
+    if let Some(chipset) = hardware.chipset.as_deref() {
+        rows.push(SystemFactRow {
+            group: SystemFactGroup::Hardware,
+            label: t("system.field.chipset").to_owned(),
+            value: chipset.to_owned(),
+        });
+    }
+    if let Some(secure_boot) = hardware.secure_boot {
+        rows.push(SystemFactRow {
+            group: SystemFactGroup::Hardware,
+            label: t("system.secure_boot").to_owned(),
+            value: if secure_boot {
+                t("common.enabled").to_owned()
+            } else {
+                t("common.disabled").to_owned()
+            },
+        });
+    }
     rows.push(SystemFactRow {
         group: SystemFactGroup::Cpu,
         label: t("system.field.cpu").to_owned(),
@@ -67,6 +92,19 @@ pub(super) fn hardware_fact_rows(hardware: &HardwareInfo) -> Vec<SystemFactRow> 
         label: t("system.field.cores").to_owned(),
         value: cores,
     });
+    if !hardware.instruction_features.is_empty() {
+        let features = hardware
+            .instruction_features
+            .iter()
+            .map(|feature| feature.label())
+            .collect::<Vec<_>>()
+            .join(" · ");
+        rows.push(SystemFactRow {
+            group: SystemFactGroup::Cpu,
+            label: t("system.field.instruction_features").to_owned(),
+            value: features,
+        });
+    }
     if let Some(memory) = hardware.total_memory_mb {
         rows.push(SystemFactRow {
             group: SystemFactGroup::Memory,

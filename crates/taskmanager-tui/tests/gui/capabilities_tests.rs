@@ -23,8 +23,8 @@ fn declaration_is_total_and_every_difference_is_registered() {
 }
 
 /// The terminal-limit set is pinned: one native (emulator-owned selection),
-/// the keyboard-native but non-equivalent controls, and the two typed
-/// absences. A new difference cannot appear silently.
+/// the keyboard-native but non-equivalent controls, and the one typed
+/// absence. A new difference cannot appear silently.
 #[test]
 fn the_terminal_limit_set_is_pinned() {
     let declaration = capability_declaration();
@@ -44,13 +44,11 @@ fn the_terminal_limit_set_is_pinned() {
     assert_eq!(
         divergent,
         [
-            "modal-overlay",
             "toast",
             "text-input",
-            "search-input",
-            "switch",
             "slider",
             "segmented-control",
+            "column-drag-resize",
             "scrollbar",
             "focus-visible",
         ]
@@ -61,5 +59,60 @@ fn the_terminal_limit_set_is_pinned() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Unsupported { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(unsupported, ["tooltip", "column-drag-resize"]);
+    assert_eq!(unsupported, ["tooltip"]);
+}
+
+/// Every terminal difference carries its DELIVERED driver, not a generic
+/// "unsupported" note. The wording is pinned so a capability change has to
+/// edit the declaration and this test together.
+#[test]
+fn every_terminal_difference_names_its_delivered_driver() {
+    let declaration = capability_declaration();
+    let expected: [(&str, &str); 8] = [
+        (
+            "tooltip",
+            "the terminal has no hover surface; key hints ride the footer/status line",
+        ),
+        (
+            "toast",
+            "transient feedback renders through the shared footer activity line",
+        ),
+        (
+            "text-input",
+            "keyboard cursor, mid-string insertion, Backspace/Delete, Home/End, and pointer caret positioning are wired; the inline field has no selection highlight or selection gesture yet",
+        ),
+        (
+            "slider",
+            "settings values use bounded discrete keyboard steps; there is no continuous pointer drag or interpolation",
+        ),
+        (
+            "segmented-control",
+            "no generic segmented group is rendered; page/resource selection uses navigation and TUI-003 bindings without a segment traversal contract",
+        ),
+        (
+            "column-drag-resize",
+            "the column menu's -/+ stepper resizes the selected tail column within the terminal cell bounds; a terminal has no pointer-driven header-edge drag surface",
+        ),
+        (
+            "scrollbar",
+            "key-driven bounded row window; the terminal shape has no pointer scroll rail",
+        ),
+        (
+            "focus-visible",
+            "the cursor row is the single focus indicator; there is no pointer/keyboard modality split",
+        ),
+    ];
+    for (capability, reason) in expected {
+        let entry = declaration
+            .entries
+            .iter()
+            .find(|entry| entry.capability.id() == capability)
+            .unwrap_or_else(|| panic!("{capability} is declared"));
+        assert!(
+            matches!(entry.support, CapabilitySupport::Divergent { reason: declared } if declared == reason)
+                || matches!(entry.support, CapabilitySupport::Unsupported { reason: declared } if declared == reason),
+            "{capability} must carry its delivered driver: {:?}",
+            entry.support
+        );
+    }
 }

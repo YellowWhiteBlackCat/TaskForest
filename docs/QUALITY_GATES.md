@@ -139,8 +139,8 @@ job 才能创建或更新 GitHub Release，避免半成品发布。
 | 前端 | headless 交互矩阵 | 真实像素证据 |
 |---|---|---|
 | GPUI | `scripts/parity/accept-frontend-interactions.sh gpui --scope linux`（standard `--with-gui`；内部仍调用 `scripts/accept-gpui-interactions.sh` 作为权威 runner 与回执作者） | `scripts/capture-niri.sh` / `capture-windows.sh` |
-| Iced | crate headless tests + capture matrix | `scripts/capture-iced.sh` |
-| TUI | crate headless tests + capture matrix | `scripts/capture-tui.sh` |
+| Iced | `scripts/parity/accept-frontend-interactions.sh iced`（standard `--with-gui` / scoped `iced` 线） | `scripts/capture-iced.sh` |
+| TUI | `scripts/parity/accept-frontend-interactions.sh tui`（standard `--with-gui` / scoped `tui` 线） | `scripts/capture-tui-matrix.sh`（矩阵）/ `scripts/capture-tui.sh`（单帧） |
 | Bevy | `scripts/parity/accept-frontend-interactions.sh bevy`（standard `--with-gui`，Bevy 线 scoped standard 同样运行；内部仍调用 `scripts/accept-bevy-interactions.sh` 作为权威 runner 与回执作者） | `scripts/capture-bevy.sh`（Wayland-only） |
 
 四个前端的画面证据统一默认 `TM_CAPTURE_NIRI_BACKGROUND=1`：由私有

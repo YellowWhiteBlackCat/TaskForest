@@ -712,7 +712,7 @@ fn dropdown_checkbox_toggles_keep_the_real_process_columns_menu_open() {
 }
 
 #[test]
-fn dropdown_outside_press_dismisses_and_blocks_the_page_target_beneath() {
+fn dropdown_outside_press_dismisses_and_forwards_the_page_target_beneath() {
     let mut app = IcedApp::demo();
     let size = Size::new(1180.0, 780.0);
     let _ = app.update(Message::WindowResized(size));
@@ -816,8 +816,8 @@ fn dropdown_outside_press_dismisses_and_blocks_the_page_target_beneath() {
         (messages, captured, outside_point)
     };
     assert!(
-        captured,
-        "Iced captures the dismissal press before it reaches the background target"
+        !captured,
+        "the shared policy forwards the dismissal press to the background target"
     );
     assert!(matches!(
         press_messages.as_slice(),
@@ -828,16 +828,44 @@ fn dropdown_outside_press_dismisses_and_blocks_the_page_target_beneath() {
     assert_eq!(
         app.shell.page(),
         AppPage::Applications,
-        "the same captured press cannot activate the underlying Performance tab"
+        "the overlay still owns the page until the base tree receives the press"
     );
     assert!(
         outside_point.y < size.height / 4.0,
         "the tested background target is the visible navigation tab"
     );
+
+    // The forwarded press reaches the base tree; the page tab activates on the
+    // press/release pair just as it does without an overlay.
+    let messages = {
+        let (mut view, mut tree, node) = build_view(&app, &renderer, size);
+        let mut messages = Vec::new();
+        for event in [
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+        ] {
+            messages.extend(dispatch(
+                &mut view,
+                &mut tree,
+                &node,
+                &renderer,
+                &viewport,
+                event,
+                mouse::Cursor::Available(outside_point),
+            ));
+        }
+        messages
+    };
+    apply_messages(&mut app, messages);
+    assert_eq!(
+        app.shell.page(),
+        AppPage::Performance,
+        "the forwarded press activates the underlying Performance tab"
+    );
 }
 
 #[test]
-fn context_menu_outside_press_dismisses_without_activating_the_page_beneath() {
+fn context_menu_outside_press_dismisses_and_forwards_the_page_target() {
     let mut app = IcedApp::demo();
     let size = Size::new(1180.0, 780.0);
     let _ = app.update(Message::WindowResized(size));
@@ -901,8 +929,8 @@ fn context_menu_outside_press_dismisses_without_activating_the_page_beneath() {
         (messages, captured)
     };
     assert!(
-        captured,
-        "the dismissal press is captured before reaching the page tab"
+        !captured,
+        "the shared context-menu policy forwards the dismissal press"
     );
     assert!(matches!(
         press_messages.as_slice(),
@@ -934,6 +962,40 @@ fn context_menu_outside_press_dismisses_without_activating_the_page_beneath() {
     assert_eq!(
         app.shell.page(),
         AppPage::Users,
-        "the captured outside press cannot activate the underlying Performance tab"
+        "the overlay still owns the page until the base tree receives the press"
+    );
+
+    // The forwarded press reaches the base tree; the page tab activates while
+    // the dismissed session action stays unsubmitted.
+    let messages = {
+        let (mut view, mut tree, node) = build_view(&app, &renderer, size);
+        let mut messages = Vec::new();
+        for event in [
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+        ] {
+            messages.extend(dispatch(
+                &mut view,
+                &mut tree,
+                &node,
+                &renderer,
+                &viewport,
+                event,
+                mouse::Cursor::Available(outside_point),
+            ));
+        }
+        messages
+    };
+    apply_messages(&mut app, messages);
+    assert_eq!(
+        app.shell.page(),
+        AppPage::Performance,
+        "the forwarded press activates the underlying Performance tab"
+    );
+    assert!(app.shell.pending_session().is_none());
+    assert_eq!(
+        app.shell.feedback_text(),
+        feedback_before_press.as_str(),
+        "the forwarded page change cannot submit the dismissed session action"
     );
 }

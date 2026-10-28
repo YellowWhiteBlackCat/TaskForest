@@ -27,7 +27,7 @@ use bevy::ecs::world::World;
 use bevy::text::Font;
 use bevy::ui_widgets::popover::Popover;
 use bevy::ui_widgets::{
-    Checkbox, MenuPopup, RadioButton, RadioGroup, ScrollArea, Scrollbar, Slider,
+    Checkbox, MenuPopup, RadioButton, RadioGroup, ScrollArea, Scrollbar, Slider, TextInput,
 };
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
@@ -135,6 +135,7 @@ struct SurfaceCensus {
     official_checkbox: usize,
     official_radio_group: usize,
     official_radio_button: usize,
+    official_text_input: usize,
     scroll_areas: usize,
 }
 
@@ -147,6 +148,7 @@ impl SurfaceCensus {
         self.official_checkbox += other.official_checkbox;
         self.official_radio_group += other.official_radio_group;
         self.official_radio_button += other.official_radio_button;
+        self.official_text_input += other.official_text_input;
         self.scroll_areas += other.scroll_areas;
     }
 }
@@ -184,6 +186,7 @@ fn census_subtree(world: &mut World, root: Entity) -> SurfaceCensus {
         official_checkbox: count_in_subtree::<Checkbox>(world, root),
         official_radio_group: count_in_subtree::<RadioGroup>(world, root),
         official_radio_button: count_in_subtree::<RadioButton>(world, root),
+        official_text_input: count_in_subtree::<TextInput>(world, root),
         scroll_areas: count_in_subtree::<ScrollArea>(world, root),
     }
 }
@@ -254,14 +257,14 @@ fn capability_declaration_is_complete_and_pinned() {
         (ModalOverlay, Kind::Ported),
         (ContextMenu, Kind::Ported),
         // The column-visibility selection menu over the Applications table.
-        (DropdownMenu, Kind::Divergent),
-        // The pointer-hover explanation tooltip overlay surface.
-        (Tooltip, Kind::Divergent),
+        (DropdownMenu, Kind::Native),
+        // Hover- or keyboard-focus-opened explanation tooltip overlay.
+        (Tooltip, Kind::Ported),
         (Toast, Kind::Divergent),
-        (TextInput, Kind::Divergent),
+        (TextInput, Kind::Native),
         (SearchInput, Kind::Ported),
-        // Read-only text selection and clipboard export surface.
-        (TextSelection, Kind::Divergent),
+        // Read-only native text input selection plus table cell selection.
+        (TextSelection, Kind::Native),
         // Boolean rows ride the official Checkbox behavior behind the
         // product's own sliding switch.
         (Switch, Kind::Ported),
@@ -273,7 +276,8 @@ fn capability_declaration_is_complete_and_pinned() {
         (Select, Kind::Ported),
         (SegmentedControl, Kind::Ported),
         (Table, Kind::Ported),
-        (ColumnDragResize, Kind::Unsupported),
+        // Header-edge drag plus the chooser's keyboard width stepper.
+        (ColumnDragResize, Kind::Ported),
         (VirtualList, Kind::Ported),
         (Tree, Kind::Ported),
         // Scrolling rides the official ScrollArea and the official
@@ -371,17 +375,27 @@ fn declared_cells_match_the_mounted_page_surface() {
         ),
         "the Scrollbar cell and the mounted scrollbar surface must agree: {totals:?}"
     );
-    assert_eq!(
-        totals.official_popover + totals.official_menu_popup > 0,
+    // DropdownMenu is an anchored official Popover, mounted only while the
+    // chooser is open; the column-chooser behavior test proves the mount.
+    assert!(
         declares_official(
             &declaration,
             ComponentCapability::DropdownMenu,
             &["bevy_ui_widgets Popover", "bevy_ui_widgets MenuPopup"]
         ),
-        "the DropdownMenu cell and the mounted popover surface must agree: {totals:?}"
+        "the DropdownMenu cell must name its official anchored popover"
     );
 
     // The mechanisms the Divergent reasons name are really mounted.
+    assert_eq!(
+        of(Page::Processes).official_text_input > 0,
+        declares_official(
+            &declaration,
+            ComponentCapability::TextInput,
+            &["bevy_ui_widgets TextInput"]
+        ),
+        "the TextInput cell and the mounted native search input must agree: {totals:?}"
+    );
     let settings = of(Page::Settings);
     assert!(
         settings.official_checkbox >= 1,
@@ -394,5 +408,16 @@ fn declared_cells_match_the_mounted_page_surface() {
     assert!(
         of(Page::Performance).scroll_areas >= 1,
         "the Performance scene scrolls through the official ScrollArea (Scrollbar cell)"
+    );
+    // System fact readouts need hardware facts, which the route-only census
+    // does not seed; the wired System-page test mounts them and proves the
+    // official read-only TextInput. The declaration must still name it.
+    assert!(
+        declares_official(
+            &declaration,
+            ComponentCapability::TextSelection,
+            &["bevy_ui_widgets TextInput"],
+        ),
+        "the TextSelection cell must name its official read-only TextInput"
     );
 }

@@ -10,8 +10,10 @@ use std::collections::HashSet;
 
 use taskmanager_application::AppPage;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskmanager_ui_contract::TextMotion;
 
 use super::ShellApp;
+use super::input_mode::SearchSlot;
 use super::process_rows::{ProcessRowAnchor, ProcessRowId};
 use super::sorting::{SortCol, SortDir};
 use crate::ProcessStatusFilter;
@@ -429,16 +431,76 @@ impl ShellApp {
         self.process_selection_invalidated = true;
     }
 
+    /// Byte position of the Applications search caret, clamped to the query
+    /// and a UTF-8 character boundary.
+    #[must_use]
+    pub fn query_cursor(&self) -> usize {
+        self.query_edit.caret_in(&self.query)
+    }
+
+    /// Byte position of the active search slot's caret.
+    #[must_use]
+    pub fn active_search_cursor(&self) -> usize {
+        match self.search_slot {
+            SearchSlot::Applications => self.query_edit.caret_in(&self.query),
+            SearchSlot::Services => self.services_query_edit.caret_in(&self.services_query),
+        }
+    }
+
     pub fn push_search_char(&mut self, character: char) {
-        if !character.is_control() {
-            self.query.push(character);
+        let changed = {
+            let (query, edit) = self.active_search_mut();
+            edit.insert_char(query, character)
+        };
+        if changed {
             self.reset_selection_after_query_change();
         }
     }
 
     pub fn pop_search_char(&mut self) {
-        self.query.pop();
-        self.reset_selection_after_query_change();
+        let changed = {
+            let (query, edit) = self.active_search_mut();
+            edit.delete_backward(query)
+        };
+        if changed {
+            self.reset_selection_after_query_change();
+        }
+    }
+
+    pub fn delete_search_char(&mut self) {
+        let changed = {
+            let (query, edit) = self.active_search_mut();
+            edit.delete_forward(query)
+        };
+        if changed {
+            self.reset_selection_after_query_change();
+        }
+    }
+
+    pub fn move_search_cursor_left(&mut self) {
+        let (query, edit) = self.active_search_mut();
+        edit.move_caret(query, TextMotion::Left, false);
+    }
+
+    pub fn move_search_cursor_right(&mut self) {
+        let (query, edit) = self.active_search_mut();
+        edit.move_caret(query, TextMotion::Right, false);
+    }
+
+    pub fn move_search_cursor_home(&mut self) {
+        let (query, edit) = self.active_search_mut();
+        edit.move_caret(query, TextMotion::TextStart, false);
+    }
+
+    pub fn move_search_cursor_end(&mut self) {
+        let (query, edit) = self.active_search_mut();
+        edit.move_caret(query, TextMotion::TextEnd, false);
+    }
+
+    /// Place the active search caret at one byte offset (a pointer click).
+    pub fn set_search_caret(&mut self, offset: usize) {
+        let (query, edit) = self.active_search_mut();
+        edit.set_caret(query, offset);
     }
 
     pub(super) fn collapse_selection_to_anchor(&mut self) {
@@ -471,10 +533,22 @@ impl ShellApp {
         self.process_selection_invalidated = false;
     }
 
-    fn reset_selection_after_query_change(&mut self) {
+    pub(super) fn reset_selection_after_query_change(&mut self) {
+        self.reset_selection_for_search_slot(self.search_slot);
+    }
+
+    pub(super) fn reset_selection_for_search_slot(&mut self, slot: SearchSlot) {
         self.selected = 0;
-        self.sync_application_selection();
-        self.collapse_selection_to_anchor();
+        match slot {
+            SearchSlot::Applications => {
+                self.sync_application_selection();
+                self.collapse_selection_to_anchor();
+            }
+            // A Services query never touches the process selection identity;
+            // it only restarts the inventory cursor, which the frontend then
+            // reconciles against its visible row set.
+            SearchSlot::Services => self.clear_non_process_selection(),
+        }
     }
 }
 

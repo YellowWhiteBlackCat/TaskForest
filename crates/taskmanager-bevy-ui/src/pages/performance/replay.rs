@@ -36,7 +36,7 @@ use bevy::ui_widgets::ScrollArea;
 use std::sync::Arc;
 use taskmanager_application::{
     ApplicationHistoryStatus, PerformanceHistoryProjection,
-    history_decimation::gap_preserving_envelope, i18n::t,
+    history_decimation::lttb_gap_preserving, i18n::t,
 };
 use taskmanager_shell::presentation::{history_replay::row_heading, missing_value};
 
@@ -133,7 +133,7 @@ fn review_scene(model: &PerformanceHistoryProjection, palette: &UiPalette) -> im
             row.clock_jumps
         );
         let samples: Arc<[f32]> =
-            gap_preserving_envelope(&row.gap_aware_samples(), MAX_CHART_POINTS).into();
+            lttb_gap_preserving(&row.gap_aware_samples(), MAX_CHART_POINTS).into();
         rows.push(Box::new(bsn! { Node { width: percent(100), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } BackgroundColor({ palette.panel_fill }) Children [ Text(heading) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } -- Text(summary) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::AnyCharacter } -- Node { width: percent(100), height: rem(REPLAY_CHART_SLOT_HEIGHT_REM), flex_shrink: 0.0, overflow: Overflow::clip() } ReplayChart(samples) ChartSize(None) ] }));
     }
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);

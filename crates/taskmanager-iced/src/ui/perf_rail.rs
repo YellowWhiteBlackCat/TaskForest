@@ -415,6 +415,10 @@ pub(crate) fn device_cards<'a>(
     let rows = app.performance_rail_rows(devices, window);
     let key = rail_widget_key(app, theme_snapshot, devices, selected, window);
     let table_theme = *theme_snapshot;
+    let focused_device = app.input.focused_control.and_then(|target| match target {
+        FocusTarget::PerfDeviceTab(device) => Some(device),
+        _ => None,
+    });
     iced::widget::lazy(key, move |_| {
         let rows = Rc::clone(&rows);
         virtual_table_body(window, Length::Fill, move |start, end| {
@@ -423,8 +427,9 @@ pub(crate) fn device_cards<'a>(
                 .iter()
                 .map(|rail_row| {
                     let is_selected = rail_row.device == selected;
+                    let is_focused = focused_device == Some(rail_row.device);
                     virtual_table_row(
-                        device_card(rail_row.clone(), table_theme, is_selected),
+                        device_card(rail_row.clone(), table_theme, is_selected, is_focused),
                         RAIL_CARD_HEIGHT,
                     )
                 })
@@ -450,6 +455,7 @@ fn rail_widget_key(
         .field((app.drive_use_bytes(), app.drive_use_base2()))
         .field((app.network_use_bytes(), app.network_use_base2()))
         .field((selected.key(), selected.index()))
+        .field(app.input.focused_control.map(crate::focus::focus_id))
         .field(
             devices
                 .iter()
@@ -517,6 +523,7 @@ fn device_card(
     row: RailRow,
     theme_snapshot: Theme,
     selected: bool,
+    is_focused: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let tooltip_lines = rail_tooltip_lines(&row);
     let RailRow {
@@ -646,12 +653,12 @@ fn device_card(
     .padding([6, 8])
     .style(move |_| theme::panel_style(&tooltip_surface))
     .into();
-    iced::widget::tooltip(
-        card,
-        tooltip_content,
-        iced::widget::tooltip::Position::FollowCursor,
-    )
-    .into()
+    let trigger = if is_focused {
+        crate::ui::components::TooltipTrigger::Focus
+    } else {
+        crate::ui::components::TooltipTrigger::Hover
+    };
+    crate::ui::components::Tooltip::new(card, tooltip_content, trigger).into()
 }
 
 /// The rail sparkline: one polyline, no caption (the card's text column owns

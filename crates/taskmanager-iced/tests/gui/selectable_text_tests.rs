@@ -7,9 +7,9 @@
 //! itself needs a live text engine and is covered by real captures, not
 //! here.
 
-use super::{char_boundary_at_or_before, word_range};
 use crate::IcedApp;
 use crate::app::Message;
+use taskmanager_ui_contract::{char_boundary_at_or_before, word_range};
 
 #[test]
 fn a_double_click_inside_an_ipv4_address_selects_the_whole_address() {

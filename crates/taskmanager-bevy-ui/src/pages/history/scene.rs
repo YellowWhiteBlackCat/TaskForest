@@ -14,7 +14,7 @@ use crate::window::WindowPalette;
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{Display, FlexWrap, Overflow};
 use bevy::ui_widgets::ScrollArea;
-use taskmanager_application::history_decimation::gap_preserving_envelope;
+use taskmanager_application::history_decimation::lttb_gap_preserving;
 
 /// The trend strip's height, in logical px — a documented pixel contract.
 ///
@@ -238,7 +238,7 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
     let min = finite.iter().copied().fold(f32::INFINITY, f32::min);
     let max = finite.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let range = max - min;
-    let compact = gap_preserving_envelope(&metric.samples, 36);
+    let compact = lttb_gap_preserving(&metric.samples, 36);
     let bars: Vec<Box<dyn Scene>> = compact
         .iter()
         .copied()

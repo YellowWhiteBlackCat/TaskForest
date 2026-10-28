@@ -70,10 +70,11 @@ pub(crate) fn wrapped_content_height(lines: &[Line<'_>], width: u16) -> usize {
 /// shares this column layout and search-highlight path.
 /// One search-highlighted cell: the query's matching segments wear the
 /// accent style, everything else renders plain. The single implementation
-/// for every highlighted column (name / pid / user / group header) — ADR-020
-/// single-source rule. Returns an owned cell so callers can pass formatted
-/// temporaries (pid strings, group names) without lifetime gymnastics.
-fn search_highlight_cell(
+/// for every highlighted column (process name / pid / user / group header /
+/// Services name and description) — ADR-020 single-source rule. Returns an
+/// owned cell so callers can pass formatted temporaries (pid strings, group
+/// names) without lifetime gymnastics.
+pub(super) fn search_highlight_cell(
     text: &str,
     query: &str,
     search_active: bool,

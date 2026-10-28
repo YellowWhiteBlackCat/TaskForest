@@ -5,6 +5,7 @@ use ratatui::backend::TestBackend;
 
 use crate::{TuiApp, TuiSurfaceKind, TuiTheme, demo_app};
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_shell::presentation::command_identity_summary;
 
 #[test]
 fn active_alert_capture_renders_the_shared_evaluated_warning_in_both_viewports() {
@@ -292,6 +293,13 @@ fn capture_scene_overrides_activate_expected_state() {
             .as_ref()
             .is_some_and(|p| p.iter().any(|proc| proc.cmdline.contains("chrome")))
     );
+    let process = app
+        .selected_detail_process()
+        .expect("the capture selects a process row");
+    assert!(
+        command_identity_summary(&process).is_some(),
+        "the identity matrix fixture must expose a command identity mismatch"
+    );
 }
 
 fn review_frame(app: &TuiApp, width: u16, height: u16) -> String {
@@ -316,7 +324,7 @@ fn review_popup_text(app: &TuiApp, width: u16, height: u16) -> String {
         .draw(|frame| crate::ui::render(frame, app, TuiTheme::default()))
         .expect("draw review");
     let kind = app.local_surface_kind().expect("review surface");
-    let popup = crate::ui::frame_plan::overlay_popup(
+    let popup = crate::ui::frame_plan::overlays::overlay_popup(
         ratatui::layout::Rect::new(0, 0, width, height),
         crate::TuiInputScope::LocalSurface(kind),
     )

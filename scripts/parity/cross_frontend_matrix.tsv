@@ -88,7 +88,7 @@ interaction	mc03-swap-truth	iced	P0-MC-03	lib	ui::tests::pages::apps_resource_pr
 interaction	mc04-gpu-layout	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	success|responsive	gpu|gpu-compact	success	
 interaction	mc04-gpu-unavailable	iced	P0-MC-04	lib	ui::tests::devices::gpu_summary_keeps_honest_dashes_for_unavailable_fields	failure	gpu	failure	
 interaction	mc04-gpu-metric-projection	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_projection_defaults_to_utilization_and_gates_families	success	gpu	success	
-interaction	mc04-gpu-metric-select	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selects_through_the_shared_gate	success|toggle	gpu	success	
+interaction	mc04-gpu-metric-families	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_page_renders_every_measured_metric_family_without_a_selector	success	gpu	success	
 interaction	mc04-gpu-metric-unavailable	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selected_unavailable_stays_explicit	failure	gpu	failure	
 interaction	mc04-gpu-metric-generation	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_generation_change_resets_to_the_default	lifecycle	gpu	lifecycle	
 interaction	mc04-engine-failures	iced	P0-MC-04	lib	ui::perf_devices::tests::engine_rows_failure_keys_cover_every_typed_kind	failure	gpu	failure	

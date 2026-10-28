@@ -33,7 +33,7 @@ unused_must_use = "deny"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -110,7 +110,7 @@ strip = "debuginfo"
 [patch.crates-io]
 # Linux system clipboard must retain the strict Wayland dependency closure.
 bevy_clipboard = { path = "./patches/bevy_clipboard" }
-# Vendored GPUI Kit 0.7.3 manifest-only patch: remove Linux x11 from both
+# Vendored GPUI Kit 0.8.1 manifest-only patch: remove Linux x11 from both
 # platform feature selectors so every GPUI backend path stays Wayland-only.
 # All GPUI Kit and GPUI sources remain upstream unchanged.
 gpui-kit = { path = "./patches/gpui-kit" }
@@ -122,7 +122,7 @@ cryoglyph = { path = "./patches/cryoglyph" }
 
 # Keep TaskForest's existing `gpui::` imports while using GPUI Kit's pinned,
 # version-matched GPUI snapshot. The Kit component and asset layers are off.
-gpui = { package = "gpui-kit", version = "0.7.3", default-features = false }
+gpui = { package = "gpui-kit", version = "0.8.1", default-features = false }
 
 # Shared UI packages from crates.io.
 zhuge-ui-core = "0.1.3"

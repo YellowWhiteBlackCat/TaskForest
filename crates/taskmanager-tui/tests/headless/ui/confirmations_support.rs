@@ -19,7 +19,7 @@ pub(crate) fn render_startup_control_confirmation(
         frame,
         theme,
         pending,
-        crate::ui::frame_plan::overlay_popup(
+        crate::ui::frame_plan::overlays::overlay_popup(
             area,
             crate::TuiInputScope::SharedSurface(SurfaceKind::Confirmation(
                 ConfirmationKind::StartupControl,

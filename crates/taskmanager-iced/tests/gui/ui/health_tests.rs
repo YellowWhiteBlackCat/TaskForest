@@ -1,6 +1,7 @@
 use super::*;
 use taskmanager_application::i18n::Language::En;
 use taskmanager_application::i18n::set_language;
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::CpuFrequencySource;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
@@ -609,5 +610,39 @@ fn thermal_zone_surface_key_differs_from_the_quantity() {
     assert_ne!(
         zh_surface, zh_quantity,
         "the zone heading must not reuse the device temperature quantity word"
+    );
+}
+
+#[test]
+fn health_rows_render_the_memory_full_stall_deduction_bill() {
+    use taskmanager_core::core::metrics::{
+        PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot, SystemSnapshot,
+    };
+
+    set_language(En);
+    let snapshot = SystemSnapshot {
+        pressure: Some(SystemPressureSnapshot {
+            memory: ScalarObservation::available(
+                ResourcePressure::new(
+                    PressureWindow::new(2.0, 1.0, 0.5, 10),
+                    PressureWindow::new(8.0, 5.0, 2.0, 20),
+                ),
+                1_000,
+            ),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let rows = health_rows(&snapshot, Language::En);
+    let health = rows
+        .iter()
+        .find(|row| row.label == t("system.health_score"))
+        .expect("the health surface states the score");
+    assert!(health.value.contains("/100"), "{}", health.value);
+    assert!(
+        health.value.contains("pressure avg10 8.0%"),
+        "the memory full-stall deduction carries its evidence: {}",
+        health.value
     );
 }

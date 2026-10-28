@@ -267,8 +267,12 @@ fn tree_node_row(
                 *pid,
                 process.not_responding,
             );
-            crate::ui::components::Popover::new(row_element, panel, Message::CloseProcessRowMenu)
-                .into()
+            crate::ui::components::Popover::context_menu(
+                row_element,
+                panel,
+                Message::CloseProcessRowMenu,
+            )
+            .into()
         } else {
             row_element
         }

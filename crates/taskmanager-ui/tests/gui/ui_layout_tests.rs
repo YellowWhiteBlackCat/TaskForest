@@ -6,7 +6,7 @@ use super::{
 use crate::primitives::scrollbar::SCROLLBAR_WIDTH;
 use gpui::{
     AppContext, Context, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
-    ScrollDelta, ScrollHandle, ScrollWheelEvent, Styled, TestAppContext, TouchPhase,
+    ScrollDelta, ScrollEvent, ScrollHandle, ScrollSource, Styled, TestAppContext, TouchPhase,
     VisualTestContext, Window, div, point, px, size,
 };
 use taskmanager_theme::{Theme, tokens};
@@ -185,12 +185,13 @@ fn tall_scroll_body(marker: &'static str) -> gpui::Div {
         .child(div().h(px(460.0)).flex_shrink_0())
 }
 
-fn vertical_wheel(position: gpui::Point<gpui::Pixels>) -> ScrollWheelEvent {
-    ScrollWheelEvent {
+fn vertical_wheel(position: gpui::Point<gpui::Pixels>) -> ScrollEvent {
+    ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(point(px(0.0), px(-80.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: ScrollSource::Pointer,
     }
 }
 

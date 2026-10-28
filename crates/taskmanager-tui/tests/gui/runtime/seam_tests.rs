@@ -19,7 +19,9 @@ use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP};
+use taskmanager_shell::{
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP, SearchSlot,
+};
 
 /// A scripted source: pops the queued items; once empty, `poll` fails
 /// with a typed error instead of blocking forever, so a regression that
@@ -446,9 +448,10 @@ fn clicks_on_headers_borders_and_outside_the_panel_are_no_ops() {
 }
 
 #[test]
-fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
-    // A confirmation gate owns the keyboard (y/n), so a click under it
-    // must not move the selection; the help overlay likewise.
+fn clicking_the_scrim_cancels_an_armed_confirmation_but_popup_chrome_does_not() {
+    // A confirmation gate owns the keyboard (y/n); a click on its popup chrome
+    // stays a blocked no-op, while a click outside the popup is the scrim
+    // gesture and cancels through the same Escape path.
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let mut sessions = app.projection().sessions.clone().expect("demo sessions");
@@ -471,14 +474,26 @@ fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
             .select_session_control(&session, SessionControlAction::Lock)
     );
     let frame = Rect::new(0, 0, 120, 40);
-    let panel = crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame)
-        .expect("users");
+    let popup = TuiFramePlan::build(&app, frame)
+        .overlay()
+        .expect("confirmation overlay")
+        .popup;
     assert_eq!(
-        apply_terminal_event(&mut app, click(10, panel.area.y + 5), frame),
+        apply_terminal_event(&mut app, click(popup.x, popup.y), frame),
         EventReaction::default(),
-        "a click under an armed gate must not select"
+        "a click on the popup chrome must not cancel the gate"
     );
     assert!(app.shell.pending_session().is_some());
+
+    let reaction = apply_terminal_event(&mut app, click(0, 0), frame);
+    assert!(
+        reaction.dirty,
+        "the scrim click repaints the closed surface"
+    );
+    assert!(
+        app.shell.pending_session().is_none(),
+        "a click outside the popup must cancel the armed gate"
+    );
 }
 
 #[test]
@@ -781,6 +796,167 @@ fn capture_marker_records_the_typed_demo_frame_identity() {
         text.contains("TUI_CAPTURE_MARKER event=frame_ready page=applications"),
         "marker must carry the live page the captured frame shows: {text:?}"
     );
+}
+
+#[test]
+fn settings_pointer_rows_focus_and_flip_only_switch_fields() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    set_language(Language::En);
+    let frame = Rect::new(0, 0, 120, 40);
+    let mut app = crate::demo_app();
+    app.toggle_settings();
+
+    // High contrast (field 2) is a switch: the first click focuses and flips
+    // it, the second click flips it back.
+    let hc_before = app.settings_form.hc;
+    for expected in [!hc_before, hc_before] {
+        let plan = TuiFramePlan::build(&app, frame);
+        let overlay = plan.overlay().expect("settings overlay");
+        let layout = overlay.settings.expect("settings field rows");
+        let row = (overlay.popup.y..overlay.popup.bottom())
+            .find(|row| layout.field_at(*row) == Some(2))
+            .expect("the high-contrast row is painted");
+        let reaction =
+            apply_terminal_event_with_plan(&mut app, click(overlay.popup.x + 2, row), &plan);
+        assert!(reaction.dirty, "a settings row click repaints the form");
+        assert_eq!(app.settings_form.field, 2, "the clicked row takes focus");
+        assert_eq!(
+            app.settings_form.hc, expected,
+            "each click on a switch row flips it exactly once"
+        );
+    }
+
+    // A non-switch row only takes focus; its value still steps with
+    // Left/Right rather than changing on the click.
+    let skin_before = app.settings_form.skin;
+    let plan = TuiFramePlan::build(&app, frame);
+    let overlay = plan.overlay().expect("settings overlay");
+    let layout = overlay.settings.expect("settings field rows");
+    let row = (overlay.popup.y..overlay.popup.bottom())
+        .find(|row| layout.field_at(*row) == Some(0))
+        .expect("the skin row is painted");
+    let reaction = apply_terminal_event_with_plan(&mut app, click(overlay.popup.x + 2, row), &plan);
+    assert!(reaction.dirty);
+    assert_eq!(app.settings_form.field, 0);
+    assert_eq!(
+        app.settings_form.skin, skin_before,
+        "a choice row takes focus without changing its value"
+    );
+
+    // The popup border above the same field row, and the footer band, stay
+    // blocked overlay cells: neither may address a field.
+    let plan = TuiFramePlan::build(&app, frame);
+    let overlay = plan.overlay().expect("settings overlay");
+    let layout = overlay.settings.expect("settings field rows");
+    let row = (overlay.popup.y..overlay.popup.bottom())
+        .find(|row| layout.field_at(*row) == Some(2))
+        .expect("the high-contrast row is painted");
+    assert_eq!(
+        plan.hit_target(overlay.popup.x, row),
+        Some(crate::ui::TuiHitTarget::Overlay {
+            scope: crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::Settings),
+        }),
+        "the popup border never resolves to a form field"
+    );
+    let blocked = apply_terminal_event_with_plan(
+        &mut app,
+        click(overlay.popup.x + 2, layout.body.bottom()),
+        &plan,
+    );
+    assert_eq!(
+        blocked,
+        EventReaction::default(),
+        "footer cells are a blocked overlay no-op"
+    );
+    assert_eq!(app.settings_form.field, 0);
+}
+
+#[test]
+fn search_field_pointer_click_opens_focus_and_places_the_caret() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let frame = Rect::new(0, 0, 120, 40);
+    let plan = TuiFramePlan::build(&app, frame);
+    let search = plan.search_field().expect("the search field is painted");
+
+    // The field's border row is inert; the content row opens search.
+    assert!(plan.hit_target(search.text_x, search.row - 1).is_none());
+    let reaction =
+        apply_terminal_event_with_plan(&mut app, click(search.text_x + 1, search.row), &plan);
+    assert!(reaction.dirty);
+    assert!(app.search_active(), "clicking the field opens search");
+    assert_eq!(app.query_cursor(), 0, "an empty query clamps the caret");
+
+    app.push_search_text("dbus-broker");
+    assert_eq!(app.query_cursor(), 11);
+    let plan = TuiFramePlan::build(&app, frame);
+    let search = plan.search_field().expect("the search field is painted");
+    let reaction =
+        apply_terminal_event_with_plan(&mut app, click(search.text_x + 5, search.row), &plan);
+    assert!(reaction.dirty);
+    assert_eq!(
+        app.query_cursor(),
+        5,
+        "clicking the '-' cell places the caret before it"
+    );
+    app.push_search_char('X');
+    assert_eq!(app.query, "dbus-Xbroker");
+    assert_eq!(app.query_cursor(), 6);
+
+    // A cell past the text lands at the end.
+    let plan = TuiFramePlan::build(&app, frame);
+    let search = plan.search_field().expect("the search field is painted");
+    let _ = apply_terminal_event_with_plan(&mut app, click(search.text_x + 30, search.row), &plan);
+    assert_eq!(app.query_cursor(), app.query.len());
+
+    // Wide characters resolve to the boundary their painted cell belongs to.
+    let mut wide = crate::demo_app();
+    let _ = wide.apply_action(AppAction::SelectPage(AppPage::Applications));
+    wide.open_search();
+    wide.push_search_text("éa");
+    let plan = TuiFramePlan::build(&wide, frame);
+    let search = plan.search_field().expect("the search field is painted");
+    let _ = apply_terminal_event_with_plan(&mut wide, click(search.text_x + 1, search.row), &plan);
+    assert_eq!(
+        wide.query_cursor(),
+        2,
+        "the caret lands on the UTF-8 boundary before 'a'"
+    );
+}
+
+#[test]
+fn services_search_field_pointer_click_opens_its_own_slot_and_places_the_caret() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    app.shell.set_services_query("Network");
+    let frame = Rect::new(0, 0, 120, 40);
+    let plan = TuiFramePlan::build(&app, frame);
+    let search = plan
+        .search_field()
+        .expect("the Services search field is painted");
+    assert_eq!(
+        plan.hit_target(search.text_x, search.row - 1),
+        None,
+        "the field border is inert"
+    );
+
+    let reaction =
+        apply_terminal_event_with_plan(&mut app, click(search.text_x + 3, search.row), &plan);
+    assert!(reaction.dirty);
+    assert!(app.search_active(), "clicking the field opens search");
+    assert_eq!(app.shell.search_slot(), SearchSlot::Services);
+    assert_eq!(
+        app.shell.services_query_cursor(),
+        3,
+        "the caret lands before the 'w' cell"
+    );
+    assert_eq!(app.query, "", "the process query is untouched");
+
+    app.push_search_char('X');
+    assert_eq!(app.shell.services_query, "NetXwork");
+    assert_eq!(app.query, "");
 }
 
 #[test]

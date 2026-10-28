@@ -109,13 +109,20 @@ pub(crate) const STARTUP_MENU_HINTS: [MenuHint; 3] = [
     },
 ];
 
-/// The column-visibility menu's footer: its single combined
+/// The column-visibility menu's footer: the width stepper and the combined
 /// toggle-then-Esc-closes hint.
-pub(crate) const COLUMN_MENU_HINTS: [MenuHint; 1] = [MenuHint {
-    chord: " Enter ",
-    label_key: "tui.toggle_esc_close",
-    joins: false,
-}];
+pub(crate) const COLUMN_MENU_HINTS: [MenuHint; 2] = [
+    MenuHint {
+        chord: " - + ",
+        label_key: "menu.word_width",
+        joins: true,
+    },
+    MenuHint {
+        chord: " Enter ",
+        label_key: "tui.toggle_esc_close",
+        joins: false,
+    },
+];
 
 /// The painted chord/label pairs of a hint table slice, in order — the one
 /// adapter from this vocabulary into the `KeyHint` component.

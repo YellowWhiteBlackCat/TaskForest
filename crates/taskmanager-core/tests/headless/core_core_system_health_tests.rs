@@ -76,3 +76,31 @@ fn health_score_does_not_turn_an_unobserved_snapshot_into_healthy() {
     assert_eq!(score.score, 100);
     assert!(score.deductions.is_empty());
 }
+
+#[test]
+fn saturation_grade_has_stable_green_yellow_red_boundaries() {
+    assert_eq!(
+        SystemSaturationGrade::from_score(100),
+        SystemSaturationGrade::Healthy
+    );
+    assert_eq!(
+        SystemSaturationGrade::from_score(80),
+        SystemSaturationGrade::Healthy
+    );
+    assert_eq!(
+        SystemSaturationGrade::from_score(79),
+        SystemSaturationGrade::Warning
+    );
+    assert_eq!(
+        SystemSaturationGrade::from_score(50),
+        SystemSaturationGrade::Warning
+    );
+    assert_eq!(
+        SystemSaturationGrade::from_score(49),
+        SystemSaturationGrade::Critical
+    );
+    assert_eq!(
+        SystemSaturationGrade::from_score(0),
+        SystemSaturationGrade::Critical
+    );
+}

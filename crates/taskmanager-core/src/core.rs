@@ -187,7 +187,7 @@ pub use storage_health::{
 };
 pub use system_health::{
     HealthDeduction, HealthDeductionKind, HealthScoreInput, SmartSelfTestIntent,
-    SmartSelfTestObservation, SystemHealthScore, SystemHealthSnapshot,
+    SmartSelfTestObservation, SystemHealthScore, SystemHealthSnapshot, SystemSaturationGrade,
 };
 pub use target::{ServiceId, SessionId, StorageDeviceKey};
 pub use time::{

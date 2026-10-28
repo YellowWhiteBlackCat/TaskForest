@@ -19,7 +19,7 @@ use bevy::input::mouse::{AccumulatedMouseScroll, MouseScrollUnit};
 use bevy::picking::events::PointerPress;
 use bevy::picking::hover::PickingInteraction;
 use bevy::picking::pointer::PointerButton;
-use bevy::ui::widget::Text;
+use bevy::text::EditableText;
 use bevy::ui_widgets::Activate;
 
 use super::{
@@ -29,6 +29,7 @@ use super::{
 };
 use crate::app::{FrontendTrack, Page, Route, ShellTrack};
 use crate::input::ShellInteractionApplied;
+use crate::input::sync_search_editor;
 use crate::scene_attach::attach_child;
 use crate::window::WindowPalette;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -134,7 +135,7 @@ fn sync_after_shell_interaction(
     mut memory: ResMut<ProcessSelectionMemory>,
     // Disjoint from the count line's Text write in `TableSurface` — a node
     // is never both the search box and the count line.
-    mut search: Query<&mut Text, (With<ProcessSearchInput>, Without<ProcessCountLine>)>,
+    mut search: Query<&mut EditableText, (With<ProcessSearchInput>, Without<ProcessCountLine>)>,
     mut commands: Commands,
 ) {
     if route.page != Page::Processes {
@@ -144,8 +145,8 @@ fn sync_after_shell_interaction(
         return;
     };
     let shell = track.shell();
-    if let Ok(mut text) = search.single_mut() {
-        text.0 = shell.query.clone();
+    if let Ok(mut editor) = search.single_mut() {
+        sync_search_editor(&mut editor, &shell.query);
     }
     rebuild_table(&mut commands, root, shell, &mut surface);
     let identity = selected_identity(shell);

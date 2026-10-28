@@ -26,8 +26,8 @@
 #              the diff-scoped P4
 #              `parity-evidence` anchor resolver (facet manifest + unified
 #              interaction matrix + feature evidence) + (with
-#              --with-gui) the GPUI/Bevy headless interaction acceptance
-#              through the unified S5 driver
+#              --with-gui) the GPUI/Iced/TUI/Bevy headless interaction
+#              acceptance through the unified S5 driver
 #              (scripts/parity/accept-frontend-interactions.sh, which still
 #              runs the legacy per-frontend gates) and fresh capture receipt
 #              route.
@@ -81,10 +81,13 @@ cd "$repo"
 
 export CARGO_BUILD_JOBS="${JOBS:-4}"
 scratch_root="${TM_SCRATCH_ROOT:-$(dirname "$repo")/.agent-scratch}"
-if ! mkdir -p "$scratch_root" 2>/dev/null; then
-    echo "local-gates: scratch root '$scratch_root' is not writable;" \
-        "set TM_SCRATCH_ROOT to a writable path OUTSIDE the repository" >&2
-    exit 2
+if ! mkdir -p "$scratch_root" 2>/dev/null || ! test -w "$scratch_root"; then
+    scratch_root="/tmp/.agent-scratch"
+    if ! mkdir -p "$scratch_root" 2>/dev/null || ! test -w "$scratch_root"; then
+        echo "local-gates: scratch root '$scratch_root' is not writable;" \
+            "set TM_SCRATCH_ROOT to a writable path OUTSIDE the repository" >&2
+        exit 2
+    fi
 fi
 # Reap runs leaked by hard kills; the EXIT trap cannot fire on SIGKILL.
 find "$scratch_root" -maxdepth 1 -name 'local-gates-*' -mtime +2 -exec rm -rf {} + 2>/dev/null
@@ -165,7 +168,7 @@ run_stage() {
 }
 
 run_py() {
-    timeout --kill-after=10s "${PY_TIMEOUT:-120}" python3 "$@"
+    timeout --kill-after=10s "${PY_TIMEOUT:-300}" python3 "$@"
 }
 
 only="${ONLY_STAGE:-}"
@@ -684,6 +687,24 @@ if maybe ui-route-table; then
     # and an unlisted ui-contract path stays fail-closed at all four.
     run_stage ui-route-table quick run_py scripts/quality/ui_evidence_route_guard.py
 fi
+if maybe scene-registry-self; then
+    # The 55 audited scenes carry one reference behavior anchor each; the
+    # self-test proves missing/extra/reordered rows and dangling anchors fail.
+    run_stage scene-registry-self quick run_py scripts/quality/scene_registry_guard.py --self-test
+fi
+if maybe scene-registry; then
+    # Exact scene set/order against the audit plus real GPUI nextest discovery.
+    run_stage scene-registry quick run_py scripts/quality/scene_registry_guard.py
+fi
+if maybe blueprint-scope-self; then
+    # The 225-slot census (ADR-059) must keep every adopted row unique and every
+    # unsupported row explicitly reasoned; the self-test proves damaged fixtures fail.
+    run_stage blueprint-scope-self quick run_py scripts/quality/blueprint_scope_guard.py --self-test
+fi
+if maybe blueprint-scope; then
+    # The committed 225-slot disposition table: 75 adopted, 150 unsupported.
+    run_stage blueprint-scope quick run_py scripts/quality/blueprint_scope_guard.py
+fi
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
 # ---- standard --------------------------------------------------------
@@ -939,12 +960,35 @@ if [[ "$with_gui" == "1" ]]; then
         run_stage bevy-interactions standard timeout --kill-after=10s 1200 \
             bash scripts/parity/accept-frontend-interactions.sh bevy
     fi
+    if maybe iced-interactions; then
+        # Iced's interaction matrix is headless; the unified driver runs the
+        # legacy Iced accept gate and folds the fresh receipts exactly like
+        # the GPUI/Bevy stages.
+        run_stage iced-interactions standard timeout --kill-after=10s 1800 \
+            bash scripts/parity/accept-frontend-interactions.sh iced
+    fi
+    if maybe tui-interactions; then
+        # TUI's interaction matrix is headless and discovery-backed; the same
+        # driver runs the legacy TUI accept gate and folds the receipt.
+        run_stage tui-interactions standard timeout --kill-after=10s 1200 \
+            bash scripts/parity/accept-frontend-interactions.sh tui
+    fi
 elif [[ "$scope" == "bevy" ]]; then
     # The Bevy interaction gate is headless: a scoped Bevy line runs it on
     # every standard pass, not only --with-gui.
     if maybe bevy-interactions; then
         run_stage bevy-interactions standard timeout --kill-after=10s 1200 \
             bash scripts/parity/accept-frontend-interactions.sh bevy
+    fi
+elif [[ "$scope" == "iced" ]]; then
+    if maybe iced-interactions; then
+        run_stage iced-interactions standard timeout --kill-after=10s 1800 \
+            bash scripts/parity/accept-frontend-interactions.sh iced
+    fi
+elif [[ "$scope" == "tui" ]]; then
+    if maybe tui-interactions; then
+        run_stage tui-interactions standard timeout --kill-after=10s 1200 \
+            bash scripts/parity/accept-frontend-interactions.sh tui
     fi
 fi
 

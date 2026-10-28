@@ -14,12 +14,63 @@ pub(super) struct SettingsFooter {
     pub(super) height: u16,
 }
 
+#[derive(Clone, Copy, Default)]
+struct FooterStyles {
+    accent: Style,
+    danger: Style,
+    dim: Style,
+}
+
+impl FooterStyles {
+    fn themed(theme: TuiTheme) -> Self {
+        Self {
+            accent: Style::new().fg(theme.accent),
+            danger: Style::new().fg(theme.danger),
+            dim: Style::new().fg(theme.dim),
+        }
+    }
+}
+
 pub(super) fn settings_footer(
     form: &SettingsForm,
     focused_field: Option<usize>,
     theme: TuiTheme,
     inner: Rect,
     setup_available: bool,
+) -> SettingsFooter {
+    build_footer(
+        form,
+        focused_field,
+        inner,
+        setup_available,
+        FooterStyles::themed(theme),
+    )
+}
+
+/// The footer's geometry without any colors: the frame plan consumes the
+/// same band split the renderer paints, so a settings row hit can never be
+/// resolved against a footer height the frame did not have.
+pub(super) fn settings_footer_plain(
+    form: &SettingsForm,
+    focused_field: Option<usize>,
+    inner: Rect,
+    setup_available: bool,
+) -> SettingsFooter {
+    build_footer(
+        form,
+        focused_field,
+        inner,
+        setup_available,
+        FooterStyles::default(),
+    )
+}
+
+fn build_footer(
+    form: &SettingsForm,
+    focused_field: Option<usize>,
+    inner: Rect,
+    setup_available: bool,
+    styles: FooterStyles,
 ) -> SettingsFooter {
     let action = if focused_field.is_some_and(|field| field >= 30) {
         t("settings.privileges_authorize")
@@ -28,7 +79,7 @@ pub(super) fn settings_footer(
     };
     let mut lines = vec![Line::from(Span::styled(
         format!("↑↓/Tab · Enter {action} · Esc {}", t("common.cancel")),
-        Style::new().fg(theme.accent),
+        styles.accent,
     ))];
     lines.push(Line::from(Span::styled(
         format!(
@@ -36,29 +87,23 @@ pub(super) fn settings_footer(
             t("sidebar.devices"),
             t("saved_views.title")
         ),
-        Style::new().fg(theme.accent),
+        styles.accent,
     )));
     if setup_available {
         lines.push(Line::from(Span::styled(
             format!("F2 {}", t("settings.additional_setup_open")),
-            Style::new().fg(theme.accent),
+            styles.accent,
         )));
     }
     if let Some(error) = form.save_error.as_deref() {
         lines.push(Line::from(Span::styled(
             format!("✗ {error}"),
-            Style::new().fg(theme.danger),
+            styles.danger,
         )));
     }
     let optional = vec![
-        Line::from(Span::styled(
-            t("settings.footer_hint"),
-            Style::new().fg(theme.dim),
-        )),
-        Line::from(Span::styled(
-            t("settings.font_terminal_hint"),
-            Style::new().fg(theme.dim),
-        )),
+        Line::from(Span::styled(t("settings.footer_hint"), styles.dim)),
+        Line::from(Span::styled(t("settings.font_terminal_hint"), styles.dim)),
     ];
     // One blank row protects the bottom edge. Eight body rows keep the
     // permission group navigable at the terminal's smallest admitted size.

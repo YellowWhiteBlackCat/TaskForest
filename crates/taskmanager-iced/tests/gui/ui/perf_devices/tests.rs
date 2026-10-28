@@ -776,3 +776,30 @@ fn gpu_chart_metric_generation_change_resets_to_the_default() {
         "a generation change resets the selection to the ADR default"
     );
 }
+
+/// P0-MC-04: the GPU page follows GPUI's no-selector parity and paints every
+/// measured family simultaneously. This is the Iced requirement anchor; the
+/// shell selection seam is not a substitute for the visible all-families page.
+#[test]
+fn gpu_page_renders_every_measured_metric_family_without_a_selector() {
+    let renderer = software_renderer();
+    let fragments = with_language(Language::En, || {
+        let mut app = gpu_selected_demo();
+        let _ = app.update(Message::WindowResized(Size::new(1180.0, 780.0)));
+        rendered_gpu_page_text(&app, Size::new(1180.0, 780.0), &renderer)
+    });
+    let labels: Vec<&str> = fragments
+        .iter()
+        .map(|(fragment, _)| fragment.as_str())
+        .collect();
+    for family in ["Utilization", "Temperature", "Frequency", "Idle residency"] {
+        assert!(
+            labels.iter().any(|fragment| fragment.starts_with(family)),
+            "the GPU page must paint the {family} family: {labels:?}"
+        );
+    }
+    assert!(
+        !labels.contains(&"Graph metric"),
+        "the Iced GPU page must not render a metric selector"
+    );
+}

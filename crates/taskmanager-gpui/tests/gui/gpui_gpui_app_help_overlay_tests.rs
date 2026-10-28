@@ -7,6 +7,7 @@ use taskmanager_shell::shell_local_bindings;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::{
     Binding, BindingCoverageStatus, FrontendShape, coverage_report, drift_findings,
+    empty_binding_tokens,
 };
 
 fn theme() -> Theme {
@@ -86,6 +87,8 @@ fn binding_declaration_binds_every_contract_command() {
     assert_eq!(declaration.entries.len(), CommandId::ALL.len());
     let report = coverage_report(&declaration);
     assert!(drift_findings(&report).is_empty(), "{report:?}");
+    let empty = empty_binding_tokens(&declaration);
+    assert!(empty.is_empty(), "empty key tokens: {empty:?}");
     for (command, status) in report {
         assert!(
             matches!(status, BindingCoverageStatus::Bound(_)),

@@ -311,7 +311,7 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             }
         }
         "services-search-highlight" => {
-            shell.query = "Network".into();
+            shell.set_services_query("Network");
         }
         "apps-search-highlight" => {
             shell.query = "zed".into();

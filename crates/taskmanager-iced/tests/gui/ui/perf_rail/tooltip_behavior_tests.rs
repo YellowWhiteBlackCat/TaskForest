@@ -2,35 +2,16 @@
 //! Interaction evidence for the production Performance rail tooltip consumer.
 
 use super::super::{RailCategory, RailRow, RailValueFormat, device_card};
-use crate::app::{FocusTarget, Message, PerfDevice};
+use crate::app::{Message, PerfDevice};
 use iced::advanced::Shell;
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::Headless;
-use iced::advanced::widget::operation::{Focusable, Operation};
-use iced::advanced::widget::{Id, Tree};
+use iced::advanced::widget::Tree;
 use iced::keyboard::key::{Code, Key, Named, Physical};
 use iced::{Element, Event, Point, Rectangle, Size, Vector, mouse};
 use std::rc::Rc;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
-
-struct FocusTargetOperation {
-    target: Id,
-    matched: bool,
-}
-
-impl Operation<()> for FocusTargetOperation {
-    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
-        visit(self);
-    }
-
-    fn focusable(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
-        if id == Some(&self.target) {
-            state.focus();
-            self.matched = true;
-        }
-    }
-}
 
 fn renderer() -> iced::Renderer {
     {
@@ -101,15 +82,8 @@ fn key_pressed(named: Named, code: Code) -> Event {
     })
 }
 
-#[test]
-fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click_or_escape() {
-    let theme = Theme::build(
-        Skin::Gnome,
-        LightDark::Dark,
-        HighContrast::Off,
-        ResolvedFonts::system_for(Skin::Gnome),
-    );
-    let row = RailRow {
+fn rail_row() -> RailRow {
+    RailRow {
         device: PerfDevice::Cpu,
         heading: "CPU".into(),
         subtitle: String::new(),
@@ -119,8 +93,21 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
         max: 100.0,
         category: RailCategory::Cpu,
         value_format: RailValueFormat::Percent,
-    };
-    let mut card = device_card(row, theme, false);
+    }
+}
+
+fn theme() -> Theme {
+    Theme::build(
+        Skin::Gnome,
+        LightDark::Dark,
+        HighContrast::Off,
+        ResolvedFonts::system_for(Skin::Gnome),
+    )
+}
+
+#[test]
+fn mounted_rail_tooltip_opens_on_hover_and_dismisses_on_click_or_escape() {
+    let mut card = device_card(rail_row(), theme(), false, false);
     let renderer = renderer();
     let viewport = Rectangle::new(Point::new(0.0, 0.0), Size::new(480.0, 160.0));
     let mut tree = Tree::new(&card);
@@ -137,43 +124,7 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
 
     assert!(
         !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "the native tooltip starts hidden"
-    );
-
-    // Focus the actual card through Iced's focusable operation, then activate
-    // it by keyboard. The card responds, but the native tooltip has no focus
-    // trigger, so no overlay appears.
-    let mut focus = FocusTargetOperation {
-        target: Id::from(crate::focus::focus_id(FocusTarget::PerfDeviceTab(
-            PerfDevice::Cpu,
-        ))),
-        matched: false,
-    };
-    card.as_widget_mut()
-        .operate(&mut tree, Layout::new(&node), &renderer, &mut focus);
-    assert!(focus.matched, "the mounted rail card is keyboard focusable");
-    assert!(
-        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "keyboard focus alone does not open Iced's native tooltip"
-    );
-    let keyboard_activation = dispatch(
-        &mut card,
-        &mut tree,
-        &node,
-        &renderer,
-        &viewport,
-        key_pressed(Named::Enter, Code::Enter),
-        mouse::Cursor::Unavailable,
-    );
-    assert!(
-        keyboard_activation
-            .iter()
-            .any(|message| matches!(message, Message::SelectPerfDevice(PerfDevice::Cpu))),
-        "keyboard activation still reaches the actual rail-card action"
-    );
-    assert!(
-        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "keyboard activation does not open the native tooltip"
+        "the tooltip starts hidden"
     );
 
     dispatch(
@@ -187,10 +138,10 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
     );
     assert!(
         tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "one pointer-hover event opens the zero-delay native tooltip"
+        "pointer hover opens the tooltip"
     );
 
-    dispatch(
+    let _press_messages = dispatch(
         &mut card,
         &mut tree,
         &node,
@@ -200,10 +151,11 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
         mouse::Cursor::Available(pointer),
     );
     assert!(
-        tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "pointer press does not dismiss Iced's native tooltip"
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "pointer press dismisses the tooltip"
     );
-    let click_messages = dispatch(
+
+    let release_messages = dispatch(
         &mut card,
         &mut tree,
         &node,
@@ -213,14 +165,14 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
         mouse::Cursor::Available(pointer),
     );
     assert!(
-        click_messages
+        release_messages
             .iter()
             .any(|message| matches!(message, Message::SelectPerfDevice(PerfDevice::Cpu))),
         "the tooltip does not block activation of its underlying card"
     );
     assert!(
-        tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "pointer click leaves Iced's native tooltip visible"
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "the click keeps the tooltip closed until the pointer exits"
     );
 
     dispatch(
@@ -229,12 +181,12 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
         &node,
         &renderer,
         &viewport,
-        key_pressed(Named::Escape, Code::Escape),
-        mouse::Cursor::Unavailable,
+        Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        mouse::Cursor::Available(pointer),
     );
     assert!(
-        tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "Escape does not dismiss Iced's native tooltip"
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "moving inside the same hover does not reopen a clicked tooltip"
     );
 
     let outside = Point::new(bounds.x + bounds.width + 20.0, pointer.y);
@@ -247,8 +199,100 @@ fn mounted_rail_tooltip_opens_on_hover_not_focus_and_dismisses_on_exit_not_click
         Event::Mouse(mouse::Event::CursorMoved { position: outside }),
         mouse::Cursor::Available(outside),
     );
+    dispatch(
+        &mut card,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        mouse::Cursor::Available(pointer),
+    );
+    assert!(
+        tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "a new hover after pointer exit reopens the tooltip"
+    );
+
+    dispatch(
+        &mut card,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Escape, Code::Escape),
+        mouse::Cursor::Unavailable,
+    );
     assert!(
         !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "pointer exit dismisses Iced's native tooltip"
+        "Escape dismisses the tooltip"
+    );
+}
+
+#[test]
+fn focused_rail_tooltip_opens_on_focus_and_escape_dismisses() {
+    let mut card = device_card(rail_row(), theme(), false, true);
+    let renderer = renderer();
+    let viewport = Rectangle::new(Point::new(0.0, 0.0), Size::new(480.0, 160.0));
+    let mut tree = Tree::new(&card);
+    let node = card.as_widget_mut().layout(
+        &mut tree,
+        &renderer,
+        &Limits::new(Size::ZERO, viewport.size()),
+    );
+    let bounds = node.bounds();
+    let pointer = Point::new(
+        bounds.x + bounds.width / 2.0,
+        bounds.y + bounds.height / 2.0,
+    );
+
+    assert!(
+        tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "a focused card opens the tooltip"
+    );
+
+    dispatch(
+        &mut card,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Escape, Code::Escape),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "Escape dismisses a focus-opened tooltip"
+    );
+
+    dispatch(
+        &mut card,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        mouse::Cursor::Available(pointer),
+    );
+    assert!(
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "hover does not reopen a tooltip dismissed while focused"
+    );
+
+    let mut fresh = device_card(rail_row(), theme(), false, true);
+    let mut fresh_tree = Tree::new(&fresh);
+    let fresh_node = fresh.as_widget_mut().layout(
+        &mut fresh_tree,
+        &renderer,
+        &Limits::new(Size::ZERO, viewport.size()),
+    );
+    assert!(
+        tooltip_is_open(
+            &mut fresh,
+            &mut fresh_tree,
+            &fresh_node,
+            &renderer,
+            &viewport
+        ),
+        "a fresh focused card opens the tooltip again"
     );
 }

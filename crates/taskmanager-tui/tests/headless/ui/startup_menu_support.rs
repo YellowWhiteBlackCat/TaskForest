@@ -6,7 +6,7 @@ use ratatui::layout::Rect;
 use super::render_startup_menu_at;
 use crate::TuiTheme;
 use crate::ui::TuiFocusPlan;
-use crate::ui::frame_plan::overlay_popup;
+use crate::ui::frame_plan::overlays::overlay_popup;
 
 pub(crate) fn render_startup_menu(
     frame: &mut Frame<'_>,

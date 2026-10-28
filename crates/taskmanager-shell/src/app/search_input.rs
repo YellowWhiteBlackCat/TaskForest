@@ -7,6 +7,7 @@
 //! bounded so one paste can never flood the filter.
 
 use super::ShellApp;
+use super::input_mode::SearchSlot;
 
 /// The bounded search-query length a bracketed paste may grow the query to
 /// (keyboard typing is naturally bounded; paste is the first bulk path).
@@ -18,33 +19,53 @@ impl ShellApp {
     /// changed (empty or fully-sanitized paste, or the query already at the
     /// cap).
     pub fn push_search_text(&mut self, text: &str) -> bool {
-        let before = self.query.clone();
-        let mut changed = false;
-        for character in text.chars() {
-            if self.query.chars().count() >= SEARCH_QUERY_MAX {
-                break;
-            }
-            match character {
-                '\n' | '\r' | '\t' => {
-                    // A pasted block flattened into one line; collapse runs
-                    // of line breaks into a single space, never doubles.
-                    if !self.query.ends_with(' ') {
-                        self.query.push(' ');
-                    }
-                    changed = true;
-                }
-                character if character.is_control() => {}
-                character => {
-                    self.query.push(character);
-                    changed = true;
-                }
-            }
+        let current = match self.search_slot() {
+            SearchSlot::Applications => &self.query,
+            SearchSlot::Services => &self.services_query,
+        };
+        let room = SEARCH_QUERY_MAX.saturating_sub(current.chars().count());
+        if room == 0 {
+            return false;
         }
+        let budgeted: String = text.chars().take(room).collect();
+        // The shared single-line paste path collapses line breaks/tabs into
+        // one space, drops other control bytes, and replaces any selection.
+        let changed = {
+            let (query, edit) = self.active_search_mut();
+            edit.insert_str(query, &budgeted, true)
+        };
         if changed {
-            self.selected = 0;
-            self.sync_application_selection();
-            self.collapse_selection_to_anchor();
+            self.reset_selection_after_query_change();
         }
-        self.query != before
+        changed
     }
+
+    /// Replace the Applications query from a frontend's own text widget.
+    /// The widget owns its `TextInput` buffer; this is the shell-side fact.
+    /// A real change applies the same cursor hygiene as a typed edit.
+    pub fn set_query(&mut self, query: impl Into<String>) {
+        let query = bounded_query(query);
+        if self.query == query {
+            return;
+        }
+        self.query = query;
+        self.query_edit.set_caret_at_end(&self.query);
+        self.reset_selection_for_search_slot(SearchSlot::Applications);
+    }
+
+    /// Replace the Services query from a frontend's own text widget.
+    pub fn set_services_query(&mut self, query: impl Into<String>) {
+        let query = bounded_query(query);
+        if self.services_query == query {
+            return;
+        }
+        self.services_query = query;
+        self.services_query_edit
+            .set_caret_at_end(&self.services_query);
+        self.reset_selection_for_search_slot(SearchSlot::Services);
+    }
+}
+
+fn bounded_query(query: impl Into<String>) -> String {
+    query.into().chars().take(SEARCH_QUERY_MAX).collect()
 }

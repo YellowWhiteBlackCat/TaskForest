@@ -412,14 +412,7 @@ impl TableDelegate for StartupDelegate {
                     StartupImpact::Low => theme.cpu,
                     StartupImpact::None => theme.fg_dim,
                 };
-                let label = match e.impact_evidence {
-                    StartupImpactEvidence::Measured { duration_ms } => {
-                        format!("{} · {duration_ms} ms", i18n::t(e.impact.i18n_key()))
-                    }
-                    StartupImpactEvidence::Unknown { .. } => {
-                        i18n::t("startup.impact_unknown").to_string()
-                    }
-                };
+                let label = startup_impact_text(e);
                 div()
                     .text_size(font_size(tokens::FONT_12))
                     .text_color(hsla(color))
@@ -808,6 +801,18 @@ fn action_bar(
             &hint,
         ))
         .render()
+}
+
+/// The impact column: the tier word plus its measured duration, or the typed
+/// unknown text. Pure so the Startup feature evidence can assert the exact
+/// renderer output without a second formatting path.
+pub(super) fn startup_impact_text(entry: &StartupEntry) -> String {
+    match entry.impact_evidence {
+        StartupImpactEvidence::Measured { duration_ms } => {
+            format!("{} · {duration_ms} ms", i18n::t(entry.impact.i18n_key()))
+        }
+        StartupImpactEvidence::Unknown { .. } => i18n::t("startup.impact_unknown").to_string(),
+    }
 }
 
 #[cfg(test)]

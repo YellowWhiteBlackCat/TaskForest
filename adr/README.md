@@ -63,6 +63,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [056](056-workspace-lint-single-source.md) | Single lint source of truth (workspace.lints) and the four unsafe trust roots | The root `[workspace.lints]` is the only lint source; business crates inherit it, the four audited unsafe trust roots declare their exception explicitly, and test-time unsafe must be registered. | Safety, Build |
 | [057](057-resolver-v3-msrv-aware-resolution.md) | Resolver v3, MSRV-aware dependency resolution | Resolver v3 makes dependency resolution honor the `rust-version` floor; feature unification semantics are unchanged. | Build |
 | [058](058-cargo-build-warnings-gate.md) | Warning threshold moves to Cargo build.warnings | The warning threshold is `build.warnings = "deny"`; CI keeps the mold-carrying `RUSTFLAGS`, so both hosts stay equally strict. | Build |
+| [059](059-blueprint-disposition-ledger.md) | Blueprint disposition ledger | `FeatureId` is the typed delivery registry; a separate public 225-slot census records every blueprint slot as adopted by a typed feature or explicitly unsupported, so no roadmap item is hidden without a 225-variant enum. | Feature coverage, Product scope |
 
 ## Decision chains
 
@@ -104,7 +105,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 |---|---|
 | Layering & cross-crate boundary | 005, 008, 009, 011, 027, 037, 047 |
 | Platform acquisition & data sources | 006, 009, 010, 011, 013, 018, 019, 024, 031, 043, 044, 049, 050 |
-| Observation & availability semantics | 007, 015, 016, 053 |
+| Observation & availability semantics | 007, 015, 016, 053, 059 |
 | History & refresh | 014, 036 |
 | Privilege & escalation | 023, 035, 048 |
 | Audited unsafe boundaries | 022, 024, 025, 031, 056 |

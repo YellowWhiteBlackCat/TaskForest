@@ -36,6 +36,7 @@ use bevy::ui_widgets::{Button, Checkbox, RadioButton};
 use bevy::window::PrimaryWindow;
 
 use crate::confirmation::ConfirmationOverlay;
+use crate::pages::processes::columns_modal::ProcessColumnsPopover;
 use crate::pages::processes::properties_modal::ProcessPropertiesOverlay;
 use crate::scene_attach::insert_into;
 use crate::widgets::scene_paint::ScenePaint;
@@ -142,7 +143,11 @@ type UndecoratedModals<'w, 's> = Query<
     Entity,
     (
         Without<TabGroup>,
-        Or<(With<ConfirmationOverlay>, With<ProcessPropertiesOverlay>)>,
+        Or<(
+            With<ConfirmationOverlay>,
+            With<ProcessPropertiesOverlay>,
+            With<ProcessColumnsPopover>,
+        )>,
     ),
 >;
 

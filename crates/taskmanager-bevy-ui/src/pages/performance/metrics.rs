@@ -401,6 +401,12 @@ pub(super) fn memory_summary(memory: Option<&MemoryMetrics>) -> String {
     if let Some(rate) = memory.current_swap_out_bytes_per_sec() {
         summary.push_str(&format!(" · {} {}/s", t("mem.swap_out_rate"), bytes(rate)));
     }
+    if memory.current_compressed_swap_cache_enabled() == Some(true) {
+        summary.push_str(&format!(" · {}", t("mem.zswap")));
+    }
+    if let Some(zram) = memory.current_compressed_swap_used_bytes() {
+        summary.push_str(&format!(" · zram {}", bytes(zram)));
+    }
     summary
 }
 

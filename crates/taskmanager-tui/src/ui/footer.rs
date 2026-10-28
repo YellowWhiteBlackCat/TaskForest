@@ -9,7 +9,7 @@ use taskmanager_application::i18n::t;
 
 use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
 use taskmanager_core::core::alerts::AlertSeverity;
-use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackSource, FeedbackTone};
 
 pub(super) fn render(
     frame: &mut Frame<'_>,
@@ -51,13 +51,13 @@ pub(super) fn render(
     });
     let (marker, feedback_color) =
         app.shell
-            .feedback_notice()
-            .map_or(("", theme.color(Color::White)), |notice| {
-                match notice.severity() {
-                    FeedbackSeverity::Info => ("", theme.color(Color::White)),
-                    FeedbackSeverity::Success => ("\u{2713} ", theme.good),
-                    FeedbackSeverity::Warning => ("\u{26a0} ", theme.warn),
-                    FeedbackSeverity::Error => ("\u{26a0} ", theme.danger),
+            .feedback_presentation()
+            .map_or(("", theme.color(Color::White)), |feedback| {
+                match feedback.tone() {
+                    FeedbackTone::Neutral => ("", theme.color(Color::White)),
+                    FeedbackTone::Positive => ("\u{2713} ", theme.good),
+                    FeedbackTone::Caution => ("\u{26a0} ", theme.warn),
+                    FeedbackTone::Danger => ("\u{26a0} ", theme.danger),
                 }
             });
     let feedback_width = usize::from(area.width.saturating_sub(30)).max(12);

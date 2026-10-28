@@ -139,7 +139,7 @@ TaskForest 践行“求同存异”端际契约治理：四端（GPUI、Iced、T
 在渲染范式与交互表达上，充分尊重并发挥 toolkit 原生优势。Toolkit 原生差异是第一等的主动设计资产，
 绝非妥协产物：
 
-- **GPUI（TaskForest-G，参考表面）**：基于 GPUI Kit 0.7.3 锁定的 GPUI 0.3.9 保留模式 GPU 画布。以根字号 rem
+- **GPUI（TaskForest-G，参考表面）**：基于 GPUI Kit 0.8.1 锁定的 GPUI 0.3.10 保留模式 GPU 画布。以根字号 rem
   弹性布局预算（`UiSize::{Small, Standard, Large}`）为基准，提供浮层 Toast 栈、指针拖拽实时调宽、
   微像素平滑图表与多设备并行卡片。
 - **TUI（TaskForest-T，字符网格与键盘优先）**：基于 Ratatui 的离散字符网格。

@@ -9,6 +9,7 @@ use taskmanager_core::core::target::SessionId;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::presentation::command_identity_summary;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 /// A scene is ready only when its requested product state exists.
@@ -100,6 +101,11 @@ pub(crate) fn scene_capture_ready(app: &TuiApp) -> bool {
                 .as_ref()
                 .is_some_and(|processes| processes.is_empty())
             && app.query.trim().is_empty()
+    } else if scene == "apps-identity-matrix" {
+        app.page() == AppPage::Applications
+            && app
+                .selected_detail_process()
+                .is_some_and(|process| command_identity_summary(&process).is_some())
     } else if matches!(scene.as_str(), "event-center" | "health-review-events") {
         app.health_open()
             && app.health_review.mode == crate::health_review::HealthReviewMode::Events

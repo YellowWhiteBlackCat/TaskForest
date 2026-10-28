@@ -18,7 +18,7 @@ use taskmanager_ui_contract::{
 /// Declare the Bevy shape's complete component capability surface.
 #[must_use]
 pub fn capability_declaration() -> FrontendCapabilityDeclaration {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Divergent, Native, Ported};
     use ComponentCapability::{
         Checkbox, ColumnDragResize, ContextMenu, DropdownMenu, FocusVisible, ModalOverlay,
         Scrollbar, SearchInput, SegmentedControl, Select, Slider, Switch, Table, TextInput,
@@ -28,41 +28,42 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        // The column chooser is a blocking modal; it preserves multi-toggle
-        // behavior and Escape dismissal but does not close on focus loss.
+        // The column chooser is Bevy's official anchored Popover: toggles stay
+        // open, outside press/Escape/focus loss close it, and focus returns to
+        // the trigger.
         (
             DropdownMenu,
-            Divergent {
-                reason: "the column chooser is a blocking modal with a scrim; toggles stay open and Escape dismisses, but focus loss does not close it",
+            Native {
+                via: "bevy_ui_widgets Popover",
             },
         ),
-        // Bevy shows a viewport-fixed tooltip on pointer hover, without a
-        // keyboard-focus trigger.
-        (
-            Tooltip,
-            Divergent {
-                reason: "tooltips are viewport-fixed and pointer-hover only; keyboard focus does not open them",
-            },
-        ),
+        // The tooltip state machine opens on pointer hover or keyboard focus
+        // and dismisses on pointer exit, pointer press, Escape, or focus loss
+        // (tests/headless/tooltip.rs drives the mounted overlay).
+        (Tooltip, Ported),
         (
             Toast,
             Divergent {
                 reason: "transient feedback renders through the shared feedback line",
             },
         ),
+        // Applications/Services search fields are native text inputs; the
+        // shell stays the single query authority through the editor bridge.
         (
             TextInput,
-            Divergent {
-                reason: "search editing is shell-owned character input rendered as a readout; no native text widget is wired",
+            Native {
+                via: "bevy_ui_widgets TextInput",
             },
         ),
         (SearchInput, Ported),
-        // A pointer press selects and copies one whole readout; there is no
-        // range gesture or visible selection highlight.
+        // System fact readouts are read-only native text inputs: pointer
+        // range/word/triple-click selection, Ctrl/Cmd+A, the clipboard chords,
+        // and the highlight are the official widget's behavior; the process
+        // table adds its own double-click cell selection and row copy.
         (
             TextSelection,
-            Divergent {
-                reason: "pointer press selects a whole readout for Ctrl/Cmd+C; the process table adds a visible double-click cell selection and a secondary-click row copy, while range/word gestures and Ctrl/Cmd+A stay unimplemented",
+            Native {
+                via: "bevy_ui_widgets TextInput (read-only EditableText)",
             },
         ),
         // The settings rows own a real sliding switch: the official
@@ -86,12 +87,10 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (Select, Ported),
         (SegmentedControl, Ported),
         (Table, Ported),
-        (
-            ColumnDragResize,
-            Unsupported {
-                reason: "the Bevy process table has no user-driven column-width control or resize handle",
-            },
-        ),
+        // The process table mounts a header-edge drag gutter with the shared
+        // anchored measurement, plus the column chooser's `-`/`=` keyboard
+        // stepper (both write the one `ColumnWidthOverrides` authority).
+        (ColumnDragResize, Ported),
         (VirtualList, Ported),
         (Tree, Ported),
         // Scrolling rides the official `bevy_ui_widgets::ScrollArea`

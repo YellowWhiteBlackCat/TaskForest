@@ -8,18 +8,17 @@ use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::{processes_view, services_view, startup_view};
 
-/// Services page state: status filter and search query.
+/// Services page state: the status filter. The search query is shell-owned
+/// (`DirectTrackState.services`, matched by the shared service predicate).
 #[derive(Clone)]
 pub struct ServicesState {
     pub filter: services_view::ServiceFilter,
-    pub query: String,
 }
 
 impl Default for ServicesState {
     fn default() -> Self {
         Self {
             filter: services_view::ServiceFilter::All,
-            query: String::new(),
         }
     }
 }

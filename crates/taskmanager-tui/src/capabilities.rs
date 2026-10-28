@@ -22,12 +22,7 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         TextSelection, Toast, Tooltip, Tree, VirtualList,
     };
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
-        (
-            ModalOverlay,
-            Divergent {
-                reason: "keyboard focus is trapped and Escape cancels; terminal popups have no outside-click scrim dismissal",
-            },
-        ),
+        (ModalOverlay, Ported),
         // The keyboard action menus on targeted rows (process/service/
         // session/startup/batch) are this shape's context-menu surface.
         (ContextMenu, Ported),
@@ -49,15 +44,10 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (
             TextInput,
             Divergent {
-                reason: "search accepts end-appends and tail Backspace; there is no frontend-owned Left/Right/Home/End cursor, selection, mid-string insertion, or Delete",
+                reason: "keyboard cursor, mid-string insertion, Backspace/Delete, Home/End, and pointer caret positioning are wired; the inline field has no selection highlight or selection gesture yet",
             },
         ),
-        (
-            SearchInput,
-            Divergent {
-                reason: "typing filters the live process projection and Escape clears it; Left/Right/Home/End, selection, mid-string insertion, and Delete lack a frontend-owned cursor",
-            },
-        ),
+        (SearchInput, Ported),
         // Selection belongs to the terminal emulator, not the app.
         (
             TextSelection,
@@ -65,12 +55,9 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                 via: "terminal emulator selection",
             },
         ),
-        (
-            Switch,
-            Divergent {
-                reason: "settings switches toggle with Space or Left/Right; pointer activation and disabled switch states are not represented",
-            },
-        ),
+        // Settings switches toggle with Space/Left/Right or a pointer click
+        // on their form row; every switch row in the product is enabled.
+        (Switch, Ported),
         (
             Slider,
             Divergent {
@@ -90,8 +77,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (Table, Ported),
         (
             ColumnDragResize,
-            Unsupported {
-                reason: "the terminal has no pointer-driven column-edge drag surface",
+            Divergent {
+                reason: "the column menu's -/+ stepper resizes the selected tail column within the terminal cell bounds; a terminal has no pointer-driven header-edge drag surface",
             },
         ),
         // Ratatui clips only the bounded row window handed to it.

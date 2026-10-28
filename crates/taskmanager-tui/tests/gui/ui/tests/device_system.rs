@@ -3,6 +3,9 @@
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::metrics::{
+    PressureWindow, ResourcePressure, SystemPressureSnapshot, SystemSnapshot,
+};
 
 use super::frame_text;
 use taskmanager_application::i18n::{Language, set_language, t};
@@ -344,4 +347,41 @@ fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
     }
 
     drop(guard);
+}
+
+#[test]
+fn system_sections_render_the_memory_full_stall_deduction_bill() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    set_language(Language::En);
+
+    let snapshot = SystemSnapshot {
+        pressure: Some(SystemPressureSnapshot {
+            memory: ScalarObservation::available(
+                ResourcePressure::new(
+                    PressureWindow::new(2.0, 1.0, 0.5, 10),
+                    PressureWindow::new(8.0, 5.0, 2.0, 20),
+                ),
+                1_000,
+            ),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let sections =
+        crate::ui::pages::system_data::system_sections(None, Some(&snapshot), None, None);
+    let health = sections
+        .iter()
+        .find(|section| section.title == t("system.health_score"))
+        .expect("the System facts state the health score");
+    assert!(
+        health
+            .facts
+            .iter()
+            .any(|fact| fact.label == t("system.health_score")
+                && fact.value.contains("pressure avg10 8.0%")),
+        "the memory full-stall deduction carries its evidence"
+    );
 }

@@ -81,6 +81,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_platform_contract::InstanceRole;
+use taskmanager_shell::FeedbackTone;
 use taskmanager_shell::ShellApp;
 
 /// The resolved token palette, injected as a resource for spawn systems.
@@ -604,22 +605,35 @@ fn rewrite_summary_line(
 /// Empty feedback keeps the line blank — never a fabricated status.
 fn rewrite_feedback_line(
     feedback: On<crate::drain::FeedbackChanged>,
-    mut lines: Query<(&mut Text, Option<&FeedbackLine>, Option<&SummaryLine>)>,
+    palette: Res<WindowPalette>,
+    mut lines: Query<(
+        &mut Text,
+        &mut TextColor,
+        Option<&FeedbackLine>,
+        Option<&SummaryLine>,
+    )>,
 ) {
     let summary = lines
         .iter()
-        .find_map(|(line, _, marker)| marker.map(|_| line.0.clone()));
-    for (mut line, feedback_marker, _) in &mut lines {
+        .find_map(|(line, _, _, marker)| marker.map(|_| line.0.clone()));
+    let color = match feedback.event().tone {
+        Some(FeedbackTone::Neutral) | None => palette.inner.body_color,
+        Some(FeedbackTone::Positive) => palette.inner.success_color,
+        Some(FeedbackTone::Caution) => palette.inner.warning_color,
+        Some(FeedbackTone::Danger) => palette.inner.danger_color,
+    };
+    for (mut line, mut ink, feedback_marker, _) in &mut lines {
         if feedback_marker.is_some() {
             // The demo shell seeds its informational feedback with the same
             // text used by the summary line. Keep one visual owner instead of
             // painting the sentence twice in the standard (non-Performance)
             // shell.
-            line.0 = if summary.as_deref() == Some(feedback.event().0.as_str()) {
+            line.0 = if summary.as_deref() == Some(feedback.event().text.as_str()) {
                 String::new()
             } else {
-                feedback.event().0.clone()
+                feedback.event().text.clone()
             };
+            ink.0 = color;
         }
     }
 }

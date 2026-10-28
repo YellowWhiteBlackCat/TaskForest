@@ -16,7 +16,7 @@ use crate::feature_coverage::FeatureId;
 /// variants carry a non-empty note that `note()` returns.
 #[test]
 fn platform_binding_is_total_typed_and_explained() {
-    assert_eq!(FeatureId::ALL.len(), 76);
+    assert_eq!(FeatureId::ALL.len(), 225);
     let mut requires = 0usize;
     let mut not_applicable = 0usize;
     let mut not_in_vocabulary = 0usize;
@@ -71,7 +71,7 @@ fn platform_binding_is_total_typed_and_explained() {
     }
     assert_eq!(
         (requires, not_applicable, not_in_vocabulary),
-        (67, 8, 1),
+        (193, 31, 1),
         "binding-shape counts are part of the contract; changing one is a conscious registry change"
     );
     assert_eq!(
@@ -96,7 +96,10 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
         required,
         [
             "accelerator.npu",
+            "alerts.notify",
             "desktop.responsiveness",
+            "filesystem.fd-limits",
+            "filesystem.file-locks",
             "hardware.inventory",
             "hardware.power-supplies",
             "history.process-events",
@@ -104,9 +107,13 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "ipc.pipe-graph",
             "ipc.posix",
             "ipc.sysv",
+            "memory.compression",
             "memory.vma-map",
+            "network.socket-control",
             "network.socket-inventory",
+            "network.traffic-control",
             "numa.topology",
+            "power.profiles",
             "process.affinity",
             "process.affinity.control",
             "process.control",
@@ -117,6 +124,9 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "process.insights.resources",
             "process.insights.threads",
             "process.list",
+            "process.oom-score",
+            "process.resource.control",
+            "profiling.off-cpu",
             "profiling.pmu",
             "profiling.syscalls",
             "sensors",
@@ -125,15 +135,23 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "services.dependencies",
             "services.logs",
             "services.logs.stream",
+            "startup.control",
+            "startup.evidence",
+            "storage.health",
+            "storage.io-priority",
             "storage.smart",
+            "storage.writeback",
             "telemetry.cpu",
             "telemetry.cpu.msr",
             "telemetry.cpu.package_power",
             "telemetry.cpu.throttle",
             "telemetry.gpu",
             "telemetry.gpu.engines",
+            "telemetry.gpu.hang",
             "telemetry.host",
             "telemetry.memory",
+            "telemetry.memory.smbios",
+            "telemetry.network",
             "telemetry.pressure",
             "telemetry.storage",
             "threads.context-switch",
@@ -147,8 +165,15 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
 #[test]
 fn shared_derivations_are_not_applicable_and_platform_gaps_are_not() {
     for feature in [
+        FeatureId::ProcessCompoundFilter,
+        FeatureId::ProcessCustomLabel,
+        FeatureId::DnsReverseLookup,
+        FeatureId::GeoIpAsnLookup,
+        FeatureId::ApplicationProtocolInference,
         FeatureId::MemoryLeakTrend,
+        FeatureId::HandleLeakTrendAnalysis,
         FeatureId::MemoryThrashingHealthScore,
+        FeatureId::PressureSaturationGrade,
         FeatureId::UseBottleneckAttribution,
         FeatureId::MultiResolutionRingBuffer,
         FeatureId::MultiFormatExport,

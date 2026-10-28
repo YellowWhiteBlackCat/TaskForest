@@ -8,12 +8,16 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
+use bevy::ecs::query::With;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::{
+    PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot, SystemSnapshot,
+};
 use taskmanager_core::core::sensors::SensorReading;
 use taskmanager_theme::tokens::UiSize;
 
@@ -103,6 +107,19 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
 }
 
 #[test]
+fn cpu_instruction_features_row_is_projected_when_present() {
+    use taskmanager_core::core::CpuInstructionFeature;
+    let mut hw = fixture_hardware();
+    hw.instruction_features = vec![CpuInstructionFeature::Avx2, CpuInstructionFeature::AesNi];
+    let rows = system_fact_rows(Some(&hw), None, None);
+    let row = rows
+        .iter()
+        .find(|r| r.label == t("system.field.instruction_features"))
+        .expect("instruction features row present");
+    assert_eq!(row.value, "AVX2 · AES-NI");
+}
+
+#[test]
 fn a_missing_inventory_states_waiting_and_states_no_facts() {
     let rows = system_fact_rows(None, None, None);
     assert!(rows.is_empty(), "no hardware, no fabricated fact rows");
@@ -138,6 +155,9 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     });
     app.init_resource::<HistoryProjectionResource>();
     super::register(&mut app);
+    // The window composition installs the readout attach/focus observers;
+    // this direct scene mount registers the same seam.
+    crate::text_selection::register(&mut app);
     // Mount the real scene after registering its typed paint system. The context borrows locals;
     // the shell moves into the track right after the spawn.
     let shell = shell_with_hardware(Some(fixture_hardware()));
@@ -166,17 +186,33 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
     let mut label_seen = 0;
-    let mut value_seen = 0;
     for text in texts.iter(world) {
         if text.0 == "Hostname" || text.0 == "主机名" || text.0 == t("system.hostname") {
             label_seen += 1;
         }
-        if text.0 == "taskforest-workstation" {
+    }
+    let mut readouts = world.query::<(&bevy::text::EditableText, &bevy::text::TextReadWriteMode)>();
+    let mut value_seen = 0;
+    for (text, mode) in readouts.iter(world) {
+        if text.value() == "taskforest-workstation" {
             value_seen += 1;
+            assert_eq!(
+                *mode,
+                bevy::text::TextReadWriteMode::ReadOnly,
+                "a fact readout is selectable but never editable"
+            );
         }
     }
     assert_eq!(label_seen, 1, "each host fact is stated exactly once");
-    assert_eq!(value_seen, 1);
+    assert_eq!(value_seen, 1, "the fact value lives in one native readout");
+    assert!(
+        world
+            .query_filtered::<bevy::ecs::entity::Entity, With<bevy::ui_widgets::TextInput>>()
+            .iter(world)
+            .count()
+            > 0,
+        "fact readouts are the official TextInput widget"
+    );
 
     // A refold (the page's only refresh trigger) repaints in place — the
     // fact is still stated exactly once, never duplicated.
@@ -187,9 +223,10 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     app.update();
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
-    let value_seen = texts
+    let mut readouts = world.query::<&bevy::text::EditableText>();
+    let value_seen = readouts
         .iter(world)
-        .filter(|text| text.0 == "taskforest-workstation")
+        .filter(|text| text.value() == "taskforest-workstation")
         .count();
     assert_eq!(value_seen, 1, "a refold repaints in place, never doubles");
 
@@ -478,6 +515,7 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     });
     thermal_app.init_resource::<HistoryProjectionResource>();
     super::register(&mut thermal_app);
+    crate::text_selection::register(&mut thermal_app);
 
     let context2 = crate::app::PageContext {
         sidebar: &Default::default(),
@@ -493,12 +531,18 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
         .expect("scene resolves");
     thermal_app.update();
 
-    let texts2: Vec<String> = thermal_app
+    let mut texts2: Vec<String> = thermal_app
         .world_mut()
         .query::<&Text>()
         .iter(thermal_app.world())
         .map(|t| t.0.clone())
         .collect();
+    let mut readouts = thermal_app.world_mut().query::<&bevy::text::EditableText>();
+    texts2.extend(
+        readouts
+            .iter(thermal_app.world())
+            .map(|text| text.value().to_string()),
+    );
     assert!(
         texts2.iter().any(|t| t == "Thermal zones" || t == "温度区"),
         "thermal zone card must be mounted when temperature readings are present: {texts2:?}"
@@ -510,5 +554,83 @@ fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
     assert!(
         texts2.iter().any(|t| t == "54.5 °C"),
         "temperature value must be rendered in thermal-zone card: {texts2:?}"
+    );
+}
+
+fn memory_full_stall_snapshot() -> SystemSnapshot {
+    SystemSnapshot {
+        pressure: Some(SystemPressureSnapshot {
+            memory: ScalarObservation::available(
+                ResourcePressure::new(
+                    PressureWindow::new(2.0, 1.0, 0.5, 10),
+                    PressureWindow::new(8.0, 5.0, 2.0, 20),
+                ),
+                1_000,
+            ),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn health_fact_carries_the_memory_full_stall_deduction_bill() {
+    set_language(Language::En);
+    let mut shell = shell_with_hardware(Some(fixture_hardware()));
+    fixture::edit_snapshot(&mut shell, |slot| {
+        *slot = Some(memory_full_stall_snapshot());
+    });
+
+    let model = system_summary_model(shell.projection());
+    let detail = model
+        .health_detail
+        .expect("observed pressure yields a health bill");
+    assert!(detail.contains("/100"), "{detail}");
+    assert!(detail.contains("pressure avg10 8.0%"), "{detail}");
+}
+
+#[test]
+fn the_mounted_system_page_renders_the_full_stall_deduction_bill() {
+    set_language(Language::En);
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
+    app.insert_resource(WindowPalette { inner: palette });
+    app.init_resource::<HistoryProjectionResource>();
+    super::register(&mut app);
+    crate::text_selection::register(&mut app);
+
+    let mut shell = shell_with_hardware(Some(fixture_hardware()));
+    fixture::edit_snapshot(&mut shell, |slot| {
+        *slot = Some(memory_full_stall_snapshot());
+    });
+    let palette = crate::palette::ui_palette(&Theme::dark(), UiSize::Standard);
+    let history = HistoryProjectionResource::default();
+    let context = crate::app::PageContext {
+        sidebar: &Default::default(),
+        gray_zero_values: false,
+        shell: &shell,
+        palette: &palette,
+        history: &history.0,
+    };
+    app.world_mut()
+        .spawn_scene(content(&context))
+        .expect("the system scene resolves without assets");
+    app.insert_non_send(FrontendTrack {
+        shell,
+        initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
+    });
+    app.update();
+
+    let world = app.world_mut();
+    let mut readouts = world.query::<&bevy::text::EditableText>();
+    assert!(
+        readouts
+            .iter(world)
+            .any(|text| text.value().to_string().contains("pressure avg10 8.0%")),
+        "the dense System facts card renders the full deduction bill"
     );
 }

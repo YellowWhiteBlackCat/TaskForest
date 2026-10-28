@@ -6,6 +6,14 @@ against real test discovery.
 
 - `cross_frontend_manifest.tsv` — the declaration list. One row per
   `(subject_kind, subject_id, frontend)`.
+- `scene_registry.tsv` — the 55 audited scenes in audit order, one evidence
+  anchor per frontend: `test:<nextest name>` (resolved against that
+  frontend's live discovery) or `capture:<scenario>` (resolved against its
+  capture matrix), with `-` only for `Unsupported`/`Pending` cells.
+  `scripts/quality/scene_registry_guard.py` enforces the exact scene
+  set/order and resolves every anchor against the owning frontend; the
+  current registry carries 219 behavior-test anchors and one explicit
+  absent cell (TUI `sidebar-hidden`, an owner-declared Unsupported scene).
 - `feature_evidence.tsv` — the P5 feature-level evidence table (G2 closure).
   One row per `(feature_id, frontend)`: the hand-declared nextest anchor that
   backs that shape's delivery claim, or an explicit `pending` gap. It is the
@@ -25,8 +33,9 @@ against real test discovery.
   W23-B side table (`feature_evidence_co_anchors.tsv`) is gone: the fold was
   the whole reason it existed, and the Rust consumer now accepts six columns.
 - `accept-frontend-interactions.sh` / `accept_frontend_interactions.py` — the
-  unified S5 driver. Since W23-B the `gpui-interactions` and
-  `bevy-interactions` stages of `scripts/quality/local-gates.sh` run it; per
+  unified S5 driver. The `gpui-interactions`, `iced-interactions`,
+  `tui-interactions` and `bevy-interactions` stages of
+  `scripts/quality/local-gates.sh` run it; per
   selected frontend it records the frontend-scoped source fingerprint, invokes
   the legacy `scripts/accept-<frontend>-interactions.sh` gate unchanged (still
   the authoritative per-frontend runner and receipt writer), folds the fresh
@@ -94,6 +103,38 @@ and both committed declarations only reference its ids.
 
 `pending` means "no discoverable anchor has been assigned yet". Pending cells
 are counted and reported, never treated as dangling.
+
+## Blueprint disposition ledger (ADR-059)
+
+`blueprint_dispositions.tsv` is the complete public census of the 225-slot
+product blueprint. `FeatureId` remains the typed delivery registry; this table
+records what happened to every slot that is not (yet) a typed feature, so no
+roadmap item can hide behind "not registered".
+
+| column | meaning |
+|---|---|
+| `slot` | 1-based blueprint slot, `1..=225` |
+| `area` | the canonical `FeatureArea` id; must match `(slot - 1) / 15` |
+| `disposition` | `adopted` or `unsupported` |
+| `feature` | the adopting `FeatureId` id on an adopted row, `-` otherwise |
+| `reason` | `-` on an adopted row; the public non-delivery reason on an unsupported row |
+
+Current census: **75 adopted + 150 unsupported = 225**, five adopted slots per
+area. The ten Wave 3/4 deliveries are among the adopted slots, not extra; the
+earlier 159 count subtracted them twice. One typed feature,
+`memory.process-swap-charge`, is deliberately outside the census (it is an
+additional per-process scalar, not a blueprint slot). The private blueprint
+titles and mechanisms stay in `.private/`; the public ledger uses slot identity,
+status, feature id and a public reason only.
+
+`BlueprintDispositionTable` parses the committed file with fail-closed
+findings, and `FeatureId::blueprint_slot()` is checked against it in both
+directions by the ui-contract tests. A blueprint item is promoted in one
+change: add its typed `FeatureId` (semantic spec, platform binding, four
+frontend declarations) and flip the slot to `adopted`; demotion flips it back.
+The quick gate runs `scripts/quality/blueprint_scope_guard.py` and its
+self-test for the public structure (slots, area order, counts, dash/reason
+rules); the Rust parser additionally resolves the feature vocabulary.
 
 ## Feature-level evidence table (P5 G2 closure)
 
@@ -317,13 +358,25 @@ Anchored batches (2026-09-22):
   observed `swap_bytes` and assert the rendered charge (plus the dash for an
   unobserved one), so all four shapes now anchor the cell.
 
-The table now carries **200 anchored + 0 `pending`** rows (50 feature IDs, with
-50 anchored cells per frontend). Every registered cell is committed
-evidence; a new near-miss must again be recorded as an explicit `pending` row.
-Every other source-complete cell keeps its G2 finding until a real test is
-anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
-`pending` row is a survey record, not a delivery claim, and it never becomes an
-anchor.
+- Track A batch (2026-10-28): the last 12 `pending` cells closed with real
+  frontend tests. `history.multi-format-export` anchors the GPUI export entry
+  (`snapshot_export` unavailable-worker feedback), the Iced and TUI export
+  entries, and the Bevy `x` export arm. `history.multi-resolution-ring`
+  anchors each shape's dashboard window selector against the shared
+  multi-resolution series (GPUI bounded review viewport, Iced hour-ring
+  controls, TUI dashboard keys, Bevy measured dashboard windows).
+  `pressure.memory-thrashing-health` anchors the deduction bill on every
+  health surface; the survey also found Bevy rendered only the compact score,
+  so its dense System facts card gained the shared `health_score_summary` row
+  (including the `MemoryFullStall` deduction) and a mounted-page test proves
+  it.
+
+The table now carries **212 anchored + 0 `pending`** rows (53 feature IDs;
+53 anchored per frontend). Every registered cell is committed evidence; a new
+near-miss must again be recorded as an explicit `pending` row. Every other
+source-complete cell keeps its G2 finding until a real test is anchored; the
+batches are a bounded delivery, never a blanket `Ready` claim. A `pending` row
+is a survey record, not a delivery claim, and it never becomes an anchor.
 
 ### Feature co-anchors (the sixth `co_test_id` column, W23-B / D6 phase 6)
 
@@ -418,9 +471,10 @@ The TUI block (47 rows, all anchored) is the D2 deliverable. TUI has no stable
 case-prefix convention and no per-frontend matrix, so every row names its test
 explicitly. The last two D2 gaps were closed by real keyboard ports rather than
 by relabelling: the terminal shape has no pointer drag or hover surface (its
-capability registry declares `ColumnDragResize` and `Tooltip` unsupported — "no
-pointer-driven column-edge drag surface", "no hover surface" — and the runtime
-deliberately drops drag/move events as unmodeled), so a UI-parity line ported
+capability registry declares `ColumnDragResize` divergent and `Tooltip`
+unsupported — "no pointer-driven column-edge drag surface", "no hover surface"
+— and the runtime deliberately drops drag/move events as unmodeled), so a
+UI-parity line ported
 the two gestures and gave each its own case id (`mc03-tui-column-reorder` = the
 column menu's `←`/`→` reorder, `mc05-tui-chart-cursor` = the Performance·CPU
 chart's `←`/`→` sample cursor). Both carry `success|keyboard`, not the source
@@ -607,15 +661,19 @@ Closed pairs (now covered by real Bevy surfaces):
   while an unobserved channel keeps the labelled collecting state — never a
   fabricated flat line or zero. The surface is the new Fan device section (a
   per-channel block with its own curve), not the battery block's inline fan text.
-- **P0-MC-04** (GPU selectable middle graph), closed by the new
-  `bev-gpu-metric-selector` row anchored to
+- **P0-MC-04** (GPU middle graph / measured metric families), closed on Bevy by
+  the new `bev-gpu-metric-selector` row anchored to
   `pages::performance::device_history_tests::gpu_curve_metric_selection_drives_the_shared_graph`:
   the test seeds an adapter with utilization/temperature/frequency samples,
   activates the GPU curve card's metric selector (driving the shared shell
   selection), asserts the selected family's own window drives the card graph
   (while an unobserved family stays explicit gaps), and that a device-generation
-  advance resets the selection to the default — mirroring the Iced
-  `gpu_chart_metric_selects_through_the_shared_gate` clause.
+  advance resets the selection to the default. The reference GPUI and Iced
+  executions are the no-selector all-families pages (Iced anchor:
+  `gpu_page_renders_every_measured_metric_family_without_a_selector`); TUI
+  exposes the shared selection as a keyboard cycle. Bevy's selector is an
+  accepted front-end execution of the same shared selection, not the universal
+  requirement definition.
 
 Unmapped rows and why (26): the seven `bev-chart-*` / `bev-history-*` rows are
 the shared-chart and Application-History surfaces (the P0-MC-01 near-misses
@@ -666,13 +724,19 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   so the unified matrix is now 197 cases / 197 anchored / 0 pending / 0
   dangling. Both rows carry `success|keyboard`: the source case's `pointer` is
   not what a terminal keyboard port drives.
-- TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
-  scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
-  marker test proves the frame-marker contract, not a per-scenario matrix. The
-  appearance dimension still holds a like-for-like pair: the same
-  `TM_TUI_CAPTURE_PAGE=performance` frame is captured with
-  `TM_TUI_CAPTURE_SKIN=gnome-dark` (default) and `gnome-light`, and each run
-  records its measured `appearance_control` verdict.
+- TUI capture has two entry points: `scripts/capture-tui.sh` for one supervised
+  frame and `scripts/capture-tui-matrix.sh`, which loops
+  `scripts/capture_tui_scenarios.tsv` and writes one supervised receipt per
+  row. The matrix row name is a receipt label; the scene token is derived from
+  the runner's `CAPTURE_SCENE` case, so page/device/appearance rows stay
+  scene-less. TUI rows still declare `capture_scenarios = -` in the unified
+  interaction matrix: the matrix is consumed by the capture coverage guard and
+  the TUI evidence validators, not by a per-row interaction-matrix mapping. The
+  appearance dimension is part of the matrix (`gnome-dark`/`gnome-light` rows)
+  and each run records its measured `appearance_control` verdict. Scenes the
+  audit declares `Unsupported` (for example `sidebar-hidden`) have no capture
+  row; `Unsupported` / `Pending` statuses are the typed absence, not a missing
+  matrix entry.
 - **Iced capture now includes the health modal (W19-B).** Iced capture reaches
   the six shared pages, the eight Performance devices and two renderer-local
   surfaces - `service-details` on Services and the health modal on Performance.
@@ -908,13 +972,13 @@ is a stage error rather than a silent skip.
 
 ### Interaction stages run the unified driver (S5 wiring, W23-B)
 
-The `gpui-interactions` and `bevy-interactions` stages of
-`scripts/quality/local-gates.sh` no longer call the legacy accept gate
-directly. The committed call chain is:
+The `gpui-interactions`, `iced-interactions`, `tui-interactions` and
+`bevy-interactions` stages of `scripts/quality/local-gates.sh` no longer call
+the legacy accept gate directly. The committed call chain is:
 
 ```
-local-gates.sh (--with-gui, or scope=bevy for the Bevy stage)
-  -> bash scripts/parity/accept-frontend-interactions.sh <gpui|bevy> [--scope linux|windows]
+local-gates.sh (--with-gui, or scope=bevy|iced|tui for the scoped stage)
+  -> bash scripts/parity/accept-frontend-interactions.sh <gpui|iced|tui|bevy> [--scope linux|windows]
      -> python3 scripts/parity/accept_frontend_interactions.py
         1. scripts/frontend_source_manifest.py --frontend <fe>   # fingerprint
         2. bash scripts/accept-<fe>-interactions.sh              # legacy gate, UNCHANGED
@@ -948,14 +1012,14 @@ Authority split, so the compatibility window is explicit:
   discovery pass is added for GPUI/ICED/Bevy (the driver reads the gate's own
   artifacts); only TUI, whose gate emits none, gets one bounded
   `cargo nextest list`.
-- The Linux gate wires the GPUI and Bevy interaction stages - the two stages
-  that existed before this change. Iced and TUI have no `local-gates`
-  interaction stage, so nothing regressed: their interaction anchors are still
+- The Linux gate wires all four interaction stages: `--with-gui` runs
+  `gpui-interactions`, `iced-interactions`, `tui-interactions` and
+  `bevy-interactions`, while a scoped line (`scope=bevy|iced|tui`) runs its own
+  stage on every standard pass. Their interaction anchors remain
   discovery-checked by the `parity-evidence` stage through the unified matrix,
-  and `bash scripts/parity/accept-frontend-interactions.sh iced|tui` runs the
-  same driver chain when an owner opens those stages. A single-frontend driver
-  run reports the resolver stage as skipped (the resolver resolves the whole
-  declaration) rather than silently passing it.
+  and the same driver chain produces fresh receipts for each frontend. A
+  single-frontend driver run reports the resolver stage as skipped (the
+  resolver resolves the whole declaration) rather than silently passing it.
 
 Known boundary: an anchored test deleted or renamed *without* touching the
 paths above stays invisible until one of them changes. That is the deliberate

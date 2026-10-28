@@ -743,3 +743,47 @@ mod memory_inventory_lane {
         );
     }
 }
+
+#[test]
+fn device_section_carries_the_memory_full_stall_deduction_bill() {
+    use taskmanager_core::core::metrics::{
+        PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot,
+    };
+
+    let snapshot = SystemSnapshot {
+        pressure: Some(SystemPressureSnapshot {
+            memory: ScalarObservation::available(
+                ResourcePressure::new(
+                    PressureWindow::new(2.0, 1.0, 0.5, 10),
+                    PressureWindow::new(8.0, 5.0, 2.0, 20),
+                ),
+                1_000,
+            ),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let sections = build_sections(
+        &hardware(),
+        &snapshot,
+        None,
+        &SmbiosMemoryState::Closed,
+        UnitPreferences::default(),
+    );
+    let health = sections
+        .iter()
+        .flat_map(|section| section.rows.iter())
+        .find(|(label, _)| label.as_str() == i18n::t("system.health_score"))
+        .expect("the device section states the health score");
+    assert!(
+        health.1.contains("/100"),
+        "the score stays visible: {}",
+        health.1
+    );
+    assert!(
+        health.1.contains("pressure avg10 8.0%"),
+        "the memory full-stall deduction carries its evidence: {}",
+        health.1
+    );
+}

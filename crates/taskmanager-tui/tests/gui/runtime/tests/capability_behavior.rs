@@ -58,11 +58,7 @@ fn search_filters_the_live_projection_and_escape_restores_it() {
     let _ = press(&mut app, KeyCode::Char('f'), KeyModifiers::CONTROL);
     assert!(app.search_active(), "Ctrl+F gives the search input focus");
 
-    // TextInput is intentionally pinned as end-only today: Left does not
-    // move a caret, so these characters append into the working SearchInput.
-    type_text(&mut app, "dbus");
-    let _ = press(&mut app, KeyCode::Left, KeyModifiers::NONE);
-    type_text(&mut app, "-broker");
+    type_text(&mut app, "dbus-broker");
 
     assert_eq!(app.query, "dbus-broker");
     let filtered = app.visible_processes();
@@ -352,11 +348,28 @@ fn modal_focus_traps_table_keys_and_escape_returns_focus() {
     assert_eq!(app.selected, selected, "the modal traps the table cursor");
     assert!(app.process_properties().is_some());
 
-    // The terminal has no outside-click scrim region. Route a real Crossterm
-    // mouse event through the committed frame plan and pin the no-dismiss
-    // behavior behind the declared ModalOverlay divergence.
+    // Popup chrome is a blocked overlay cell; an outside press is the scrim
+    // gesture the shared modal policy maps onto the same close path.
     let plan = crate::ui::TuiFramePlan::build(&app, Rect::new(0, 0, 120, 40));
+    let popup = plan.overlay().expect("properties overlay").popup;
     assert!(plan.hit_target(0, 0).is_none());
+    let chrome = crate::runtime::runtime_support::apply_terminal_event_with_plan(
+        &mut app,
+        Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: popup.x,
+            row: popup.y,
+            modifiers: KeyModifiers::NONE,
+        }),
+        &plan,
+    );
+    assert_eq!(
+        chrome,
+        crate::runtime::runtime_support::EventReaction::default(),
+        "popup chrome stays a blocked no-op"
+    );
+    assert!(app.process_properties().is_some());
+
     let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         Event::Mouse(MouseEvent {
@@ -367,19 +380,10 @@ fn modal_focus_traps_table_keys_and_escape_returns_focus() {
         }),
         &plan,
     );
-    assert_eq!(
-        reaction,
-        crate::runtime::runtime_support::EventReaction::default()
-    );
-    assert!(
-        app.process_properties().is_some(),
-        "outside click does not dismiss"
-    );
-
-    let _ = press(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+    assert!(reaction.dirty, "the scrim press repaints the closed modal");
     assert!(
         app.process_properties().is_none(),
-        "Escape cancels the modal"
+        "an outside press cancels the modal"
     );
     let _ = press(&mut app, KeyCode::Down, KeyModifiers::NONE);
     assert_ne!(app.selected, selected, "the table regains keyboard focus");

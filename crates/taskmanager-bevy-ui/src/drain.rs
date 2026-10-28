@@ -20,6 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
 use taskmanager_ipc::DaemonMessage;
+use taskmanager_shell::FeedbackTone;
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
@@ -68,7 +69,10 @@ pub(crate) struct ShellProjectionFolded;
 /// async completions both surface here — the Bevy counterpart of the TUI
 /// status bar.
 #[derive(Event)]
-pub(crate) struct FeedbackChanged(pub(crate) String);
+pub(crate) struct FeedbackChanged {
+    pub(crate) text: String,
+    pub(crate) tone: Option<FeedbackTone>,
+}
 
 /// Last feedback text seen by the drain, for change detection.
 #[derive(Resource, Default)]
@@ -428,7 +432,14 @@ pub(crate) fn drain_system(
     let feedback = track.shell.feedback_text().to_owned();
     if feedback_cache.0.as_deref() != Some(feedback.as_str()) {
         feedback_cache.0 = Some(feedback.clone());
-        commands.trigger(FeedbackChanged(feedback));
+        let tone = track
+            .shell
+            .feedback_presentation()
+            .map(|feedback| feedback.tone());
+        commands.trigger(FeedbackChanged {
+            text: feedback,
+            tone,
+        });
     }
 }
 

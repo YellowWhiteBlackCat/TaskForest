@@ -32,8 +32,8 @@ use super::thermal::thermal_zone_card_scene;
 use super::thermal::{gpu_temperature_card_scene, sensor_temperature_projection};
 use super::topology::{memory_topology, topology_card_scene};
 use super::{
-    MemoryInventoryAnchor, SystemBody, SystemFactGroup, SystemSummaryModel, clean_memory_size,
-    fact_row_scene, kpi_tile_scene, section_card_scene, system_fact_rows,
+    MemoryInventoryAnchor, SystemBody, SystemFactGroup, SystemFactRow, SystemSummaryModel,
+    clean_memory_size, fact_row_scene, kpi_tile_scene, section_card_scene, system_fact_rows,
 };
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::window::{Role, TextRole};
@@ -229,6 +229,13 @@ pub(crate) fn system_body_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let mut rows = system_fact_rows(inputs.hardware, inputs.smbios, inputs.npu);
+    if let Some(detail) = inputs.summary.health_detail.as_ref() {
+        rows.push(SystemFactRow {
+            group: SystemFactGroup::Health,
+            label: t("system.health_score").to_owned(),
+            value: detail.clone(),
+        });
+    }
     rows.extend(identity_fact_rows(inputs.smbios, inputs.disclosure));
     rows.extend(module_serial_rows(inputs.smbios, inputs.disclosure));
     let projection = inputs.sensors.map(sensor_temperature_projection);
@@ -263,6 +270,7 @@ pub(crate) fn system_body_scene(
         (SystemFactGroup::Hardware, "common.hardware"),
         (SystemFactGroup::Npu, "npu.title"),
         (SystemFactGroup::MemoryInventory, "system.memory_inventory"),
+        (SystemFactGroup::Health, "system.health_score"),
     ]
     .into_iter()
     .filter_map(|(group, title)| {

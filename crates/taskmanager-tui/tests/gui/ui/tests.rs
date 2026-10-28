@@ -74,6 +74,8 @@ mod process_render;
 mod row_alignment;
 #[path = "tests/service_details_render.rs"]
 mod service_details_render;
+#[path = "tests/services_search_render.rs"]
+mod services_search_render;
 #[path = "tests/session_render.rs"]
 mod session_render;
 #[path = "tests/source_render.rs"]

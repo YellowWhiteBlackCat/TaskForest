@@ -36,7 +36,7 @@ use crate::palette::{UiPalette, space_4, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::WindowPalette;
 use crate::window::{CustomTextInk, Role, TextRole};
-use taskmanager_ui_contract::{COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
+use taskmanager_ui_contract::ColumnResizePolicy;
 
 pub(crate) mod contrast;
 pub(crate) mod ellipsis;
@@ -111,7 +111,7 @@ pub(crate) const LAYOUT_MIN_COLUMN_WIDTH_PX: f32 = 40.0;
 /// Clamp a column width to the contract's resize policy.
 #[must_use]
 pub(crate) fn clamp_column_width(width: f32) -> f32 {
-    width.clamp(COLUMN_WIDTH_MIN, COLUMN_WIDTH_MAX)
+    ColumnResizePolicy::PROCESS.clamp(width)
 }
 
 /// Distribute available horizontal width across table columns.
@@ -352,7 +352,11 @@ pub(crate) struct CellRender<'a> {
 /// (the single source of search-match geometry, ADR-020) over the cell's own
 /// text. Only the identity column carries the highlight, exactly like the
 /// reference surfaces.
-fn highlight_ranges(column: &str, text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
+pub(crate) fn highlight_ranges(
+    column: &str,
+    text: &str,
+    query: &str,
+) -> Vec<std::ops::Range<usize>> {
     if column != "Name" || query.trim().is_empty() {
         return Vec::new();
     }
@@ -362,7 +366,10 @@ fn highlight_ranges(column: &str, text: &str, query: &str) -> Vec<std::ops::Rang
 /// The value split into its plain and highlighted segments. The segments are
 /// contiguous and cover the whole value, so the cell renders exactly the text
 /// it was handed.
-fn highlight_segments(text: &str, ranges: &[std::ops::Range<usize>]) -> Vec<(String, bool)> {
+pub(crate) fn highlight_segments(
+    text: &str,
+    ranges: &[std::ops::Range<usize>],
+) -> Vec<(String, bool)> {
     if ranges.is_empty() {
         return vec![(text.to_owned(), false)];
     }

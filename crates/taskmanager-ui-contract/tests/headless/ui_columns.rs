@@ -71,3 +71,39 @@ fn the_column_width_policy_is_pinned_and_coherent() {
         assert!(COLUMN_WIDTH_MIN + COLUMN_WIDTH_KEYBOARD_STEP <= COLUMN_WIDTH_MAX);
     }
 }
+
+/// One transition authority: drags and keyboard steps clamp identically, and
+/// a terminal can supply its cell bounds through the same policy.
+#[test]
+fn the_resize_policy_clamps_and_steps_in_the_callers_unit() {
+    let process = ColumnResizePolicy::PROCESS;
+    assert_eq!(process.step(120.0, 1), 130.0);
+    assert_eq!(process.step(120.0, -2), 100.0);
+    assert_eq!(
+        process.step(COLUMN_WIDTH_MAX, 1),
+        COLUMN_WIDTH_MAX,
+        "a keyboard step never passes the maximum"
+    );
+    assert_eq!(process.drag(50.0, 5_000.0), COLUMN_WIDTH_MAX);
+    assert_eq!(process.drag(COLUMN_WIDTH_MIN, -5_000.0), COLUMN_WIDTH_MIN);
+
+    let cells = ColumnResizePolicy {
+        min: 4.0,
+        max: 40.0,
+        step: 1.0,
+    };
+    assert_eq!(cells.step(4.0, -1), 4.0);
+    assert_eq!(cells.drag(39.5, 1.0), 40.0);
+    assert_eq!(cells.step(10.0, 3), 13.0);
+
+    let inverted = ColumnResizePolicy {
+        min: 10.0,
+        max: 2.0,
+        step: 1.0,
+    };
+    assert_eq!(
+        inverted.clamp(20.0),
+        10.0,
+        "an inverted bound pair still yields a legal width"
+    );
+}

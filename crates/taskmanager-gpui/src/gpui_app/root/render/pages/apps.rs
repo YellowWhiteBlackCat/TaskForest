@@ -6,7 +6,7 @@
 use gpui::{Context, Div, ParentElement, Styled, Window, div, px};
 use taskmanager_shell::SortDir;
 use taskmanager_shell::presentation::process_anomaly_summary;
-use taskmanager_shell::presentation::uninterruptible_process_count;
+use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_ui::layout::PageScaffold;
 
 use super::{PageRenderContext, RootView, init_search_entity, vm};
@@ -36,7 +36,7 @@ impl RootView {
         let appearance = presentation.appearance;
         let page_metrics = vm::process_page_metrics(snap);
         let process_count = self.processes().len();
-        let uninterruptible_count = uninterruptible_process_count(
+        let uninterruptible_summary = uninterruptible_process_summary(
             self.projection()
                 .processes
                 .as_ref()
@@ -69,7 +69,7 @@ impl RootView {
                     theme: t,
                     application_count,
                     process_count,
-                    uninterruptible_count,
+                    uninterruptible_summary,
                     anomaly_summary,
                     search_input: &search_input,
                     rows: &rows,

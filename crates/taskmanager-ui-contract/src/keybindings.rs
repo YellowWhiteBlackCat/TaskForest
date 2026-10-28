@@ -140,6 +140,19 @@ impl BindingCoverageStatus {
     }
 }
 
+/// Wired entries whose token is empty. An empty token is a silent hole, not a
+/// deliberate absence: a frontend that derived a row from help metadata must
+/// fail its gate instead of claiming a key it does not execute.
+#[must_use]
+pub fn empty_binding_tokens(declaration: &FrontendBindingDeclaration) -> Vec<CommandId> {
+    declaration
+        .entries
+        .iter()
+        .filter(|entry| matches!(entry.binding, Binding::Key("")))
+        .map(|entry| entry.command)
+        .collect()
+}
+
 /// The coverage matrix for one declaration against the full contract command
 /// set, in canonical [`CommandId::ALL`] order; declared commands outside the
 /// known set follow in declaration order as [`BindingCoverageStatus::Unknown`].

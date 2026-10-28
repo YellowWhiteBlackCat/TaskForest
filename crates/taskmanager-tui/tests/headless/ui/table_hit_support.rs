@@ -48,6 +48,8 @@ pub(crate) fn row_at_plan(plan: &TuiFramePlan, column: u16, row: u16) -> Option<
             // Overlay cells and overlay control rows are not table rows.
             crate::ui::frame_plan::TuiHitTarget::Overlay { .. }
             | crate::ui::frame_plan::TuiHitTarget::OverlayControl { .. }
+            | crate::ui::frame_plan::TuiHitTarget::SettingsField { .. }
+            | crate::ui::frame_plan::TuiHitTarget::SearchCaret { .. }
             | crate::ui::frame_plan::TuiHitTarget::NavigationPage(_) => None,
         })
 }

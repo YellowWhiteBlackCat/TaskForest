@@ -402,7 +402,7 @@ pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
         ProcessMetadataObservation, ProcessMetadataObservations,
     };
     let mut p1 = ProcessItem::new(93401, "chrome-mail");
-    p1.cmdline = "/opt/google/chrome/chrome --profile-directory=Default --app-id=abc123".into();
+    p1.cmdline = "/usr/bin/chrome-wrapper --profile-directory=Default --app-id=abc123".into();
     p1.apply_metadata_observations(ProcessMetadataObservations {
         executable_path: ProcessMetadataObservation::available(
             "/opt/google/chrome/chrome".into(),
@@ -411,7 +411,7 @@ pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
         ..Default::default()
     });
     let mut p2 = ProcessItem::new(93402, "snap-core");
-    p2.cmdline = "/snap/core/current/usr/lib/snapd/snapd".into();
+    p2.cmdline = "/usr/bin/snap run firefox".into();
     p2.apply_metadata_observations(ProcessMetadataObservations {
         executable_path: ProcessMetadataObservation::available(
             "/snap/core/current/usr/lib/snapd/snapd".into(),
@@ -420,7 +420,7 @@ pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
         ..Default::default()
     });
     let mut p3 = ProcessItem::new(93403, "appimage-zed");
-    p3.cmdline = "/tmp/.mount_zed123/usr/bin/zed".into();
+    p3.cmdline = "/usr/bin/zed-editor".into();
     p3.apply_metadata_observations(ProcessMetadataObservations {
         executable_path: ProcessMetadataObservation::available(
             "/tmp/.mount_zed123/usr/bin/zed".into(),

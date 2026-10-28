@@ -178,6 +178,16 @@ pub(crate) fn system_sections(
     {
         device.push(t("system.field.chipset"), chipset);
     }
+    if let Some(secure_boot) = hardware.and_then(|item| item.secure_boot) {
+        device.push(
+            t("system.secure_boot"),
+            if secure_boot {
+                t("common.enabled")
+            } else {
+                t("common.disabled")
+            },
+        );
+    }
     device.push(
         t("system.field.package_count"),
         hardware

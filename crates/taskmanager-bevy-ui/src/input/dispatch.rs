@@ -10,13 +10,15 @@
 
 use bevy::app::AppExit;
 use bevy::ecs::message::{MessageReader, MessageWriter};
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
+use bevy::ecs::query::With;
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
+use bevy::input_focus::InputFocus;
 use taskmanager_application::{Modifiers, PlatformEffect};
 
-use taskmanager_shell::{InputDispatch, ShellApp, ShellKeyEvent};
+use taskmanager_shell::{InputDispatch, SearchSlot, ShellApp, ShellKeyEvent};
 
 use crate::app::{
     FrontendTrack, Page, Route, action_for_page, modifier_state, request_route, route_key_press,
@@ -35,17 +37,22 @@ use crate::pages::startup::menu::StartupMenuCtx;
 
 use super::{
     FrontendMenuKind, FrontendMenus, InventoryActionModals, InventorySelections, KeyboardOwner,
-    PendingEffects, QuitForwarded, ShellInteractionApplied, TextInputState, commit_query_to_shell,
-    keyboard_owner, modifiers_from, text_char,
+    NativeTextEditing, PendingEffects, QuitForwarded, SearchEditor, ShellInteractionApplied,
+    TextInputState, keyboard_owner, modifiers_from, text_char,
 };
 use crate::first_run_modal::SetupState;
+use crate::text_selection::ReadoutInput;
 use crate::window_surface::WindowSurfaceState;
 use taskmanager_core::core::smart::SmartSelfTestKind;
 
 #[path = "dispatch/diagnostics.rs"]
 mod diagnostics;
+#[path = "dispatch/search_line.rs"]
+mod search_line;
 #[path = "dispatch/system_about.rs"]
 mod system_about;
+
+use search_line::edit_search_line;
 
 /// One just-pressed key, normalized once for the whole arm chain: the facts
 /// every arm reads are captured here so each arm stays a predicate on
@@ -106,6 +113,9 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     perf_device_focus: Option<&'a PerformanceDeviceFocus>,
     surface: Option<&'a WindowSurfaceState>,
     setup: Option<&'a SetupState>,
+    /// Whether a native read-only text input owns the keyboard, so page
+    /// bindings and the product copy arm stay out of its way.
+    native_text_focused: bool,
     /// Whether any press this frame mutated shell state.
     applied: bool,
 }
@@ -114,11 +124,16 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     /// Normalizes one raw Bevy press once for the whole arm chain.
     fn normalize(&self, event: &KeyboardInput, modifiers: Modifiers) -> KeyPress {
         let frontend_menus = self.modals.present();
+        let context = if self.native_text_focused {
+            KeyboardOwner::NativeText
+        } else {
+            keyboard_owner(self.shell, frontend_menus, self.route.page)
+        };
         KeyPress {
             key_code: event.key_code,
             character: text_char(event, modifiers),
             modifiers,
-            context: keyboard_owner(self.shell, frontend_menus, self.route.page),
+            context,
             page: self.route.page,
             frontend_menus,
         }
@@ -532,9 +547,13 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         if !matches!(press.context, KeyboardOwner::Search) {
             return false;
         }
-        let mut query = self.shell.query.clone();
+        let slot = self.shell.search_slot();
+        let mut query = match slot {
+            SearchSlot::Applications => self.shell.query.clone(),
+            SearchSlot::Services => self.shell.services_query.clone(),
+        };
         let mut state = self.text_state.as_deref_mut().cloned().unwrap_or_default();
-        let consumed = edit_search_line(press, &mut state, &mut query, self.shell);
+        let consumed = edit_search_line(press, &mut state, &mut query, self.shell, slot);
         if let Some(resource) = self.text_state {
             **resource = state;
         }
@@ -626,74 +645,6 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     }
 }
 
-/// Applies one press to the search line, committing every query edit to the
-/// shell (the single owner of the search text). `true` when the line editor
-/// consumed the press; an unconsumed press keeps falling through the chain.
-fn edit_search_line(
-    press: KeyPress,
-    state: &mut TextInputState,
-    query: &mut String,
-    shell: &mut ShellApp,
-) -> bool {
-    let is_ctrl = press.modifiers.control;
-    match press.key_code {
-        KeyCode::ArrowLeft => {
-            if is_ctrl {
-                state.move_word_left(query);
-            } else {
-                state.move_left(query);
-            }
-        }
-        KeyCode::ArrowRight => {
-            if is_ctrl {
-                state.move_word_right(query);
-            } else {
-                state.move_right(query);
-            }
-        }
-        KeyCode::Home => state.move_home(),
-        KeyCode::End => state.move_end(query),
-        KeyCode::Backspace => {
-            let changed = if is_ctrl {
-                state.delete_word_backward(query)
-            } else {
-                state.delete_backward(query)
-            };
-            if changed {
-                commit_query_to_shell(shell, query);
-            }
-        }
-        KeyCode::Delete => {
-            if state.delete_forward(query) {
-                commit_query_to_shell(shell, query);
-            }
-        }
-        KeyCode::Escape => {
-            if !query.is_empty() {
-                state.clear_line(query);
-                commit_query_to_shell(shell, query);
-            } else {
-                shell.close_search();
-            }
-        }
-        KeyCode::KeyU if is_ctrl => {
-            state.clear_line(query);
-            commit_query_to_shell(shell, query);
-        }
-        _ => {
-            let Some(character) = press.character else {
-                return false;
-            };
-            if press.modifiers.control || press.modifiers.alt {
-                return false;
-            }
-            state.insert_char(query, character);
-            commit_query_to_shell(shell, query);
-        }
-    }
-    true
-}
-
 /// Read-only sources the keyboard adapter consults to resolve one press: the
 /// just-pressed events, the live key state, and the optional page-local
 /// surfaces.
@@ -713,6 +664,15 @@ pub(crate) struct KeyboardDispatchInputs<'w, 's> {
     export_dir: Option<Res<'w, ServiceLogExportDir>>,
     surface: Option<Res<'w, WindowSurfaceState>>,
     setup: Option<Res<'w, SetupState>>,
+    /// The toolkit focus owner, when the input focus resource exists.
+    focus: Option<Res<'w, InputFocus>>,
+    /// Read-only native readouts; a focused member owns its character keys.
+    readouts: Query<'w, 's, (), With<ReadoutInput>>,
+    /// Native search editors; a focused member owns its character keys when
+    /// the composition installed the text-input plugin.
+    search_editors: Query<'w, 's, (), With<SearchEditor>>,
+    /// Whether the toolkit text-input plugin is installed.
+    native_editing: Option<Res<'w, NativeTextEditing>>,
 }
 
 /// Mutable sinks the keyboard adapter drives: the frame-tail effect queue, the
@@ -775,6 +735,14 @@ pub(crate) fn keyboard_dispatch_system(
             perf_device_focus: inputs.perf_device_focus.as_deref(),
             surface: inputs.surface.as_deref(),
             setup: inputs.setup.as_deref(),
+            native_text_focused: inputs.native_editing.is_some_and(|native| native.0)
+                && inputs
+                    .focus
+                    .as_deref()
+                    .and_then(InputFocus::get)
+                    .is_some_and(|entity| {
+                        inputs.readouts.contains(entity) || inputs.search_editors.contains(entity)
+                    }),
             applied: false,
         };
         frame.run(&events, modifiers);
@@ -793,9 +761,13 @@ pub(crate) fn keyboard_dispatch_system(
         let feedback = shell.feedback_text().to_owned();
         if cache.0.as_deref() != Some(feedback.as_str()) {
             cache.0 = Some(feedback.clone());
-            outputs
-                .commands
-                .trigger(crate::drain::FeedbackChanged(feedback));
+            let tone = shell
+                .feedback_presentation()
+                .map(|feedback| feedback.tone());
+            outputs.commands.trigger(crate::drain::FeedbackChanged {
+                text: feedback,
+                tone,
+            });
         }
     }
     // Quit forwarding is frame-level, not key-level: a quit requested

@@ -1,4 +1,7 @@
-use super::{lttb_indices, stride_envelope, stride_envelope_positions};
+use super::{
+    lttb_gap_preserving, lttb_gap_preserving_positions, lttb_gap_preserving_runs, lttb_indices,
+    stride_envelope, stride_envelope_positions,
+};
 
 // ── lttb_indices ───────────────────────────────────────────────────────
 
@@ -110,6 +113,66 @@ fn lttb_uses_original_indices_as_x_for_sparse_runs() {
     for pair in indices.windows(2) {
         assert!(pair[0] < pair[1], "original sparse indices stay increasing");
     }
+}
+
+#[test]
+fn gap_preserving_lttb_keeps_runs_separate_and_uses_original_indices() {
+    let samples = [1.0, 2.0, 3.0, 4.0, 5.0, f32::NAN, 8.0, 9.0, 10.0, 11.0];
+    let positions = lttb_gap_preserving_positions(&samples, 7);
+    assert_eq!(positions.first(), Some(&Some(0)));
+    assert_eq!(positions.last(), Some(&Some(9)));
+    assert_eq!(
+        positions
+            .iter()
+            .filter(|position| position.is_none())
+            .count(),
+        1
+    );
+    assert!(
+        positions
+            .iter()
+            .flatten()
+            .all(|position| samples[*position].is_finite())
+    );
+    assert!(
+        positions.len() <= 7,
+        "six finite points plus one run separator"
+    );
+
+    let values = lttb_gap_preserving(&samples, 7);
+    assert_eq!(values.iter().filter(|value| value.is_nan()).count(), 1);
+    assert_eq!(values.first(), Some(&1.0));
+    assert_eq!(values.last(), Some(&11.0));
+}
+
+#[test]
+fn gap_preserving_lttb_fails_open_when_the_budget_cannot_cover_each_run() {
+    let samples = [1.0, 2.0, 3.0, f32::NAN, 5.0, 6.0, 7.0, f32::NAN, 9.0, 10.0];
+    let runs = lttb_gap_preserving_runs(&samples, 2);
+    assert_eq!(
+        runs,
+        vec![
+            vec![(0, 1.0), (1, 2.0), (2, 3.0)],
+            vec![(4, 5.0), (5, 6.0), (6, 7.0)],
+            vec![(8, 9.0), (9, 10.0)],
+        ]
+    );
+}
+
+#[test]
+fn gap_preserving_lttb_allocates_shared_budget_without_losing_endpoints() {
+    let mut samples = (0..100).map(|value| value as f32).collect::<Vec<_>>();
+    samples[30] = f32::NAN;
+    samples[70] = f32::NAN;
+    let runs = lttb_gap_preserving_runs(&samples, 12);
+    assert_eq!(runs.len(), 3);
+    assert!(runs.iter().map(Vec::len).sum::<usize>() <= 12);
+    assert_eq!(runs[0].first().map(|(index, _)| *index), Some(0));
+    assert_eq!(runs[0].last().map(|(index, _)| *index), Some(29));
+    assert_eq!(runs[1].first().map(|(index, _)| *index), Some(31));
+    assert_eq!(runs[1].last().map(|(index, _)| *index), Some(69));
+    assert_eq!(runs[2].first().map(|(index, _)| *index), Some(71));
+    assert_eq!(runs[2].last().map(|(index, _)| *index), Some(99));
 }
 
 // ── stride_envelope ────────────────────────────────────────────────────

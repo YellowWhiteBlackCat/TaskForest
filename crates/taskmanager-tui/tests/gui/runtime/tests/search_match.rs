@@ -6,11 +6,12 @@
 //! frontend benefits); the Enter-to-next-match is TUI-local navigation.
 
 use super::super::*;
-use ratatui::crossterm::event::KeyModifiers;
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::SearchSlot;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn app_on_processes() -> crate::TuiApp {
@@ -53,6 +54,61 @@ fn type_search_query(app: &mut crate::TuiApp, query: &str) {
             ),
         );
     }
+}
+
+#[test]
+fn search_editing_moves_the_caret_and_edits_mid_string() {
+    let mut app = app_on_processes();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+    type_search_query(&mut app, "abc");
+    assert_eq!(app.query, "abc");
+    assert_eq!(app.query_cursor(), 3);
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert_eq!(app.query_cursor(), 2);
+    type_search_query(&mut app, "X");
+    assert_eq!(app.query, "abXc");
+    assert_eq!(app.query_cursor(), 3);
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Home, KeyModifiers::NONE));
+    assert_eq!(app.query_cursor(), 0);
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
+    assert_eq!(app.query, "bXc");
+    assert_eq!(app.query_cursor(), 0);
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    assert_eq!(app.query_cursor(), 3);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+    );
+    assert_eq!(app.query, "bX");
+    assert_eq!(app.query_cursor(), 2);
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    assert_eq!(app.query_cursor(), 2, "right at the end is a no-op");
+}
+
+#[test]
+fn search_editing_respects_utf8_boundaries() {
+    let mut app = app_on_processes();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+    type_search_query(&mut app, "aé中");
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert_eq!(app.query_cursor(), "aé".len());
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+    );
+    assert_eq!(app.query, "a中");
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
+    assert_eq!(app.query, "a");
 }
 
 #[test]
@@ -370,4 +426,131 @@ fn the_search_box_renders_the_match_counter() {
         text.contains(&format!("{count} matches")),
         "the search box must show the match count, got:\n{text}"
     );
+}
+
+fn app_on_services() -> crate::TuiApp {
+    let mut app = crate::demo_app();
+    app.application.active_page = AppPage::Services;
+    app.shell.move_selection_to(0);
+    app
+}
+
+#[test]
+fn services_search_filters_its_own_page_and_never_touches_the_process_query() {
+    let mut app = app_on_services();
+    app.query = "keep".to_owned();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+    assert!(app.search_active());
+    assert_eq!(app.shell.search_slot(), SearchSlot::Services);
+
+    type_search_query(&mut app, "Network");
+
+    assert_eq!(app.shell.services_query, "Network");
+    assert_eq!(
+        app.query, "keep",
+        "the Services slot never edits the process query"
+    );
+    assert_eq!(
+        app.shell
+            .visible_services()
+            .iter()
+            .map(|service| service.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["NetworkManager.service", "systemd-timesyncd.service"],
+        "the query matches both the name and the description"
+    );
+    assert_eq!(app.shell.table_row_count(), Some(2));
+    assert!(app.selected < app.shell.visible_service_count());
+}
+
+#[test]
+fn services_search_keeps_the_selected_service_when_it_still_matches() {
+    let mut app = app_on_services();
+    let identity = app
+        .shell
+        .visible_service_at(1)
+        .expect("second demo service")
+        .id
+        .clone();
+    app.shell.move_selection_to(1);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+
+    type_search_query(&mut app, "blue");
+
+    assert_eq!(app.shell.services_query, "blue");
+    assert_eq!(app.shell.visible_service_count(), 1);
+    assert_eq!(app.shell.selected, 0);
+    assert_eq!(
+        app.shell.visible_service_at(0).map(|service| &service.id),
+        Some(&identity),
+        "the query edit preserves the selected service's identity"
+    );
+}
+
+#[test]
+fn services_search_falls_back_when_the_selected_service_is_filtered_out() {
+    let mut app = app_on_services();
+    app.shell.move_selection_to(0);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+
+    type_search_query(&mut app, "docker");
+
+    assert_eq!(app.shell.visible_service_count(), 1);
+    assert_eq!(
+        app.shell
+            .visible_service_at(app.shell.selected)
+            .map(|service| service.name.as_str()),
+        Some("docker.service"),
+        "the cursor lands on the deterministic first remaining row"
+    );
+}
+
+#[test]
+fn services_search_escape_clears_the_query_then_closes_the_field() {
+    let mut app = app_on_services();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+    type_search_query(&mut app, "Network");
+    assert_eq!(app.shell.visible_service_count(), 2);
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.search_active(), "the first Escape keeps the field open");
+    assert_eq!(app.shell.services_query, "");
+    assert_eq!(
+        app.shell.visible_service_count(),
+        5,
+        "clearing the query restores the full inventory"
+    );
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(!app.search_active(), "the second Escape closes the field");
+}
+
+#[test]
+fn services_search_backspace_edits_only_the_services_query() {
+    let mut app = app_on_services();
+    app.query = "process".to_owned();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
+    );
+    type_search_query(&mut app, "net");
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE),
+    );
+    assert_eq!(app.shell.services_query, "ne");
+    assert_eq!(app.shell.services_query_cursor(), 2);
+    assert_eq!(app.query, "process");
 }

@@ -190,6 +190,17 @@ pub(super) fn device_section(hw: &HardwareInfo, smbios: &SmbiosMemoryState) -> S
             hw.firmware_version.as_deref(),
         ),
     ));
+    if let Some(secure_boot) = hw.secure_boot {
+        s.rows.push((
+            i18n::t("system.secure_boot").to_string(),
+            i18n::t(if secure_boot {
+                "common.enabled"
+            } else {
+                "common.disabled"
+            })
+            .to_string(),
+        ));
+    }
     // Desktop session facts (conditional — servers and Windows report none).
     if let Some(package_manager) = hw.package_manager.as_deref() {
         let package_manager = package_manager.trim();

@@ -38,10 +38,10 @@ use iced::advanced::text::{self, Hit, Paragraph};
 use iced::advanced::widget::{self, Id, Tree};
 use iced::advanced::{Clipboard, Layout, Renderer, Shell, Widget, layout};
 use iced::{Color, Element, Event, Length, Point, Rectangle, Size};
-use std::ops::Range;
 
 use crate::app::Message;
 use crate::text_metrics::{MeasuredParagraph, line_at_y};
+use taskmanager_ui_contract::{TextEditState, char_boundary_at_or_before};
 
 /// The wrapping of a value.
 ///
@@ -92,22 +92,23 @@ struct State {
     measured: MeasuredParagraph,
     content: String,
     last_click: Option<iced::advanced::mouse::Click>,
-    /// The reference `SelectableTextState` shape: an anchor plus a byte-range
-    /// selection, cleared whenever the text changes.
-    anchor: Option<usize>,
-    selection: Range<usize>,
+    /// The shared byte-range selection state (the same caret/selection
+    /// machine the shell search and Bevy readouts use), cleared whenever the
+    /// text changes.
+    edit: TextEditState,
     dragging: bool,
 }
 
 impl State {
     fn clear(&mut self) {
-        self.anchor = None;
-        self.selection = 0..0;
+        self.edit.clear_selection();
         self.dragging = false;
     }
 
     fn selected_text(&self) -> Option<String> {
-        (!self.selection.is_empty()).then(|| self.content[self.selection.clone()].to_owned())
+        self.edit
+            .selected_text(&self.content)
+            .map(ToOwned::to_owned)
     }
 
     /// The byte caret for one pointer position: the offset of the character
@@ -148,76 +149,25 @@ impl State {
     fn begin(&mut self, index: usize, click: Kind) {
         let index = char_boundary_at_or_before(&self.content, index);
         match click {
-            Kind::Single => {
-                self.anchor = Some(index);
-                self.selection = index..index;
-            }
+            Kind::Single => self.edit.begin_selection(&self.content, index),
             Kind::Double => {
-                self.anchor = None;
-                self.selection = word_range(&self.content, index);
+                self.edit.select_word_at(&self.content, index);
             }
-            Kind::Triple => {
-                self.anchor = None;
-                self.selection = 0..self.content.len();
-            }
+            Kind::Triple => self.edit.select_all(&self.content),
         }
     }
 
     fn extend(&mut self, index: usize) {
-        let Some(anchor) = self.anchor else {
-            return;
-        };
-        let head = char_boundary_at_or_before(&self.content, index);
-        self.selection = anchor.min(head)..anchor.max(head);
+        self.edit.extend_selection(&self.content, index);
     }
 
     /// Finish a drag session; the returned selection goes to the primary
-    /// clipboard (the reference writes pointer selections there too).
+    /// clipboard (the reference writes pointer selections there too). The
+    /// range stays painted until another gesture replaces it.
     fn finish(&mut self) -> Option<String> {
         self.dragging = false;
-        self.anchor = None;
         self.selected_text()
     }
-}
-
-/// The reference's boundary rule: a hit offset resolves to the character it
-/// points into, never the middle of a multi-byte character.
-fn char_boundary_at_or_before(text: &str, mut index: usize) -> usize {
-    index = index.min(text.len());
-    while index > 0 && !text.is_char_boundary(index) {
-        index -= 1;
-    }
-    index
-}
-
-/// The reference's word selection: an identifier-like run of alphanumeric
-/// bytes plus `.`, `:`, `-`, `_` — so `192.168.1.1` and `aa:bb:cc:dd:ee:ff`
-/// each select whole around any clicked byte. A click on a separator (or
-/// past the end) takes the separator alone, never a neighboring identifier.
-fn word_range(text: &str, index: usize) -> Range<usize> {
-    let bytes = text.as_bytes();
-    let is_word =
-        |byte: u8| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b':' | b'-' | b'_');
-    let clicked = char_boundary_at_or_before(text, index);
-    if clicked >= text.len() {
-        return clicked..clicked;
-    }
-    if !is_word(bytes[clicked]) {
-        let mut end = clicked + 1;
-        while end < text.len() && !text.is_char_boundary(end) {
-            end += 1;
-        }
-        return clicked..end;
-    }
-    let mut start = clicked;
-    while start > 0 && is_word(bytes[start - 1]) {
-        start -= 1;
-    }
-    let mut end = clicked + 1;
-    while end < text.len() && is_word(bytes[end]) {
-        end += 1;
-    }
-    start..end
 }
 
 impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
@@ -280,12 +230,22 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
 
         match event {
             Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. }) => {
+                let command = modifiers.control() || modifiers.logo();
                 let copy_intent = matches!(key, iced::keyboard::Key::Character(c)
                     if c.eq_ignore_ascii_case("c"))
-                    && (modifiers.control() || modifiers.logo());
+                    && command;
+                let select_all_intent = matches!(key, iced::keyboard::Key::Character(c)
+                    if c.eq_ignore_ascii_case("a"))
+                    && command;
                 if copy_intent && let Some(selected) = state.selected_text() {
                     // The explicit copy intent goes to the standard clipboard.
                     clipboard.write(iced::advanced::clipboard::Kind::Standard, selected);
+                    shell.capture_event();
+                } else if select_all_intent && self.is_owner {
+                    // Select-all belongs to the readout that owns the window's
+                    // one selection; otherwise Ctrl-A keeps the shared
+                    // row-summary meaning.
+                    state.edit.select_all(&state.content);
                     shell.capture_event();
                 }
             }
@@ -325,7 +285,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
             _ => {}
         }
 
-        if !self.is_owner && !state.selection.is_empty() {
+        if !self.is_owner && state.edit.selection(&state.content).is_some() {
             // Ownership lost to another selectable value this frame.
             state.clear();
         }
@@ -345,11 +305,11 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
         let bounds = layout.bounds();
         let raw = state.measured.paragraph().raw();
 
-        if !state.selection.is_empty() {
+        if let Some(selection) = state.edit.selection(&state.content) {
             for line in state.measured.lines() {
                 // The part of the selection that falls inside this line.
-                let from = state.selection.start.max(line.start_byte);
-                let to = state.selection.end.min(line.end_byte);
+                let from = selection.start.max(line.start_byte);
+                let to = selection.end.min(line.end_byte);
                 if to <= from {
                     continue;
                 }

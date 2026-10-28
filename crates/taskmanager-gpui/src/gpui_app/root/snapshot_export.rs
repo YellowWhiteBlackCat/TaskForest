@@ -144,3 +144,7 @@ impl RootView {
         true
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/root/snapshot_export_tests.rs"]
+mod tests;

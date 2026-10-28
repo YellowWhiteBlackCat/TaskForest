@@ -538,13 +538,20 @@ fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) ->
         ChartTier::Headline => {
             let card = card.w_full();
             match max_height {
-                // Companion mode: fixed companion height, shrinkable to the
-                // companion floor under viewport pressure. Never grows — the
-                // matrix below owns the surplus.
-                Some(max_height) => card
-                    .h(max_height)
-                    .min_h(px(HEADLINE_COMPANION_FLOOR))
-                    .flex_shrink(1.0),
+                // Companion mode: a DEFINITE companion height. The allocator
+                // already solved the page's vertical budget (it only admits
+                // the companion band when the headline keeps
+                // `HEADLINE_COMPANION_FLOOR`), so this card must not re-enter
+                // flex distribution: the band below owns the surplus.
+                //
+                // `min_h` carries the same value as `h` on purpose. The card
+                // starts from `graph_card`'s `flex_1()` (zero basis), and a
+                // zero basis wins over `h()` on the main axis; while `h()`
+                // alone does not feed the parent section's intrinsic size, a
+                // min-height does. Both are needed for the budget to arrive as
+                // an exact height instead of collapsing to the section's
+                // content minimum.
+                Some(max_height) => card.flex_none().min_h(max_height).h(max_height),
                 None => card.flex_1().min_h(length(tier.min_height())),
             }
         }

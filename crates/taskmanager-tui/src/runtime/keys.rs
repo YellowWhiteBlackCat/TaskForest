@@ -22,7 +22,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use taskmanager_application::{AppPage, Modifiers, PlatformEffect};
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{
-    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoTable, InputDispatch,
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoTable, InputDispatch, SearchSlot,
 };
 
 use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectAction, TuiDirectArm, TuiDirectScope};
@@ -143,21 +143,47 @@ fn route_shell_owned_input(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
 fn route_search(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
     match key.code {
         KeyCode::Char(character) => app.handle_local_char(character, modifiers(key)),
-        KeyCode::Esc if !app.query.is_empty() => {
-            let anchor = app.selected_application_row_anchor();
-            app.query.clear();
-            app.detail_scroll_reset();
-            if app.page() == AppPage::Applications {
-                app.reconcile_query_application_anchor(anchor);
+        KeyCode::Esc if !active_search_query(app).is_empty() => {
+            let anchor = app.capture_search_row_anchor();
+            match app.shell.search_slot() {
+                SearchSlot::Applications => app.query.clear(),
+                SearchSlot::Services => app.shell.set_services_query(""),
             }
+            app.detail_scroll_reset();
+            app.reconcile_search_row_anchor(anchor);
             InputDispatch::Consumed
         }
         KeyCode::Backspace => {
-            let anchor = app.selected_application_row_anchor();
-            let query_before = app.query.clone();
+            let before = active_search_query(app).to_owned();
+            let anchor = app.capture_search_row_anchor();
             app.pop_search_char();
-            if app.query != query_before && app.page() == AppPage::Applications {
-                app.reconcile_query_application_anchor(anchor);
+            if active_search_query(app) != before {
+                app.reconcile_search_row_anchor(anchor);
+            }
+            InputDispatch::Consumed
+        }
+        KeyCode::Left => {
+            app.move_search_cursor_left();
+            InputDispatch::Consumed
+        }
+        KeyCode::Right => {
+            app.move_search_cursor_right();
+            InputDispatch::Consumed
+        }
+        KeyCode::Home => {
+            app.move_search_cursor_home();
+            InputDispatch::Consumed
+        }
+        KeyCode::End => {
+            app.move_search_cursor_end();
+            InputDispatch::Consumed
+        }
+        KeyCode::Delete => {
+            let before = active_search_query(app).to_owned();
+            let anchor = app.capture_search_row_anchor();
+            app.delete_search_char();
+            if active_search_query(app) != before {
+                app.reconcile_search_row_anchor(anchor);
             }
             InputDispatch::Consumed
         }
@@ -165,6 +191,14 @@ fn route_search(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
             InputDispatch::consumed(app.jump_to_next_search_match())
         }
         _ => route_shell_owned_input(app, key),
+    }
+}
+
+/// The query owned by the search field's current slot.
+fn active_search_query(app: &TuiApp) -> &str {
+    match app.shell.search_slot() {
+        SearchSlot::Applications => app.query.as_str(),
+        SearchSlot::Services => app.shell.services_query.as_str(),
     }
 }
 

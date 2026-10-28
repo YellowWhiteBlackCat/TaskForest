@@ -16,6 +16,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
+use taskmanager_shell::SortCol;
 use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};
@@ -44,7 +45,15 @@ pub(super) fn render_column_menu_at(
             let visible = app.column_visible(*column);
             let active = focus.menu_item(crate::TuiSurfaceKind::ColumnMenu) == Some(index);
             let marker = if visible { "✓" } else { " " };
-            let text = format!(" {marker} {}", super::text::pad_cells(column.label(), 12));
+            let width = if matches!(column, SortCol::Pid | SortCol::Name | SortCol::Cpu) {
+                String::from("--")
+            } else {
+                format!("{:>2}", app.column_width(*column))
+            };
+            let text = format!(
+                " {marker} {} {width}",
+                super::text::pad_cells(column.label(), 12)
+            );
             if active {
                 Line::from(vec![
                     Span::styled("› ", Style::new().fg(theme.accent)),

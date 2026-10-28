@@ -136,6 +136,37 @@ pub struct SystemHealthScore {
     pub deductions: Vec<HealthDeduction>,
 }
 
+/// Three-step saturation grade shared by every product surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemSaturationGrade {
+    Healthy,
+    Warning,
+    Critical,
+}
+
+impl SystemSaturationGrade {
+    #[must_use]
+    pub const fn from_score(score: u8) -> Self {
+        if score >= 80 {
+            Self::Healthy
+        } else if score >= 50 {
+            Self::Warning
+        } else {
+            Self::Critical
+        }
+    }
+
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Healthy => "system.saturation_healthy",
+            Self::Warning => "system.saturation_warning",
+            Self::Critical => "system.saturation_critical",
+        }
+    }
+}
+
 impl SystemHealthScore {
     /// Calculate a score from observed evidence. `None` means no input was
     /// observed at all, so the UI can show "unknown" rather than 100.
@@ -214,6 +245,13 @@ impl SystemHealthScore {
     #[must_use]
     pub fn is_degraded(&self) -> bool {
         !self.deductions.is_empty()
+    }
+
+    /// Red/yellow/green saturation classification derived from the same
+    /// transparent score every surface renders.
+    #[must_use]
+    pub const fn saturation_grade(&self) -> SystemSaturationGrade {
+        SystemSaturationGrade::from_score(self.score)
     }
 }
 

@@ -24,12 +24,18 @@ pub(crate) fn gpu_fact_line(gpu: &GpuMetrics) -> String {
             t(if connected { "common.yes" } else { "common.no" })
         ));
     }
+    if let Some(driver) = gpu.driver_version.as_deref().filter(|v| !v.is_empty()) {
+        values.push(format!("{} {driver}", t("gpu.driver_version")));
+    }
     if let Some(version) = gpu
         .vbios_version
         .as_deref()
         .filter(|value| !value.is_empty())
     {
         values.push(format!("{} {version}", t("gpu.vbios_version")));
+    }
+    if let Some(reason) = gpu.current_throttle_reason_text().filter(|r| !r.is_empty()) {
+        values.push(format!("{} {reason}", t("gpu.throttling")));
     }
     if let Some(api) = gpu.graphics_api.as_ref()
         && let Some(version) = api

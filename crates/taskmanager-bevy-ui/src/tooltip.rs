@@ -1,17 +1,22 @@
-//! Pointer-hover explanation tooltip overlay surface.
+//! Hover and keyboard-focus explanation tooltip overlay surface.
 //!
 //! Interactive controls and key metrics can attach [`TooltipText`] so pointer
-//! hover reveals a viewport-fixed explanation card. This surface is declared
-//! `Divergent`: it has no keyboard-focus trigger, though the overlay is
-//! pointer-transparent and supports click/Escape dismissal.
+//! hover — or keyboard focus on the trigger — reveals a viewport-fixed
+//! explanation card. The overlay is pointer-transparent and read-only;
+//! pointer exit, pointer press, Escape, or focus loss dismisses it.
 //!
 //! # Architecture
 //!
 //! Governed by an explicit discrete state machine ([`TooltipState`]):
-//! `None` when inactive, `Some(session)` when an interactive element is
-//! hovered.
+//! `None` when inactive, `Some(session)` when a trigger is hovered or
+//! keyboard-focused.
 //! State transitions emit [`TooltipStateChanged`] so the observer updates
 //! the overlay without frame-by-frame polling.
+//!
+//! A focused trigger owns the card: focus opens it immediately (no hover
+//! delay), and a hover over a different target does not steal it. Escape or
+//! pointer press while focused latches the card closed until focus leaves
+//! that trigger; focus loss itself dismisses the card.
 //!
 //! # The hover delay (BEVY-176)
 //!
@@ -43,6 +48,7 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
+use bevy::input_focus::InputFocus;
 use bevy::math::{Rect, Vec2};
 use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
@@ -54,6 +60,9 @@ use bevy::ui::prelude::{
     UiGlobalTransform, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use taskmanager_ui_contract::{
+    OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
+};
 
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::scene_attach::attach_child;
@@ -61,6 +70,11 @@ use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 
 /// The hover delay before the card becomes visible.
 pub(crate) const TOOLTIP_DELAY: Duration = Duration::from_millis(300);
+
+/// Whether the shared tooltip policy dismisses on one normalized cause.
+fn tooltip_dismisses(cause: OverlayDismissCause) -> bool {
+    dismiss_outcome(OverlayKind::Tooltip, cause, OverlayDismissContext::single()).dismiss
+}
 
 /// Active session of an element hover tooltip.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -81,6 +95,11 @@ pub(crate) struct TooltipState {
     hovered_since: Option<Duration>,
     /// Whether the hover has lasted long enough for the card to show.
     ready: bool,
+    /// The keyboard-focused trigger that currently owns the card.
+    focused_target: Option<Entity>,
+    /// Escape or pointer press dismissed the focused trigger's card; it
+    /// stays closed until focus leaves that trigger.
+    focus_dismissed: bool,
 }
 
 impl TooltipState {
@@ -123,6 +142,12 @@ impl TooltipState {
     #[must_use]
     fn hovered_since(&self) -> Option<Duration> {
         self.hovered_since
+    }
+
+    /// Whether a keyboard-focused trigger currently owns the card.
+    #[must_use]
+    fn focus_holds(&self) -> bool {
+        self.focused_target.is_some() && !self.focus_dismissed
     }
 }
 
@@ -220,6 +245,7 @@ pub(crate) fn tooltip_hover_interaction_system(
     for input in keyboard.read() {
         if input.state == ButtonState::Pressed
             && input.key_code == KeyCode::Escape
+            && tooltip_dismisses(OverlayDismissCause::Escape)
             && let Some(target) = state.session.as_ref().map(|session| session.target)
         {
             state.dismiss(target);
@@ -229,7 +255,12 @@ pub(crate) fn tooltip_hover_interaction_system(
     for (entity, text, interaction) in &query {
         match interaction {
             PickingInteraction::Hovered => {
-                if state.dismissed_target != Some(entity) {
+                let dismissed_while_focused =
+                    state.focused_target == Some(entity) && state.focus_dismissed;
+                if !state.focus_holds()
+                    && !dismissed_while_focused
+                    && state.dismissed_target != Some(entity)
+                {
                     // The delay clock restarts whenever the pointer lands on
                     // a new target; the card stays hidden until it elapses.
                     state.begin_hover(entity, time.elapsed());
@@ -248,16 +279,69 @@ pub(crate) fn tooltip_hover_interaction_system(
                 if state.dismissed_target == Some(entity) {
                     state.dismissed_target = None;
                 }
-                if state.session.as_ref().map(|s| s.target) == Some(entity) {
+                if state.session.as_ref().map(|s| s.target) == Some(entity)
+                    && state.focused_target != Some(entity)
+                    && tooltip_dismisses(OverlayDismissCause::PointerExit)
+                {
                     state.hide();
                     changed = true;
                 }
             }
             PickingInteraction::Pressed => {
-                if state.session.as_ref().map(|s| s.target) == Some(entity) {
+                if state.session.as_ref().map(|s| s.target) == Some(entity)
+                    && tooltip_dismisses(OverlayDismissCause::PointerPress)
+                {
                     state.dismiss(entity);
                     changed = true;
                 }
+            }
+        }
+    }
+    if changed {
+        commands.trigger(TooltipStateChanged);
+    }
+}
+
+/// System tracking keyboard focus on entities with [`TooltipText`].
+///
+/// A focused trigger opens the card immediately — the keyboard equivalent of
+/// settling on a target. Focus loss dismisses it; a hover over another target
+/// cannot steal the card while focus still holds it.
+pub(crate) fn tooltip_focus_interaction_system(
+    mut state: ResMut<TooltipState>,
+    focus: Res<InputFocus>,
+    targets: Query<&TooltipText>,
+    mut commands: Commands,
+) {
+    let focused_target = focus.get().filter(|entity| targets.contains(*entity));
+    if state.focused_target == focused_target {
+        return;
+    }
+    let previous = std::mem::replace(&mut state.focused_target, focused_target);
+    state.focus_dismissed = false;
+    let mut changed = false;
+    match focused_target {
+        Some(entity) => {
+            if let Ok(text) = targets.get(entity) {
+                let next = TooltipSession {
+                    target: entity,
+                    text: text.0.clone(),
+                };
+                if state.session.as_ref() != Some(&next) {
+                    state.show(entity, text.0.clone());
+                    changed = true;
+                }
+                state.ready = true;
+            }
+        }
+        None => {
+            if tooltip_dismisses(OverlayDismissCause::FocusLoss)
+                && previous.is_some_and(|entity| {
+                    state.session.as_ref().map(|session| session.target) == Some(entity)
+                })
+            {
+                state.hide();
+                changed = true;
             }
         }
     }
@@ -343,6 +427,9 @@ pub(crate) fn tooltip_placement_system(
 impl TooltipState {
     fn dismiss(&mut self, target: Entity) {
         self.dismissed_target = Some(target);
+        if self.focused_target == Some(target) {
+            self.focus_dismissed = true;
+        }
         if self.session.as_ref().map(|session| session.target) == Some(target) {
             self.session = None;
             self.ready = false;
@@ -382,8 +469,15 @@ fn on_tooltip_state_changed(
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<TooltipState>();
     app.add_observer(on_tooltip_state_changed);
-    app.add_systems(bevy::app::Update, tooltip_hover_interaction_system);
-    app.add_systems(bevy::app::Update, tooltip_delay_system);
+    app.add_systems(
+        bevy::app::Update,
+        (
+            tooltip_hover_interaction_system,
+            tooltip_focus_interaction_system,
+            tooltip_delay_system,
+        )
+            .chain(),
+    );
     app.add_systems(
         bevy::app::PostUpdate,
         tooltip_placement_system.before(bevy::ui::UiSystems::Layout),

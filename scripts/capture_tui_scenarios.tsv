@@ -136,8 +136,6 @@ apps-group-expanded	applications	default	120	36	gnome-dark
 apps-group-expanded-compact	applications	default	54	16	gnome-dark
 telemetry-paused	performance	default	120	36	gnome-dark
 telemetry-paused-compact	performance	default	54	16	gnome-dark
-sidebar-hidden	performance	default	120	36	gnome-dark
-sidebar-hidden-compact	performance	default	54	16	gnome-dark
 service-details-logs	services	default	120	36	gnome-dark
 service-details-logs-compact	services	default	54	16	gnome-dark
 diagnostic-preview	performance	default	120	36	gnome-dark

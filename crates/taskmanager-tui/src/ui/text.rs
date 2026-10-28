@@ -15,6 +15,28 @@ pub(super) fn cell_width(value: &str) -> usize {
     Line::from(value).width()
 }
 
+/// Resolve a painted cell inside `value` back to a UTF-8 byte boundary.
+///
+/// A one-cell character resolves to the boundary before it; a wide character
+/// resolves before it in its first cell and after it in its second, so both
+/// edges of the glyph are reachable. A cell past the text resolves to the
+/// end. The renderer and the pointer caret read the same rule.
+#[must_use]
+pub(crate) fn byte_at_cell(value: &str, target: usize) -> usize {
+    let mut width = 0;
+    for (offset, character) in value.char_indices() {
+        let cells = cell_width(&character.to_string());
+        if target < width + cells {
+            if cells > 1 && target >= width + cells / 2 {
+                return offset + character.len_utf8();
+            }
+            return offset;
+        }
+        width += cells;
+    }
+    value.len()
+}
+
 /// Pad a value to at least `width` terminal cells without splitting a
 /// grapheme. Values wider than the requested width are preserved; callers
 /// that need a hard bound should truncate first.

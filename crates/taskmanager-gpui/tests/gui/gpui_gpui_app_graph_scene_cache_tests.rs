@@ -5,7 +5,7 @@ use super::super::cache::GraphPresentationCache;
 use super::{
     BadgeDirections, GraphSceneKey, GraphStaticSceneKey, MAX_GRAPH_SCENE_ENTRIES,
     MAX_GRAPH_STATIC_SCENE_ENTRIES, MAX_SPARK_SCENE_ENTRIES, MIN_HOVER_REFRESH_INTERVAL,
-    SeriesSlot, SparkSceneKey, compose_badge_text, decimate_run, hover_refresh_is_due, rgba_bits,
+    SeriesSlot, SparkSceneKey, compose_badge_text, hover_refresh_is_due, rgba_bits,
 };
 use crate::gpui_app::graph::GraphOpts;
 use gpui::{Bounds, Point, Rgba, Size, px};
@@ -27,6 +27,13 @@ fn base() -> Rgba {
         b: 0.9,
         a: 1.0,
     }
+}
+
+fn decimate_run(run: &[(usize, f32)], budget: usize) -> Vec<(usize, f32)> {
+    lttb_indices(run, budget)
+        .into_iter()
+        .map(|position| run[position])
+        .collect()
 }
 
 /// Test-local canonical single-series key (primary slot): the production

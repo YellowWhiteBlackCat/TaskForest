@@ -1,13 +1,13 @@
 //! Pure Services filter/sort projection and its render cache key.
 
-use taskmanager_core::core::text::contains_ascii_ci;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_shell::matches_service_query;
 use taskmanager_shell::order_service_rows;
 use taskmanager_shell::{InfoSortCol, SortDir};
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::list_view::FilterSpec;
 use taskmanager_application::i18n;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 
 /// Status filter for the Services list.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -71,21 +71,15 @@ pub fn sorted_services(
     filtered
 }
 
-/// Filter by typed status and case-insensitive name or description.
+/// Filter by typed status and the shared name/description query rule.
 pub fn filter_services(
     items: &[ServiceItem],
     filter: ServiceFilter,
     query: &str,
 ) -> Vec<ServiceItem> {
-    let query = query.trim();
     items
         .iter()
-        .filter(|service| {
-            filter.matches(service.status)
-                && (query.is_empty()
-                    || contains_ascii_ci(&service.name, query)
-                    || contains_ascii_ci(&service.description, query))
-        })
+        .filter(|service| filter.matches(service.status) && matches_service_query(service, query))
         .cloned()
         .collect()
 }

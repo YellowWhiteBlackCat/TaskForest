@@ -65,6 +65,6 @@ UI integration testing: render real components in headless windows, simulate inp
 and verify state, focus, layout and application callbacks. `gpui_kit::TestSupportExt` is also
 available without the feature: `.test_support()` keeps production render chains
 intact and returns the original element in normal builds. Snapshots read native
-accessibility properties without hand-supplied state.
+accessibility properties without hand-supplied state. See [UI integration testing](TESTING.md) for usage.
 The independent `profiler` feature enables GPUI frame-event instrumentation and is off by default.
 See <https://gpui-kit.com> for the guides.
