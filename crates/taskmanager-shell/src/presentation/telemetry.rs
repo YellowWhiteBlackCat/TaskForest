@@ -265,6 +265,15 @@ pub fn service_diagnostics_rows(diagnostics: &ServiceDiagnostics) -> Vec<(String
     if let Some(user) = diagnostics.user.as_deref() {
         rows.push((i18n::t("svc.user").to_owned(), user.to_owned()));
     }
+    if let Some(current) = diagnostics.memory_current_bytes {
+        let max_str = diagnostics
+            .memory_max_bytes
+            .map_or_else(|| "∞".to_owned(), super::bytes);
+        rows.push((
+            i18n::t("svc.memory_limit").to_owned(),
+            format!("{} / {max_str}", super::bytes(current)),
+        ));
+    }
     if !diagnostics.triggers.is_empty() {
         rows.push((
             i18n::t("svc.triggers").to_owned(),
@@ -448,8 +457,17 @@ pub fn health_score_for_snapshot(snapshot: &SystemSnapshot) -> Option<SystemHeal
 /// Render the score and a bounded deduction bill for dense status surfaces.
 #[must_use]
 pub fn health_score_summary(score: &SystemHealthScore) -> String {
+    let grade = format!(
+        "{}: {}",
+        i18n::t("system.saturation_grade"),
+        i18n::t(score.saturation_grade().i18n_key())
+    );
     if score.deductions.is_empty() {
-        return format!("{}: {}/100", i18n::t("system.health_score"), score.score);
+        return format!(
+            "{}: {}/100 · {grade}",
+            i18n::t("system.health_score"),
+            score.score
+        );
     }
     let deductions = score
         .deductions
@@ -464,7 +482,7 @@ pub fn health_score_summary(score: &SystemHealthScore) -> String {
         String::new()
     };
     format!(
-        "{}: {}/100 · {}{}",
+        "{}: {}/100 · {grade} · {}{}",
         i18n::t("system.health_score"),
         score.score,
         deductions,

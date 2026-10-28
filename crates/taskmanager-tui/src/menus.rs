@@ -39,15 +39,16 @@ pub struct BatchMenuTarget {
 impl TuiApp {
     /// Open the service-action menu for the selected Services-page row.
     /// Returns false (and an honest status line) when no row or no provider
-    /// target is available. The cursor indexes the same sorted projection
-    /// the renderer paints, so the frozen target is always the highlighted
-    /// row (the shell's `sorted_service_at` is the single translation).
+    /// target is available. The cursor indexes the same query-filtered sorted
+    /// projection the renderer paints, so the frozen target is always the
+    /// highlighted row (the shell's `visible_service_at` is the single
+    /// translation).
     #[must_use]
     pub fn open_service_menu(&mut self) -> bool {
         if self.page() != AppPage::Services {
             return false;
         }
-        let Some(service) = self.sorted_service_at(self.selected) else {
+        let Some(service) = self.shell.visible_service_at(self.selected) else {
             return false;
         };
         if service.id.as_str().is_empty() {
@@ -538,7 +539,7 @@ impl TuiApp {
         if self.page() != AppPage::Services {
             return false;
         }
-        let Some(service) = self.sorted_service_at(self.selected) else {
+        let Some(service) = self.shell.visible_service_at(self.selected) else {
             return false;
         };
         let target_id = service.id.clone();

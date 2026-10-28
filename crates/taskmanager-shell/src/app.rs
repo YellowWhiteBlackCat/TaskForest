@@ -29,6 +29,7 @@ use taskmanager_core::{
 use taskmanager_platform_contract::{
     CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId,
 };
+use taskmanager_ui_contract::TextEditState;
 
 use crate::{InputDispatch, ProcessStatusFilter, ShellKeyEvent, matches_process_query, route_key};
 use selection::VisibleProcessesMemo;
@@ -66,8 +67,8 @@ mod sorting;
 mod system_telemetry;
 
 pub use self::direct_track::{
-    DirectTrackState, InventorySorts, ProcessSelection, ProcessViewing, identity_range,
-    order_service_rows, order_session_rows, order_startup_rows,
+    DirectTrackState, InventorySorts, ProcessSelection, ProcessViewing, ServiceViewing,
+    identity_range, order_service_rows, order_session_rows, order_startup_rows,
 };
 pub use self::selection::selected_rows_range;
 
@@ -78,11 +79,12 @@ pub use self::frame::{
     TelemetryFrameState,
 };
 pub use self::gpu_chart_metric::gpu_chart_metric_gate;
-pub use self::input_mode::ShellInputMode;
+pub use self::input_mode::{SearchSlot, ShellInputMode};
 use self::lifecycle::ShellLifecycleState;
 pub use self::lifecycle::{
-    FeedbackBatchLifetime, FeedbackLifecycle, FeedbackNotice, FeedbackSeverity, FeedbackSource,
-    FeedbackState, QuitReason, QuitRequestOutcome, QuitState,
+    FeedbackBatchLifetime, FeedbackLifecycle, FeedbackNotice, FeedbackPresentation,
+    FeedbackSeverity, FeedbackSource, FeedbackState, FeedbackTone, QuitReason, QuitRequestOutcome,
+    QuitState,
 };
 pub use self::platform_feedback::process_control_notice_text;
 pub use self::process_control::{
@@ -351,6 +353,19 @@ pub struct ShellApp {
     /// could silently retarget a neighboring process.
     process_selection_invalidated: bool,
     pub query: String,
+    /// The Services page's own search query. It never narrows the process
+    /// list; [`crate::matches_service_query`] is the one match rule every
+    /// frontend applies to the shared sorted Services projection.
+    pub services_query: String,
+    /// The shared caret/selection machine over the search query. It is a
+    /// position inside the shared query, not a second query buffer; accessors
+    /// clamp it to the current string and a UTF-8 boundary.
+    query_edit: TextEditState,
+    /// The Services slot's caret/selection machine (same contract as
+    /// [`Self::query_edit`]).
+    services_query_edit: TextEditState,
+    /// Which page-owned query the shared search field edits.
+    search_slot: SearchSlot,
     /// The active Applications state bucket. The renderer owns the segmented
     /// control; the shell owns the filtered row set consumed by every action
     /// and keyboard path.
@@ -680,7 +695,7 @@ impl ShellApp {
     pub fn table_row_count(&self) -> Option<usize> {
         match self.page() {
             AppPage::Applications => Some(self.visible_process_count()),
-            AppPage::Services => Some(self.data.services.as_deref().unwrap_or_default().len()),
+            AppPage::Services => Some(self.visible_service_count()),
             AppPage::Startup => Some(
                 self.data
                     .startup_entries

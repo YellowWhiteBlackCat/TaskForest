@@ -290,7 +290,7 @@ fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiF
             process_table::render_processes(frame, app, theme, process, table, plan.focus)
         }
         TuiPageLayout::Services { page, table } => {
-            pages::render_services(frame, app, theme, page, table)
+            pages::render_services(frame, app, theme, page, table, plan.focus)
         }
         TuiPageLayout::System { content } => pages::render_system(frame, app, theme, content),
         TuiPageLayout::Startup { page, table } => {

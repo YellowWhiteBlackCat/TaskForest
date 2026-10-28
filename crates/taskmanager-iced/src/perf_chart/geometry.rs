@@ -2,6 +2,7 @@
 
 use iced::widget::canvas::Path;
 use iced::{Point, Size};
+use taskmanager_application::history_decimation::lttb_gap_preserving_runs;
 
 use super::{WindowSlots, sample_x};
 
@@ -182,28 +183,23 @@ fn series_point_runs_with(
     max: f32,
     x_of: &dyn Fn(usize) -> f32,
 ) -> Vec<Vec<Point>> {
-    let count = samples.len();
-    if count == 0 {
-        return Vec::new();
-    }
     let height = finite_nonnegative(size.height);
-    let mut runs = Vec::new();
-    let mut current = Vec::new();
-    for (index, &raw) in samples.iter().enumerate() {
-        if !raw.is_finite() {
-            if !current.is_empty() {
-                runs.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-        let x = x_of(index);
-        let y = scaled_y_in_range(raw, min, max, height);
-        current.push(Point::new(x, y));
-    }
-    if !current.is_empty() {
-        runs.push(current);
-    }
-    runs
+    let width = if size.width.is_finite() {
+        size.width.clamp(0.0, 16_384.0)
+    } else {
+        0.0
+    };
+    let budget = (width.ceil() as usize).saturating_mul(2).max(2);
+    lttb_gap_preserving_runs(samples, budget)
+        .into_iter()
+        .map(|run| {
+            run.into_iter()
+                .map(|(index, raw)| {
+                    Point::new(x_of(index), scaled_y_in_range(raw, min, max, height))
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// The y-coordinate for one value under the exact normalization

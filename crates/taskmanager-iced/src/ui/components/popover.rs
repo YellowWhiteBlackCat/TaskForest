@@ -13,11 +13,12 @@
 //! the toolkits overlap):
 //! - anchoring: below the anchor when it fits, flipped above when it does
 //!   not, always inside the window ([`anchor`], pure and behavior-tested);
-//! - an outside press dismisses: the press is published as `on_dismiss` and
-//!   captured, so the surface underneath is never activated by the closing
-//!   press. (iced delivers every runtime event to overlays regardless of
-//!   pointer position, and a captured overlay event skips the base tree
-//!   entirely — the two runtime facts this contract is built on.)
+//! - an outside press dismisses through the shared overlay policy; the
+//!   reference GPUI shape forwards the same press to the background target,
+//!   so this primitive does not capture it unless the policy says the frontend
+//!   deliberately blocks the background. (iced delivers every runtime event to
+//!   overlays regardless of pointer position; an uncaptured event reaches the
+//!   base tree, a captured one skips it.)
 //! - Escape, focus restore, and surface precedence stay with the shell's
 //!   surface state machine.
 
@@ -29,6 +30,9 @@ use iced::{Element, Event, Length, Point, Rectangle, Size, Vector};
 
 use crate::app::Message;
 use taskmanager_theme::tokens::SPACE_1;
+use taskmanager_ui_contract::{
+    OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
+};
 
 mod anchor;
 
@@ -39,6 +43,7 @@ pub(crate) struct Popover<'a> {
     panel: Element<'a, Message, iced::Theme, iced::Renderer>,
     on_dismiss: Message,
     gap: f32,
+    kind: OverlayKind,
 }
 
 impl<'a> Popover<'a> {
@@ -52,6 +57,19 @@ impl<'a> Popover<'a> {
             panel: panel.into(),
             on_dismiss,
             gap: f32::from(SPACE_1),
+            kind: OverlayKind::DropdownMenu,
+        }
+    }
+
+    /// A row/action menu anchored to a targeted object.
+    pub(crate) fn context_menu(
+        anchor: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
+        panel: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
+        on_dismiss: Message,
+    ) -> Self {
+        Self {
+            kind: OverlayKind::ContextMenu,
+            ..Self::new(anchor, panel, on_dismiss)
         }
     }
 }
@@ -181,6 +199,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Popover<'_> {
             size: bounds.size(),
             gap: self.gap,
             on_dismiss: self.on_dismiss.clone(),
+            kind: self.kind,
             panel: &mut self.panel,
             tree: panel_tree,
         }));
@@ -206,6 +225,7 @@ struct PopoverOverlay<'a, 'b> {
     size: Size,
     gap: f32,
     on_dismiss: Message,
+    kind: OverlayKind,
     panel: &'b mut Element<'a, Message, iced::Theme, iced::Renderer>,
     tree: &'b mut Tree,
 }
@@ -240,15 +260,24 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for PopoverOverlay<'
         let Some(panel_layout) = layout.children().next() else {
             return;
         };
-        // A press that does not land on the panel closes the surface, and the
-        // captured event never reaches the base tree — the click that dismisses
-        // a menu must not also activate whatever happened to sit under it.
+        // A press that does not land on the panel closes the surface. The
+        // shared policy decides whether the same press is forwarded to the
+        // background target; the reference GPUI shape forwards it.
         if let Event::Mouse(iced::mouse::Event::ButtonPressed(_)) = event {
             let over_panel = cursor.is_over(panel_layout.bounds());
             if !over_panel {
-                shell.publish(self.on_dismiss.clone());
-                shell.capture_event();
-                return;
+                let outcome = dismiss_outcome(
+                    self.kind,
+                    OverlayDismissCause::OutsidePress,
+                    OverlayDismissContext::single(),
+                );
+                if outcome.dismiss {
+                    shell.publish(self.on_dismiss.clone());
+                    if !outcome.forward_outside_press {
+                        shell.capture_event();
+                    }
+                    return;
+                }
             }
         }
         self.panel.as_widget_mut().update(

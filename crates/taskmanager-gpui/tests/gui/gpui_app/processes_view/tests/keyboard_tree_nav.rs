@@ -47,7 +47,7 @@ fn seed_three_level_tree(
     draw(cx, win);
 }
 
-fn press(cx: &mut TestAppContext, win: WindowHandle<RootView>, key: &str) {
+fn press(cx: &mut TestAppContext, win: WindowHandle<RootView>, key: &'static str) {
     cx.dispatch_keystroke(win.into(), Keystroke::parse(key).unwrap());
 }
 

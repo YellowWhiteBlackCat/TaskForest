@@ -49,7 +49,9 @@ src/feature_coverage.rs          FeatureId/FeatureArea coverage registry and the
 │                                declaration per frontend, proving declaration
 │                                discipline only, never behavioral equivalence
 src/feature_coverage/            delivery semantic specs, per-feature platform
-                                 binding, and the read-only three-axis ledger fold
+                                 binding, the read-only three-axis ledger fold,
+                                 and the 225-slot blueprint disposition census
+                                 with its bidirectional slot gate (ADR-059)
 src/accessibility/               neutral accessibility model and snapshots
 src/conformance.rs               conformance suite contracts and test helpers
 ```

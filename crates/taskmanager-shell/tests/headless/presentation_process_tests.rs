@@ -41,3 +41,33 @@ fn format_open_files_saturation_variants() {
     );
     assert_eq!(format_open_files_saturation(10, None, None, "∞"), None);
 }
+
+#[test]
+fn uninterruptible_ratio_uses_the_observed_inventory_and_keeps_real_zero() {
+    let process = |pid: u32, name: &str, status: &str| {
+        let mut process = ProcessItem::new(pid, name);
+        process.status = status.to_owned();
+        process
+    };
+    let processes = vec![
+        process(1, "blocked-a", "D"),
+        process(2, "sleeping", "S"),
+        process(3, "running", "R"),
+        process(4, "blocked-b", "D"),
+    ];
+    assert_eq!(uninterruptible_process_count(Some(&processes)), Some(2));
+    assert_eq!(uninterruptible_process_ratio(Some(&processes)), Some(50.0));
+    assert_eq!(
+        uninterruptible_process_summary(Some(&processes)),
+        Some(format!("{} 2 · 50.0%", t("proc.d_state")))
+    );
+
+    let healthy = vec![process(5, "sleeping", "S")];
+    assert_eq!(uninterruptible_process_ratio(Some(&healthy)), Some(0.0));
+    assert_eq!(
+        uninterruptible_process_summary(Some(&healthy)),
+        Some(format!("{} 0 · 0.0%", t("proc.d_state")))
+    );
+    assert_eq!(uninterruptible_process_ratio(Some(&[])), None);
+    assert_eq!(uninterruptible_process_summary(None), None);
+}

@@ -9,10 +9,24 @@
 //! every method stays reachable on `TuiApp`).
 
 use taskmanager_application::AppPage;
+use taskmanager_ui_contract::ColumnResizePolicy;
 
 use crate::FocusPanel;
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol};
+
+/// The TUI's active resize-policy bounds, in terminal cells. The shared
+/// contract's pixel bounds do not translate to a character grid.
+pub(crate) const COLUMN_WIDTH_MIN_CELLS: u16 = 4;
+pub(crate) const COLUMN_WIDTH_MAX_CELLS: u16 = 40;
+
+/// The same resize transition the graphical frontends apply, expressed in
+/// terminal cells: one cell per keyboard step.
+const COLUMN_CELLS_POLICY: ColumnResizePolicy = ColumnResizePolicy {
+    min: COLUMN_WIDTH_MIN_CELLS as f32,
+    max: COLUMN_WIDTH_MAX_CELLS as f32,
+    step: 1.0,
+};
 
 impl TuiApp {
     /// Scroll the inline detail panel by `delta` lines (positive = down). The
@@ -104,6 +118,54 @@ impl TuiApp {
             SortCol::DiskWrite,
             SortCol::Network,
         ]
+    }
+
+    /// The historical default cell width of one reorderable tail column.
+    #[must_use]
+    pub(crate) const fn default_column_width(column: SortCol) -> u16 {
+        match column {
+            SortCol::Memory | SortCol::Pss | SortCol::Swap => 10,
+            SortCol::User => 12,
+            SortCol::State | SortCol::Threads => 7,
+            SortCol::Fds | SortCol::Nice => 5,
+            SortCol::StartTime => 11,
+            SortCol::CpuTime | SortCol::DiskRead | SortCol::DiskWrite | SortCol::Network => 9,
+            SortCol::Pid | SortCol::Name | SortCol::Cpu => 0,
+        }
+    }
+
+    /// The current display width of one process-table column. A user resize
+    /// overrides the historical default for the session; the fixed
+    /// PID/Name/CPU prefix returns its structural width and cannot be resized.
+    #[must_use]
+    pub(crate) fn column_width(&self, column: SortCol) -> u16 {
+        self.column_widths
+            .get(&column)
+            .copied()
+            .unwrap_or_else(|| Self::default_column_width(column))
+    }
+
+    /// Step the selected tail column's width by one cell, clamped to the
+    /// terminal shape's active resize bounds. The fixed PID/Name/CPU prefix and
+    /// the sort order are untouched; the width is session-local presentation
+    /// state, like the column order.
+    pub fn column_menu_resize(&mut self, delta: i16) {
+        let Some(column) = self
+            .column_menu_selection()
+            .and_then(|selection| Self::toggleable_columns().get(selection).copied())
+        else {
+            return;
+        };
+        if matches!(column, SortCol::Pid | SortCol::Name | SortCol::Cpu) {
+            return;
+        }
+        let current = self.column_width(column);
+        let next = COLUMN_CELLS_POLICY.step(f32::from(current), i32::from(delta));
+        let next = u16::try_from(next.round() as i32).unwrap_or(current);
+        if next != current {
+            self.column_widths.insert(column, next);
+            self.detail_scroll_reset();
+        }
     }
 
     /// Toggle the column-visibility menu on the Applications page (mutually
@@ -263,5 +325,11 @@ impl TuiApp {
     pub fn toggle_sort_direction(&mut self) {
         self.toggle_process_sort_direction_preserving_anchor();
         self.persist_process_prefs();
+    }
+}
+
+impl Default for TuiApp {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -27,7 +27,7 @@ impl RootView {
     /// collapses to an `Rc` clone between changes.
     pub(crate) fn services_rows(&self) -> Rc<Vec<ServiceItem>> {
         let filter = self.services_state.filter;
-        let query = self.services_state.query.trim().to_owned();
+        let query = self.shell.services.query().trim().to_owned();
         let sort = self.inventory_sort(InfoTable::Services);
         let generation = self.services_generation();
         self.projection_caches

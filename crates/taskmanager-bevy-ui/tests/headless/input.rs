@@ -38,6 +38,7 @@ use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::PlatformEffect;
+use taskmanager_application::i18n::t;
 use taskmanager_core::core::process::ProcessBatchAction;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
@@ -574,7 +575,10 @@ fn escape_clears_feedback_notice_and_fires_feedback_changed() {
     let mut app = input_app(shell);
     app.add_observer(
         move |event: bevy::ecs::observer::On<crate::drain::FeedbackChanged>| {
-            received_clone.lock().unwrap().push(event.event().0.clone());
+            received_clone
+                .lock()
+                .unwrap()
+                .push(event.event().text.clone());
         },
     );
 
@@ -669,7 +673,8 @@ fn cursor_of(app: &App) -> usize {
     let q = query_of(app);
     app.world()
         .resource::<super::TextInputState>()
-        .cursor_pos(&q)
+        .edit
+        .caret_in(&q)
 }
 
 #[test]
@@ -916,9 +921,9 @@ fn text_input_word_navigation_and_deletion() {
     // End jumps to end (index 18)
     press_key(&mut app, KeyCode::End, None);
 
-    // Ctrl+Backspace deletes "third"
+    // Ctrl+Backspace deletes "third" and the gap before it.
     press_ctrl(&mut app, KeyCode::Backspace, None);
-    assert_eq!(query_of(&app), "first second ");
+    assert_eq!(query_of(&app), "first second");
 }
 
 // The dispatch-arm behavior tests (0b / 2b / 2c / 3a) live in a sibling
@@ -1026,4 +1031,21 @@ fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
             == 1,
         "plain R queues exactly one setup Run effect, got {effects:?}"
     );
+}
+
+#[test]
+fn x_snapshot_export_reports_the_unavailable_worker() {
+    let mut app = input_app(fixture::demo_app());
+    app.world_mut()
+        .non_send_mut::<FrontendTrack>()
+        .shell
+        .clear_feedback_notice();
+
+    press_key(&mut app, KeyCode::KeyX, Some("x"));
+
+    let shell = &app.world().non_send::<FrontendTrack>().shell;
+    let feedback = shell.feedback_notice().expect("export feedback");
+    assert_eq!(feedback.source(), FeedbackSource::Persistence);
+    assert_eq!(feedback.severity(), FeedbackSeverity::Error);
+    assert_eq!(feedback.text(), t("system.export_unavailable"));
 }

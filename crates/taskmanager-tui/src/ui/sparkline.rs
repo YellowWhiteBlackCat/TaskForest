@@ -27,7 +27,7 @@
 
 use ratatui::style::Style;
 use ratatui::text::Span;
-use taskmanager_application::history_decimation::gap_preserving_envelope;
+use taskmanager_application::history_decimation::lttb_gap_preserving;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{bytes, graph_summary, missing_value};
 
@@ -414,7 +414,7 @@ pub(super) fn history_trend_with_width_in(
     samples: &[f32],
     width: usize,
 ) -> String {
-    let bounded = gap_preserving_envelope(samples, width.clamp(1, 600));
+    let bounded = lttb_gap_preserving(samples, width.clamp(1, 600));
     let samples = bounded.as_slice();
     let finite = samples.iter().copied().filter(|sample| sample.is_finite());
     let min = finite.clone().fold(f32::INFINITY, f32::min);

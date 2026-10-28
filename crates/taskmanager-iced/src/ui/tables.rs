@@ -12,7 +12,7 @@ use taskmanager_application::{AppPage, RefreshRequest};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
 use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
 
-use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
+use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir, matches_service_text};
 use taskmanager_theme::tokens;
 
 pub(super) use super::components::{
@@ -312,7 +312,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                                     service.source_index,
                                     service.name.clone(),
                                 );
-                                crate::ui::components::Popover::new(
+                                crate::ui::components::Popover::context_menu(
                                     cells,
                                     panel,
                                     Message::CloseServiceRowMenu,
@@ -548,10 +548,11 @@ pub(crate) struct ServiceRow {
     pub(super) cycle: bool,
 }
 
+/// The Services projection's row matcher (the cache already trims and
+/// lowercases; the shared rule folds ASCII case itself). One typed rule for
+/// every frontend, so a name can never filter differently per renderer.
 pub(crate) fn service_matches_lower(service: &ServiceRow, query: &str) -> bool {
-    query.is_empty()
-        || service.name.to_lowercase().contains(query)
-        || service.description.to_lowercase().contains(query)
+    matches_service_text(&service.name, &service.description, query)
 }
 
 /// Shared fixed row contract for the three inventory tables. Service action

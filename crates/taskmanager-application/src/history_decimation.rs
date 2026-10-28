@@ -26,6 +26,11 @@
 //!
 //! - [`crate::history_decimation::gap_preserving_envelope`] — coarse review cells keep any unavailable
 //!   interval visible; complete cells retain their maximum.
+//! - [`crate::history_decimation::lttb_gap_preserving_positions`] — the
+//!   endpoint-preserving LTTB route for gapped series. It splits the input into
+//!   finite runs, allocates one shared point budget across those runs, and
+//!   inserts explicit gap separators. Renderers use this when their budget is
+//!   expressed in pixels rather than coarse review cells.
 //!
 //! # Degenerate budgets (adjudicated: never erase)
 //!
@@ -121,6 +126,127 @@ pub fn lttb_indices(run: &[(usize, f32)], budget: usize) -> Vec<usize> {
     }
     selected.push(len - 1);
     selected
+}
+
+/// Decimate a gapped series with LTTB while retaining every finite run as a
+/// separate run. The returned positions are original indices into `samples`.
+///
+/// `target` is a budget for finite points, not for gap separators. Every run
+/// with at least three points keeps its endpoints; the remaining budget is
+/// distributed in proportion to each run's decimatable interior. If `target`
+/// cannot give every run its minimum, or no decimation is needed, every finite
+/// point is returned unchanged. This is deliberately fail-open on fidelity:
+/// a tight budget never erases a run.
+#[must_use]
+pub fn lttb_gap_preserving_runs(samples: &[f32], target: usize) -> Vec<Vec<(usize, f32)>> {
+    let mut runs = Vec::<Vec<(usize, f32)>>::new();
+    let mut current = Vec::<(usize, f32)>::new();
+    for (index, sample) in samples.iter().copied().enumerate() {
+        if sample.is_finite() {
+            current.push((index, sample));
+        } else if !current.is_empty() {
+            runs.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        runs.push(current);
+    }
+    if target == 0 || runs.is_empty() {
+        return runs;
+    }
+    let finite_total = runs.iter().map(Vec::len).sum::<usize>();
+    if target >= finite_total {
+        return runs;
+    }
+    let minimums = runs.iter().map(|run| run.len().min(3)).collect::<Vec<_>>();
+    let minimum_total = minimums.iter().sum::<usize>();
+    if target < minimum_total {
+        return runs;
+    }
+
+    let mut budgets = minimums;
+    let capacities = runs
+        .iter()
+        .zip(&budgets)
+        .map(|(run, minimum)| run.len().saturating_sub(*minimum))
+        .collect::<Vec<_>>();
+    let capacity_total = capacities.iter().sum::<usize>();
+    if capacity_total == 0 {
+        return runs;
+    }
+    let distributable = target.saturating_sub(minimum_total).min(capacity_total);
+    let mut allocated = 0usize;
+    let mut remainders = Vec::with_capacity(runs.len());
+    for (index, capacity) in capacities.iter().copied().enumerate() {
+        let numerator = distributable.saturating_mul(capacity);
+        let share = numerator / capacity_total;
+        budgets[index] = budgets[index].saturating_add(share);
+        allocated = allocated.saturating_add(share);
+        remainders.push((index, numerator % capacity_total));
+    }
+    let mut leftover = distributable.saturating_sub(allocated);
+    remainders.sort_by(
+        |(left_index, left_remainder), (right_index, right_remainder)| {
+            right_remainder
+                .cmp(left_remainder)
+                .then_with(|| left_index.cmp(right_index))
+        },
+    );
+    for (index, _) in remainders {
+        if leftover == 0 {
+            break;
+        }
+        if budgets[index] < runs[index].len() {
+            budgets[index] = budgets[index].saturating_add(1);
+            leftover = leftover.saturating_sub(1);
+        }
+    }
+
+    runs.iter()
+        .zip(budgets)
+        .map(|(run, budget)| {
+            lttb_indices(run, budget)
+                .into_iter()
+                .filter_map(|position| run.get(position).copied())
+                .collect()
+        })
+        .collect()
+}
+
+/// Positions selected by [`lttb_gap_preserving_runs`], with one `None`
+/// separator between finite runs. `target` bounds the total projected length,
+/// including those separators. No separator is emitted for leading or trailing
+/// gaps because a line chart has no run on that side to disconnect.
+///
+/// If `target` cannot represent every run with its own endpoints and one
+/// separator, the function returns every finite point rather than erasing a
+/// run. That fail-open result can exceed `target`; callers with a hard display
+/// slot should treat the input as too fragmented for LTTB instead of silently
+/// dropping evidence.
+#[must_use]
+pub fn lttb_gap_preserving_positions(samples: &[f32], target: usize) -> Vec<Option<usize>> {
+    let run_count = lttb_gap_preserving_runs(samples, 0).len();
+    let separator_count = run_count.saturating_sub(1);
+    let finite_target = target.saturating_sub(separator_count);
+    let runs = lttb_gap_preserving_runs(samples, finite_target);
+    let mut positions = Vec::new();
+    for (run_index, run) in runs.iter().enumerate() {
+        if run_index > 0 {
+            positions.push(None);
+        }
+        positions.extend(run.iter().map(|(index, _)| Some(*index)));
+    }
+    positions
+}
+
+/// Values selected by [`lttb_gap_preserving_positions`], with `NaN`
+/// separators between finite runs.
+#[must_use]
+pub fn lttb_gap_preserving(samples: &[f32], target: usize) -> Vec<f32> {
+    lttb_gap_preserving_positions(samples, target)
+        .into_iter()
+        .map(|position| position.map_or(f32::NAN, |position| samples[position]))
+        .collect()
 }
 
 /// Stride-bucket MAXIMUM envelope of a (possibly gapped) sample curve.

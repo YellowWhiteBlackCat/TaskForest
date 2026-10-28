@@ -33,7 +33,7 @@ use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
     HistoryFrontendSession,
 };
-use taskmanager_application::history_decimation::gap_preserving_envelope;
+use taskmanager_application::history_decimation::lttb_gap_preserving;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     ApplicationHistoryCapability, ApplicationHistoryMetricSeries, ApplicationHistoryProjection,
@@ -207,7 +207,7 @@ impl HistoryPageModel {
 /// projection violates its current worker bound. Preserve the complete
 /// selected window and explicit gaps rather than keeping only a recent tail.
 fn bounded_samples(samples: &[f32]) -> Arc<[f32]> {
-    gap_preserving_envelope(samples, MAX_RENDERED_HISTORY_POINTS).into()
+    lttb_gap_preserving(samples, MAX_RENDERED_HISTORY_POINTS).into()
 }
 
 /// Format a scalar without converting unavailable, negative-count, or

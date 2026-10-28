@@ -17,7 +17,6 @@ use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::entity::Entity;
-use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -41,7 +40,7 @@ use super::details::ProcessDetailsRoot;
 use super::{
     ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
     ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, centered_scroll_top, content,
-    count_line_text, empty_state_text, rows_projection, sort_projection,
+    count_line_text, count_line_text_for_shell, empty_state_text, rows_projection, sort_projection,
 };
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::palette::{UiPalette, ui_palette};
@@ -100,6 +99,7 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.add_plugins(crate::input::InputPlugin);
     app.init_resource::<Assets<Font>>();
     app.insert_resource(WindowPalette {
         inner: palette.clone(),
@@ -486,7 +486,10 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
         "the default CPU-descending sort is marked by the semantic direction plate, \
          flowing inline with the column label"
     );
-    assert_eq!(count_line(&mut app), count_line_text(3, ""));
+    assert_eq!(
+        count_line(&mut app),
+        with_shell(&mut app, |shell| count_line_text_for_shell(shell, 3, ""))
+    );
 }
 
 #[test]
@@ -698,7 +701,12 @@ fn query_commit_replaces_the_shell_query_and_refilters_the_rows() {
     // Locale-agnostic oracle: the rendered line IS the pure formatter's
     // output over the same (count, query) pair — shared catalog copy on any
     // host language, never a hardcoded English string.
-    assert_eq!(count_line(&mut app), count_line_text(1, "alloy"));
+    assert_eq!(
+        count_line(&mut app),
+        with_shell(&mut app, |shell| {
+            count_line_text_for_shell(shell, 1, "alloy")
+        })
+    );
 
     // Committing the empty string clears the query (backspace parity) and
     // restores the full set.
@@ -708,7 +716,10 @@ fn query_commit_replaces_the_shell_query_and_refilters_the_rows() {
     });
     assert_eq!(with_shell(&mut app, |shell| shell.query.clone()), "");
     assert_eq!(row_links(&mut app).len(), 3);
-    assert_eq!(count_line(&mut app), count_line_text(3, ""));
+    assert_eq!(
+        count_line(&mut app),
+        with_shell(&mut app, |shell| count_line_text_for_shell(shell, 3, ""))
+    );
 }
 
 #[test]
@@ -774,7 +785,10 @@ fn a_drain_fold_rebuilds_rows_and_idle_frames_do_not() {
     assert_eq!(after.len(), 3, "the fold re-reads the projection");
     let texts = row_texts(&mut app);
     assert!(texts.iter().any(|text| text.contains("gamma")));
-    assert_eq!(count_line(&mut app), count_line_text(3, ""));
+    assert_eq!(
+        count_line(&mut app),
+        with_shell(&mut app, |shell| count_line_text_for_shell(shell, 3, ""))
+    );
 }
 
 #[test]
@@ -845,11 +859,13 @@ fn the_search_input_displays_the_shell_query() {
         .single(world)
         .expect("exactly one search input node");
     let text = world
-        .get::<Children>(input)
-        .and_then(|children| children.iter().next())
-        .and_then(|child| world.get::<Text>(*child))
-        .expect("the search display text node");
-    assert_eq!(text.0, "al", "the display mirrors the shell query");
+        .get::<bevy::text::EditableText>(input)
+        .expect("the search input carries the native editor buffer");
+    assert_eq!(
+        text.value().to_string(),
+        "al",
+        "the native buffer mirrors the shell query"
+    );
 }
 
 #[test]

@@ -16,7 +16,6 @@ pub(crate) struct ProcessPresentationState {
     pub(crate) env_filter: String,
     pub(crate) last_insights_target: Option<FrozenProcessIdentity>,
     pub(crate) hidden_columns: HashSet<SortCol>,
-    pub(crate) services_query: String,
     pub(crate) details_section: DetailsSection,
     pub(crate) insights_facet: ProcessInsightFacet,
 }
@@ -31,7 +30,6 @@ impl ProcessPresentationState {
             env_filter: String::new(),
             last_insights_target: None,
             hidden_columns: HashSet::new(),
-            services_query: String::new(),
             details_section: DetailsSection::default(),
             insights_facet: ProcessInsightFacet::Network,
         }

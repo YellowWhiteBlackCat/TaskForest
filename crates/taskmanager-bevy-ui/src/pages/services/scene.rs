@@ -2,6 +2,9 @@
 
 use super::*;
 use bevy::text::{LineBreak, TextLayout};
+use taskmanager_shell::SearchSlot;
+
+use crate::input::{SearchEditor, ServicesSearchPlaceholder};
 
 pub(crate) fn on_services_search_input_activated(
     _activate: On<Activate>,
@@ -9,24 +12,19 @@ pub(crate) fn on_services_search_input_activated(
     mut text_state: Option<ResMut<crate::input::TextInputState>>,
     mut commands: Commands,
 ) {
-    track.shell.open_search();
+    track.shell.open_search_for(SearchSlot::Services);
     if let Some(ref mut state) = text_state {
-        state.cursor = track.shell.query.chars().count();
+        state.edit.set_caret_at_end(&track.shell.services_query);
     }
     commands.trigger(crate::input::ShellInteractionApplied);
 }
 
 pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
-    let text = if query.is_empty() {
-        t("search.services").to_owned()
-    } else {
-        query.to_owned()
-    };
-    let ink = if query.is_empty() {
-        palette.dim_color
-    } else {
-        palette.nav_active_ink
-    };
+    let text = query.to_owned();
+    let placeholder = t("search.services").to_owned();
+    let ink = palette.nav_active_ink;
+    let placeholder_ink = palette.dim_color;
+    let placeholder_visible = query.is_empty();
     let width = space_24() * 10.0;
     let radius = palette.control_radius_px;
     bsn! {
@@ -39,10 +37,19 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         }
         BackgroundColor({ palette.panel_fill })
         ServicesSearchInput
+        SearchEditor({ text })
+        TextInput
+        TextFont { font_size: FontSize::Rem(1.0) }
+        TextColor(ink)
+        TextRole(Role::Body)
+        TextLayout { linebreak: LineBreak::NoWrap }
         Button
         on(on_services_search_input_activated)
         Children [
-             Text(text) TextRole(Role::Body) TextColor(ink) TextLayout { linebreak: LineBreak::NoWrap }
+             Text(placeholder) TextRole(Role::Body) TextColor(placeholder_ink)
+             Node { position_type: PositionType::Absolute, left: px(space_8()) }
+             Pickable::IGNORE
+             ServicesSearchPlaceholder({ placeholder_visible })
         ]
     }
 }
@@ -58,7 +65,14 @@ pub(super) fn services_body_scene(
     let selected = selected_row(rows, selection);
     let notice = source_notice_text(shell.projection().services_source.as_deref());
     let empty = empty_state_text(shell.projection().services_source.as_deref());
-    let children = body_children(rows, selected, notice, empty, palette);
+    let children = body_children(
+        rows,
+        selected,
+        notice,
+        empty,
+        palette,
+        &shell.services_query,
+    );
     let header = header_scene(shell.services_sort, palette);
     let toolbar = services_toolbar_scene(selection.target.is_some(), palette);
     bsn! {
@@ -82,6 +96,7 @@ pub(super) fn body_children(
     notice: Option<String>,
     empty: String,
     palette: &UiPalette,
+    query: &str,
 ) -> Vec<Box<dyn Scene>> {
     let mut children = Vec::new();
     if let Some(text) = notice {
@@ -96,6 +111,7 @@ pub(super) fn body_children(
                 index,
                 selected == Some(index),
                 palette,
+                query,
             ));
         }
     }
@@ -359,6 +375,7 @@ pub(super) fn service_row_scene(
     index: usize,
     selected: bool,
     palette: &UiPalette,
+    query: &str,
 ) -> Box<dyn Scene> {
     let widths = columns();
     let name = row.name.clone();
@@ -390,7 +407,7 @@ pub(super) fn service_row_scene(
         Button
         on(on_services_row_activated)
         Children [
-             @service_name_cell_scene(name, name_width, row.cycle, palette) --
+             @service_name_cell_scene(name, name_width, row.cycle, palette, query) --
              @chip_cell_scene(row.status, status_width, chip, palette) --
              @text_cell_scene(description, description_width, Role::Body)
         ]
@@ -402,6 +419,7 @@ pub(super) fn service_name_cell_scene(
     width: f32,
     cycle: bool,
     palette: &UiPalette,
+    query: &str,
 ) -> impl Scene + use<> {
     let alert = if cycle {
         vec![crate::icons::icon_scene(
@@ -412,6 +430,31 @@ pub(super) fn service_name_cell_scene(
     } else {
         Vec::new()
     };
+    let ranges = crate::widgets::table::highlight_ranges("Name", &name, query);
+    let mut flow: Vec<Box<dyn Scene>> = Vec::new();
+    for (segment, is_match) in crate::widgets::table::highlight_segments(&name, &ranges) {
+        let background = if is_match {
+            palette.selection_bg
+        } else {
+            Color::NONE
+        };
+        if is_match {
+            flow.push(Box::new(bsn! {
+                TextSpan({ segment })
+                TextRole(Role::Body)
+                TextBackgroundColor({ background })
+                TextColor({ palette.highlight_fg })
+                CustomTextInk
+            }) as Box<dyn Scene>);
+        } else {
+            flow.push(Box::new(bsn! {
+                TextSpan({ segment })
+                TextRole(Role::Body)
+                TextBackgroundColor({ background })
+            }) as Box<dyn Scene>);
+        }
+    }
+    let root_text = if flow.is_empty() { name } else { String::new() };
     bsn! {
         Node {
             width: px(width),
@@ -424,11 +467,11 @@ pub(super) fn service_name_cell_scene(
         Children [
             { alert }--
 
-                Text(name)
+                Text(root_text)
                 TextRole(Role::Body)
                 TextLayout { linebreak: LineBreak::NoWrap }
                 Pickable::IGNORE
-
+                Children [ { flow } ]
         ]
     }
 }

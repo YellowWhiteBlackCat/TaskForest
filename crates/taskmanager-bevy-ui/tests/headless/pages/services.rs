@@ -904,3 +904,37 @@ fn ordering_cycle_members_paint_the_warning_plate() {
         "exactly the ordering-cycle members must carry the warning plate"
     );
 }
+
+#[test]
+fn services_search_highlight_paints_only_matched_name_runs() {
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![
+            service_item("network", "NetworkManager.service", ServiceStatus::Active),
+            service_item("docker", "docker.service", ServiceStatus::Inactive),
+        ],
+    );
+    app.world_mut()
+        .non_send_mut::<FrontendTrack>()
+        .shell
+        .set_services_query("Network");
+    app.update();
+    app.update();
+    let world = app.world_mut();
+    let mut spans = world.query::<(&bevy::text::TextSpan, &bevy::text::TextBackgroundColor)>();
+    let highlighted: Vec<String> = spans
+        .iter(world)
+        .filter(|(_, background)| background.0 != bevy::color::Color::NONE)
+        .map(|(span, _)| span.0.clone())
+        .collect();
+    assert!(
+        highlighted.iter().any(|span| span == "Network"),
+        "the matched service-name run carries the highlight: {highlighted:?}"
+    );
+    assert!(
+        !highlighted.iter().any(|span| span == "docker"),
+        "an unmatched service name is never highlighted: {highlighted:?}"
+    );
+}

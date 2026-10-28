@@ -4,7 +4,9 @@ use crate::health_review::HealthReviewMode;
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::presentation::command_help;
 use taskmanager_shell::shell_local_bindings;
-use taskmanager_ui_contract::{BindingCoverageStatus, coverage_report, drift_findings};
+use taskmanager_ui_contract::{
+    BindingCoverageStatus, coverage_report, drift_findings, empty_binding_tokens,
+};
 
 /// Contract gate: every command has exactly one explicit entry — no
 /// missing, duplicated, or unknown command.
@@ -16,6 +18,8 @@ fn declaration_covers_every_contract_command_exactly_once() {
     let report = coverage_report(&declaration);
     assert_eq!(report.len(), CommandId::ALL.len());
     assert!(drift_findings(&report).is_empty(), "{report:?}");
+    let empty = empty_binding_tokens(&declaration);
+    assert!(empty.is_empty(), "empty key tokens: {empty:?}");
 }
 
 /// The deliberately-unbound set is explicit — anything else unbound means the
@@ -121,8 +125,11 @@ fn action_menu_vocabulary_pairs_match_the_pinned_footers() {
     );
     assert_eq!(
         menu_hint_pairs(&COLUMN_MENU_HINTS),
-        vec![(" Enter ", " toggle · Esc close".to_owned())],
-        "the column menu pins its single combined toggle/close hint"
+        vec![
+            (" - + ", " width · ".to_owned()),
+            (" Enter ", " toggle · Esc close".to_owned()),
+        ],
+        "the column menu pins its width stepper and combined toggle/close hint"
     );
 }
 

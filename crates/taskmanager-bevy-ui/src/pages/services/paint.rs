@@ -5,7 +5,11 @@ use crate::widgets::scene_paint::ScenePaint;
 use bevy::app::{App, PostUpdate};
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{NonSend, SystemParam};
+use bevy::prelude::Visibility;
+use bevy::text::EditableText;
 use bevy::ui::UiSystems;
+
+use crate::input::{ServicesSearchPlaceholder, placeholder_visibility, sync_search_editor};
 
 #[derive(Resource, Default)]
 pub(super) struct PaintState {
@@ -35,12 +39,13 @@ struct PaintAccess<'w, 's> {
     search: Query<
         'w,
         's,
-        &'static mut Text,
+        &'static mut EditableText,
         (
             With<ServicesSearchInput>,
             bevy::ecs::query::Without<ServicesStatusLine>,
         ),
     >,
+    placeholder: Query<'w, 's, &'static mut Visibility, With<ServicesSearchPlaceholder>>,
     commands: Commands<'w, 's>,
 }
 fn paint(mut access: PaintAccess) {
@@ -71,14 +76,13 @@ fn paint(mut access: PaintAccess) {
     for mut text in &mut access.status {
         text.0 = line.clone();
     }
-    let new_text = if shell.query.is_empty() {
-        t("search.services").to_owned()
-    } else {
-        shell.query.clone()
-    };
-    for mut text in &mut access.search {
-        if text.0 != new_text {
-            text.0 = new_text.clone();
+    for mut editor in &mut access.search {
+        sync_search_editor(&mut editor, &shell.services_query);
+    }
+    let placeholder = placeholder_visibility(&shell.services_query);
+    for mut visibility in &mut access.placeholder {
+        if *visibility != placeholder {
+            *visibility = placeholder;
         }
     }
 }

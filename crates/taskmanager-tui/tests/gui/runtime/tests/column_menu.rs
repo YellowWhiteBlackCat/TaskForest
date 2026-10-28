@@ -8,7 +8,7 @@
 use super::super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use ratatui::crossterm::event::KeyModifiers;
+use ratatui::crossterm::event::{KeyCode, KeyModifiers};
 use taskmanager_application::AppPage;
 
 use crate::TuiTheme;
@@ -70,6 +70,61 @@ fn c_key_opens_the_column_menu_and_esc_closes_it() {
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Esc, KeyModifiers::NONE),
     );
     assert!(!app.column_menu_open(), "Esc must close the column menu");
+}
+
+#[test]
+fn column_menu_width_stepper_resizes_tail_columns_and_skips_the_prefix() {
+    let mut app = app_on_processes();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('C'), KeyModifiers::SHIFT),
+    );
+    // The menu cursor starts on CPU; Memory is the first reorderable tail.
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let default = app.column_width(SortCol::Memory);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
+    );
+    assert_eq!(app.column_width(SortCol::Memory), default + 1);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
+    );
+    assert_eq!(app.column_width(SortCol::Memory), default);
+
+    for _ in 0..64 {
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE),
+        );
+    }
+    assert_eq!(
+        app.column_width(SortCol::Memory),
+        crate::column_prefs::COLUMN_WIDTH_MIN_CELLS
+    );
+    for _ in 0..64 {
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
+        );
+    }
+    assert_eq!(
+        app.column_width(SortCol::Memory),
+        crate::column_prefs::COLUMN_WIDTH_MAX_CELLS
+    );
+
+    let _ = handle_key(&mut app, KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+    let cpu_width = app.column_width(SortCol::Cpu);
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE),
+    );
+    assert_eq!(
+        app.column_width(SortCol::Cpu),
+        cpu_width,
+        "the fixed PID/Name/CPU prefix cannot be resized"
+    );
 }
 
 #[test]

@@ -49,9 +49,11 @@ mod inventory_sort;
 mod process_selection;
 mod process_viewing;
 mod request_sessions;
+mod service_viewing;
 mod session_control;
 
 pub use process_selection::identity_range;
+pub use service_viewing::ServiceViewing;
 use taskmanager_application::{
     AlertEvaluation, AlertEventSeed, AlertRuleEditResult, ControlRequestId,
     DesktopNotificationRequest, ManagedAlertRuleEdit, NetworkEscalationState,
@@ -202,6 +204,8 @@ pub struct DirectTrackState {
     pub selection: ProcessSelection,
     /// Applications-table viewing state: sort, status bucket, search query.
     pub processes: ProcessViewing,
+    /// Services-page search query (shared match rule; one shell-owned slot).
+    pub services: ServiceViewing,
     /// Services / Startup / Users interactive sorts.
     pub sorts: InventorySorts,
     /// Sole typed feedback authority: latest inventory outcomes and runtime

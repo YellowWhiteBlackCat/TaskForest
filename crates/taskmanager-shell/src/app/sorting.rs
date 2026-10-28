@@ -407,6 +407,58 @@ impl ShellApp {
             .collect()
     }
 
+    /// The sorted Services rows that survive the page's query.
+    ///
+    /// The query lives on the shell, so the filtered projection does too: the
+    /// renderer, the row count, and every row action index the same list.
+    #[must_use]
+    pub fn visible_services(&self) -> Vec<&ServiceItem> {
+        let services = self.data.services.as_deref().unwrap_or_default();
+        self.visible_service_indices()
+            .into_iter()
+            .filter_map(|index| services.get(index))
+            .collect()
+    }
+
+    /// Resolve one visible Services row (query applied) to its provider row.
+    #[must_use]
+    pub fn visible_service_at(&self, index: usize) -> Option<&ServiceItem> {
+        let services = self.data.services.as_deref()?;
+        self.visible_service_indices()
+            .get(index)
+            .and_then(|&source| services.get(source))
+    }
+
+    /// Number of Services rows the active query keeps, in the shared sort
+    /// order. Counts without materializing the visible list.
+    #[must_use]
+    pub fn visible_service_count(&self) -> usize {
+        let services = self.data.services.as_deref().unwrap_or_default();
+        self.sorted_service_indices()
+            .into_iter()
+            .filter(|&index| {
+                services.get(index).is_some_and(|service| {
+                    crate::service_query::matches_service_query(service, &self.services_query)
+                })
+            })
+            .count()
+    }
+
+    /// Provider-order indices of the sorted Services rows the active query
+    /// keeps.
+    #[must_use]
+    pub fn visible_service_indices(&self) -> Vec<usize> {
+        let services = self.data.services.as_deref().unwrap_or_default();
+        self.sorted_service_indices()
+            .into_iter()
+            .filter(|&index| {
+                services.get(index).is_some_and(|service| {
+                    crate::service_query::matches_service_query(service, &self.services_query)
+                })
+            })
+            .collect()
+    }
+
     /// Resolve one Services-table visual row — the order every renderer
     /// projects through [`Self::sorted_services`] — back to its provider row.
     /// This is the single "row N → target" translation for the page's menus

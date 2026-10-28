@@ -48,6 +48,7 @@ source "$REPO/scripts/capture_tui_terminal_env.sh"
 CAPTURE_PAGE="${TM_TUI_CAPTURE_PAGE:-performance}"
 CAPTURE_DEVICE="${TM_TUI_CAPTURE_DEVICE:-}"
 CAPTURE_SCENE="${TM_TUI_CAPTURE_SCENE:-}"
+CAPTURE_MATRIX_ROW="${TM_TUI_CAPTURE_MATRIX_ROW:-<manual>}"
 CAPTURE_COLUMNS="${TM_TUI_CAPTURE_COLUMNS:-120}"
 CAPTURE_LINES="${TM_TUI_CAPTURE_LINES:-36}"
 CAPTURE_FONT_SIZE="${TM_TUI_CAPTURE_FONT_SIZE:-13}"
@@ -99,7 +100,7 @@ case "$CAPTURE_SCENE" in
   startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;
   services-search-highlight|service-details-logs) CAPTURE_PAGE=services ;;
   application-history-replay) CAPTURE_PAGE=app-history ;;
-  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|health-review-events|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
+  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|health-review-events|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2
@@ -613,6 +614,8 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'page=%s\n' "$CAPTURE_PAGE"
   printf 'device=%s\n' "${CAPTURE_DEVICE:-default}"
   printf 'scene=%s\n' "${CAPTURE_SCENE:-default}"
+  printf 'matrix=scripts/capture_tui_scenarios.tsv\n'
+  printf 'matrix_row=%s\n' "$CAPTURE_MATRIX_ROW"
   printf 'terminal_columns=%s\n' "$CAPTURE_COLUMNS"
   printf 'terminal_lines=%s\n' "$CAPTURE_LINES"
   printf 'terminal_font_size=%s\n' "$CAPTURE_FONT_SIZE"

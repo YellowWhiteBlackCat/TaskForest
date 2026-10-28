@@ -92,8 +92,8 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
     cx: &mut gpui::TestAppContext,
 ) {
     use gpui::{
-        Modifiers, ScrollDelta, ScrollHandle, ScrollWheelEvent, TouchPhase, VisualTestContext,
-        point, px, size,
+        Modifiers, ScrollDelta, ScrollEvent, ScrollHandle, ScrollSource, TouchPhase,
+        VisualTestContext, point, px, size,
     };
 
     let handle = ScrollHandle::new();
@@ -171,11 +171,12 @@ async fn system_information_modal_uses_a_visible_fixed_rail_and_real_wheel(
     );
 
     let offset_before = handle.offset();
-    visual.simulate_event(ScrollWheelEvent {
+    visual.simulate_event(ScrollEvent {
         position: viewport_before.center(),
         delta: ScrollDelta::Pixels(point(px(0.0), px(-80.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: ScrollSource::Pointer,
     });
     assert!(handle.offset().y < offset_before.y);
     cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))

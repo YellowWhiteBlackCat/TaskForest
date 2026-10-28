@@ -104,7 +104,8 @@ impl TuiApp {
     pub(crate) fn selected_inventory_row_anchor(&self) -> Option<InventoryRowAnchor> {
         match self.page() {
             AppPage::Services => self
-                .sorted_service_at(self.selected)
+                .shell
+                .visible_service_at(self.selected)
                 .filter(|service| !service.id.as_str().is_empty())
                 .map(|service| InventoryRowAnchor::Service(service.id.clone())),
             AppPage::Startup => self
@@ -126,7 +127,8 @@ impl TuiApp {
     pub(crate) fn reconcile_inventory_row_anchor(&mut self, anchor: Option<InventoryRowAnchor>) {
         let target = match anchor.as_ref() {
             Some(InventoryRowAnchor::Service(id)) => self
-                .sorted_services()
+                .shell
+                .visible_services()
                 .iter()
                 .position(|service| service.id == *id),
             Some(InventoryRowAnchor::Startup(id)) => self
@@ -141,7 +143,7 @@ impl TuiApp {
         }
         .unwrap_or_else(|| {
             let count = match self.page() {
-                AppPage::Services => self.sorted_services().len(),
+                AppPage::Services => self.shell.visible_service_count(),
                 AppPage::Startup => self.sorted_startup_entries().len(),
                 AppPage::Users => self.sorted_sessions().len(),
                 _ => 0,
@@ -625,6 +627,39 @@ impl TuiApp {
         self.sync_grouped_application_selection();
     }
 
+    /// Capture the row anchor of the active search page before a query edit.
+    /// The two searchable pages project through different row sets; the
+    /// caller hands the token back to [`Self::reconcile_search_row_anchor`].
+    #[must_use]
+    pub(crate) fn capture_search_row_anchor(&self) -> Option<PageRowAnchor> {
+        match self.page() {
+            AppPage::Applications => self
+                .selected_application_row_anchor()
+                .map(PageRowAnchor::Application),
+            AppPage::Services => self
+                .selected_inventory_row_anchor()
+                .map(PageRowAnchor::Inventory),
+            _ => None,
+        }
+    }
+
+    /// Restore the search page's cursor after a query edit reset the shell's
+    /// positional cursor. A row filtered out by the new query falls back to
+    /// the page's first-actionable row, exactly like the Applications path.
+    pub(crate) fn reconcile_search_row_anchor(&mut self, anchor: Option<PageRowAnchor>) {
+        match (self.page(), anchor) {
+            (AppPage::Applications, Some(PageRowAnchor::Application(anchor))) => {
+                self.reconcile_query_application_anchor(Some(anchor));
+            }
+            (AppPage::Applications, _) => self.reconcile_query_application_anchor(None),
+            (AppPage::Services, Some(PageRowAnchor::Inventory(anchor))) => {
+                self.reconcile_inventory_row_anchor(Some(anchor));
+            }
+            (AppPage::Services, _) => self.reconcile_inventory_row_anchor(None),
+            _ => {}
+        }
+    }
+
     /// Keep the exact Applications row selected while a search query changes
     /// if that identity remains visible. When the query removes it, clear the
     /// stale target and use the search field's established first-actionable
@@ -809,7 +844,7 @@ impl TuiApp {
             self.last_service_dependencies_target = None;
             return None;
         }
-        let service_id = self.sorted_service_at(self.selected)?.id.clone();
+        let service_id = self.shell.visible_service_at(self.selected)?.id.clone();
         if self.last_service_dependencies_target.as_ref() == Some(&service_id) {
             return None;
         }

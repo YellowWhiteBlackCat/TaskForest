@@ -26,10 +26,14 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
+use bevy::input::ButtonState;
+use bevy::input::keyboard::{KeyCode, KeyboardInput};
+use bevy::input_focus::{AutoFocus, FocusLost, FocusedInput, InputFocus};
 use bevy::picking::events::PointerPress;
 use bevy::prelude::Visibility;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::prelude::px;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, GlobalZIndex, JustifyContent, Node,
     OverrideClip, PositionType, UiRect, Val, percent, rem,
@@ -38,12 +42,16 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
-use taskmanager_ui_contract::{IconId, PROCESS_COLUMNS, ProcessColumnSpec};
+use taskmanager_ui_contract::{
+    ColumnResizePolicy, IconId, OverlayDismissCause, OverlayDismissContext, OverlayKind,
+    PROCESS_COLUMNS, ProcessColumnSpec, dismiss_outcome,
+};
 
 use crate::input::ShellInteractionApplied;
 use crate::palette::{UiPalette, space_4, space_8, space_16};
 use crate::scene_attach::attach_child;
 use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::widgets::table::resize::{ColumnWidthNode, ColumnWidthOverrides, live_column_width};
 use crate::window::{Role, TextRole, WindowPalette};
 
 /// Stores the user's hidden column IDs for the processes table.
@@ -362,6 +370,65 @@ fn on_press_outside_the_chooser(
     commands.trigger(ProcessColumnsModalChanged);
 }
 
+/// Observer: focus leaving the open chooser closes it and returns focus to
+/// the trigger. Intra-popover focus moves keep the surface open.
+fn on_chooser_focus_lost(
+    lost: On<FocusLost>,
+    mut state: Option<ResMut<ProcessColumnsModalState>>,
+    focus: Res<InputFocus>,
+    surface: ChooserSurface,
+    mut commands: Commands,
+) {
+    let Some(state) = state.as_deref_mut() else {
+        return;
+    };
+    if !state.is_open() {
+        return;
+    }
+    let mut current = lost.entity;
+    let mut inside = false;
+    for _ in 0..16 {
+        if surface.popovers.contains(current) {
+            inside = true;
+            break;
+        }
+        let Ok(parent) = surface.parents.get(current) else {
+            break;
+        };
+        current = parent.parent();
+    }
+    if !inside {
+        return;
+    }
+    if let Some(new_focus) = focus.get() {
+        let mut current = new_focus;
+        for _ in 0..16 {
+            if surface.popovers.contains(current) {
+                return;
+            }
+            let Ok(parent) = surface.parents.get(current) else {
+                break;
+            };
+            current = parent.parent();
+        }
+    }
+    let outcome = dismiss_outcome(
+        OverlayKind::DropdownMenu,
+        OverlayDismissCause::FocusLoss,
+        OverlayDismissContext::single(),
+    );
+    if !outcome.dismiss {
+        return;
+    }
+    state.close();
+    commands.trigger(ProcessColumnsModalChanged);
+    if outcome.restore_focus
+        && let Some(trigger) = surface.triggers.iter().next()
+    {
+        commands.entity(trigger).insert(AutoFocus);
+    }
+}
+
 /// Observer: a column row toggles that column's visibility.
 pub(crate) fn on_column_toggle_activated(
     activate: On<Activate>,
@@ -485,6 +552,44 @@ fn on_modal_state_changed(
 }
 
 /// Register the chooser state and observers on the app.
+/// Observer: `-`/`=` on a focused column row steps that column's width by
+/// the shared keyboard step. The popover stays open and the live header/body
+/// cells update in place, exactly like a drag commit.
+pub(crate) fn on_column_chooser_width_key(
+    mut key: On<FocusedInput<KeyboardInput>>,
+    state: Option<Res<ProcessColumnsModalState>>,
+    toggles: Query<&ProcessColumnToggleId>,
+    mut overrides: Option<ResMut<ColumnWidthOverrides>>,
+    mut nodes: Query<(&ColumnWidthNode, &mut Node)>,
+) {
+    if !state.is_some_and(|state| state.is_open())
+        || key.input.state != ButtonState::Pressed
+        || key.input.repeat
+    {
+        return;
+    }
+    let steps = match key.input.key_code {
+        KeyCode::Minus | KeyCode::NumpadSubtract => -1,
+        KeyCode::Equal | KeyCode::NumpadAdd => 1,
+        _ => return,
+    };
+    let Ok(toggle) = toggles.get(key.focused_entity) else {
+        return;
+    };
+    let Some(overrides) = overrides.as_deref_mut() else {
+        return;
+    };
+    let column = toggle.0;
+    let width = ColumnResizePolicy::PROCESS.step(live_column_width(column, overrides), steps);
+    overrides.widths.insert(column.to_owned(), width);
+    for (marker, mut node) in &mut nodes {
+        if marker.0 == column {
+            node.width = px(width);
+        }
+    }
+    key.propagate(false);
+}
+
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<ProcessHiddenColumns>();
     app.init_resource::<ProcessColumnsModalState>();
@@ -492,6 +597,8 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_modal_state_changed);
     app.add_observer(on_visibility_changed);
     app.add_observer(on_press_outside_the_chooser);
+    app.add_observer(on_chooser_focus_lost);
+    app.add_observer(on_column_chooser_width_key);
     app.add_systems(bevy::app::Last, flush_pending_despawns);
 }
 

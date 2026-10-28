@@ -28,6 +28,47 @@ pub const COLUMN_WIDTH_MAX: f32 = 1200.0;
 /// The width change one keyboard resize step applies.
 pub const COLUMN_WIDTH_KEYBOARD_STEP: f32 = 10.0;
 
+/// The resize arithmetic one column-width surface applies.
+///
+/// The bounds live in the caller's unit: the graphical frontends use the
+/// shared pixel policy, while a terminal passes its own cell policy. The
+/// CLAMP and STEP semantics are shared either way, so a drag and a keyboard
+/// step can never disagree about how a width moves or where it stops.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ColumnResizePolicy {
+    pub min: f32,
+    pub max: f32,
+    pub step: f32,
+}
+
+impl ColumnResizePolicy {
+    /// The shared process-column pixel policy.
+    pub const PROCESS: Self = Self {
+        min: COLUMN_WIDTH_MIN,
+        max: COLUMN_WIDTH_MAX,
+        step: COLUMN_WIDTH_KEYBOARD_STEP,
+    };
+
+    /// Clamp one width into the policy's bounds (an inverted pair is
+    /// normalized so `max` never sits below `min`).
+    #[must_use]
+    pub fn clamp(self, width: f32) -> f32 {
+        width.clamp(self.min, self.max.max(self.min))
+    }
+
+    /// Apply one pointer-drag delta from the session's anchored width.
+    #[must_use]
+    pub fn drag(self, current: f32, delta: f32) -> f32 {
+        self.clamp(current + delta)
+    }
+
+    /// Apply `steps` keyboard resize steps.
+    #[must_use]
+    pub fn step(self, current: f32, steps: i32) -> f32 {
+        self.clamp(current + steps as f32 * self.step)
+    }
+}
+
 /// One process-table column, described toolkit-neutrally.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProcessColumnSpec {

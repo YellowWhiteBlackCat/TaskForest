@@ -30,7 +30,7 @@
 
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use taskmanager_application::history_decimation::lttb_indices;
+use taskmanager_application::history_decimation::lttb_gap_preserving_runs;
 use taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD;
 use taskmanager_ui::theme_binding::font_weight;
 
@@ -45,8 +45,8 @@ use static_scene::paint_graph_static_scene;
 
 use super::{
     DualGraphSeries, GraphDynamicGeometry, GraphOpts, GraphStaticGeometry, GraphXMapping,
-    build_graph_dynamic_geometry, build_graph_static_geometry, finite_sample_runs,
-    graph_fill_background, latest_finite_sample,
+    build_graph_dynamic_geometry, build_graph_static_geometry, graph_fill_background,
+    latest_finite_sample,
 };
 
 /// Upper bound on retained graph scenes. Real pages stay far below this
@@ -759,8 +759,7 @@ fn build_sparkline_paths(
         .saturating_mul(samples_per_pixel)
         .max(2);
     let mut paths = Vec::new();
-    for run in finite_sample_runs(samples) {
-        let run = decimate_run(&run, point_budget);
+    for run in lttb_gap_preserving_runs(samples, point_budget) {
         let mut path = PathBuilder::stroke(px(sw));
         if let [(index, sample)] = run.as_slice() {
             let x = (*index as f32 / denom) * bw;
@@ -783,23 +782,6 @@ fn build_sparkline_paths(
         }
     }
     paths
-}
-
-/// Largest-triangle-three-buckets downsampling of one finite run, delegated
-/// to the toolkit-neutral single source
-/// (`taskmanager_application::history_decimation::lttb_indices`, promoted
-/// verbatim from this crate). Always keeps the first and last sample;
-/// interior buckets keep the point with the largest triangle area against the
-/// previous selection and the next bucket's average. Original indices are
-/// preserved (the time axis and gap spacing never distort). Runs at or below
-/// `budget` — and degenerate budgets (`< 3`) — are returned unchanged. The
-/// thin adapter exists because the sparkline path consumes `(index, sample)`
-/// pairs while the neutral kernel returns run positions.
-fn decimate_run(run: &[(usize, f32)], budget: usize) -> Vec<(usize, f32)> {
-    lttb_indices(run, budget)
-        .into_iter()
-        .map(|position| run[position])
-        .collect()
 }
 
 // ── Hover-refresh rate gate ────────────────────────────────────────────────

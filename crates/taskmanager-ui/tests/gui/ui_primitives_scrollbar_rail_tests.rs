@@ -1,9 +1,9 @@
 use super::{SCROLLBAR_WIDTH, ScrollbarHandle, ScrollbarRail, thumb_id};
 use gpui::{
     AppContext, Bounds, Context, ElementId, InteractiveElement, IntoElement, Modifiers,
-    MouseButton, ParentElement, Pixels, Point, Render, ScrollDelta, ScrollHandle, ScrollWheelEvent,
-    Size, StatefulInteractiveElement, Styled, TestAppContext, TouchPhase, Window, div, point, px,
-    size,
+    MouseButton, ParentElement, Pixels, Point, Render, ScrollDelta, ScrollEvent, ScrollHandle,
+    ScrollSource, Size, StatefulInteractiveElement, Styled, TestAppContext, TouchPhase, Window,
+    div, point, px, size,
 };
 use std::cell::Cell;
 use std::rc::Rc;
@@ -290,11 +290,12 @@ async fn rail_hit_strip_keeps_wheel_dispatch_on_the_underlying_scroll_owner(
         .debug_bounds("tm-wheel-rail")
         .expect("the wheel fixture must expose the rail hit strip");
     let before = handle.offset();
-    vcx.simulate_event(ScrollWheelEvent {
+    vcx.simulate_event(ScrollEvent {
         position: rail.center(),
         delta: ScrollDelta::Pixels(point(px(0.0), px(-80.0))),
         modifiers: Modifiers::none(),
         touch_phase: TouchPhase::Moved,
+        source: ScrollSource::Pointer,
     });
     assert!(
         handle.offset().y < before.y,

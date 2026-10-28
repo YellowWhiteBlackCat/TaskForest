@@ -139,14 +139,23 @@
 //! only that some frontend really renders the shared projection facet that
 //! backs it (or deliberately refuses it).
 
-use crate::capabilities::CapabilitySupport;
-use crate::keybindings::FrontendShape;
-
+mod blueprint_dispositions;
+mod declaration;
+mod identifiers;
 mod platform_axis;
 mod platform_binding;
 mod platform_gate;
 mod semantic_spec;
 
+pub use blueprint_dispositions::{
+    BlueprintDisposition, BlueprintDispositionFinding, BlueprintDispositionRow,
+    BlueprintDispositionTable, blueprint_disposition_findings,
+};
+pub use declaration::{
+    FeatureCoverageDeclaration, FeatureCoverageEntry, FeatureCoverageFinding,
+    FeatureCoverageFindingKind, FeatureCoverageStatus, feature_coverage_drift,
+    feature_coverage_findings, feature_coverage_report,
+};
 pub use platform_axis::{
     FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, MISSING_DECLARATION_REASON,
     MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause, PlatformUnavailability, classify,
@@ -160,11 +169,6 @@ pub use platform_gate::{
 };
 pub use semantic_spec::FeatureSemanticSpec;
 
-/// One functional area of the 225-item four-frontend parity blueprint.
-///
-/// The 15 variants mirror the blueprint's 15 areas one-to-one. The 10 Wave 3 /
-/// Wave 4 deliverables do not introduce an extra axis: each is filed under the
-/// blueprint area it deepens (see [`FeatureId::area`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FeatureArea {
     /// Area 1: process lifecycle, scheduling and control.
@@ -266,6 +270,7 @@ impl FeatureArea {
 }
 
 /// Which blueprint produced a feature: the 225-item area list or the Wave 3 /
+/// Wave 4 core delivery set./// Which blueprint produced a feature: the 225-item area list or the Wave 3 /
 /// Wave 4 core delivery set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FeatureOrigin {
@@ -286,6 +291,12 @@ impl FeatureOrigin {
     }
 }
 
+/// The blueprint's total slot count. The complete 225-slot census is
+/// [`BlueprintDispositionTable`] (ADR-059); [`FeatureId::ALL`] is the typed
+/// subset that has been adopted, so this count is not its length. The census
+/// states every remaining slot explicitly instead of hiding it in prose.
+pub const BLUEPRINT_ITEM_COUNT: usize = 225;
+
 /// One feature identity in the coverage matrix.
 ///
 /// Every variant here is a real product feature the parity ledger tracks -
@@ -294,47 +305,98 @@ impl FeatureOrigin {
 /// `ALL`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FeatureId {
-    // -- Area 1: process lifecycle -----------------------------------------
     /// Blueprint item 1: Linux scheduler policy perception and adjustment.
     ProcessSchedulerPolicy,
     /// Blueprint item 2: cross-platform nice / priority-class mapping.
     ProcessPriorityMapping,
+    /// Blueprint item 3: process efficiency mode (EcoQoS / cgroup throttle).
+    ProcessEfficiencyMode,
     /// Blueprint item 4: interactive CPU affinity bitmask editing.
     ProcessAffinityMask,
     /// Blueprint item 5: cascade process-tree control (tree kill).
     ProcessTreeKill,
+    /// Blueprint item 6: two-phase graceful shutdown with automatic escalation.
+    ProcessTwoPhaseTermination,
+    /// Blueprint item 7: cgroups v2 runtime resource quota limits.
+    ProcessCgroupResourceLimiting,
+    /// Blueprint item 8: Linux OOM score perception.
+    ProcessOomScore,
+    /// Blueprint item 9: active process physical memory working set trimming.
+    ProcessTrimWorkingSet,
+    /// Blueprint item 10: on-demand process memory core dump / minidump generation.
+    ProcessCoreDump,
+    /// Blueprint item 11: daemon fault self-healing and automatic restart rule.
+    ProcessAutoRestartRule,
+    /// Blueprint item 12: process freeze and thaw control.
+    ProcessFreezeThawControl,
+    /// Blueprint item 13: user-defined process classification tags and highlight badges.
+    ProcessCustomLabel,
     /// Blueprint item 14: full process ancestry lineage.
     ProcessAncestorLineage,
-    // -- Area 2: memory forensics ------------------------------------------
+    /// Blueprint item 15: compound search filter over process projection.
+    ProcessCompoundFilter,
     /// Blueprint item 16: RSS/PSS/USS and virtual memory breakdown.
     MemoryBreakdownRssPss,
-    /// Per-process swap charge (`VmSwap`): the swap currently charged to one
-    /// process. It is deliberately separate from the resident physical-memory
-    /// facets of [`Self::MemoryBreakdownRssPss`] (whose delivery definition
-    /// explicitly excludes the swap charge) and from the system-level
-    /// swap-in/out rates of [`Self::SwapThroughputRate`]; the process-row
-    /// scalar `swap_bytes` is its single authority.
+    /// Blueprint item 17: two-tier smaps rollup summary and lazy detailed smaps parsing.
+    MemorySmapsRollupTiering,
+    /// Per-process swap charge (`VmSwap`).
     MemoryProcessSwapCharge,
     /// Blueprint item 18: full virtual memory area (VMA) map.
     MemoryVmaMap,
+    /// Blueprint item 20: shared memory segment cross-process PID reference correlation.
+    SharedMemorySegmentCrossAudit,
+    /// Blueprint item 21: private and shared dirty page accumulation and writeback pressure.
+    MemoryDirtyPagePressure,
     /// Blueprint item 27: long-term memory leak trend prediction.
     MemoryLeakTrend,
     /// Blueprint item 19: minor/major page-fault accounting.
     MemoryPageFaults,
+    /// Blueprint item 22: ZSWAP / compressed swap and memory telemetry.
+    MemoryCompressionZswap,
     /// Blueprint item 23: anonymous transparent huge-page accounting.
     MemoryTransparentHugePages,
-    // -- Area 3: handles and descriptors -----------------------------------
+    /// Blueprint item 24: user-space memory allocator heap topology and fragmentation inference.
+    UserspaceAllocatorInference,
+    /// Blueprint item 25: Windows commit limit charge and paged / non-paged kernel pool breakdown.
+    WindowsCommitKernelPools,
+    /// Blueprint item 26: macOS physical memory breakdown (compressed, wired, resident).
+    MacosMemoryClassification,
+    /// Blueprint item 28: safe read-only memory signature probing.
+    MemoryReadOnlyStringProbing,
+    /// Blueprint item 29: dual-snapshot virtual memory area differential comparison.
+    VmaSnapshotDiff,
+    /// Blueprint item 30: memory mapped executable code section integrity verification.
+    CodeSectionIntegrityAudit,
     /// Blueprint item 31: structured FD / handle enumeration.
     HandleEnumeration,
     /// Blueprint item 32: automatic handle type classifier.
     HandleTypeClassification,
+    /// Blueprint item 33: open file locks and exclusive status detection.
+    FileLocksAudit,
     /// Blueprint item 34: deleted-but-held (ghost) file detection.
     DeletedFileHandleWatch,
     /// Blueprint item 35: descriptor-limit saturation (RLIMIT_NOFILE).
     HandleFdLimitSaturation,
+    /// Blueprint item 36: bidirectional pipe peer PID reverse lookup.
+    PipePeerPidLookup,
+    /// Blueprint item 37: Unix-domain-socket peer process association.
+    UdsPeerAssociation,
+    /// Blueprint item 38: hardware device node descriptor inspection.
+    DeviceNodeHandleInspection,
     /// Blueprint item 39: reverse lookup of handles by path.
     HandleReversePathSearch,
-    // -- Area 4: thread topology -------------------------------------------
+    /// Blueprint item 40: targeted emergency handle closure action.
+    EmergencyCloseHandleAction,
+    /// Blueprint item 41: handle and descriptor leak trend analysis.
+    HandleLeakTrendAnalysis,
+    /// Blueprint item 42: Windows security access token privileges audit.
+    WindowsAccessTokenAudit,
+    /// Blueprint item 43: anonymous memory file (memfd) sealed properties audit.
+    MemfdSealsAudit,
+    /// Blueprint item 44: mount namespace root inode dual-perspective path resolution.
+    MountNamespaceRootLookup,
+    /// Blueprint item 45: epoll and kqueue descriptor subscription hot-spot monitoring.
+    EpollSubscriptionHotspots,
     /// Blueprint item 46: per-thread topology and resource statistics.
     ThreadTopologyEnumeration,
     /// Blueprint item 57: runqueue wait latency per thread.
@@ -345,40 +407,116 @@ pub enum FeatureId {
     ThreadUninterruptibleSleepDiagnosis,
     /// Blueprint item 49: kernel wait-channel classification.
     ThreadWaitChannelClassification,
-    // -- Area 5: network and sockets ---------------------------------------
+    /// Blueprint item 50: safe user and kernel thread callstack sampling.
+    ThreadCallstackSampling,
+    /// Blueprint item 51: fast userspace mutex (futex) contention and lock owner perception.
+    ThreadFutexContention,
+    /// Blueprint item 52: thread stack memory layout, usage depth, and guard page safety.
+    ThreadStackLayoutGuard,
+    /// Blueprint item 53: per-thread nice priority and CPU core affinity orchestration.
+    ThreadSchedulingNiceAffinity,
+    /// Blueprint item 54: thread pool activity heuristics and idle worker identification.
+    ThreadPoolWorkerHeuristics,
+    /// Blueprint item 55: targeted single-thread suspend and resume lifecycle control.
+    ThreadSuspendResumeControl,
+    /// Blueprint item 56: zombie thread and unharvested task exit detection.
+    ThreadZombieDetection,
+    /// Blueprint item 58: thread-local storage (TLS) area sizing and overhead audit.
+    ThreadLocalStorageAudit,
+    /// Blueprint item 59: high-frequency thread creation and destruction churn warning.
+    ThreadChurnWarning,
+    /// Blueprint item 60: multi-thread aggregated CPU execution contribution slice breakdown.
+    ThreadCpuSliceHeatmap,
     /// Blueprint item 61: per-process Rx/Tx throughput telemetry.
     ProcessNetworkThroughput,
     /// Blueprint item 62: TCP/UDP/Unix socket inventory.
     SocketInventory,
+    /// Blueprint item 63: TCP connection state tracking.
+    SocketStateTracking,
     /// Blueprint item 64: listening-port topology and conflict warnings.
     ListeningPortTopology,
     /// Blueprint item 65: per-socket round-trip-time telemetry.
     SocketRttMetrics,
     /// Blueprint item 66: socket send/receive queue backlog.
     SocketQueueBacklog,
-    // -- Area 6: storage and filesystem I/O --------------------------------
+    /// Blueprint item 67: asynchronous reverse PTR domain resolution with LRU caching.
+    DnsReverseLookup,
+    /// Blueprint item 68: IP geolocation and autonomous system (ASN) attribution.
+    GeoIpAsnLookup,
+    /// Blueprint item 69: real-time socket connection creation and closure audit event stream.
+    SocketConnectionAuditFeed,
+    /// Blueprint item 70: anomalous port and heuristic threat intelligence detection.
+    MaliciousConnectionDetection,
+    /// Blueprint item 71: emergency network socket reset and drop action.
+    NetworkSocketReset,
+    /// Blueprint item 72: process network bandwidth limits and traffic shaping.
+    NetworkTrafficShaping,
+    /// Blueprint item 73: common application-layer network protocol heuristic inference.
+    ApplicationProtocolInference,
+    /// Blueprint item 74: half-closed (CLOSE_WAIT) and orphan socket leak detection.
+    OrphanSocketLeakDetection,
+    /// Blueprint item 75: rolling network bandwidth history time series.
+    NetworkRollingBandwidth,
     /// Blueprint item 76: logical vs physical I/O accounting.
     ProcessLogicalPhysicalIo,
     /// Blueprint item 77: system storage device and partition topology.
     DiskDeviceTopology,
     /// Blueprint item 78: per-disk IOPS, queue depth and latency.
     DiskIopsQueueLatency,
+    /// Blueprint item 79: process I/O scheduling class and priority adjustment.
+    ProcessIoPriority,
+    /// Blueprint item 80: filesystem mount integrity and status audit.
+    StorageFilesystemMountAudit,
+    /// Blueprint item 81: kernel dirty pages and writeback flow.
+    DirtyWritebackFlow,
     /// Blueprint item 82: NVMe/SATA SMART health and wear readouts.
     DiskSmartHealth,
+    /// Blueprint item 83: filesystem space and Inode exhaustion countdown prediction.
+    StorageSpaceDepletionCountdown,
+    /// Blueprint item 84: disk I/O stall and sync write hang diagnosis.
+    StorageIoStallDiagnosis,
     /// Blueprint item 85: system swap-in/swap-out throughput.
     SwapThroughputRate,
-    // -- Area 7: hardware topology and NUMA --------------------------------
+    /// Blueprint item 86: active file hotspot ranking and write throughput attribution.
+    StorageTopAccessedFiles,
+    /// Blueprint item 87: in-memory virtual filesystem capacity accounting.
+    VirtualMemoryFsCapacity,
+    /// Blueprint item 88: storage media TRIM / Discard reclamation support.
+    StorageTrimDiscardSupport,
+    /// Blueprint item 89: multi-disk array (RAID/LVM/ZFS/Btrfs) pool topology and sync rebuild progress.
+    RaidPoolTopology,
+    /// Blueprint item 90: emergency read-only remount and media failure alerts.
+    DiskReadOnlyFailureAlert,
     /// Blueprint item 91: socket -> NUMA -> core -> thread topology tree.
     HardwareTopologyTree,
+    /// Blueprint item 92: performance/efficiency core-class breakdown.
+    CpuHeterogeneousCoreClass,
     /// Blueprint item 93: multi-level CPU cache capacity readout.
     CpuCacheTopology,
     /// Blueprint item 94: NUMA node memory distribution and locality.
     NumaMemoryDistribution,
-    /// Blueprint item 92: performance/efficiency core-class breakdown.
-    CpuHeterogeneousCoreClass,
+    /// Blueprint item 95: per-process NUMA memory allocation policy (MPOL) configuration.
+    ProcessNumaMemoryPolicy,
+    /// Blueprint item 96: cross-NUMA node remote memory allocation and thrashing alert.
+    NumaThrashingAlert,
+    /// Blueprint item 97: PCIe bus topology and negotiated link speed degradation detection.
+    PcieLinkSpeedDegradation,
     /// Blueprint item 98: per-core clock frequency readout.
     CpuCoreFrequency,
-    // -- Area 8: accelerator telemetry -------------------------------------
+    /// Blueprint item 99: advanced hardware thermal velocity and precision boost state perception.
+    CpuThermalBoostStatus,
+    /// Blueprint item 100: CPU instruction-set features and extensions.
+    CpuInstructionFeatures,
+    /// Blueprint item 101: SMBIOS / DMI physical memory slots (DIMM) details.
+    SmbiosMemorySlots,
+    /// Blueprint item 102: memory channel topology and symmetry assessment.
+    MemoryChannelSymmetry,
+    /// Blueprint item 103: CPU-GPU-NPU heterogeneous interconnect and unified memory architecture.
+    HeterogeneousInterconnectArchitecture,
+    /// Blueprint item 104: motherboard chipset, firmware version and secure boot state.
+    FirmwareSecureBoot,
+    /// Blueprint item 105: per-core hardware IRQ and softirq load distribution balance matrix.
+    CpuInterruptAffinityBalance,
     /// Blueprint item 106: dGPU / iGPU adapter enumeration.
     GpuAdapterEnumeration,
     /// Blueprint item 107: native NPU telemetry integration.
@@ -389,9 +527,32 @@ pub enum FeatureId {
     GpuMemoryReadout,
     /// Blueprint item 110: per-process GPU attribution.
     ProcessGpuAttribution,
-    // -- Area 9: power and thermal -----------------------------------------
+    /// Blueprint item 111: GPU core and hot-spot temperature readout.
+    GpuTemperatureReadout,
+    /// Blueprint item 112: GPU board power draw and limit telemetry.
+    GpuPowerDraw,
+    /// Blueprint item 113: GPU core clock frequency telemetry.
+    GpuCoreClockFrequency,
+    /// Blueprint item 114: GPU performance limiters and throttle reasons.
+    GpuThrottleReasons,
+    /// Blueprint item 115: dedicated hardware video encoder/decoder engine utilization.
+    GpuCodecUtilization,
+    /// Blueprint item 116: per-process GPU context handles and client connections.
+    GpuProcessClients,
+    /// Blueprint item 117: NPU tensor workflow queue depth and inference execution latency.
+    NpuInferenceTelemetry,
+    /// Blueprint item 118: multi-GPU interconnect bridge bandwidth and topology status.
+    GpuLinkTopology,
+    /// Blueprint item 119: GPU driver, VBIOS and graphics API runtime.
+    GpuFirmwareApiRuntime,
+    /// Blueprint item 120: GPU reset and timeout detection recovery event telemetry.
+    GpuResetTdrLogs,
     /// Blueprint item 121: Intel/AMD RAPL hardware power draw.
     RaplPowerDraw,
+    /// Blueprint item 122: relative energy impact score across CPU, GPU, wakeups.
+    EnergyImpactScore,
+    /// Blueprint item 124: battery remaining time and charge estimate.
+    BatteryRemainingTimeEstimate,
     /// Blueprint item 125: system thermal zone sensor traversal.
     ThermalZoneSensors,
     /// Blueprint item 127: CPU C-state residency analysis.
@@ -400,72 +561,200 @@ pub enum FeatureId {
     BatteryPowerInventory,
     /// Blueprint item 126: CPU thermal-throttle (PROCHOT) events.
     ThermalThrottleEvents,
-    // -- Area 10: security isolation ---------------------------------------
+    /// Blueprint item 128: CPU energy performance preference (EPP) bias.
+    CpuEnergyPerformancePreference,
+    /// Blueprint item 129: chassis and cooling fan speed telemetry.
+    FanSpeedTelemetry,
+    /// Blueprint item 130: per-process timer expiration and wakeup frequency telemetry.
+    ProcessWakeupFrequency,
+    /// Blueprint item 131: power-profiles daemon state and switching.
+    PowerProfilesDaemon,
+    /// Blueprint item 132: sleep/suspend inhibitor locks and power assertions detection.
+    SleepInhibitLocks,
+    /// Blueprint item 133: display screen and backlight power consumption correlation.
+    DisplayBacklightPower,
+    /// Blueprint item 134: USB and external bus device runtime power management (Runtime PM) audit.
+    UsbDeviceRuntimePm,
+    /// Blueprint item 135: session cumulative energy consumption and cost conversion.
+    SessionEnergyCostCalculation,
     /// Blueprint item 136 / Wave 3 task 1: Linux namespace audit.
     LinuxNamespaceAudit,
-    /// Blueprint item 138 / Wave 3 task 2: POSIX capabilities decode.
-    PosixCapabilitiesAudit,
-    /// Blueprint item 140: seccomp syscall filter audit.
-    SeccompFilterAudit,
     /// Blueprint item 137: container/sandbox environment identification.
     SandboxEnvironmentDetection,
+    /// Blueprint item 138 / Wave 3 task 2: POSIX capabilities decode.
+    PosixCapabilitiesAudit,
+    /// Blueprint item 139: mandatory access control policy label inspection.
+    MandatoryAccessControlLabels,
+    /// Blueprint item 140: seccomp syscall filter audit.
+    SeccompFilterAudit,
+    /// Blueprint item 141: Linux Landlock runtime sandbox ruleset audit.
+    LandlockSandboxAudit,
+    /// Blueprint item 142: no-new-privileges flag audit.
+    SecurityNoNewPrivs,
+    /// Blueprint item 143: user and group identity credentials audit.
+    ProcessOwnerCredentials,
+    /// Blueprint item 144: executable binary digital signature and certificate chain verification.
+    BinarySignatureVerification,
+    /// Blueprint item 145: binary compiler hardening flags audit.
+    CompilerHardeningAudit,
+    /// Blueprint item 146: Windows integrity levels and AppContainer sandboxing audit.
+    WindowsIntegrityLevels,
+    /// Blueprint item 147: macOS entitlements and TCC hardware privacy permissions audit.
+    MacosTccPermissions,
+    /// Blueprint item 148: heuristic high-privilege anomaly detection and escalation alert.
+    PrivilegeAnomalyDetection,
     /// Blueprint item 149: executable/argv0 masquerading detection.
     ProcessMasqueradingDetection,
-    // -- Area 11: services and init ----------------------------------------
-    /// Blueprint item 157 / Wave 3 task 3: systemd dependency DAG.
-    SystemdDependencyDag,
-    /// Blueprint item 159 / Wave 3 task 4: sd-journal service log stream.
-    ServiceLogStream,
-    /// Blueprint item 158: service failure root-cause diagnosis.
-    ServiceFailureDiagnosis,
+    /// Blueprint item 150: executable memory scan detecting anonymous unmapped code and DLL injection.
+    CodeInjectionDetection,
     /// Blueprint item 151: service unit inventory and status.
     ServiceInventoryStatus,
+    /// Blueprint item 152: system and user session service units aggregation.
+    UserServiceAggregation,
+    /// Blueprint item 153: granular service supervisor state machine.
+    ServiceStateMachine,
+    /// Blueprint item 154: service unit file state (enabled/disabled/masked).
+    ServiceUnitFileState,
     /// Blueprint item 155: typed service lifecycle control.
     ServiceLifecycleControl,
-    // -- Area 12: pressure and saturation ----------------------------------
+    /// Blueprint item 156: service unit cgroup memory usage and ceiling.
+    ServiceCgroupResourceLimits,
+    /// Blueprint item 157 / Wave 3 task 3: systemd dependency DAG.
+    SystemdDependencyDag,
+    /// Blueprint item 158: service failure root-cause diagnosis.
+    ServiceFailureDiagnosis,
+    /// Blueprint item 159 / Wave 3 task 4: sd-journal service log stream.
+    ServiceLogStream,
+    /// Blueprint item 160: service restart churn and start-limit accounting.
+    ServiceRestartChurn,
+    /// Blueprint item 161: systemd timer elapse schedule.
+    ServiceTimerSchedule,
+    /// Blueprint item 162: socket activation trigger relationships.
+    ServiceSocketActivation,
+    /// Blueprint item 163: service unit file and drop-in configuration overrides.
+    ServiceUnitFileDropIns,
+    /// Blueprint item 164: startup app boot-impact assessment.
+    StartupImpactAssessment,
+    /// Blueprint item 165: reversible startup item enable/disable control.
+    StartupItemControl,
     /// Blueprint item 166 / Wave 3 task 5: PSI multi-window telemetry.
     PsiMultiWindowTelemetry,
+    /// Blueprint item 167: red/yellow/green saturation grading.
+    PressureSaturationGrade,
     /// Blueprint item 168 / Wave 3 task 6: thrashing and health scoring.
     MemoryThrashingHealthScore,
-    /// Blueprint item 177: USE-methodology bottleneck attribution.
-    UseBottleneckAttribution,
     /// Blueprint item 169: logical-processor-normalized load average.
     PressureLoadAverageNormalized,
+    /// Blueprint item 170: hardware IRQ and softirq CPU saturation analysis.
+    SoftirqSaturationAnalysis,
+    /// Blueprint item 171: share of observed tasks blocked in D-state.
+    PressureDStateRatio,
+    /// Blueprint item 172: filesystem metadata and Inode lock contention latency.
+    FilesystemLockLatency,
+    /// Blueprint item 173: memory compaction stall and transparent huge page allocation delay.
+    MemoryCompactionStall,
+    /// Blueprint item 174: critical memory exhaustion and imminent kernel OOM-killer alert.
+    OomImminentWarning,
+    /// Blueprint item 175: kernel global file descriptor pool capacity.
+    GlobalFdPoolCapacity,
+    /// Blueprint item 176: IPC pipe and message queue buffer filling and saturation monitoring.
+    IpcBufferSaturation,
+    /// Blueprint item 177: USE-methodology bottleneck attribution.
+    UseBottleneckAttribution,
     /// Blueprint item 178: unresponsive foreground application detection.
     UnresponsiveAppDetection,
-    // -- Area 13: IPC and D-Bus --------------------------------------------
+    /// Blueprint item 180: native desktop alert and tray notification integration.
+    PressureNativeAlertIntegration,
     /// Blueprint item 181 / Wave 4 task 7: D-Bus service topology.
     DbusServiceTopology,
     /// Blueprint item 182: D-Bus introspection browsing.
     DbusIntrospection,
-    /// Blueprint item 190 / Wave 4 task 8: pipe deadlock diagnosis.
-    PipeDeadlockDiagnosis,
+    /// Blueprint item 183: real-time D-Bus message flow and method call frequency telemetry.
+    DbusTrafficMonitoring,
     /// Blueprint item 184: POSIX / System V shared-memory segment inventory.
     SharedMemorySegments,
+    /// Blueprint item 185: POSIX and System V message queue depth and capacity limits.
+    PosixSysvMessageQueues,
+    /// Blueprint item 186: named semaphores and mutexes inventory.
+    NamedSemaphoresInventory,
+    /// Blueprint item 187: anonymous pipe bidirectional topology visualization.
+    PipeGraphVisualization,
     /// Blueprint item 188: Unix-domain-socket peer topology.
     UdsPeerTopology,
-    // -- Area 14: dynamic tracing ------------------------------------------
+    /// Blueprint item 189: Windows named pipe and mailslot namespace enumeration.
+    WindowsNamedPipes,
+    /// Blueprint item 190 / Wave 4 task 8: pipe deadlock diagnosis.
+    PipeDeadlockDiagnosis,
+    /// Blueprint item 191: cross-process kernel eventfd and signalfd association.
+    KernelEventNotifiers,
+    /// Blueprint item 192: shared memory segment permissions and global leak risk audit.
+    SharedMemorySecurityAudit,
+    /// Blueprint item 193: D-Bus on-demand auto-activation service response latency profiling.
+    DbusActivationLatency,
+    /// Blueprint item 194: unattached orphaned IPC shared memory and semaphore resource detection.
+    OrphanIpcReclamation,
+    /// Blueprint item 195: system-wide IPC data throughput ranking across communication channels.
+    TopIpcThroughputProducers,
     /// Blueprint item 196 / Wave 4 task 9: hardware PMU counter abstraction.
     PmuCounterAbstraction,
     /// Blueprint item 197: syscall frequency and latency distribution.
     SyscallDistributionProfiling,
     /// Blueprint item 198: slow syscall trap.
     SlowSyscallTrap,
+    /// Blueprint item 199: off-CPU time attribution and blocking duration.
+    OffCpuBlockingAnalysis,
+    /// Blueprint item 200: real-time process file activity monitor stream.
+    ProcessFileActivityTrace,
+    /// Blueprint item 201: real-time network socket lifecycle call audit stream.
+    SocketLifecycleAuditStream,
     /// Blueprint item 202: process fork/exec/exit event trace.
     ProcessEventTrace,
     /// Blueprint item 203: CPU stack-sampling flame graph.
     CpuFlameGraph,
-    // -- Area 15: history and time travel ----------------------------------
+    /// Blueprint item 204: dynamic memory allocation hotspot backtrace profiling.
+    DynamicAllocationProfiling,
+    /// Blueprint item 205: mutex contention hotspot and wait duration profiling.
+    MutexContentionProfiler,
+    /// Blueprint item 206: page-fault occurrence callchain backtrace localization.
+    PageFaultCallchainBacktrace,
+    /// Blueprint item 207: voluntary and involuntary context-switch trigger categorization.
+    ContextSwitchTriggerAnalysis,
+    /// Blueprint item 208: low-overhead in-memory flight recording trace hook.
+    FlightRecordingModeHook,
+    /// Blueprint item 209: cross-tool standard trace data format export (Chrome Trace / Perfetto).
+    TraceDataStandardExport,
+    /// Blueprint item 210: dynamic tracing privileges and kernel safety restrictions self-audit.
+    DynamicTracingCapabilityGate,
     /// Blueprint item 211 / Wave 4 task 10: multi-resolution ring buffer.
     MultiResolutionRingBuffer,
-    /// Blueprint item 217: structured multi-format export engine.
-    MultiFormatExport,
     /// Blueprint item 212: interactive time-travel scrubber.
     TimeTravelScrubber,
+    /// Blueprint item 213: short-lived and exited ghost process retention and trace capture.
+    GhostProcessesCapture,
+    /// Blueprint item 214: arbitrary two-point system state differential comparison.
+    SystemSnapshotDiff,
+    /// Blueprint item 215: pre-crash system telemetry blackbox automatic preservation.
+    BlackboxCrashPreservation,
+    /// Blueprint item 216: offline session recording (.tmrec) serialization and replay load.
+    OfflineSessionRecording,
+    /// Blueprint item 217: structured multi-format export engine.
+    MultiFormatExport,
     /// Blueprint item 218: percentile aggregate analytics (P50/P90/P99).
     TelemetryPercentileAggregation,
+    /// Blueprint item 219: gap-preserving LTTB downsampling for history charts.
+    HistoryLttbDownsampling,
+    /// Blueprint item 220: user-defined event timeline bookmarks and notes annotation.
+    EventTimelineBookmarks,
+    /// Blueprint item 221: process leaderboard ranking evolution over time replay.
+    LeaderboardRankEvolution,
+    /// Blueprint item 222: automated performance benchmarking and A/B diff comparison.
+    BenchmarkAbComparison,
     /// Blueprint item 223: chart image export (SVG/PNG).
     HistoryChartImageExport,
+    /// Blueprint item 224: variable-speed telemetry replay simulation engine.
+    VariableSpeedReplayEngine,
+    /// Blueprint item 225: enterprise privacy data redaction and compliance audit export.
+    EnterprisePrivacyRedaction,
 }
 
 impl FeatureId {
@@ -475,247 +764,230 @@ impl FeatureId {
     pub const ALL: &'static [Self] = &[
         Self::ProcessSchedulerPolicy,
         Self::ProcessPriorityMapping,
+        Self::ProcessEfficiencyMode,
         Self::ProcessAffinityMask,
         Self::ProcessTreeKill,
+        Self::ProcessTwoPhaseTermination,
+        Self::ProcessCgroupResourceLimiting,
+        Self::ProcessOomScore,
+        Self::ProcessTrimWorkingSet,
+        Self::ProcessCoreDump,
+        Self::ProcessAutoRestartRule,
+        Self::ProcessFreezeThawControl,
+        Self::ProcessCustomLabel,
         Self::ProcessAncestorLineage,
+        Self::ProcessCompoundFilter,
         Self::MemoryBreakdownRssPss,
+        Self::MemorySmapsRollupTiering,
         Self::MemoryProcessSwapCharge,
         Self::MemoryVmaMap,
+        Self::SharedMemorySegmentCrossAudit,
+        Self::MemoryDirtyPagePressure,
         Self::MemoryLeakTrend,
         Self::MemoryPageFaults,
+        Self::MemoryCompressionZswap,
         Self::MemoryTransparentHugePages,
+        Self::UserspaceAllocatorInference,
+        Self::WindowsCommitKernelPools,
+        Self::MacosMemoryClassification,
+        Self::MemoryReadOnlyStringProbing,
+        Self::VmaSnapshotDiff,
+        Self::CodeSectionIntegrityAudit,
         Self::HandleEnumeration,
         Self::HandleTypeClassification,
+        Self::FileLocksAudit,
         Self::DeletedFileHandleWatch,
         Self::HandleFdLimitSaturation,
+        Self::PipePeerPidLookup,
+        Self::UdsPeerAssociation,
+        Self::DeviceNodeHandleInspection,
         Self::HandleReversePathSearch,
+        Self::EmergencyCloseHandleAction,
+        Self::HandleLeakTrendAnalysis,
+        Self::WindowsAccessTokenAudit,
+        Self::MemfdSealsAudit,
+        Self::MountNamespaceRootLookup,
+        Self::EpollSubscriptionHotspots,
         Self::ThreadTopologyEnumeration,
         Self::ThreadRunqueueLatency,
         Self::ThreadContextSwitchRates,
         Self::ThreadUninterruptibleSleepDiagnosis,
         Self::ThreadWaitChannelClassification,
+        Self::ThreadCallstackSampling,
+        Self::ThreadFutexContention,
+        Self::ThreadStackLayoutGuard,
+        Self::ThreadSchedulingNiceAffinity,
+        Self::ThreadPoolWorkerHeuristics,
+        Self::ThreadSuspendResumeControl,
+        Self::ThreadZombieDetection,
+        Self::ThreadLocalStorageAudit,
+        Self::ThreadChurnWarning,
+        Self::ThreadCpuSliceHeatmap,
         Self::ProcessNetworkThroughput,
         Self::SocketInventory,
+        Self::SocketStateTracking,
         Self::ListeningPortTopology,
         Self::SocketRttMetrics,
         Self::SocketQueueBacklog,
+        Self::DnsReverseLookup,
+        Self::GeoIpAsnLookup,
+        Self::SocketConnectionAuditFeed,
+        Self::MaliciousConnectionDetection,
+        Self::NetworkSocketReset,
+        Self::NetworkTrafficShaping,
+        Self::ApplicationProtocolInference,
+        Self::OrphanSocketLeakDetection,
+        Self::NetworkRollingBandwidth,
         Self::ProcessLogicalPhysicalIo,
         Self::DiskDeviceTopology,
         Self::DiskIopsQueueLatency,
+        Self::ProcessIoPriority,
+        Self::StorageFilesystemMountAudit,
+        Self::DirtyWritebackFlow,
         Self::DiskSmartHealth,
+        Self::StorageSpaceDepletionCountdown,
+        Self::StorageIoStallDiagnosis,
         Self::SwapThroughputRate,
+        Self::StorageTopAccessedFiles,
+        Self::VirtualMemoryFsCapacity,
+        Self::StorageTrimDiscardSupport,
+        Self::RaidPoolTopology,
+        Self::DiskReadOnlyFailureAlert,
         Self::HardwareTopologyTree,
+        Self::CpuHeterogeneousCoreClass,
         Self::CpuCacheTopology,
         Self::NumaMemoryDistribution,
-        Self::CpuHeterogeneousCoreClass,
+        Self::ProcessNumaMemoryPolicy,
+        Self::NumaThrashingAlert,
+        Self::PcieLinkSpeedDegradation,
         Self::CpuCoreFrequency,
+        Self::CpuThermalBoostStatus,
+        Self::CpuInstructionFeatures,
+        Self::SmbiosMemorySlots,
+        Self::MemoryChannelSymmetry,
+        Self::HeterogeneousInterconnectArchitecture,
+        Self::FirmwareSecureBoot,
+        Self::CpuInterruptAffinityBalance,
         Self::GpuAdapterEnumeration,
         Self::NpuTelemetry,
         Self::GpuEngineUtilization,
         Self::GpuMemoryReadout,
         Self::ProcessGpuAttribution,
+        Self::GpuTemperatureReadout,
+        Self::GpuPowerDraw,
+        Self::GpuCoreClockFrequency,
+        Self::GpuThrottleReasons,
+        Self::GpuCodecUtilization,
+        Self::GpuProcessClients,
+        Self::NpuInferenceTelemetry,
+        Self::GpuLinkTopology,
+        Self::GpuFirmwareApiRuntime,
+        Self::GpuResetTdrLogs,
         Self::RaplPowerDraw,
+        Self::EnergyImpactScore,
+        Self::BatteryRemainingTimeEstimate,
         Self::ThermalZoneSensors,
         Self::CpuCStateAnalysis,
         Self::BatteryPowerInventory,
         Self::ThermalThrottleEvents,
+        Self::CpuEnergyPerformancePreference,
+        Self::FanSpeedTelemetry,
+        Self::ProcessWakeupFrequency,
+        Self::PowerProfilesDaemon,
+        Self::SleepInhibitLocks,
+        Self::DisplayBacklightPower,
+        Self::UsbDeviceRuntimePm,
+        Self::SessionEnergyCostCalculation,
         Self::LinuxNamespaceAudit,
-        Self::PosixCapabilitiesAudit,
-        Self::SeccompFilterAudit,
         Self::SandboxEnvironmentDetection,
+        Self::PosixCapabilitiesAudit,
+        Self::MandatoryAccessControlLabels,
+        Self::SeccompFilterAudit,
+        Self::LandlockSandboxAudit,
+        Self::SecurityNoNewPrivs,
+        Self::ProcessOwnerCredentials,
+        Self::BinarySignatureVerification,
+        Self::CompilerHardeningAudit,
+        Self::WindowsIntegrityLevels,
+        Self::MacosTccPermissions,
+        Self::PrivilegeAnomalyDetection,
         Self::ProcessMasqueradingDetection,
-        Self::SystemdDependencyDag,
-        Self::ServiceLogStream,
-        Self::ServiceFailureDiagnosis,
+        Self::CodeInjectionDetection,
         Self::ServiceInventoryStatus,
+        Self::UserServiceAggregation,
+        Self::ServiceStateMachine,
+        Self::ServiceUnitFileState,
         Self::ServiceLifecycleControl,
+        Self::ServiceCgroupResourceLimits,
+        Self::SystemdDependencyDag,
+        Self::ServiceFailureDiagnosis,
+        Self::ServiceLogStream,
+        Self::ServiceRestartChurn,
+        Self::ServiceTimerSchedule,
+        Self::ServiceSocketActivation,
+        Self::ServiceUnitFileDropIns,
+        Self::StartupImpactAssessment,
+        Self::StartupItemControl,
         Self::PsiMultiWindowTelemetry,
+        Self::PressureSaturationGrade,
         Self::MemoryThrashingHealthScore,
-        Self::UseBottleneckAttribution,
         Self::PressureLoadAverageNormalized,
+        Self::SoftirqSaturationAnalysis,
+        Self::PressureDStateRatio,
+        Self::FilesystemLockLatency,
+        Self::MemoryCompactionStall,
+        Self::OomImminentWarning,
+        Self::GlobalFdPoolCapacity,
+        Self::IpcBufferSaturation,
+        Self::UseBottleneckAttribution,
         Self::UnresponsiveAppDetection,
+        Self::PressureNativeAlertIntegration,
         Self::DbusServiceTopology,
         Self::DbusIntrospection,
-        Self::PipeDeadlockDiagnosis,
+        Self::DbusTrafficMonitoring,
         Self::SharedMemorySegments,
+        Self::PosixSysvMessageQueues,
+        Self::NamedSemaphoresInventory,
+        Self::PipeGraphVisualization,
         Self::UdsPeerTopology,
+        Self::WindowsNamedPipes,
+        Self::PipeDeadlockDiagnosis,
+        Self::KernelEventNotifiers,
+        Self::SharedMemorySecurityAudit,
+        Self::DbusActivationLatency,
+        Self::OrphanIpcReclamation,
+        Self::TopIpcThroughputProducers,
         Self::PmuCounterAbstraction,
         Self::SyscallDistributionProfiling,
         Self::SlowSyscallTrap,
+        Self::OffCpuBlockingAnalysis,
+        Self::ProcessFileActivityTrace,
+        Self::SocketLifecycleAuditStream,
         Self::ProcessEventTrace,
         Self::CpuFlameGraph,
+        Self::DynamicAllocationProfiling,
+        Self::MutexContentionProfiler,
+        Self::PageFaultCallchainBacktrace,
+        Self::ContextSwitchTriggerAnalysis,
+        Self::FlightRecordingModeHook,
+        Self::TraceDataStandardExport,
+        Self::DynamicTracingCapabilityGate,
         Self::MultiResolutionRingBuffer,
-        Self::MultiFormatExport,
         Self::TimeTravelScrubber,
+        Self::GhostProcessesCapture,
+        Self::SystemSnapshotDiff,
+        Self::BlackboxCrashPreservation,
+        Self::OfflineSessionRecording,
+        Self::MultiFormatExport,
         Self::TelemetryPercentileAggregation,
+        Self::HistoryLttbDownsampling,
+        Self::EventTimelineBookmarks,
+        Self::LeaderboardRankEvolution,
+        Self::BenchmarkAbComparison,
         Self::HistoryChartImageExport,
+        Self::VariableSpeedReplayEngine,
+        Self::EnterprisePrivacyRedaction,
     ];
-
-    /// Stable machine name for gates and diagnostics.
-    #[must_use]
-    pub const fn id(self) -> &'static str {
-        match self {
-            Self::ProcessSchedulerPolicy => "process.scheduler-policy",
-            Self::ProcessPriorityMapping => "process.priority-mapping",
-            Self::ProcessAffinityMask => "process.affinity-mask",
-            Self::ProcessTreeKill => "process.tree-kill",
-            Self::ProcessAncestorLineage => "process.ancestor-lineage",
-            Self::MemoryBreakdownRssPss => "memory.breakdown-rss-pss",
-            Self::MemoryProcessSwapCharge => "memory.process-swap-charge",
-            Self::MemoryVmaMap => "memory.vma-map",
-            Self::MemoryLeakTrend => "memory.leak-trend",
-            Self::MemoryPageFaults => "memory.page-faults",
-            Self::MemoryTransparentHugePages => "memory.transparent-huge-pages",
-            Self::HandleEnumeration => "handles.enumeration",
-            Self::HandleTypeClassification => "handles.type-classification",
-            Self::DeletedFileHandleWatch => "handles.deleted-file-watch",
-            Self::HandleFdLimitSaturation => "handles.fd-limit-saturation",
-            Self::HandleReversePathSearch => "handles.reverse-path-search",
-            Self::ThreadTopologyEnumeration => "threads.topology",
-            Self::ThreadRunqueueLatency => "threads.runqueue-latency",
-            Self::ThreadContextSwitchRates => "threads.context-switch-rates",
-            Self::ThreadUninterruptibleSleepDiagnosis => "threads.uninterruptible-sleep",
-            Self::ThreadWaitChannelClassification => "threads.wait-channel-classification",
-            Self::ProcessNetworkThroughput => "network.process-throughput",
-            Self::SocketInventory => "network.socket-inventory",
-            Self::ListeningPortTopology => "network.listening-port-topology",
-            Self::SocketRttMetrics => "network.socket-rtt",
-            Self::SocketQueueBacklog => "network.socket-queue-backlog",
-            Self::ProcessLogicalPhysicalIo => "storage.process-logical-physical-io",
-            Self::DiskDeviceTopology => "storage.device-topology",
-            Self::DiskIopsQueueLatency => "storage.iops-queue-latency",
-            Self::DiskSmartHealth => "storage.smart-health",
-            Self::SwapThroughputRate => "storage.swap-throughput",
-            Self::HardwareTopologyTree => "hardware.topology-tree",
-            Self::CpuCacheTopology => "hardware.cpu-cache-topology",
-            Self::NumaMemoryDistribution => "hardware.numa-memory-distribution",
-            Self::CpuHeterogeneousCoreClass => "hardware.heterogeneous-cores",
-            Self::CpuCoreFrequency => "hardware.core-frequency",
-            Self::GpuAdapterEnumeration => "gpu.adapter-enumeration",
-            Self::NpuTelemetry => "accelerator.npu-telemetry",
-            Self::GpuEngineUtilization => "gpu.engine-utilization",
-            Self::GpuMemoryReadout => "gpu.memory-usage",
-            Self::ProcessGpuAttribution => "gpu.process-attribution",
-            Self::RaplPowerDraw => "power.rapl-draw",
-            Self::ThermalZoneSensors => "power.thermal-zones",
-            Self::CpuCStateAnalysis => "power.cstate-analysis",
-            Self::BatteryPowerInventory => "power.battery-inventory",
-            Self::ThermalThrottleEvents => "power.thermal-throttle-events",
-            Self::LinuxNamespaceAudit => "security.namespace-audit",
-            Self::PosixCapabilitiesAudit => "security.posix-capabilities",
-            Self::SeccompFilterAudit => "security.seccomp-filter",
-            Self::SandboxEnvironmentDetection => "security.sandbox-detection",
-            Self::ProcessMasqueradingDetection => "security.masquerading-detection",
-            Self::SystemdDependencyDag => "services.dependency-dag",
-            Self::ServiceLogStream => "services.log-stream",
-            Self::ServiceFailureDiagnosis => "services.failure-diagnosis",
-            Self::ServiceInventoryStatus => "services.inventory",
-            Self::ServiceLifecycleControl => "services.lifecycle-control",
-            Self::PsiMultiWindowTelemetry => "pressure.psi-multi-window",
-            Self::MemoryThrashingHealthScore => "pressure.memory-thrashing-health",
-            Self::UseBottleneckAttribution => "pressure.use-attribution",
-            Self::PressureLoadAverageNormalized => "pressure.load-average-normalized",
-            Self::UnresponsiveAppDetection => "pressure.unresponsive-apps",
-            Self::DbusServiceTopology => "ipc.dbus-service-topology",
-            Self::DbusIntrospection => "ipc.dbus-introspection",
-            Self::PipeDeadlockDiagnosis => "ipc.pipe-deadlock",
-            Self::SharedMemorySegments => "ipc.shared-memory-segments",
-            Self::UdsPeerTopology => "ipc.uds-peer-topology",
-            Self::PmuCounterAbstraction => "tracing.pmu-counters",
-            Self::SyscallDistributionProfiling => "tracing.syscall-distribution",
-            Self::SlowSyscallTrap => "tracing.slow-syscall-trap",
-            Self::ProcessEventTrace => "tracing.process-event-trace",
-            Self::CpuFlameGraph => "tracing.cpu-flame-graph",
-            Self::MultiResolutionRingBuffer => "history.multi-resolution-ring",
-            Self::MultiFormatExport => "history.multi-format-export",
-            Self::TimeTravelScrubber => "history.time-travel-scrubber",
-            Self::TelemetryPercentileAggregation => "history.percentile-aggregation",
-            Self::HistoryChartImageExport => "history.chart-image-export",
-        }
-    }
-
-    /// The blueprint area this feature belongs to.
-    #[must_use]
-    pub const fn area(self) -> FeatureArea {
-        match self {
-            Self::ProcessSchedulerPolicy
-            | Self::ProcessPriorityMapping
-            | Self::ProcessAffinityMask
-            | Self::ProcessTreeKill
-            | Self::ProcessAncestorLineage => FeatureArea::ProcessLifecycle,
-            Self::MemoryBreakdownRssPss
-            | Self::MemoryProcessSwapCharge
-            | Self::MemoryVmaMap
-            | Self::MemoryLeakTrend
-            | Self::MemoryPageFaults
-            | Self::MemoryTransparentHugePages => FeatureArea::MemoryForensics,
-            Self::HandleEnumeration
-            | Self::HandleTypeClassification
-            | Self::DeletedFileHandleWatch
-            | Self::HandleFdLimitSaturation
-            | Self::HandleReversePathSearch => FeatureArea::HandleDescriptorAudit,
-            Self::ThreadTopologyEnumeration
-            | Self::ThreadRunqueueLatency
-            | Self::ThreadContextSwitchRates
-            | Self::ThreadUninterruptibleSleepDiagnosis
-            | Self::ThreadWaitChannelClassification => FeatureArea::ThreadTopology,
-            Self::ProcessNetworkThroughput
-            | Self::SocketInventory
-            | Self::ListeningPortTopology
-            | Self::SocketRttMetrics
-            | Self::SocketQueueBacklog => FeatureArea::NetworkSockets,
-            Self::ProcessLogicalPhysicalIo
-            | Self::DiskDeviceTopology
-            | Self::DiskIopsQueueLatency
-            | Self::DiskSmartHealth
-            | Self::SwapThroughputRate => FeatureArea::StorageFilesystemIo,
-            Self::HardwareTopologyTree
-            | Self::CpuCacheTopology
-            | Self::NumaMemoryDistribution
-            | Self::CpuHeterogeneousCoreClass
-            | Self::CpuCoreFrequency => FeatureArea::HardwareTopologyNuma,
-            Self::GpuAdapterEnumeration
-            | Self::NpuTelemetry
-            | Self::GpuEngineUtilization
-            | Self::GpuMemoryReadout
-            | Self::ProcessGpuAttribution => FeatureArea::AcceleratorTelemetry,
-            Self::RaplPowerDraw
-            | Self::ThermalZoneSensors
-            | Self::CpuCStateAnalysis
-            | Self::BatteryPowerInventory
-            | Self::ThermalThrottleEvents => FeatureArea::PowerThermal,
-            Self::LinuxNamespaceAudit
-            | Self::PosixCapabilitiesAudit
-            | Self::SeccompFilterAudit
-            | Self::SandboxEnvironmentDetection
-            | Self::ProcessMasqueradingDetection => FeatureArea::SecurityIsolation,
-            Self::SystemdDependencyDag
-            | Self::ServiceLogStream
-            | Self::ServiceFailureDiagnosis
-            | Self::ServiceInventoryStatus
-            | Self::ServiceLifecycleControl => FeatureArea::ServicesInit,
-            Self::PsiMultiWindowTelemetry
-            | Self::MemoryThrashingHealthScore
-            | Self::UseBottleneckAttribution
-            | Self::PressureLoadAverageNormalized
-            | Self::UnresponsiveAppDetection => FeatureArea::PressureSaturation,
-            Self::DbusServiceTopology
-            | Self::DbusIntrospection
-            | Self::PipeDeadlockDiagnosis
-            | Self::SharedMemorySegments
-            | Self::UdsPeerTopology => FeatureArea::IpcDbus,
-            Self::PmuCounterAbstraction
-            | Self::SyscallDistributionProfiling
-            | Self::SlowSyscallTrap
-            | Self::ProcessEventTrace
-            | Self::CpuFlameGraph => FeatureArea::DynamicTracing,
-            Self::MultiResolutionRingBuffer
-            | Self::MultiFormatExport
-            | Self::TimeTravelScrubber
-            | Self::TelemetryPercentileAggregation
-            | Self::HistoryChartImageExport => FeatureArea::HistoryTimeTravel,
-        }
-    }
 
     /// Which blueprint produced this feature.
     #[must_use]
@@ -734,191 +1006,6 @@ impl FeatureId {
             _ => FeatureOrigin::Blueprint225,
         }
     }
-}
-
-/// One declared feature-to-support pair.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FeatureCoverageEntry {
-    pub feature: FeatureId,
-    pub support: CapabilitySupport,
-}
-
-/// A frontend's explicit declaration of its feature coverage: one entry per
-/// contract-known feature.
-#[derive(Clone, Debug)]
-pub struct FeatureCoverageDeclaration {
-    pub frontend: FrontendShape,
-    pub entries: Vec<FeatureCoverageEntry>,
-}
-
-/// The coverage outcome for one feature.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FeatureCoverageStatus {
-    /// An explicit support decision.
-    Declared(CapabilitySupport),
-    /// Contract-known but absent from the declaration - a silent omission.
-    Missing,
-    /// Declared more than once by the same frontend.
-    Duplicated,
-    /// Declared but outside the known feature set.
-    Unknown,
-}
-
-impl FeatureCoverageStatus {
-    /// Whether the feature carries an explicit decision - the only status a
-    /// no-drift declaration may show.
-    #[must_use]
-    pub const fn is_explicit(self) -> bool {
-        matches!(self, Self::Declared(_))
-    }
-
-    /// Whether this status is a drift finding a gate must reject.
-    #[must_use]
-    pub const fn is_drift(self) -> bool {
-        !self.is_explicit()
-    }
-}
-
-/// What a feature-coverage gate rejects, beyond the plain drift statuses.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FeatureCoverageFindingKind {
-    /// Contract-known feature absent from the declaration.
-    Missing,
-    /// Feature declared more than once.
-    Duplicated,
-    /// Declared feature outside the known set.
-    Unknown,
-    /// A non-reference shape declared `Reference` (reusing the GPUI-05 rule
-    /// from the capability registry: only the GPUI shape owns reference
-    /// semantics).
-    ReferenceOutsideReferenceShape,
-    /// The reference shape declared `Ported`/`Divergent`/`Native` - the
-    /// shape that owns the semantics cannot port, diverge from, or delegate
-    /// itself. It MAY declare [`CapabilitySupport::Unsupported`] ("reference
-    /// surface not yet delivered"): the coverage matrix keeps every gap
-    /// visible, and the reference shape honestly states its own undelivered
-    /// items instead of fabricating a `Reference` claim.
-    ReferenceShapeCannotPort,
-    /// A `Native`/`Divergent`/`Unsupported` decision without its required
-    /// supplier/reason text.
-    EmptyExplanation,
-}
-
-/// One gate finding: the frontend, the feature, and what is wrong.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FeatureCoverageFinding {
-    pub frontend: FrontendShape,
-    pub feature: FeatureId,
-    pub kind: FeatureCoverageFindingKind,
-}
-
-/// The coverage matrix for one declaration against the full feature set, in
-/// canonical [`FeatureId::ALL`] order.
-#[must_use]
-pub fn feature_coverage_report(
-    declaration: &FeatureCoverageDeclaration,
-) -> Vec<(FeatureId, FeatureCoverageStatus)> {
-    feature_coverage_report_over(declaration, FeatureId::ALL)
-}
-
-/// The drift findings alone.
-#[must_use]
-pub fn feature_coverage_drift(
-    report: &[(FeatureId, FeatureCoverageStatus)],
-) -> Vec<(FeatureId, FeatureCoverageStatus)> {
-    report
-        .iter()
-        .copied()
-        .filter(|(_, status)| status.is_drift())
-        .collect()
-}
-
-/// The one-call gate payload: fold drift plus the shape-discipline rules
-/// (reference role, reference-shape totality, non-empty explanations), reusing
-/// the capability-registry semantics. An empty result is the only passing
-/// state.
-#[must_use]
-pub fn feature_coverage_findings(
-    declaration: &FeatureCoverageDeclaration,
-) -> Vec<FeatureCoverageFinding> {
-    let drift_kind = |status: FeatureCoverageStatus| match status {
-        FeatureCoverageStatus::Missing => Some(FeatureCoverageFindingKind::Missing),
-        FeatureCoverageStatus::Duplicated => Some(FeatureCoverageFindingKind::Duplicated),
-        FeatureCoverageStatus::Unknown => Some(FeatureCoverageFindingKind::Unknown),
-        FeatureCoverageStatus::Declared(_) => None,
-    };
-    let mut findings: Vec<FeatureCoverageFinding> = feature_coverage_report(declaration)
-        .into_iter()
-        .filter_map(|(feature, status)| {
-            drift_kind(status).map(|kind| FeatureCoverageFinding {
-                frontend: declaration.frontend,
-                feature,
-                kind,
-            })
-        })
-        .collect();
-    for (feature, status) in feature_coverage_report(declaration) {
-        let FeatureCoverageStatus::Declared(support) = status else {
-            continue;
-        };
-        let kind = if support == CapabilitySupport::Reference
-            && !declaration.frontend.is_capability_reference_shape()
-        {
-            Some(FeatureCoverageFindingKind::ReferenceOutsideReferenceShape)
-        } else if declaration.frontend.is_capability_reference_shape()
-            && matches!(
-                support,
-                CapabilitySupport::Ported
-                    | CapabilitySupport::Divergent { .. }
-                    | CapabilitySupport::Native { .. }
-            )
-        {
-            Some(FeatureCoverageFindingKind::ReferenceShapeCannotPort)
-        } else if support.explanation().is_some_and(str::is_empty) {
-            Some(FeatureCoverageFindingKind::EmptyExplanation)
-        } else {
-            None
-        };
-        if let Some(kind) = kind {
-            findings.push(FeatureCoverageFinding {
-                frontend: declaration.frontend,
-                feature,
-                kind,
-            });
-        }
-    }
-    findings.sort_by_key(|finding| finding.feature);
-    findings.dedup();
-    findings
-}
-
-/// The fold against a restricted known set - the seam that keeps the `Unknown`
-/// path real (a declared feature outside `known` is reported, never silently
-/// dropped).
-fn feature_coverage_report_over(
-    declaration: &FeatureCoverageDeclaration,
-    known: &[FeatureId],
-) -> Vec<(FeatureId, FeatureCoverageStatus)> {
-    let mut report: Vec<(FeatureId, FeatureCoverageStatus)> = known
-        .iter()
-        .map(|feature| (*feature, FeatureCoverageStatus::Missing))
-        .collect();
-    for entry in &declaration.entries {
-        match report
-            .iter_mut()
-            .find(|(feature, _)| *feature == entry.feature)
-        {
-            Some((_, status)) => {
-                if status.is_explicit() || matches!(status, FeatureCoverageStatus::Duplicated) {
-                    *status = FeatureCoverageStatus::Duplicated;
-                } else {
-                    *status = FeatureCoverageStatus::Declared(entry.support);
-                }
-            }
-            None => report.push((entry.feature, FeatureCoverageStatus::Unknown)),
-        }
-    }
-    report
 }
 
 #[cfg(test)]

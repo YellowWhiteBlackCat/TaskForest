@@ -24,7 +24,14 @@ use std::io;
 use std::time::{Duration, Instant};
 use taskmanager_application::AppAction;
 use taskmanager_application::i18n::current_language;
+use taskmanager_shell::SearchSlot;
 use taskmanager_ui_contract::navigation::NavOrientation;
+use taskmanager_ui_contract::{
+    OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
+};
+
+use crate::surface::{TuiInputScope, TuiSurfaceKind};
+use crate::ui::settings::SETTINGS_FIELDS;
 
 use super::capture_profile::CaptureProfileReceipt;
 use ratatui::Terminal;
@@ -209,70 +216,69 @@ pub(crate) fn apply_terminal_event_with_plan(
                 }
                 MouseEventKind::Down(MouseButton::Left) => {
                     // Click resolution through the committed plan, in paint
-                    // order: an actionable overlay control row first (the
-                    // painted popup owns those cells), then every other popup
-                    // cell as a blocked overlay hit, then the background
-                    // table. Overlay clicks select through the SAME mutators
-                    // and Enter methods the keyboard uses, so a pointer user
-                    // can never reach an action the keyboard cannot, and the
-                    // frozen-target/confirmation gates stay in the path.
-                    match plan.hit_target(mouse.column, mouse.row) {
-                        Some(TuiHitTarget::OverlayControl { surface, index }) => {
-                            apply_overlay_control_click(app, plan, surface, index)
+                    // order: an actionable overlay control row first, every
+                    // other popup cell as a blocked overlay hit, and any cell
+                    // outside the popup as the shared dismissal policy. The
+                    // policy decides whether the outside press is forwarded to
+                    // the background target after the overlay closes.
+                    let hit = plan.hit_target(mouse.column, mouse.row);
+                    if let Some(overlay) = plan.overlay() {
+                        // A committed plan addresses only the surface that
+                        // was current when it painted. If the keyboard owner
+                        // changed without a repaint, neither the stale rows
+                        // nor a forwarded background press may act.
+                        if overlay.scope != app.input_scope() {
+                            return EventReaction::default();
                         }
-                        Some(TuiHitTarget::Overlay { .. }) => EventReaction::default(),
-                        Some(TuiHitTarget::NavigationPage(page)) => {
-                            if app.nav_orientation != NavOrientation::Vertical
-                                || super::modals::any_pointer_surface_open(app)
-                            {
-                                return EventReaction::default();
+                        let kind = overlay_kind(overlay.scope);
+                        return match hit {
+                            Some(TuiHitTarget::OverlayControl { surface, index }) => {
+                                apply_overlay_control_click(app, plan, surface, index)
                             }
-                            EventReaction {
-                                dirty: true,
-                                effect: app.apply_action(AppAction::SelectPage(page)),
+                            Some(TuiHitTarget::SettingsField { index }) => {
+                                apply_settings_field_click(app, index)
                             }
-                        }
-                        Some(TuiHitTarget::TableRow { page, index }) => {
-                            // Click-to-select: the hit-test projects the
-                            // clicked cell through the SAME visual row
-                            // projection the renderer painted
-                            // (`ui::table_hit`) and selects through the
-                            // shell's `select_row` — the keyboard's own
-                            // entry, with the keyboard's own boundary.
-                            // Clicks that land on headers/borders/non-table
-                            // pages are honest no-ops.
-                            if super::modals::any_pointer_surface_open(app) {
-                                return EventReaction::default();
-                            }
-                            if page != app.page() || !plan.page_matches(app.page()) {
-                                // The screen has not painted the page selected
-                                // by an earlier event in this burst yet, so a
-                                // coordinate from the previous page cannot
-                                // safely target it.
-                                return EventReaction::default();
-                            }
-                            let selected = index;
-                            if app.page() == AppPage::Applications {
-                                let rows = app.process_rows_snapshot();
-                                let process =
-                                    crate::process_view::process_at(&rows, selected).cloned();
-                                let row_key = crate::process_view::row_key_at(&rows, selected);
-                                let _ = app.apply_selection_resolution_with_row(
-                                    selected, process, row_key,
+                            Some(TuiHitTarget::Overlay { .. }) => EventReaction::default(),
+                            Some(TuiHitTarget::NavigationPage(_))
+                            | Some(TuiHitTarget::TableRow { .. })
+                            | Some(TuiHitTarget::SearchCaret { .. })
+                            | None => {
+                                let outcome = dismiss_outcome(
+                                    kind,
+                                    OverlayDismissCause::OutsidePress,
+                                    OverlayDismissContext::single(),
                                 );
-                                EventReaction {
-                                    dirty: app.selected == selected,
-                                    effect: None,
+                                if !outcome.dismiss {
+                                    return EventReaction::default();
                                 }
-                            } else {
-                                EventReaction {
-                                    dirty: app.shell.select_row(selected),
-                                    effect: None,
+                                let escape = KeyEvent::new(
+                                    ratatui::crossterm::event::KeyCode::Esc,
+                                    KeyModifiers::NONE,
+                                );
+                                let close = EventReaction {
+                                    dirty: true,
+                                    effect: handle_key(app, escape),
+                                };
+                                if outcome.forward_outside_press {
+                                    let background = apply_background_hit(app, plan, hit);
+                                    EventReaction {
+                                        dirty: true,
+                                        effect: background.effect.or(close.effect),
+                                    }
+                                } else {
+                                    close
                                 }
                             }
-                        }
-                        None => EventReaction::default(),
+                        };
                     }
+                    // The inline search field stays pointer-addressable while
+                    // it owns the keyboard; its caret click is not a
+                    // background interaction behind an overlay.
+                    let search_hit = matches!(hit, Some(TuiHitTarget::SearchCaret { .. }));
+                    if super::modals::any_pointer_surface_open(app) && !search_hit {
+                        return EventReaction::default();
+                    }
+                    apply_background_hit(app, plan, hit)
                 }
                 // Every remaining crossterm pointer variant is deliberately
                 // unsupported: no wildcard may turn a gesture into selection
@@ -289,6 +295,77 @@ pub(crate) fn apply_terminal_event_with_plan(
             dirty: true,
             effect: None,
         },
+    }
+}
+
+/// Map the TUI's input scope to the shared overlay family whose dismissal
+/// policy governs an outside press. Action menus are contextual menus; the
+/// column chooser is a dropdown; every dialog/form surface is a modal.
+fn overlay_kind(scope: TuiInputScope) -> OverlayKind {
+    match scope {
+        TuiInputScope::LocalSurface(kind) => match kind {
+            TuiSurfaceKind::ColumnMenu => OverlayKind::DropdownMenu,
+            TuiSurfaceKind::ProcessMenu
+            | TuiSurfaceKind::ServiceMenu
+            | TuiSurfaceKind::BatchMenu
+            | TuiSurfaceKind::SessionMenu
+            | TuiSurfaceKind::StartupMenu => OverlayKind::ContextMenu,
+            _ => OverlayKind::Modal,
+        },
+        TuiInputScope::SharedSurface(_)
+        | TuiInputScope::ServiceLog
+        | TuiInputScope::Help
+        | TuiInputScope::Suggestions
+        | TuiInputScope::Search
+        | TuiInputScope::DetailsPanel
+        | TuiInputScope::Content => OverlayKind::Modal,
+    }
+}
+
+/// Resolve a click against the background table/navigation exactly as the
+/// no-overlay path does. The overlay adapter may call this after the shared
+/// policy says the outside press is forwarded.
+fn apply_background_hit(
+    app: &mut TuiApp,
+    plan: &TuiFramePlan,
+    hit: Option<TuiHitTarget>,
+) -> EventReaction {
+    match hit {
+        Some(TuiHitTarget::NavigationPage(page)) => {
+            if app.nav_orientation != NavOrientation::Vertical {
+                return EventReaction::default();
+            }
+            EventReaction {
+                dirty: true,
+                effect: app.apply_action(AppAction::SelectPage(page)),
+            }
+        }
+        Some(TuiHitTarget::SearchCaret { column }) => apply_search_caret_click(app, plan, column),
+        Some(TuiHitTarget::TableRow { page, index }) => {
+            if page != app.page() || !plan.page_matches(app.page()) {
+                return EventReaction::default();
+            }
+            let selected = index;
+            if app.page() == AppPage::Applications {
+                let rows = app.process_rows_snapshot();
+                let process = crate::process_view::process_at(&rows, selected).cloned();
+                let row_key = crate::process_view::row_key_at(&rows, selected);
+                let _ = app.apply_selection_resolution_with_row(selected, process, row_key);
+                EventReaction {
+                    dirty: app.selected == selected,
+                    effect: None,
+                }
+            } else {
+                EventReaction {
+                    dirty: app.shell.select_row(selected),
+                    effect: None,
+                }
+            }
+        }
+        Some(TuiHitTarget::OverlayControl { .. })
+        | Some(TuiHitTarget::SettingsField { .. })
+        | Some(TuiHitTarget::Overlay { .. })
+        | None => EventReaction::default(),
     }
 }
 
@@ -408,6 +485,62 @@ fn apply_overlay_control_click(
         | crate::TuiSurfaceKind::ProcessAffinity
         | crate::TuiSurfaceKind::DiagnosticBundle
         | crate::TuiSurfaceKind::FirstRun => EventReaction::default(),
+    }
+}
+
+/// A search-field click: the field takes the keyboard (opening that page's
+/// search slot when it was closed) and the caret lands on the clicked cell.
+/// The plan's painted cell geometry is the only authority for the byte
+/// offset.
+fn apply_search_caret_click(app: &mut TuiApp, plan: &TuiFramePlan, column: u16) -> EventReaction {
+    let Some(search) = plan.search_field() else {
+        return EventReaction::default();
+    };
+    if !plan.page_matches(app.page()) {
+        return EventReaction::default();
+    }
+    match app.page() {
+        AppPage::Applications => {
+            if !app.search_active() {
+                app.open_search();
+            }
+            let offset = search.byte_at(&app.query, column);
+            app.set_search_caret(offset);
+        }
+        AppPage::Services => {
+            if !app.search_active() || app.shell.search_slot() != SearchSlot::Services {
+                app.shell.open_search_for(SearchSlot::Services);
+            }
+            let offset = search.byte_at(&app.shell.services_query, column);
+            app.set_search_caret(offset);
+        }
+        AppPage::Performance
+        | AppPage::System
+        | AppPage::Startup
+        | AppPage::Users
+        | AppPage::AppHistory => return EventReaction::default(),
+    }
+    EventReaction {
+        dirty: true,
+        effect: None,
+    }
+}
+
+/// A settings form row click: the row takes keyboard focus (the same stable
+/// field index Tab addresses) and, when it is a switch, flips exactly once.
+/// Non-switch rows only take focus; their values still step with Left/Right.
+fn apply_settings_field_click(app: &mut TuiApp, field: usize) -> EventReaction {
+    if app.local_surface_kind() != Some(crate::TuiSurfaceKind::Settings) || field >= SETTINGS_FIELDS
+    {
+        return EventReaction::default();
+    }
+    app.settings_form.field = field;
+    if app.settings_form.focused_switch() {
+        app.settings_form.step_value(1);
+    }
+    EventReaction {
+        dirty: true,
+        effect: None,
     }
 }
 

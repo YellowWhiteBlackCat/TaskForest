@@ -82,6 +82,18 @@ at the terminal boundary. GPU captions, details and graph samples likewise
 consume only current typed scalar/throttle accessors, so unavailable provider
 facts remain gaps.
 
-Real terminal evidence can target these non-default surfaces with
-`TM_TUI_CAPTURE_DEVICE=gpu bash scripts/capture-tui.sh` and
-`TM_TUI_CAPTURE_SCENE=system-npu bash scripts/capture-tui.sh`.
+Real terminal evidence has two entry points:
+
+- `bash scripts/capture-tui-matrix.sh` runs the committed
+  `scripts/capture_tui_scenarios.tsv` matrix (one supervised receipt per row;
+  the product binary is built once). Use
+  `--scenarios process-selection,apps-identity-matrix` for a bounded subset and
+  `--list` / `--dry-run` to inspect the resolved page/device/scene/skin without
+  capturing.
+- `TM_TUI_CAPTURE_DEVICE=gpu bash scripts/capture-tui.sh` and
+  `TM_TUI_CAPTURE_SCENE=system-npu bash scripts/capture-tui.sh` remain the
+  single-frame entry for a targeted manual run.
+
+The matrix row name is a receipt label; the scene token is derived from the
+`CAPTURE_SCENE` case in `scripts/capture-tui.sh`. A scene the UI parity audit
+declares `Unsupported` (for example `sidebar-hidden`) has no matrix row.

@@ -13,7 +13,7 @@ use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, ResMut, RunSystemOnce};
 use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
-use bevy::input_focus::InputFocusPlugin;
+use bevy::input_focus::{FocusCause, InputFocus, InputFocusPlugin};
 use bevy::scene::ScenePlugin;
 use bevy::text::Font;
 use bevy::ui::prelude::Node;
@@ -23,6 +23,7 @@ use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_ui_contract::{COLUMN_WIDTH_KEYBOARD_STEP, COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
 
 use super::{
     ProcessColumnToggleId, ProcessColumnsModalChanged, ProcessColumnsModalState,
@@ -132,6 +133,12 @@ fn column_chooser_is_an_anchored_popover_inside_its_trigger() {
         bevy::ui::prelude::Val::Percent(100.0),
         "the chooser is a local menu, never a page-sized sheet"
     );
+    assert!(
+        world
+            .get::<bevy::ui_widgets::popover::Popover>(popover)
+            .is_some(),
+        "the chooser mounts the official bevy_ui_widgets Popover"
+    );
 
     // Close it again.
     app.world_mut()
@@ -153,6 +160,111 @@ fn column_chooser_is_an_anchored_popover_inside_its_trigger() {
             .count(),
         0,
         "closing the chooser removes the popover"
+    );
+}
+
+/// The chooser traps focus in its own modal tab group, closes when focus
+/// leaves the popover, and returns focus to the trigger.
+#[test]
+fn column_chooser_closes_on_focus_loss_and_restores_trigger_focus() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
+    });
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = ShellApp::new();
+    app.update();
+    app.update();
+
+    app.world_mut()
+        .run_system_once(
+            |mut state: ResMut<ProcessColumnsModalState>, mut commands: Commands| {
+                state.open();
+                commands.trigger(ProcessColumnsModalChanged);
+            },
+        )
+        .expect("open column chooser");
+    app.update();
+    app.update();
+    app.update();
+
+    let world = app.world_mut();
+    let popover = world
+        .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+        .iter(world)
+        .next()
+        .expect("the anchored popover is mounted");
+    let trigger = world
+        .query_filtered::<Entity, With<ProcessColumnsTrigger>>()
+        .iter(world)
+        .next()
+        .expect("the chooser trigger is mounted");
+    let focused = world
+        .resource::<InputFocus>()
+        .get()
+        .expect("the chooser takes focus when it mounts");
+    let mut current = focused;
+    let mut inside_popover = false;
+    for _ in 0..16 {
+        if current == popover {
+            inside_popover = true;
+            break;
+        }
+        let Some(parent) = world.get::<bevy::ecs::hierarchy::ChildOf>(current) else {
+            break;
+        };
+        current = parent.parent();
+    }
+    assert!(
+        inside_popover && world.get::<ProcessColumnToggleId>(focused).is_some(),
+        "the first focusable chooser row receives focus when the popover mounts: {focused:?}"
+    );
+    assert!(
+        world
+            .get::<bevy::input_focus::tab_navigation::TabGroup>(popover)
+            .is_some(),
+        "the popover is its own modal tab group"
+    );
+
+    world
+        .run_system_once(move |mut focus: ResMut<InputFocus>| {
+            focus.set(trigger, FocusCause::Navigated);
+        })
+        .expect("move focus out of the chooser");
+    app.update();
+    app.update();
+
+    let world = app.world_mut();
+    assert_eq!(
+        world.resource::<ProcessColumnsModalState>().session,
+        None,
+        "focus loss closes the chooser"
+    );
+    assert_eq!(
+        world
+            .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+            .iter(world)
+            .count(),
+        0,
+        "the closed popover is removed"
+    );
+    assert_eq!(
+        world.resource::<InputFocus>().get(),
+        Some(trigger),
+        "focus returns to the chooser trigger"
     );
 }
 
@@ -260,6 +372,123 @@ fn column_chooser_toggles_columns_and_resets_without_blocking_the_page() {
     app.update();
     let hidden = app.world().resource::<ProcessHiddenColumns>();
     assert!(hidden.0.is_empty(), "the reset restores every column");
+}
+
+/// Keyboard width stepping: `-`/`=` on the focused column row moves the one
+/// width override authority and the live cells together, with the popover
+/// staying open.
+#[test]
+fn column_chooser_keyboard_steps_the_focused_column_width() {
+    use crate::widgets::table::resize::{ColumnWidthNode, ColumnWidthOverrides};
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        AssetPlugin::default(),
+        ScenePlugin,
+        InputPlugin,
+        InputFocusPlugin,
+    ));
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
+    });
+
+    let mut track = app
+        .world_mut()
+        .get_non_send_mut::<FrontendTrack>()
+        .expect("the window plugin installed the track");
+    track.shell = ShellApp::new();
+    app.update();
+    app.update();
+    app.world_mut()
+        .run_system_once(
+            |mut state: ResMut<ProcessColumnsModalState>, mut commands: Commands| {
+                state.open();
+                commands.trigger(ProcessColumnsModalChanged);
+            },
+        )
+        .expect("open column chooser");
+    app.update();
+    app.update();
+
+    let world = app.world_mut();
+    let focused = world
+        .resource::<InputFocus>()
+        .get()
+        .expect("the chooser takes focus when it mounts");
+    let column = world
+        .get::<ProcessColumnToggleId>(focused)
+        .expect("focus lands on a column row")
+        .0;
+    let start = world
+        .query::<(&ColumnWidthNode, &Node)>()
+        .iter(world)
+        .find(|(marker, _)| marker.0 == column)
+        .map(|(_, node)| match node.width {
+            bevy::ui::prelude::Val::Px(width) => width,
+            _ => panic!("the column cell carries a pixel width"),
+        })
+        .expect("the column has a live cell");
+
+    let mut expected = start;
+    for (code, direction) in [
+        (KeyCode::Minus, -1.0_f32),
+        (KeyCode::Equal, 1.0),
+        (KeyCode::Equal, 1.0),
+        (KeyCode::Minus, -1.0),
+    ] {
+        let event = KeyboardInput {
+            key_code: code,
+            logical_key: Key::Character("x".into()),
+            state: bevy::input::ButtonState::Pressed,
+            text: None,
+            repeat: false,
+            window: Entity::PLACEHOLDER,
+        };
+        app.world_mut()
+            .commands()
+            .trigger(bevy::input_focus::FocusedInput::new(
+                focused,
+                event,
+                Entity::PLACEHOLDER,
+            ));
+        app.update();
+        expected = (expected + direction * COLUMN_WIDTH_KEYBOARD_STEP)
+            .clamp(COLUMN_WIDTH_MIN, COLUMN_WIDTH_MAX);
+
+        let world = app.world_mut();
+        let width = world
+            .resource::<ColumnWidthOverrides>()
+            .widths
+            .get(column)
+            .copied()
+            .expect("the keyboard step committed a width");
+        assert_eq!(
+            width, expected,
+            "the shared keyboard step is applied to the focused column"
+        );
+        let live = world
+            .query::<(&ColumnWidthNode, &Node)>()
+            .iter(world)
+            .find(|(marker, _)| marker.0 == column)
+            .map(|(_, node)| match node.width {
+                bevy::ui::prelude::Val::Px(width) => width,
+                _ => panic!("the column cell carries a pixel width"),
+            })
+            .expect("the column has a live cell");
+        assert_eq!(live, width, "the painted cell follows the override");
+        assert!(
+            world
+                .query_filtered::<Entity, With<ProcessColumnsPopover>>()
+                .iter(world)
+                .count()
+                == 1,
+            "the chooser stays open across a width step"
+        );
+    }
+    assert_eq!(expected, start, "the stepper is reversible");
 }
 
 /// The keyboard seam opens the chooser over the page's own trigger.

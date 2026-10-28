@@ -45,7 +45,7 @@ const MAX_RELATION_CHARS: usize = 80;
 /// table nor squeezes it below its usable width.
 #[must_use]
 pub(super) fn column_split(app: &TuiApp, content: Rect) -> (Rect, Option<Rect>) {
-    let affords = !app.sorted_services().is_empty()
+    let affords = app.shell.visible_service_count() > 0
         && content.width >= MIN_CONTENT_WIDTH
         && content.height >= MIN_CONTENT_HEIGHT;
     if !affords {
@@ -61,7 +61,7 @@ pub(super) fn column_split(app: &TuiApp, content: Rect) -> (Rect, Option<Rect>) 
 /// dependency lifecycle. Every unavailable fact is a dash — never a zero,
 /// an empty success, or another service's data.
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    let Some(service) = app.sorted_service_at(app.selected) else {
+    let Some(service) = app.shell.visible_service_at(app.selected) else {
         return;
     };
     // The dependency channel carries at most one service's facts. A capture

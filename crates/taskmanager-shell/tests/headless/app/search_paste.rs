@@ -47,6 +47,37 @@ fn paste_into_a_query_ending_in_a_space_does_not_double_the_space() {
 }
 
 #[test]
+fn paste_inserts_at_the_search_caret() {
+    let mut shell = crate::demo_app();
+    shell.open_search();
+    shell.push_search_char('a');
+    shell.push_search_char('c');
+    shell.move_search_cursor_left();
+    assert!(shell.push_search_text("b"));
+    assert_eq!(shell.query, "abc");
+    assert_eq!(shell.query_cursor(), 2);
+}
+
+#[test]
+fn search_editing_respects_utf8_boundaries() {
+    let mut shell = crate::demo_app();
+    shell.open_search();
+    for character in "aé中".chars() {
+        shell.push_search_char(character);
+    }
+    shell.move_search_cursor_left();
+    assert_eq!(shell.query_cursor(), "aé".len());
+    shell.pop_search_char();
+    assert_eq!(shell.query, "a中");
+    shell.delete_search_char();
+    assert_eq!(shell.query, "a");
+    shell.move_search_cursor_home();
+    assert_eq!(shell.query_cursor(), 0);
+    shell.move_search_cursor_end();
+    assert_eq!(shell.query_cursor(), 1);
+}
+
+#[test]
 fn paste_is_bounded_by_the_query_cap() {
     let mut shell = crate::demo_app();
     shell.open_search();

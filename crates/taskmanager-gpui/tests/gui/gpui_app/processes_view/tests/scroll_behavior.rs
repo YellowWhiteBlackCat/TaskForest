@@ -1,12 +1,12 @@
 //! Real GPUI scroll-chain tests for the Apps table.
 //!
-//! These tests intentionally dispatch `ScrollWheelEvent` into a rendered
+//! These tests intentionally dispatch `ScrollEvent` into a rendered
 //! RootView. Geometry-only tests cannot observe the ordering between the
 //! uniform-list listener, the single horizontal owner, and the pinned header.
 
 use gpui::{
-    Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase, VisualTestContext, point,
-    px, size,
+    Modifiers, ScrollDelta, ScrollEvent, ScrollSource, TestAppContext, TouchPhase,
+    VisualTestContext, point, px, size,
 };
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
@@ -16,12 +16,13 @@ fn wheel(
     position: gpui::Point<gpui::Pixels>,
     delta: gpui::Point<gpui::Pixels>,
     modifiers: Modifiers,
-) -> ScrollWheelEvent {
-    ScrollWheelEvent {
+) -> ScrollEvent {
+    ScrollEvent {
         position,
         delta: ScrollDelta::Pixels(delta),
         modifiers,
         touch_phase: TouchPhase::Moved,
+        source: ScrollSource::Pointer,
     }
 }
 

@@ -17,9 +17,9 @@
 #      a local shape check and the iced-specific capture-scenario membership
 #      check, and does not re-declare the path vocabulary.
 #   2. Every projected matrix test name is present in `cargo nextest list` for
-#      the taskmanager-iced lib target.
-#   3. The whole lib target runs with the locked workspace and the CI nextest
-#      profile (NEXTEST_EXPERIMENTAL_LIBTEST_JSON for per-test events).
+#      the taskmanager-iced lib and gui test targets.
+#   3. The whole lib and gui targets run with the locked workspace and the CI
+#      nextest profile (NEXTEST_EXPERIMENTAL_LIBTEST_JSON for per-test events).
 #   4. A libtest JSON `ok` event must exist for every projected matrix test; a
 #      missing, filtered, renamed or failed case fails the receipt validator.
 #   5. Git/Rust/discovery/run/validation receipts land under
@@ -110,7 +110,9 @@ validate_matrix() {
         case "$line" in '#'*|name$'\t'*) continue ;; esac
         fields=()
         IFS=$'\t' read -r -a fields <<<"$line"
-        [ "${#fields[@]}" -eq 3 ] || die "malformed capture-scenario row: $line"
+        # The capture matrix schema is owned by visual_capture_coverage; this
+        # gate only needs the scenario name in column one.
+        [ "${#fields[@]}" -ge 1 ] || die "malformed capture-scenario row: $line"
         scenario_names["${fields[0]}"]=1
     done <"$scenarios"
     [ "${#scenario_names[@]}" -gt 0 ] || die "no capture scenarios in $scenarios"
@@ -180,13 +182,13 @@ if not isinstance(suites, dict):
     sys.exit("missing rust-suites")
 found = []
 for suite in suites.values():
-    if not isinstance(suite, dict) or suite.get("kind") != "lib":
+    if not isinstance(suite, dict):
         continue
     cases = suite.get("testcases")
     if isinstance(cases, dict):
         found.extend(cases)
 if not found:
-    sys.exit("no lib test cases discovered")
+    sys.exit("no test cases discovered")
 for name in sorted(set(found)):
     print(name)
 ' "$1" | tr -d '\r'
@@ -391,18 +393,20 @@ validate_matrix "$MATRIX" "$REQUIREMENTS" "$CAPTURE_SCENARIOS"
 printf 'case_count=%s\np0_count=%s\n' "$MATRIX_CASE_COUNT" "$MATRIX_P0_COUNT" \
     >"$RUN_DIR/matrix-summary.txt"
 
-# 3) Every matrix test must exist in nextest's discovery of the lib target.
+# 3) Every matrix test must exist in nextest's discovery of the lib and gui
+#    test targets. The legacy `lib-list.json` name is kept for the driver.
 timeout --kill-after=10s 20m cargo nextest list --locked --profile ci \
-    -p taskmanager-iced --lib --message-format json >"$RUN_DIR/lib-list.json"
+    -p taskmanager-iced --message-format json >"$RUN_DIR/lib-list.json"
 LIBTEST_NAMES="$RUN_DIR/lib-list-names.txt"
 libtest_names "$RUN_DIR/lib-list.json" >"$LIBTEST_NAMES"
 validate_discovery "$MATRIX" "$LIBTEST_NAMES"
 
-# 4) Run the whole taskmanager-iced lib target with per-test JSON events.
+# 4) Run the whole taskmanager-iced lib and gui targets with per-test JSON
+#    events. The legacy `lib-run.log` name is kept for the driver.
 NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 \
     timeout --kill-after=10s 30m cargo nextest run --locked --profile ci \
     --message-format libtest-json-plus --cargo-quiet -j 4 \
-    -p taskmanager-iced --lib >"$RUN_DIR/lib-run.log" 2>&1
+    -p taskmanager-iced >"$RUN_DIR/lib-run.log" 2>&1
 
 RUN_EVENTS="$RUN_DIR/lib-run-events.txt"
 run_log_events "$RUN_DIR/lib-run.log" >"$RUN_EVENTS"
@@ -414,7 +418,7 @@ validate_run "$MATRIX" "$RUN_EVENTS"
     printf '  "status": "pass",\n'
     printf '  "matrix": {"case_count": %s, "p0_count": %s},\n' \
         "$MATRIX_CASE_COUNT" "$MATRIX_P0_COUNT"
-    printf '  "discovered_lib_tests": %s,\n' "$(grep -c . "$LIBTEST_NAMES")"
+    printf '  "discovered_tests": %s,\n' "$(grep -c . "$LIBTEST_NAMES")"
     printf '  "run": {"ok_events": %s, "failed_events": %s, "test_events": %s}\n' \
         "$(awk -F'\t' '$1 == "ok" { n += 1 } END { print n + 0 }' "$RUN_EVENTS")" \
         "$(awk -F'\t' '$1 == "failed" { n += 1 } END { print n + 0 }' "$RUN_EVENTS")" \

@@ -5,7 +5,6 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
-use bevy::picking::hover::PickingInteraction;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::ScalarObservation;
@@ -13,9 +12,7 @@ use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
 
-use super::{
-    ClipboardPort, SelectableText, TextSelectionSession, TextSelectionState, copy_selection_or_row,
-};
+use super::{ClipboardPort, TextSelectionSession, TextSelectionState, copy_selection_or_row};
 
 fn token_process(pid: u32, name: &str) -> ProcessItem {
     let mut process = ProcessItem::new(pid, name);
@@ -137,40 +134,25 @@ fn copy_selection_or_row_prioritizes_text_selection_over_row_summary() {
 }
 
 #[test]
-fn pointer_press_selects_the_whole_readout_for_copy() {
+fn readout_input_marker_does_not_add_a_tab_stop() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     super::register(&mut app);
-
     let entity = app
         .world_mut()
-        .spawn((
-            SelectableText::new("cpu-fact", "AMD Ryzen"),
-            PickingInteraction::None,
-        ))
+        .spawn(super::ReadoutInput("AMD Ryzen".into()))
         .id();
-
     app.update();
 
-    // Pointer press establishes a whole-readout selection. Bevy does not yet
-    // render a visible highlight or support range/word selection.
-    *app.world_mut()
-        .get_mut::<PickingInteraction>(entity)
-        .unwrap() = PickingInteraction::Pressed;
-    app.update();
-
-    let state = app.world().resource::<TextSelectionState>();
-    assert!(state.is_active());
-    assert_eq!(state.selected_text(), Some("AMD Ryzen"));
-
-    // Clearing the application selection leaves no copyable text.
-    app.world_mut().resource_mut::<TextSelectionState>().clear();
-    app.update();
-
-    assert!(!app.world().resource::<TextSelectionState>().is_active());
-    assert_eq!(
-        app.world().resource::<TextSelectionState>().selected_text(),
-        None
+    assert!(
+        app.world()
+            .get::<bevy::input_focus::tab_navigation::TabIndex>(entity)
+            .is_none(),
+        "readouts stay out of the Tab order; a pointer press gives them focus"
+    );
+    assert!(
+        app.world().get::<super::ReadoutInput>(entity).is_some(),
+        "the readout carries the pointer-focus marker"
     );
 }
 

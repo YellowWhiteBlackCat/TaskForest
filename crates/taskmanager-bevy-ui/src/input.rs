@@ -44,7 +44,7 @@ use bevy::input::ButtonInput;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
 use taskmanager_application::{Modifiers, PlatformEffect};
 
-use taskmanager_shell::ShellApp;
+use taskmanager_shell::{SearchSlot, ShellApp};
 
 use crate::app::{Page, modifier_state};
 use crate::menu_modal::{MenuModal, ModalDriver};
@@ -56,10 +56,15 @@ use crate::pages::startup::menu::StartupMenuCtx;
 
 #[path = "input/dispatch.rs"]
 mod dispatch;
+mod search_editor;
 #[path = "input/text_input.rs"]
 mod text_input;
 
 pub(crate) use dispatch::keyboard_dispatch_system;
+pub(crate) use search_editor::{
+    NativeTextEditing, SearchEditor, ServicesSearchPlaceholder, placeholder_visibility,
+    sync_search_editor,
+};
 pub(crate) use text_input::TextInputState;
 
 /// Platform effects produced by shell state transitions on the input path.
@@ -79,11 +84,14 @@ pub(crate) struct ShellInteractionApplied;
 pub(crate) struct QuitForwarded(pub(crate) bool);
 
 pub(crate) fn commit_query_to_shell(shell: &mut ShellApp, text: &str) {
-    while !shell.query.is_empty() {
-        shell.pop_search_char();
-    }
-    if !text.is_empty() {
-        shell.push_search_text(text);
+    shell.set_query(text);
+}
+
+/// Commit a fallback line-editor buffer to the slot that owns it.
+pub(crate) fn commit_slot_query(shell: &mut ShellApp, slot: SearchSlot, text: &str) {
+    match slot {
+        SearchSlot::Applications => commit_query_to_shell(shell, text),
+        SearchSlot::Services => shell.set_services_query(text),
     }
 }
 
@@ -99,7 +107,10 @@ impl Plugin for InputPlugin {
             .init_resource::<QuitForwarded>()
             .init_resource::<crate::drain::FeedbackCache>()
             .init_resource::<crate::pages::services::log_panel::ServiceLogExportDir>()
-            .init_resource::<TextInputState>();
+            .init_resource::<TextInputState>()
+            .init_resource::<bevy::input_focus::InputFocus>();
+        search_editor::register(app);
+        app.add_systems(bevy::app::PreUpdate, search_editor::focus_active_search);
     }
 }
 
@@ -115,6 +126,10 @@ enum KeyboardOwner {
     ServiceLogPanel,
     SharedSurface,
     Search,
+    /// A native (ReadOnly) text input owns the keyboard: the widget itself
+    /// handles selection and clipboard chords, and page bindings must not
+    /// steal its character keys.
+    NativeText,
     Free,
 }
 

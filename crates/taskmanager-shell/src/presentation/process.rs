@@ -32,13 +32,26 @@ pub fn uninterruptible_process_count(processes: Option<&[ProcessItem]>) -> Optio
     })
 }
 
+/// Share of the observed process inventory currently in uninterruptible sleep.
+/// A missing or empty inventory has no denominator and therefore no ratio.
+#[must_use]
+pub fn uninterruptible_process_ratio(processes: Option<&[ProcessItem]>) -> Option<f32> {
+    let processes = processes.filter(|items| !items.is_empty())?;
+    let count = processes
+        .iter()
+        .filter(|process| process.status_kind().is_uninterruptible())
+        .count();
+    Some(count as f32 / processes.len() as f32 * 100.0)
+}
+
 /// Compact aggregate diagnostic for the process-page subtitle. It is omitted
-/// when the inventory has not arrived or when the measured count is zero.
+/// only when the inventory has not arrived or is empty. A measured zero stays
+/// visible with its true zero-percent ratio instead of disappearing.
 #[must_use]
 pub fn uninterruptible_process_summary(processes: Option<&[ProcessItem]>) -> Option<String> {
-    uninterruptible_process_count(processes)
-        .filter(|count| *count > 0)
-        .map(|count| format!("{} {count}", i18n::t("proc.d_state")))
+    let count = uninterruptible_process_count(processes)?;
+    let ratio = uninterruptible_process_ratio(processes)?;
+    Some(format!("{} {count} · {ratio:.1}%", i18n::t("proc.d_state")))
 }
 
 /// Format the open-file descriptor count against the process's soft/hard limits

@@ -21,17 +21,18 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::config::Config;
-use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::Skin;
 use taskmanager_ui_contract::IconId;
 
-use super::process_details::wrapped_content_height;
 use crate::ThemeParams;
 use crate::TuiTheme;
 use taskmanager_application::i18n::Language;
 use taskmanager_core::core::alerts::{NotificationPolicy, QuietHours};
 mod footer;
+mod layout;
 use footer::settings_footer;
+use layout::settings_field_rows;
+pub(crate) use layout::{SettingsOverlayLayout, settings_overlay_layout};
 
 /// Number of settings fields (row count of the form): 0 skin, 1 mode,
 /// 2 high contrast, 3 UI font, 4 mono font, 5 density, 6 language,
@@ -469,200 +470,41 @@ pub(super) fn render_settings_overlay_at(
     ])
     .areas(inner);
 
-    let mut lines: Vec<Line<'static>> = Vec::with_capacity(SETTINGS_FIELDS + 1);
-    lines.push(field_line(
-        focused_field,
-        0,
-        t("settings.skin"),
-        Skin::ALL[form.skin].label(),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        1,
-        t("settings.mode"),
-        mode_display_label(form.mode),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        2,
-        t("settings.high_contrast"),
-        if form.hc {
-            t("settings.on")
-        } else {
-            t("settings.off")
-        },
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        3,
-        t("settings.desktop_ui_font"),
-        font_display_label(form.ui_font),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        4,
-        t("settings.desktop_mono_font"),
-        font_display_label(form.mono_font),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        5,
-        t("settings.row_density"),
-        density_display_label(form.density),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        6,
-        t("settings.language"),
-        language_display_label(form.language),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        7,
-        t("settings.refresh_interval"),
-        REFRESH_LABELS[form.refresh],
-        theme,
-    ));
-    for (index, key) in DEVICE_LABEL_KEYS.iter().enumerate() {
+    // Scroll the focused field into view on short terminals (the body shows
+    // roughly `body.height - 1` rows; a focused field past that window is
+    // still reachable via Tab and becomes visible as the offset follows it).
+    // The layout owns the offset so the pointer hit map and the painted frame
+    // can never disagree about which rows carry which fields.
+    let layout = settings_overlay_layout(app, popup, focused_field);
+    let rows = settings_field_rows(app);
+    let mut lines: Vec<Line<'static>> = Vec::with_capacity(rows.len() + 2);
+    for row in rows.iter().filter(|row| row.field < 30) {
         lines.push(field_line(
             focused_field,
-            8 + index,
-            t(key),
-            if form.show[index] {
-                t("settings.on")
-            } else {
-                t("settings.off")
-            },
+            row.field,
+            &row.label,
+            &row.value,
             theme,
         ));
     }
-    for family_index in 0..UNIT_FAMILIES.len() {
-        let bytes_on = form.units[family_index * 2];
-        let base2_on = form.units[family_index * 2 + 1];
-        lines.push(field_line(
-            focused_field,
-            18 + family_index * 2,
-            t(unit_label_key(family_index, true)),
-            if bytes_on {
-                t("settings.bytes")
-            } else {
-                t("settings.bits")
-            },
-            theme,
-        ));
-        lines.push(field_line(
-            focused_field,
-            19 + family_index * 2,
-            t(unit_label_key(family_index, false)),
-            if base2_on {
-                t("settings.base_2")
-            } else {
-                t("settings.base_10")
-            },
-            theme,
-        ));
-    }
-    lines.push(field_line(
-        focused_field,
-        24,
-        t("settings.gray_zero_values"),
-        if form.gray_zero {
-            t("settings.on")
-        } else {
-            t("settings.off")
-        },
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        25,
-        t("settings.graph_data_points"),
-        GRAPH_LABELS[form.graph_points],
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        26,
-        t("settings.desktop_notifications"),
-        if form.notify_enabled {
-            t("settings.on")
-        } else {
-            t("settings.off")
-        },
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        27,
-        t("settings.quiet_hours_start"),
-        &format!("{:02}:00", form.quiet_start),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        28,
-        t("settings.quiet_hours_end"),
-        &format!("{:02}:00", form.quiet_end),
-        theme,
-    ));
-    lines.push(field_line(
-        focused_field,
-        29,
-        t("settings.history_persistence"),
-        if form.history_persistence {
-            t("settings.on")
-        } else {
-            t("settings.off")
-        },
-        theme,
-    ));
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
         format!("── {} ──", t("settings.privileges")),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     )]));
-    for (index, privilege) in PrivilegeCenterInputs::from_shell(&app.shell)
-        .rows()
-        .into_iter()
-        .enumerate()
-    {
-        let status = if privilege.action.is_some() {
-            format!(
-                "{} · [Enter] {}",
-                t(privilege.state.label_key()),
-                t("settings.privileges_authorize")
-            )
-        } else {
-            t(privilege.state.label_key()).to_owned()
-        };
+    for row in rows.iter().filter(|row| row.field >= 30) {
         lines.push(field_line(
             focused_field,
-            30 + index,
-            t(privilege.label_key),
-            &status,
+            row.field,
+            &row.label,
+            &row.value,
             theme,
         ));
     }
-    // Scroll the focused field into view on short terminals (the body shows
-    // roughly `body.height - 1` rows; a focused field past that window is
-    // still reachable via Tab and becomes visible as the offset follows it).
-    let visible_rows = body.height.saturating_sub(1) as usize;
-    let focused_row = focused_field.map(|field| field + if field >= 30 { 2 } else { 0 });
-    let scroll = focused_row.map_or(0, |row| {
-        wrapped_content_height(&lines[..(row + 1).min(lines.len())], body.width)
-            .saturating_sub(visible_rows)
-    });
     frame.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: true })
-            .scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
+            .scroll((layout.scroll, 0)),
         body,
     );
 

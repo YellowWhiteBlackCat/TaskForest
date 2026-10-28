@@ -45,12 +45,13 @@ pub(crate) mod topology;
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
+use crate::text_selection::ReadoutInput;
 use crate::widgets::controls::detail_row_scene;
 use crate::widgets::layout::SystemDashboardBudget;
 use crate::window::{Role, TextRole, WindowPalette};
-use bevy::text::{LineBreak, TextLayout};
+use bevy::text::{LineBreak, TextColor, TextFont, TextLayout, TextReadWriteMode};
 use bevy::ui::ComputedNode;
-use bevy::ui_widgets::ScrollArea;
+use bevy::ui_widgets::{ScrollArea, TextInput};
 use dashboard::{SystemDashboardState, SystemDashboardToolbar};
 use privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
 use taskmanager_application::SmbiosMemoryState;
@@ -59,6 +60,7 @@ use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_core::core::npu::NpuEngineKind;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
+use taskmanager_shell::presentation::health_score_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
 /// The KPI tile's flex basis, in rem: the width one tile asks for before the
@@ -113,12 +115,17 @@ pub(crate) struct SystemSummaryModel {
     pub(crate) active_alerts: usize,
     /// Transparent score plus the first bounded evidence deductions.
     pub(crate) health: Option<String>,
+    /// The full score + deduction bill for the dense System facts card. The
+    /// KPI tile keeps the compact score; this row is the auditable surface
+    /// required by `pressure.memory-thrashing-health`.
+    pub(crate) health_detail: Option<String>,
 }
 
 /// Fold the shell projection into the System page KPI summary values (pure).
 /// Matches Iced `DashboardSummaryModel` and GPUI `summary_card` readouts.
 pub(crate) fn system_summary_model(projection: &SystemProjectionStore) -> SystemSummaryModel {
     let snapshot = projection.snapshot.as_ref();
+    let health = snapshot.and_then(health_score_for_snapshot);
     SystemSummaryModel {
         cpu: snapshot
             .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
@@ -133,11 +140,10 @@ pub(crate) fn system_summary_model(projection: &SystemProjectionStore) -> System
         active_alerts: projection.alert_center.active_alerts().len(),
         // KPI tiles own their label separately; keep the value slot to the
         // compact score so the full explanatory health sentence cannot be
-        // clipped inside a narrow fifth card. The detailed deduction bill is
-        // still available through the shared score summary on dense surfaces.
-        health: snapshot
-            .and_then(health_score_for_snapshot)
-            .map(|score| format!("{}/100", score.score)),
+        // clipped inside a narrow fifth card. The full deduction bill is
+        // rendered by the dense System facts card below.
+        health: health.as_ref().map(|score| format!("{}/100", score.score)),
+        health_detail: health.as_ref().map(health_score_summary),
     }
 }
 
@@ -156,6 +162,7 @@ pub(crate) enum SystemFactGroup {
     MemoryInventory,
     Hardware,
     Npu,
+    Health,
 }
 
 /// One label→value fact row. The value is already final display text.
@@ -284,15 +291,20 @@ fn status_line_text(
 
 pub(crate) fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl Scene + use<> {
     // Inspection facts keep complete values in the owned wrapped row grammar.
+    // The value is a READ-ONLY native text input: pointer presses/drags,
+    // double-click words, triple-click select-all, Ctrl/Cmd+A, and the
+    // clipboard chords are the official widget's behavior, over the same
+    // wrapped layout the plain readout used.
     let value = row.value.clone();
-    let text_val = row.value.clone();
-    let label = row.label.clone();
     let value_scene = Box::new(bsn! {
-        Text(text_val)
+        TextInput
+        TextReadWriteMode::ReadOnly
+        TextFont::default()
+        TextColor::default()
         TextRole(Role::Body)
         TextLayout { linebreak: LineBreak::WordBoundary }
         Node { width: percent(100), min_width: px(0.0) }
-        crate::text_selection::SelectableText(label, value)
+        ReadoutInput({ value })
     }) as Box<dyn bevy::scene::Scene>;
     detail_row_scene(row.label.clone(), value_scene, palette)
 }

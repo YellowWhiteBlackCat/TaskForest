@@ -182,13 +182,13 @@ ADAPTERS: dict[str, Adapter] = {
         discovery_files=("lib-list.json",),
         run_log_files=("lib-run.log",),
         discovery_command=(
-            "cargo nextest list --locked --profile ci -p taskmanager-iced --lib "
-            "--message-format json"
+            "cargo nextest list --locked --profile ci -p taskmanager-iced "
+            "--message-format json (lib and gui test targets)"
         ),
         run_command=(
             "NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --locked "
             "--profile ci --message-format libtest-json-plus --cargo-quiet -j 4 "
-            "-p taskmanager-iced --lib"
+            "-p taskmanager-iced (lib and gui test targets)"
         ),
         discovery_from_accept=True,
     ),

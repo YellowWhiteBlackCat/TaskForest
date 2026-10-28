@@ -14,6 +14,19 @@ class CoverageError(RuntimeError):
     """Raised when a reachable visual surface has no capture contract."""
 
 
+MATRIX_RUNNERS = {
+    "gpui": ("scripts/capture_scenarios.tsv", "scripts/capture-niri.sh"),
+    "iced": ("scripts/capture_iced_scenarios.tsv", "scripts/capture-iced-matrix.sh"),
+    "bevy": ("scripts/capture_bevy_scenarios.tsv", "scripts/capture-bevy.sh"),
+    "tui": ("scripts/capture_tui_scenarios.tsv", "scripts/capture-tui-matrix.sh"),
+}
+
+# Declaration-only matrices are a fail-closed finding unless the owner records
+# why no committed runner consumes the matrix yet. The exemption is printed on
+# every run and must be removed when the runner lands.
+DECLARATION_ONLY_EXEMPTIONS: dict[str, str] = {}
+
+
 def read_tsv(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream, delimiter="\t"))
@@ -51,6 +64,63 @@ def audit_doc_scenario_tokens(path: Path) -> set[str]:
     if not tokens:
         raise CoverageError(f"UI parity audit doc has no scenario tokens: {path}")
     return tokens
+
+
+KNOWN_SCENE_STATUSES = {
+    "Aligned",
+    "AcceptedDifference",
+    "Partial",
+    "Unsupported",
+    "Pending",
+}
+
+
+def parse_audit_scene_statuses(source: str) -> dict[str, dict[str, str]]:
+    """Parse the audit table's per-frontend status cells.
+
+    The status vocabulary table has two columns and is skipped; the scene table
+    has seven. Footnote suffixes such as ``Partial[A]`` are stripped so the
+    capture requirement sees only the status token.
+    """
+    statuses: dict[str, dict[str, str]] = {}
+    for line in source.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 7:
+            continue
+        token_match = re.search(r"`([a-z0-9-]+)`", cells[1])
+        if token_match is None:
+            continue
+        token = token_match.group(1)
+        decisions = {
+            frontend: cells[index].split("[", 1)[0].strip()
+            for frontend, index in (("iced", 3), ("bevy", 4), ("tui", 5))
+        }
+        for frontend, status in decisions.items():
+            if status not in KNOWN_SCENE_STATUSES:
+                raise CoverageError(
+                    f"UI parity audit has unknown status {status!r} for {token}/{frontend}"
+                )
+        statuses[token] = decisions
+    if not statuses:
+        raise CoverageError("UI parity audit doc has no scene status rows")
+    return statuses
+
+
+def audit_scene_statuses(path: Path) -> dict[str, dict[str, str]]:
+    return parse_audit_scene_statuses(path.read_text(encoding="utf-8"))
+
+
+def required_capture_tokens(
+    statuses: dict[str, dict[str, str]], frontend: str
+) -> set[str]:
+    """A typed absence does not need a capture row; delivered/partial scenes do."""
+    return {
+        token
+        for token, decisions in statuses.items()
+        if decisions[frontend] not in {"Unsupported", "Pending"}
+    }
 
 
 def require_parity_scenarios(
@@ -176,6 +246,33 @@ def require_recognized_column(
         )
 
 
+def matrix_runner_verdict(matrix_name: str, runner_source: str) -> bool:
+    """Whether a committed runner actually loops the declared matrix.
+
+    Mentioning the matrix path is not enough: a runner that only prints the
+    matrix name (or captures a single environment-selected frame) must not
+    satisfy the check.
+    """
+    return matrix_name in runner_source and "while IFS=" in runner_source
+
+
+def runner_coverage(
+    frontend: str,
+    matrix_name: str,
+    runner_source: str,
+    exemptions: dict[str, str],
+) -> tuple[str, str | None]:
+    """Classify one matrix as consumed, explicitly exempt, or a failure."""
+    if matrix_runner_verdict(matrix_name, runner_source):
+        return "runner", None
+    if frontend in exemptions:
+        return "exempt", exemptions[frontend]
+    raise CoverageError(
+        f"{frontend} capture matrix {matrix_name} is declaration-only: "
+        "no committed runner loops it"
+    )
+
+
 def validate(root: Path) -> dict[str, object]:
     gpui_matrix = read_tsv(root / "scripts/capture_scenarios.tsv")
     iced_matrix = read_tsv(root / "scripts/capture_iced_scenarios.tsv")
@@ -198,6 +295,12 @@ def validate(root: Path) -> dict[str, object]:
         raise CoverageError(f"GPUI capture scenarios lack matrix rows: {missing_scenarios}")
 
     audit_tokens = audit_doc_scenario_tokens(root / "docs/UI_PARITY_AUDIT.md")
+    scene_statuses = audit_scene_statuses(root / "docs/UI_PARITY_AUDIT.md")
+    missing_statuses = sorted(audit_tokens - scene_statuses.keys())
+    if missing_statuses:
+        raise CoverageError(
+            f"UI parity audit statuses lack scenario tokens: {missing_statuses}"
+        )
     missing_from_audit = sorted(required_scenarios - audit_tokens)
     if missing_from_audit:
         raise CoverageError(
@@ -267,8 +370,21 @@ def validate(root: Path) -> dict[str, object]:
     )
 
     tui_matrix = read_tsv(root / "scripts/capture_tui_scenarios.tsv")
+    runner_status: dict[str, str] = {}
+    exemptions: list[tuple[str, str]] = []
+    for frontend, (matrix_name, runner_path) in MATRIX_RUNNERS.items():
+        runner = root / runner_path
+        runner_source = runner.read_text(encoding="utf-8") if runner.is_file() else ""
+        status, reason = runner_coverage(
+            frontend, matrix_name, runner_source, DECLARATION_ONLY_EXEMPTIONS
+        )
+        runner_status[frontend] = status
+        if reason is not None:
+            exemptions.append((frontend, reason))
     for frontend, rows in [("Iced", iced_matrix), ("Bevy", bevy_matrix), ("TUI", tui_matrix)]:
-        require_parity_scenarios(audit_tokens, rows, frontend)
+        require_parity_scenarios(
+            required_capture_tokens(scene_statuses, frontend.lower()), rows, frontend
+        )
     tui_pages = {row["page"] for row in tui_matrix}
     required_tui_pages = {
         "applications", "performance", "services", "system", "startup", "users", "app-history"
@@ -296,6 +412,8 @@ def validate(root: Path) -> dict[str, object]:
         "bevy_pages": sorted(required_bevy_pages),
         "tui_rows": len(tui_matrix),
         "tui_devices": sorted(required_tui_devices),
+        "runner_status": runner_status,
+        "exemptions": exemptions,
     }
 
 
@@ -312,6 +430,25 @@ def self_test() -> int:
                 raise AssertionError("missing semantic scenario must be named") from error
         else:
             raise AssertionError("row count cannot replace semantic coverage")
+    sample_statuses = parse_audit_scene_statuses(
+        "| 分组 | GPUI 场景 Token | 场景定义 | Iced | Bevy | TUI | 差异/证据 |\n"
+        "|---|---|---|:---:|:---:|:---:|---|\n"
+        "| x | `about` | d | Aligned | Aligned | Unsupported[S] | [S] |\n"
+        "| x | `apps` | d | AcceptedDifference[D] | Aligned | Partial[A] | [D] |\n"
+    )
+    if required_capture_tokens(sample_statuses, "tui") != {"apps"}:
+        raise AssertionError("Unsupported/Pending scenes must not require a capture row")
+    if required_capture_tokens(sample_statuses, "iced") != {"about", "apps"}:
+        raise AssertionError("delivered scenes must require a capture row")
+    try:
+        parse_audit_scene_statuses(
+            "| x | `about` | d | Aligned | Aligned | NotAStatus | - |\n"
+        )
+    except CoverageError as error:
+        if "NotAStatus" not in str(error):
+            raise AssertionError("an unknown status must be named") from error
+    else:
+        raise AssertionError("an unknown status must fail closed")
     recognized = {"cpu", "memory"}
     require_recognized_column([{"device": "cpu"}, {"device": "memory"}], "device", recognized, "fixture")
     try:
@@ -323,6 +460,35 @@ def self_test() -> int:
             raise AssertionError("unrecognized column value must be named") from error
     else:
         raise AssertionError("an unrecognized capture column must fail closed")
+
+    consumed = "MATRIX=scripts/capture_scenarios.tsv\nwhile IFS=$'\\t' read -r name; do :; done\n"
+    declaration_only = "printf 'matrix=scripts/capture_tui_scenarios.tsv\\n'\n"
+    if not matrix_runner_verdict("scripts/capture_scenarios.tsv", consumed):
+        raise AssertionError("a runner looping the matrix must be recognized")
+    if matrix_runner_verdict("scripts/capture_tui_scenarios.tsv", declaration_only):
+        raise AssertionError("a declaration-only matrix must not count as consumed")
+    if matrix_runner_verdict("scripts/capture_scenarios.tsv", "while IFS= read -r name; do :; done"):
+        raise AssertionError("a loop over another matrix must not count as consumed")
+    try:
+        runner_coverage(
+            "tui",
+            "scripts/capture_tui_scenarios.tsv",
+            declaration_only,
+            {},
+        )
+    except CoverageError as error:
+        if "declaration-only" not in str(error):
+            raise AssertionError("a declaration-only matrix must be named") from error
+    else:
+        raise AssertionError("a declaration-only matrix must fail closed")
+    status, reason = runner_coverage(
+        "tui",
+        "scripts/capture_tui_scenarios.tsv",
+        declaration_only,
+        {"tui": "runner not committed yet"},
+    )
+    if (status, reason) != ("exempt", "runner not committed yet"):
+        raise AssertionError("an explicit declaration-only exemption must be reported")
     print("visual capture coverage self-test: PASS")
     return 0
 
@@ -339,14 +505,23 @@ def main() -> int:
     except (CoverageError, OSError, KeyError) as error:
         print(f"visual capture coverage: FAIL: {error}", file=sys.stderr)
         return 1
+    runners = ", ".join(
+        f"{frontend}={status}" for frontend, status in summary["runner_status"].items()
+    )
     print(
         "visual capture coverage: PASS "
         f"(GPUI {summary['gpui_rows']} rows/{summary['gpui_capture_scenarios']} scenarios/"
         f"{len(summary['gpui_devices'])} performance devices; "
         f"Iced {summary['iced_rows']} rows/{len(summary['iced_devices'])} performance devices; "
         f"Bevy {summary['bevy_rows']} rows/{len(summary['bevy_pages'])} pages; "
-        f"TUI {summary['tui_rows']} rows/{len(summary['tui_devices'])} performance devices)"
+        f"TUI {summary['tui_rows']} rows/{len(summary['tui_devices'])} performance devices; "
+        f"matrix runners: {runners})"
     )
+    for frontend, reason in summary["exemptions"]:
+        print(
+            f"visual capture coverage: WARN {frontend} matrix is declaration-only: {reason}",
+            file=sys.stderr,
+        )
     return 0
 
 

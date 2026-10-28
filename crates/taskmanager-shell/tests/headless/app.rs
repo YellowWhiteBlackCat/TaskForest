@@ -582,7 +582,7 @@ fn hold_ctrl_pauses_telemetry_via_the_shared_refresh_policy() {
 }
 
 #[test]
-fn focus_search_switches_to_the_applications_page_and_opens_the_field() {
+fn focus_search_switches_non_search_pages_to_the_applications_field() {
     use taskmanager_application::AppAction;
     let mut app = crate::demo_app();
     // Start elsewhere (Performance) so the search field is not visible.
@@ -595,6 +595,36 @@ fn focus_search_switches_to_the_applications_page_and_opens_the_field() {
     let _ = app.apply_action(AppAction::FocusSearch);
     assert_eq!(app.application.active_page, AppPage::Applications);
     assert!(app.search_active());
+    assert_eq!(app.search_slot(), SearchSlot::Applications);
+}
+
+#[test]
+fn focus_search_on_services_opens_the_services_slot_without_switching_pages() {
+    use taskmanager_application::AppAction;
+    let mut app = crate::demo_app();
+    app.application.active_page = AppPage::Services;
+    app.query = "existing process query".to_owned();
+
+    let _ = app.apply_action(AppAction::FocusSearch);
+    assert_eq!(app.application.active_page, AppPage::Services);
+    assert!(app.search_active());
+    assert_eq!(app.search_slot(), SearchSlot::Services);
+
+    app.push_search_char('n');
+    app.push_search_char('e');
+    assert_eq!(app.services_query, "ne");
+    assert_eq!(
+        app.query, "existing process query",
+        "the Services slot never edits the process query"
+    );
+    assert_eq!(app.services_query_cursor(), 2);
+    app.close_search();
+
+    app.open_search();
+    assert_eq!(app.search_slot(), SearchSlot::Applications);
+    app.push_search_char('x');
+    assert_eq!(app.query, "existing process queryx");
+    assert_eq!(app.services_query, "ne");
 }
 
 #[test]

@@ -13,12 +13,13 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::text::{FontSize, LineBreak, TextColor, TextFont, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Val,
     percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, TextInput};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -27,6 +28,7 @@ use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
+use crate::input::SearchEditor;
 use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
@@ -204,7 +206,7 @@ pub(crate) fn on_search_input_activated(
 ) {
     track.shell.open_search();
     if let Some(ref mut state) = text_state {
-        state.cursor = track.shell.query.chars().count();
+        state.edit.set_caret_at_end(&track.shell.query);
     }
     commands.trigger(crate::input::ShellInteractionApplied);
 }
@@ -412,7 +414,7 @@ fn on_query_commit(
     ensure_applications_row_context(shell);
     crate::input::commit_query_to_shell(shell, &text);
     if let Some(ref mut state) = text_state {
-        state.cursor = shell.query.chars().count();
+        state.edit.set_caret_at_end(&shell.query);
     }
     surface.scroll.top = 0; // the cursor reset puts row 0 back in view
     let Ok(root) = surface.roots.single() else {
@@ -611,11 +613,14 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.panel_fill })
         ProcessSearchInput
+        SearchEditor({ text })
+        TextInput
+        TextFont { font_size: FontSize::Rem(1.0) }
+        TextColor({ palette.body_color })
+        TextRole(Role::Body)
+        TextLayout { linebreak: LineBreak::NoWrap }
         Button
         on(on_search_input_activated)
-        Children [
-             Text(text) TextRole(Role::Body)
-        ]
     }
 }
 

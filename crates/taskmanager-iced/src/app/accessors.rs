@@ -160,10 +160,10 @@ impl IcedApp {
             .map_or(1.0, |appear| appear.progress)
     }
 
-    /// The Services-page name filter.
+    /// The Services-page name filter (shell-owned; shared match rule).
     #[must_use]
     pub fn services_query(&self) -> &str {
-        &self.process_presentation.services_query
+        &self.shell.services_query
     }
 
     /// Tick-injected wall time used by service-log window filtering.

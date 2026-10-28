@@ -12,7 +12,7 @@
 [package]
 edition = "2024"
 name = "gpui-kit"
-version = "0.7.3"
+version = "0.8.1"
 build = false
 publish = true
 autolib = false
@@ -68,6 +68,10 @@ profiler = [
 speech = [
     "component",
     "gpui-component/speech",
+]
+syntect = [
+    "component",
+    "gpui-component/syntect",
 ]
 test-support = [
     "gpui/test-support",
@@ -234,208 +238,41 @@ tree-sitter-zig = [
 name = "gpui_kit"
 path = "src/lib.rs"
 
-[[test]]
-name = "assets"
-path = "tests/assets.rs"
-
-[[test]]
-name = "collections"
-path = "tests/collections.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "components"
-path = "tests/components.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "controls"
-path = "tests/controls.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "date_picker"
-path = "tests/date_picker.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "diff"
-path = "tests/diff.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "disclosure"
-path = "tests/disclosure.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "dock"
-path = "tests/dock.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "exports"
-path = "tests/exports.rs"
-
-[[test]]
-name = "input"
-path = "tests/input.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "input_focus"
-path = "tests/input_focus.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "interactions"
-path = "tests/interactions.rs"
-required-features = ["test-support"]
-
-[[test]]
-name = "lifecycle"
-path = "tests/lifecycle.rs"
-required-features = ["test-support"]
-
-[[test]]
-name = "menu"
-path = "tests/menu.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "overlays"
-path = "tests/overlays.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "rendering"
-path = "tests/rendering.rs"
-test = false
-harness = false
-required-features = [
-    "test-support",
-    "component",
-    "assets",
-]
-
-[[test]]
-name = "root"
-path = "tests/root.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "search"
-path = "tests/search.rs"
-required-features = [
-    "assets",
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "test_macro"
-path = "tests/test_macro.rs"
-
-[[test]]
-name = "text_selection"
-path = "tests/text_selection.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "touch_selection"
-path = "tests/touch_selection.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "ui"
-path = "tests/ui.rs"
-required-features = [
-    "test-support",
-    "component",
-]
-
-[[test]]
-name = "window"
-path = "tests/window.rs"
-required-features = ["test-support"]
-
 [dependencies.gpui]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre"
 
 [dependencies.gpui-base]
-version = "0.7.1"
+version = "0.8.1"
 
 [dependencies.gpui-component]
-version = "0.7.1"
+version = "0.8.1"
 optional = true
 
 [dependencies.gpui-fast]
-version = "0.1.7"
+version = "0.1.12"
 features = ["windows-manifest-provided-by-host"]
 optional = true
 package = "gpui-fast"
 
 [dependencies.gpui-kit-assets]
-version = "0.7.1"
+version = "0.8.1"
 optional = true
 
 [dependencies.gpui_macros]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre-macros"
 
 [dev-dependencies.chrono]
 version = "0.4.38"
 
 [dev-dependencies.gpui]
-version = "=0.3.9"
+version = "=0.3.10"
 features = ["test-support"]
 package = "gpui-pre"
 
 [dev-dependencies.gpui-fast]
-version = "0.1.7"
+version = "0.1.12"
 features = [
     "windows-manifest-provided-by-host",
     "test-support",
@@ -447,7 +284,7 @@ version = "0.97.0"
 features = ["proposed"]
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies.gpui-fast-platform]
-version = "0.1.7"
+version = "0.1.12"
 features = [
     "font-kit",
     "wayland",
@@ -457,7 +294,7 @@ optional = true
 package = "gpui-fast-platform"
 
 [target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies.gpui_platform]
-version = "=0.3.9"
+version = "=0.3.10"
 features = [
     "font-kit",
     "wayland",
@@ -466,12 +303,12 @@ features = [
 package = "gpui-pre-platform"
 
 [target.'cfg(target_family = "wasm")'.dependencies.gpui-fast-web]
-version = "0.1.7"
+version = "0.1.12"
 optional = true
 package = "gpui-fast-web"
 
 [target.'cfg(target_family = "wasm")'.dependencies.gpui_web]
-version = "=0.3.9"
+version = "=0.3.10"
 package = "gpui-pre-web"
 
 [lints.clippy]

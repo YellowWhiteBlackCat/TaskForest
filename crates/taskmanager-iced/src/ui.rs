@@ -27,7 +27,7 @@ use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::i18n::{self, Key};
 use crate::theme;
-use taskmanager_shell::FeedbackSeverity;
+use taskmanager_shell::FeedbackTone;
 use taskmanager_theme::Theme;
 
 mod about;
@@ -141,16 +141,12 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     let status = footer_status(shell);
     let status_color = if shell.should_quit() {
         crate::theme_binding::color(theme_snapshot.palette().warning)
-    } else if let Some(notice) = shell.feedback_notice() {
-        match notice.severity() {
-            FeedbackSeverity::Info => crate::theme_binding::color(theme_snapshot.palette().fg),
-            FeedbackSeverity::Success => {
-                crate::theme_binding::color(theme_snapshot.palette().success)
-            }
-            FeedbackSeverity::Warning => {
-                crate::theme_binding::color(theme_snapshot.palette().warning)
-            }
-            FeedbackSeverity::Error => crate::theme_binding::color(theme_snapshot.palette().danger),
+    } else if let Some(feedback) = shell.feedback_presentation() {
+        match feedback.tone() {
+            FeedbackTone::Neutral => crate::theme_binding::color(theme_snapshot.palette().fg),
+            FeedbackTone::Positive => crate::theme_binding::color(theme_snapshot.palette().success),
+            FeedbackTone::Caution => crate::theme_binding::color(theme_snapshot.palette().warning),
+            FeedbackTone::Danger => crate::theme_binding::color(theme_snapshot.palette().danger),
         }
     } else {
         crate::theme_binding::color(theme_snapshot.palette().fg)

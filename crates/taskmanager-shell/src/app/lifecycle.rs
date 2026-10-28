@@ -55,6 +55,33 @@ pub enum FeedbackSeverity {
     Error,
 }
 
+/// The renderer-neutral visual tone of one feedback notice. Every frontend
+/// maps this tone onto its own palette; the severity→tone decision itself has
+/// exactly one authority here.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FeedbackTone {
+    /// Ordinary information; the frontend's normal ink.
+    Neutral,
+    /// A completed action; the frontend's positive ink.
+    Positive,
+    /// A caution or degraded outcome; the frontend's warning ink.
+    Caution,
+    /// A failed action; the frontend's danger ink.
+    Danger,
+}
+
+impl FeedbackSeverity {
+    #[must_use]
+    pub const fn tone(self) -> FeedbackTone {
+        match self {
+            Self::Info => FeedbackTone::Neutral,
+            Self::Success => FeedbackTone::Positive,
+            Self::Warning => FeedbackTone::Caution,
+            Self::Error => FeedbackTone::Danger,
+        }
+    }
+}
+
 /// Explicit notice lifetime. `PlatformBatches(n)` survives until `n`
 /// subsequently applied platform batches have crossed the shell reducer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,6 +162,46 @@ impl FeedbackNotice {
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
+    }
+}
+
+/// The shared presentation projection of one feedback notice: the notice's
+/// copy and lifecycle plus the one derived visual tone. Frontends paint this
+/// instead of re-matching severity themselves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FeedbackPresentation<'a> {
+    notice: &'a FeedbackNotice,
+}
+
+impl<'a> FeedbackPresentation<'a> {
+    #[must_use]
+    pub const fn new(notice: &'a FeedbackNotice) -> Self {
+        Self { notice }
+    }
+
+    #[must_use]
+    pub const fn source(&self) -> FeedbackSource {
+        self.notice.source()
+    }
+
+    #[must_use]
+    pub const fn severity(&self) -> FeedbackSeverity {
+        self.notice.severity()
+    }
+
+    #[must_use]
+    pub const fn lifecycle(&self) -> FeedbackLifecycle {
+        self.notice.lifecycle()
+    }
+
+    #[must_use]
+    pub const fn tone(&self) -> FeedbackTone {
+        self.notice.severity().tone()
+    }
+
+    #[must_use]
+    pub fn text(&self) -> &'a str {
+        self.notice.text()
     }
 }
 
@@ -366,6 +433,14 @@ impl ShellApp {
     #[must_use]
     pub const fn feedback_notice(&self) -> Option<&FeedbackNotice> {
         self.lifecycle.feedback.notice()
+    }
+
+    /// The shared presentation projection every frontend paints. `None` when
+    /// no point-of-action notice is active (background activity is not a
+    /// notice and has no tone).
+    #[must_use]
+    pub fn feedback_presentation(&self) -> Option<FeedbackPresentation<'_>> {
+        self.feedback_notice().map(FeedbackPresentation::new)
     }
 
     pub fn set_feedback_activity(&mut self, text: impl Into<String>) {

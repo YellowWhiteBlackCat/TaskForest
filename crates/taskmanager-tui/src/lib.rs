@@ -130,8 +130,8 @@ use taskmanager_core::core::target::ServiceId;
 use taskmanager_core::core::text::contains_ascii_ci;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::{
-    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
-    matches_process_query,
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, SearchSlot, ShellKeyEvent,
+    SortCol, matches_process_query,
 };
 use taskmanager_shell::{ShellApp, gpu_chart_metric_gate};
 
@@ -263,6 +263,9 @@ pub struct TuiApp {
     /// [`Self::reorderable_columns`]'s default order. TUI-local (ADR-027):
     /// session-local presentation state; the shell owns the sort value.
     pub column_order: Vec<SortCol>,
+    /// Session-local tail-column width overrides set by the column menu's
+    /// `-`/`+` stepper. Missing entries use [`Self::default_column_width`].
+    pub column_widths: std::collections::HashMap<SortCol, u16>,
     /// Which Applications-page panel owns the keyboard (Tab cycles the
     /// focus; the details panel consumes Up/Down as panel scroll).
     pub focus_panel: FocusPanel,
@@ -382,6 +385,7 @@ impl TuiApp {
             visual_row_count_cache: std::cell::RefCell::new(None),
             hidden_columns: std::collections::HashSet::new(),
             column_order: Self::reorderable_columns().to_vec(),
+            column_widths: std::collections::HashMap::new(),
             focus_panel: FocusPanel::Table,
             help_scroll: 0,
             last_insights_target: None,
@@ -640,14 +644,15 @@ impl TuiApp {
     /// panel and any partial service-log owner release the keyboard.
     pub fn handle_local_char(&mut self, character: char, modifiers: Modifiers) -> InputDispatch {
         let query_before = self.query.clone();
-        let query_anchor = if self.page() == AppPage::Applications {
-            self.selected_application_row_anchor()
-        } else {
-            None
-        };
+        let services_query_before = self.shell.services_query.clone();
+        let search_anchor = self.capture_search_row_anchor();
         let effect = self.shell.handle_local_char(character, modifiers);
-        if self.page() == AppPage::Applications && self.query != query_before {
-            self.reconcile_query_application_anchor(query_anchor);
+        let query_changed = match self.shell.search_slot() {
+            SearchSlot::Applications => self.query != query_before,
+            SearchSlot::Services => self.shell.services_query != services_query_before,
+        };
+        if query_changed {
+            self.reconcile_search_row_anchor(search_anchor);
         }
         if self.shell.interaction_surface().is_some()
             || self.shell.help_open()
@@ -881,12 +886,6 @@ impl TuiApp {
             .filter(|count| *count > 0)
             .unwrap_or_else(|| std::thread::available_parallelism().map_or(8, |count| count.get()))
             .min(128)
-    }
-}
-
-impl Default for TuiApp {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

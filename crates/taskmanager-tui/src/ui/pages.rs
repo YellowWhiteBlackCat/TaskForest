@@ -19,10 +19,13 @@ use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_shell::presentation::control_error_detail;
-use taskmanager_shell::{InfoSortCol, SortDir, service_cycle_members};
+use taskmanager_shell::{InfoSortCol, SortDir};
 
 mod service_details;
 mod service_log;
+mod services;
+mod services_search;
+pub(crate) use services::{ServicesPageLayout, render_services, services_page_layout};
 pub(crate) mod system_data;
 
 fn source_title(notice: SourceNotice) -> &'static str {
@@ -54,7 +57,7 @@ fn source_state_message(
 /// the page keeps its full area and the caller's empty/state text remains the
 /// honest fallback.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct SourceNoticeLayout {
+pub(crate) struct SourceNoticeLayout {
     pub(super) notice: Option<Rect>,
     pub(super) content: Rect,
 }
@@ -124,49 +127,6 @@ fn render_source_notice(
         notice_area,
     );
     layout.content
-}
-
-/// The Services page's table, the optional selected-service details column
-/// and the optional log band. Source-notice geometry is resolved before the
-/// details and log splits so both the renderer and `table_hit` address the
-/// same table rectangle.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ServicesPageLayout {
-    pub(super) area: Rect,
-    pub(super) source: SourceNoticeLayout,
-    pub(super) details: Option<Rect>,
-    pub(super) table: Rect,
-    pub(super) log: Option<Rect>,
-}
-
-#[must_use]
-pub(super) fn services_page_layout(app: &TuiApp, area: Rect) -> ServicesPageLayout {
-    let source = source_notice_layout(area, app.projection().services_source.as_deref());
-    // The selected-service details column (GPUI services_view/details
-    // parity) shares the table's row band on the right. It is a pure
-    // addition with one honest rule: a narrow or short terminal, or an empty
-    // inventory, yields the WHOLE column back to the table — the panel never
-    // overlaps it nor squeezes it below its usable width.
-    let (content, details) = service_details::column_split(app, source.content);
-    if app.shell.service_log.is_none() {
-        return ServicesPageLayout {
-            area,
-            source,
-            details,
-            table: content,
-            log: None,
-        };
-    }
-    let log_height = (content.height / 2).clamp(8, 14);
-    let [table, log] =
-        Layout::vertical([Constraint::Min(4), Constraint::Length(log_height)]).areas(content);
-    ServicesPageLayout {
-        area,
-        source,
-        details,
-        table,
-        log: Some(log),
-    }
 }
 
 /// The Startup page's optional timeline and table areas. `table_before_notice`
@@ -241,104 +201,6 @@ pub(super) fn users_page_layout(app: &TuiApp, area: Rect) -> UsersPageLayout {
         source,
         table,
         feedback,
-    }
-}
-
-pub(super) fn render_services(
-    frame: &mut Frame<'_>,
-    app: &TuiApp,
-    theme: TuiTheme,
-    layout: ServicesPageLayout,
-    panel: TablePanelProjection,
-) {
-    // Rows project through the shared sort order (provider order until a
-    // header click picks a column), so the selection index always maps to the
-    // same visible order the Iced frontend renders.
-    let sorted_services = app.sorted_services();
-    let cycle_members = app
-        .projection()
-        .services
-        .as_deref()
-        .map(service_cycle_members)
-        .unwrap_or_default();
-    let state_message = source_state_message(
-        app.projection().services_source.as_deref(),
-        t("empty.no_services_reported"),
-        app.source_retry_request().is_some(),
-    );
-    let painted = render_windowed_table(
-        frame,
-        WindowedTableProps {
-            theme,
-            panel,
-            title: t("page.services_help"),
-            header: sort_header_row(
-                [
-                    t("common.service"),
-                    t("common.status"),
-                    t("common.description"),
-                ],
-                theme,
-                name_status_sort(app.shell.services_sort),
-            ),
-            widths: vec![
-                Constraint::Percentage(38),
-                Constraint::Length(12),
-                Constraint::Min(20),
-            ],
-            column_spacing: 2,
-            // With no rows the honest state panel owns the whole page area,
-            // including the log band's slot below.
-            state_area: layout.area,
-            state_message: &state_message,
-        },
-        |index| {
-            let service = sorted_services[index];
-            let color = match service.status.as_str() {
-                "Active" => theme.good,
-                "Failed" => theme.danger,
-                _ => theme.dim,
-            };
-            let status = if cycle_members.contains(&service.id) {
-                format!("{} · {}", service.status.as_str(), t("svc.cycle"))
-            } else {
-                service.status.as_str().to_owned()
-            };
-            Row::new([
-                Cell::from(service.name.as_str()),
-                Cell::from(status).style(Style::new().fg(if cycle_members.contains(&service.id) {
-                    theme.warn
-                } else {
-                    color
-                })),
-                Cell::from(service.description.as_str()),
-            ])
-        },
-    );
-    if painted != WindowedTableOutcome::Table {
-        return;
-    }
-    let _ = render_source_notice(
-        frame,
-        app,
-        theme,
-        layout.source,
-        app.projection().services_source.as_deref(),
-    );
-    // The selected-service details column (GPUI services-view parity): the
-    // state triplet plus the read-only relation rows, following the same
-    // `selected` cursor as the table. Painted only when the table itself
-    // painted rows — an empty or failed inventory leaves the state panel in
-    // charge of the whole page, so the column's slot stays with it.
-    if let Some(details_area) = layout.details {
-        service_details::render(frame, app, theme, details_area);
-    }
-    // The open service-log stream (opened with `o` on the Services page) owns
-    // the bottom band of the page; the table gets the rest. The log panel is
-    // bounded and honest: entries render from the shared feed, an empty or
-    // unavailable stream renders its state instead of fabricating lines.
-    if let Some(log) = layout.log {
-        service_log::render(frame, app, theme, log);
     }
 }
 

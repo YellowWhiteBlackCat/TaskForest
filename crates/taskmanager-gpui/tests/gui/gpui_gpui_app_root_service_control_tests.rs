@@ -283,3 +283,50 @@ async fn session_confirmation_rejects_missing_or_duplicate_current_rows(
         assert!(view.pending_confirmation().is_none());
     });
 }
+
+#[gpui::test]
+fn startup_toggle_arms_the_shared_gate_and_confirms_through_the_control_path(
+    cx: &mut gpui::TestAppContext,
+) {
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    root.update(cx, |view, cx| {
+        let entry = StartupEntry {
+            id: "desktop:helper.desktop".into(),
+            name: "Desktop helper".into(),
+            exec: "capture-desktop-helper --background".into(),
+            enabled: true,
+            source: StartupSource::DesktopEntry,
+            scope: StartupScope::User,
+            control_policy: StartupControlPolicy::Direct,
+            locator: "/home/<user>/.config/autostart/helper.desktop".into(),
+            impact: StartupImpact::Low,
+            impact_evidence: StartupImpactEvidence::Unknown {
+                reason: StartupImpactUnknownReason::NotInstrumented,
+            },
+        };
+        view.request_startup_control_confirmation(entry.clone(), false);
+        assert!(
+            view.pending_confirmation().is_some(),
+            "the toggle must arm the shared confirmation"
+        );
+        assert!(
+            view.confirm_service_control_confirmation(cx),
+            "confirm must submit the frozen startup request"
+        );
+        assert!(
+            view.pending_confirmation().is_none(),
+            "confirm consumes the pending gate"
+        );
+        let outcome = view
+            .shell
+            .feedback
+            .startup()
+            .expect("the absent platform worker reports a typed outcome");
+        assert_eq!(outcome.target_name, entry.name);
+        assert!(!outcome.enabled);
+        assert!(
+            outcome.result.is_err(),
+            "the absent platform worker rejects honestly instead of faking success"
+        );
+    });
+}

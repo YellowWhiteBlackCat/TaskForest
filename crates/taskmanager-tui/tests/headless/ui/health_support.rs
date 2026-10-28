@@ -4,7 +4,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 
 use super::render_health_overlay_at;
-use crate::ui::frame_plan::overlay_popup;
+use crate::ui::frame_plan::overlays::overlay_popup;
 use crate::{TuiApp, TuiTheme};
 
 pub(crate) fn render_health_overlay(

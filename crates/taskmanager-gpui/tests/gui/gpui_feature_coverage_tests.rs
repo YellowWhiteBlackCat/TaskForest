@@ -85,9 +85,9 @@ fn the_reference_undelivered_set_is_pinned() {
             "pressure.unresponsive-apps",
             "ipc.dbus-service-topology",
             "ipc.dbus-introspection",
-            "ipc.pipe-deadlock",
             "ipc.shared-memory-segments",
             "ipc.uds-peer-topology",
+            "ipc.pipe-deadlock",
             "tracing.pmu-counters",
             "tracing.syscall-distribution",
             "tracing.slow-syscall-trap",
@@ -227,7 +227,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        50,
+        55,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

@@ -318,7 +318,8 @@ fn user_rows_in_window(
                 // The open menu floats on its own row: anchored by the
                 // popover primitive and dismissed by an outside press.
                 let panel = user_menu_panel(table_theme, session.id.to_string());
-                crate::ui::components::Popover::new(row, panel, Message::CloseUserRowMenu).into()
+                crate::ui::components::Popover::context_menu(row, panel, Message::CloseUserRowMenu)
+                    .into()
             } else {
                 row
             };

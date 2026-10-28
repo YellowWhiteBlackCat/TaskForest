@@ -166,3 +166,35 @@ fn timed_notice_expires_when_time_advances_past_duration() {
     app.advance_feedback_time(std::time::Duration::from_millis(300));
     assert!(app.feedback_notice().is_none());
 }
+
+/// One severity→tone authority: every frontend paints the same projection
+/// instead of re-matching severity, and the notice keeps its typed metadata.
+#[test]
+fn feedback_presentation_derives_one_tone_and_carries_the_notice_fields() {
+    let mut app = ShellApp::new();
+    assert_eq!(
+        app.feedback_presentation(),
+        None,
+        "background activity alone is not a notice"
+    );
+
+    for (severity, tone) in [
+        (FeedbackSeverity::Info, FeedbackTone::Neutral),
+        (FeedbackSeverity::Success, FeedbackTone::Positive),
+        (FeedbackSeverity::Warning, FeedbackTone::Caution),
+        (FeedbackSeverity::Error, FeedbackTone::Danger),
+    ] {
+        app.report_notice(
+            FeedbackSource::Interaction,
+            severity,
+            FeedbackLifecycle::UntilReplaced,
+            "shared feedback",
+        );
+        let feedback = app.feedback_presentation().expect("the notice is present");
+        assert_eq!(feedback.tone(), tone);
+        assert_eq!(feedback.severity(), severity);
+        assert_eq!(feedback.source(), FeedbackSource::Interaction);
+        assert_eq!(feedback.lifecycle(), FeedbackLifecycle::UntilReplaced);
+        assert_eq!(feedback.text(), "shared feedback");
+    }
+}

@@ -2,6 +2,7 @@ use super::*;
 use crate::presentation::smart::{self_test_intent, smart_section_visible};
 use taskmanager_application::AppAction;
 use taskmanager_application::MsrReadoutSession;
+use taskmanager_core::SystemHealthScore;
 use taskmanager_core::core::metrics::{
     CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, MsrReadoutSnapshot,
     MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics,
@@ -13,6 +14,18 @@ use taskmanager_core::core::smart::{
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_core::{DeviceGeneration, SystemLoadAverage};
 use taskmanager_platform_contract::RequestId;
+
+#[test]
+fn health_summary_names_the_red_yellow_green_saturation_grade() {
+    let score = SystemHealthScore {
+        score: 72,
+        deductions: Vec::new(),
+    };
+    let summary = health_score_summary(&score);
+    assert!(summary.contains(i18n::t("system.saturation_grade")));
+    assert!(summary.contains(i18n::t("system.saturation_warning")));
+    assert!(!summary.contains(i18n::t("system.saturation_healthy")));
+}
 
 #[test]
 fn service_exit_diagnostics_explain_configuration_failure_in_both_locales() {

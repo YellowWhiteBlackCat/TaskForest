@@ -129,3 +129,24 @@ fn startup_source_detail_does_not_claim_complete_rows_for_inventory_failure() {
     assert!(detail.contains(i18n::t("startup.source_inventory_degraded")));
     assert!(!detail.contains(i18n::t("startup.source_inventory_available")));
 }
+
+#[test]
+fn startup_impact_text_carries_the_tier_duration_or_typed_unknown() {
+    use taskmanager_core::core::startup::StartupImpactUnknownReason;
+
+    let measured = entry("measured", true);
+    assert_eq!(
+        startup_impact_text(&measured),
+        format!("{} · 10 ms", i18n::t(measured.impact.i18n_key()))
+    );
+
+    let mut unknown = measured;
+    unknown.impact_evidence = StartupImpactEvidence::Unknown {
+        reason: StartupImpactUnknownReason::NotInstrumented,
+    };
+    assert_eq!(
+        startup_impact_text(&unknown),
+        i18n::t("startup.impact_unknown"),
+        "an unmeasured impact never fabricates a duration"
+    );
+}

@@ -41,7 +41,7 @@ fn services_rows_reuse_the_projection_until_an_input_changes(cx: &mut TestAppCon
         assert!(!Rc::ptr_eq(&first, &rebuilt));
 
         // A query edit invalidates it too (without any generation bump).
-        view.services_state.query = "Alpha".to_owned();
+        view.shell.services.set_query("Alpha");
         let filtered = view.services_rows();
         assert_eq!(filtered.len(), 1, "the memo must apply the new query");
         assert_eq!(filtered[0].name, "Alpha");

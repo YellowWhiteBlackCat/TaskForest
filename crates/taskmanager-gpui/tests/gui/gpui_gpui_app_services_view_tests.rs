@@ -91,7 +91,7 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
         .expect("the unfiltered service row must render");
 
     view.update(cx, |v, cx| {
-        v.services_state.query = "4".to_owned();
+        v.shell.services.set_query("4");
         cx.notify();
     });
     vcx.update(|window, cx| window.draw(cx).clear(cx));

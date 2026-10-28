@@ -6,19 +6,17 @@
 //! reused by pointer input until the next frame is painted.
 
 use ratatui::layout::{Constraint, Layout, Rect};
-use taskmanager_application::AppPage;
 use taskmanager_application::system_timeline::SystemPageSection;
+use taskmanager_application::{AppPage, SurfaceKind};
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use crate::{TuiApp, TuiInputScope};
 mod focus;
+pub(crate) mod overlays;
 use focus::local_surface_focus_control;
+use overlays::{TuiOverlayControls, TuiOverlayPlan, overlay_plan};
 
-use super::{
-    batch_menu, pages, process_menu, process_properties::ProcessDetailsSection, process_table,
-    service_menu, session_menu, startup_menu,
-};
-use taskmanager_application::{ConfirmationKind, SurfaceKind};
+use super::{pages, process_properties::ProcessDetailsSection, process_table};
 
 /// Rows occupied by the table border, header, and the header's bottom margin
 /// before the first data row. The hit-test rule belongs to the frame plan so
@@ -236,56 +234,37 @@ pub(crate) enum TuiHitTarget {
         surface: crate::TuiSurfaceKind,
         index: usize,
     },
+    /// A form row painted inside the settings overlay. The index is the
+    /// stable settings-field index the keyboard focus walks.
+    SettingsField {
+        index: usize,
+    },
+    /// The Applications search field's painted content row. The column is
+    /// resolved into a query byte through the same cell geometry the
+    /// renderer used.
+    SearchCaret {
+        column: u16,
+    },
 }
 
-/// The active overlay's exact painted rectangle and owning input scope.  The
-/// rectangle is part of the frame plan so an overlay renderer cannot quietly
-/// recalculate a different popup from the same terminal area.
+/// The Applications search field's painted text slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct TuiOverlayPlan {
-    pub(crate) scope: TuiInputScope,
-    pub(crate) popup: Rect,
-    /// The clickable control rows painted inside the popup, if the surface
-    /// has any. Every other popup cell stays a blocked `Overlay` hit.
-    pub(crate) controls: Option<TuiOverlayControls>,
+pub(crate) struct SearchFieldPlan {
+    /// The content row (inside the field's border).
+    pub(crate) row: u16,
+    /// The first cell of the query text (the search glyph and its gap
+    /// occupy the two cells before it).
+    pub(crate) text_x: u16,
+    /// The clickable content span, border excluded.
+    pub(crate) left: u16,
+    pub(crate) right: u16,
 }
 
-/// The painted, pointer-addressable control rows of one overlay surface.
-/// Geometry mirrors the surface renderer exactly — one border cell, the
-/// renderer's own header/footer bands, and the same item inventory the
-/// renderer iterates — and both consume the same committed popup rectangle,
-/// so a click and the highlight paint can never drift apart.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct TuiOverlayControls {
-    /// The surface whose popup paints these rows; it must still own the
-    /// keyboard when a click on a stale plan is applied.
-    pub(crate) surface: crate::TuiSurfaceKind,
-    /// Absolute y of control row 0; every control paints one full-width row.
-    pub(crate) first_row: u16,
-    /// Absolute x/width of the control rows (the popup's inner width).
-    pub(crate) x: u16,
-    pub(crate) width: u16,
-    /// Painted control count: the surface's item inventory clamped to the
-    /// body rows the popup can actually show (the renderer clips the rest).
-    pub(crate) count: u16,
-}
-
-impl TuiOverlayControls {
-    /// The control index addressed by one cell, if the cell is on a painted
-    /// control row. Border, header, footer, and gap cells yield `None`.
+impl SearchFieldPlan {
+    /// The query byte boundary under one painted cell.
     #[must_use]
-    pub(crate) fn row_at(self, column: u16, row: u16) -> Option<usize> {
-        if column < self.x || column >= self.x.saturating_add(self.width) {
-            return None;
-        }
-        if row < self.first_row {
-            return None;
-        }
-        let offset = row - self.first_row;
-        if offset >= self.count {
-            return None;
-        }
-        Some(usize::from(offset))
+    pub(crate) fn byte_at(self, query: &str, column: u16) -> usize {
+        super::text::byte_at_cell(query, usize::from(column.saturating_sub(self.text_x)))
     }
 }
 
@@ -430,6 +409,7 @@ pub(crate) struct TuiFramePlan {
     pub(super) input_scope: TuiInputScope,
     pub(super) focus: TuiFocusPlan,
     pub(super) overlay: Option<TuiOverlayPlan>,
+    pub(super) search: Option<SearchFieldPlan>,
 }
 
 impl TuiFramePlan {
@@ -477,7 +457,7 @@ impl TuiFramePlan {
                 let page = pages::services_page_layout(app, body);
                 let table = TablePanelProjection::new(
                     page.table,
-                    app.sorted_services().len(),
+                    app.shell.visible_service_count(),
                     app.selected,
                 );
                 TuiPageLayout::Services { page, table }
@@ -510,6 +490,31 @@ impl TuiFramePlan {
             }
             AppPage::AppHistory => TuiPageLayout::AppHistory { content: body },
         };
+        let search = match page {
+            TuiPageLayout::Applications { process, .. } if process.search.height >= 3 => {
+                Some(SearchFieldPlan {
+                    row: process.search.y.saturating_add(1),
+                    text_x: process.search.x.saturating_add(3),
+                    left: process.search.x.saturating_add(1),
+                    right: process.search.right().saturating_sub(1),
+                })
+            }
+            TuiPageLayout::Services { page, .. } if page.search.height >= 3 => {
+                Some(SearchFieldPlan {
+                    row: page.search.y.saturating_add(1),
+                    text_x: page.search.x.saturating_add(3),
+                    left: page.search.x.saturating_add(1),
+                    right: page.search.right().saturating_sub(1),
+                })
+            }
+            TuiPageLayout::Performance { .. }
+            | TuiPageLayout::Applications { .. }
+            | TuiPageLayout::Services { .. }
+            | TuiPageLayout::Startup { .. }
+            | TuiPageLayout::Users { .. }
+            | TuiPageLayout::System { .. }
+            | TuiPageLayout::AppHistory { .. } => None,
+        };
         Self {
             area,
             chrome,
@@ -518,7 +523,14 @@ impl TuiFramePlan {
             input_scope,
             focus: TuiFocusPlan::build(app, input_scope),
             overlay: overlay_plan(app, area, input_scope),
+            search,
         }
+    }
+
+    /// The Applications search field's painted slot for this frame.
+    #[must_use]
+    pub(crate) const fn search_field(&self) -> Option<SearchFieldPlan> {
+        self.search
     }
 
     /// The exact overlay geometry painted for this frame, if any.
@@ -574,6 +586,12 @@ impl TuiFramePlan {
             .overlay
             .filter(|overlay| overlay.popup.contains((column, row).into()))
         {
+            if let Some(settings) = overlay.settings
+                && settings.body.contains((column, row).into())
+                && let Some(index) = settings.field_at(row)
+            {
+                return Some(TuiHitTarget::SettingsField { index });
+            }
             if let Some(controls) = overlay.controls
                 && let Some(index) = controls.row_at(column, row)
             {
@@ -595,6 +613,13 @@ impl TuiFramePlan {
                 return Some(TuiHitTarget::NavigationPage(*page));
             }
             return None;
+        }
+        if let Some(search) = self.search
+            && row == search.row
+            && column >= search.left
+            && column < search.right
+        {
+            return Some(TuiHitTarget::SearchCaret { column });
         }
         let index = self.table_row_at(column, row)?;
         Some(TuiHitTarget::TableRow {
@@ -629,155 +654,5 @@ impl TuiFramePlan {
             return None;
         }
         Some(panel.window.start + usize::from(offset))
-    }
-}
-
-fn overlay_plan(app: &TuiApp, area: Rect, scope: TuiInputScope) -> Option<TuiOverlayPlan> {
-    let popup = overlay_popup(area, scope)?;
-    let controls = match scope {
-        TuiInputScope::LocalSurface(surface) => overlay_controls(app, surface, popup),
-        TuiInputScope::SharedSurface(_)
-        | TuiInputScope::ServiceLog
-        | TuiInputScope::Help
-        | TuiInputScope::Suggestions
-        | TuiInputScope::Search
-        | TuiInputScope::DetailsPanel
-        | TuiInputScope::Content => None,
-    };
-    Some(TuiOverlayPlan {
-        scope,
-        popup,
-        controls,
-    })
-}
-
-/// Project the clickable control rows one local surface paints inside its
-/// popup. Every band mirrors that surface's renderer exactly: one border
-/// cell, the renderer's own header/footer layout splits, and the same item
-/// inventory the renderer iterates. Surfaces without actionable controls
-/// (the settings form, the informational overlays) yield `None`, so every
-/// cell there stays a blocked `Overlay` hit. A popup too small to guarantee
-/// the painted body bands also yields `None`: an unresolvable cell is always
-/// fail-closed blocked, never a guess.
-fn overlay_controls(
-    app: &TuiApp,
-    surface: crate::TuiSurfaceKind,
-    popup: Rect,
-) -> Option<TuiOverlayControls> {
-    // The bordered inner rectangle every overlay paints its content into
-    // (`Block::inner` over `Borders::ALL`).
-    let inner = Rect {
-        x: popup.x.saturating_add(1),
-        y: popup.y.saturating_add(1),
-        width: popup.width.saturating_sub(2),
-        height: popup.height.saturating_sub(2),
-    };
-    // (header rows above the first control, footer rows, item inventory) —
-    // the exact band splits each renderer applies to the bordered inner area.
-    let (header_rows, footer_rows, items) = match surface {
-        // Service/Process/Batch/Session menus paint a frozen-target line and
-        // a blank line before the first action row, above a 3-row footer.
-        crate::TuiSurfaceKind::ServiceMenu => (2, 3, service_menu::MENU_ACTIONS.len()),
-        crate::TuiSurfaceKind::ProcessMenu => (2, 3, process_menu::MENU_ACTIONS.len()),
-        crate::TuiSurfaceKind::BatchMenu => (2, 3, batch_menu::MENU_ACTIONS.len()),
-        crate::TuiSurfaceKind::SessionMenu => (2, 3, session_menu::MENU_ACTIONS.len()),
-        // The startup menu paints its action rows directly at the body top.
-        crate::TuiSurfaceKind::StartupMenu => (0, 3, startup_menu::MENU_ACTIONS.len()),
-        // The column menu lists the toggleable columns with a 2-row footer.
-        crate::TuiSurfaceKind::ColumnMenu => (0, 2, TuiApp::toggleable_columns().len()),
-        // The palette paints a 3-row filter field, then the filtered rows,
-        // then a 2-row footer. The filtered inventory is baked at plan-build
-        // time so a later keystroke cannot retarget a committed click.
-        crate::TuiSurfaceKind::CommandPalette => (3, 2, app.filtered_palette_rows().len()),
-        crate::TuiSurfaceKind::Settings
-        | crate::TuiSurfaceKind::SavedViews
-        | crate::TuiSurfaceKind::SidebarEditor
-        | crate::TuiSurfaceKind::About
-        | crate::TuiSurfaceKind::SystemInformation
-        | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers
-        | crate::TuiSurfaceKind::ServiceDependencies
-        | crate::TuiSurfaceKind::ProcessAffinity
-        | crate::TuiSurfaceKind::DiagnosticBundle
-        | crate::TuiSurfaceKind::FirstRun => return None,
-    };
-    let header_rows = u16::try_from(header_rows).unwrap_or(u16::MAX);
-    let footer_rows = u16::try_from(footer_rows).unwrap_or(u16::MAX);
-    let items = u16::try_from(items).unwrap_or(u16::MAX);
-    // One body row beyond the bands must be guaranteed (every body slot is a
-    // `Min` constraint) or the renderer's layout is degenerate and no control
-    // row can be resolved honestly.
-    if inner.width == 0 || inner.height < header_rows.saturating_add(footer_rows).saturating_add(1)
-    {
-        return None;
-    }
-    let body_rows = inner.height - footer_rows;
-    let count = items.min(body_rows - header_rows);
-    if count == 0 {
-        return None;
-    }
-    Some(TuiOverlayControls {
-        surface,
-        first_row: inner.y + header_rows,
-        x: inner.x,
-        width: inner.width,
-        count,
-    })
-}
-
-/// Resolve an overlay popup from its typed input owner. The frame plan stores
-/// this result for production rendering and hit-tests; isolated render tests
-/// call the same function directly.
-pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
-    let size = match scope {
-        TuiInputScope::SharedSurface(surface) => match surface {
-            SurfaceKind::ProcessProperties => (96, 30),
-            SurfaceKind::Confirmation(kind) => confirmation_size(kind),
-        },
-        TuiInputScope::LocalSurface(surface) => match surface {
-            crate::TuiSurfaceKind::Settings => (68, 32),
-            crate::TuiSurfaceKind::SavedViews => (68, 24),
-            crate::TuiSurfaceKind::SidebarEditor => (68, 24),
-            crate::TuiSurfaceKind::About => (72, 20),
-            crate::TuiSurfaceKind::SystemInformation => (84, 30),
-            crate::TuiSurfaceKind::Health => (84, 30),
-            crate::TuiSurfaceKind::Containers => (84, 22),
-            crate::TuiSurfaceKind::ServiceMenu => (52, 13),
-            crate::TuiSurfaceKind::ProcessMenu => (52, 19),
-            crate::TuiSurfaceKind::BatchMenu => (52, 15),
-            crate::TuiSurfaceKind::SessionMenu | crate::TuiSurfaceKind::StartupMenu => (52, 11),
-            crate::TuiSurfaceKind::ColumnMenu => (
-                44,
-                u16::try_from(crate::TuiApp::toggleable_columns().len())
-                    .unwrap_or(u16::MAX)
-                    .saturating_add(4),
-            ),
-            crate::TuiSurfaceKind::CommandPalette => (72, 26),
-            crate::TuiSurfaceKind::ServiceDependencies => (72, 20),
-            crate::TuiSurfaceKind::ProcessAffinity => (64, 16),
-            crate::TuiSurfaceKind::DiagnosticBundle => (78, 24),
-            // Three complete descriptor groups, copy/docs hints and the
-            // fixed action/scroll footer fit the normal review. Compact
-            // terminals clamp this slot and scroll only the body.
-            crate::TuiSurfaceKind::FirstRun => (60, 24),
-        },
-        TuiInputScope::Help => (68, 24),
-        TuiInputScope::Suggestions => (74, 22),
-        TuiInputScope::ServiceLog
-        | TuiInputScope::Search
-        | TuiInputScope::DetailsPanel
-        | TuiInputScope::Content => return None,
-    };
-    Some(centered_popup(area, size.0, size.1))
-}
-
-const fn confirmation_size(kind: ConfirmationKind) -> (u16, u16) {
-    match kind {
-        ConfirmationKind::EndTask => (58, 9),
-        ConfirmationKind::ServiceControl
-        | ConfirmationKind::StartupControl
-        | ConfirmationKind::SessionControl => (60, 9),
-        ConfirmationKind::SmartSelfTest => (62, 9),
-        ConfirmationKind::ProcessBatch => (64, 15),
     }
 }

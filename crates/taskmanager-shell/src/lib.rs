@@ -33,6 +33,7 @@ pub mod memory;
 pub mod presentation;
 pub mod process_filter;
 pub mod saved_views;
+pub mod service_query;
 pub mod system_timeline;
 pub mod viewmodel;
 
@@ -47,13 +48,14 @@ pub use app::process_rows::{
 };
 pub use app::{
     BatchFoldChanges, BatchFoldOutput, DirectTrackState, FeedbackBatchLifetime, FeedbackLifecycle,
-    FeedbackNotice, FeedbackSeverity, FeedbackSource, FeedbackState, FrameCommit, InfoSortCol,
-    InfoTable, PAGE_STEP, ProcessControlAvailability, ProcessControlFeedback, ProcessControlKind,
-    ProcessControlScope, ProcessSelection, ProcessViewing, QuitReason, QuitRequestOutcome,
-    QuitState, ShellApp, ShellInputMode, SortCol, SortDir, SystemProjectionStore,
-    TelemetryFrameState, aggregate_sort_key, gpu_chart_metric_gate, identity_range,
-    order_service_rows, order_session_rows, order_startup_rows, process_control_notice_text,
-    queue_effect, queue_effect_result, selected_rows_range, sort_axis,
+    FeedbackNotice, FeedbackPresentation, FeedbackSeverity, FeedbackSource, FeedbackState,
+    FeedbackTone, FrameCommit, InfoSortCol, InfoTable, PAGE_STEP, ProcessControlAvailability,
+    ProcessControlFeedback, ProcessControlKind, ProcessControlScope, ProcessSelection,
+    ProcessViewing, QuitReason, QuitRequestOutcome, QuitState, SearchSlot, ShellApp,
+    ShellInputMode, SortCol, SortDir, SystemProjectionStore, TelemetryFrameState,
+    aggregate_sort_key, gpu_chart_metric_gate, identity_range, order_service_rows,
+    order_session_rows, order_startup_rows, process_control_notice_text, queue_effect,
+    queue_effect_result, selected_rows_range, sort_axis,
 };
 pub use fixture::demo_app;
 pub use input_dispatch::InputDispatch;
@@ -68,3 +70,4 @@ pub use presentation::{
     service_cycle_members,
 };
 pub use process_filter::{ProcessStatusFilter, matches_process_query};
+pub use service_query::{matches_service_query, matches_service_text};

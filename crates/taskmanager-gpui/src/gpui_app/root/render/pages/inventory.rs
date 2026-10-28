@@ -36,7 +36,7 @@ impl RootView {
                     selected: selected.as_ref(),
                     hovered: hovered.cloned(),
                     filter: self.services_state.filter,
-                    query: &self.services_state.query,
+                    query: self.shell.services.query(),
                     rows: self.services_rows(),
                     feedback: self.services_feedback(),
                     search_input: self

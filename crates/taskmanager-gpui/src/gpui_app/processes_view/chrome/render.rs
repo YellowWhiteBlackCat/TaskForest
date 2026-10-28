@@ -9,8 +9,8 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
-    Context, Div, InteractiveElement, IntoElement, IsZero, ParentElement, Pixels, ScrollHandle,
-    ScrollWheelEvent, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div, px,
+    Context, Div, InteractiveElement, IntoElement, IsZero, ParentElement, Pixels, ScrollEvent,
+    ScrollHandle, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div, px,
     uniform_list,
 };
 use taskmanager_ui::inputs::text_input::TextInputState;
@@ -43,7 +43,7 @@ pub struct ProcessesViewProps<'a> {
     pub theme: &'a Theme,
     pub application_count: usize,
     pub process_count: usize,
-    pub uninterruptible_count: Option<usize>,
+    pub uninterruptible_summary: Option<String>,
     pub anomaly_summary: Option<String>,
     pub search_input: &'a gpui::Entity<TextInputState>,
     pub rows: &'a Rc<Vec<VisibleRow>>,
@@ -103,8 +103,8 @@ pub struct ProcessesViewProps<'a> {
 /// platform adapters normalize Shift+wheel into `delta.x`; remapping it here
 /// would happen after the child list already
 /// consumed `delta.y` and would create a diagonal scroll.
-fn vertical_wheel_guard() -> impl Fn(&ScrollWheelEvent, &mut Window, &mut gpui::App) {
-    move |event: &ScrollWheelEvent, window, cx| {
+fn vertical_wheel_guard() -> impl Fn(&ScrollEvent, &mut Window, &mut gpui::App) {
+    move |event: &ScrollEvent, window, cx| {
         let delta = event.delta.pixel_delta(window.line_height());
         if !delta.x.is_zero() {
             return;
@@ -119,8 +119,8 @@ fn vertical_wheel_guard() -> impl Fn(&ScrollWheelEvent, &mut Window, &mut gpui::
 /// is deliberately left for the outer viewport's built-in listener.
 fn header_wheel_guard(
     processes_scroll: UniformListScrollHandle,
-) -> impl Fn(&ScrollWheelEvent, &mut Window, &mut gpui::App) {
-    move |event: &ScrollWheelEvent, window, cx| {
+) -> impl Fn(&ScrollEvent, &mut Window, &mut gpui::App) {
+    move |event: &ScrollEvent, window, cx| {
         let delta = event.delta.pixel_delta(window.line_height());
         if !delta.x.is_zero() {
             return;
@@ -146,7 +146,7 @@ pub fn render_processes(
         theme,
         application_count,
         process_count,
-        uninterruptible_count,
+        uninterruptible_summary,
         anomaly_summary,
         search_input,
         rows,
@@ -214,7 +214,7 @@ pub fn render_processes(
         .debug_selector(|| "tm-procs-header-scroll".to_string())
         .w(content_width)
         .flex_shrink_0()
-        .on_scroll_wheel(header_wheel_guard(processes_scroll.clone()))
+        .on_scroll(header_wheel_guard(processes_scroll.clone()))
         .child(
             sort_header_row(super::SortHeaderRowProps {
                 theme: &theme,
@@ -359,7 +359,7 @@ pub fn render_processes(
         .min_w(px(0.0))
         .overflow_x_scroll()
         .track_scroll(&horizontal_scroll)
-        .on_scroll_wheel(vertical_wheel_guard())
+        .on_scroll(vertical_wheel_guard())
         .restrict_scroll_to_axis()
         .child(table_content);
 
@@ -433,7 +433,7 @@ pub fn render_processes(
             theme: &theme,
             application_count,
             process_count,
-            uninterruptible_count,
+            uninterruptible_summary,
             anomaly_summary,
             search_input,
             presentation,

@@ -24,10 +24,9 @@ fn declaration_is_total_and_every_difference_is_registered() {
 
 /// The registered divergences are exactly the known architecture drivers —
 /// this pins the set so a new divergence cannot appear silently. Text
-/// selection keeps its registered keyboard/block-selection differences, the
-/// footer feedback line remains the toast divergence, Tooltip records the
-/// native Iced hover-only trigger and dismissal boundary, and DropdownMenu
-/// records Iced's captured outside press.
+/// selection keeps its registered keyboard-focus boundary, the footer
+/// feedback line remains the toast divergence, and Tooltip records the
+/// native Iced hover-only trigger and dismissal boundary.
 #[test]
 fn the_registered_divergences_are_exactly_the_known_drivers() {
     let declaration = capability_declaration();
@@ -37,29 +36,54 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(
-        divergent,
-        ["dropdown-menu", "tooltip", "toast", "text-selection"]
-    );
+    assert_eq!(divergent, ["tooltip", "toast", "text-selection"]);
+}
+
+/// The prose registry is a human-readable projection of the declaration; this
+/// marker keeps its divergence list from drifting while the code stays the
+/// single authority.
+#[test]
+fn parity_registry_doc_lists_the_declared_divergences() {
+    let doc = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/docs/PARITY_REGISTRY.md"
+    ))
+    .expect("PARITY_REGISTRY.md is readable");
+    let marker = doc
+        .lines()
+        .find_map(|line| line.strip_prefix("<!-- iced-capability-divergences: "))
+        .and_then(|rest| rest.strip_suffix(" -->"))
+        .expect("PARITY_REGISTRY.md carries the divergence marker");
+    let mut documented: Vec<&str> = marker
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect();
+    documented.sort_unstable();
+    let declaration = capability_declaration();
+    let mut declared: Vec<&str> = declaration
+        .entries
+        .iter()
+        .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
+        .map(|entry| entry.capability.id())
+        .collect();
+    declared.sort_unstable();
+    assert_eq!(documented, declared);
 }
 
 #[test]
-fn dropdown_menu_divergence_records_outside_press_capture() {
+fn dropdown_menu_is_ported_and_forwards_the_outside_press() {
     let declaration = capability_declaration();
     let dropdown = declaration
         .entries
         .iter()
         .find(|entry| entry.capability == ComponentCapability::DropdownMenu)
         .expect("DropdownMenu capability is registered");
-    assert!(matches!(
-        dropdown.support,
-        CapabilitySupport::Divergent { reason }
-            if reason == "Iced captures the outside dismissal press so the background target does not activate; GPUI forwards that same press to the background target"
-    ));
+    assert!(matches!(dropdown.support, CapabilitySupport::Ported));
 }
 
 #[test]
-fn tooltip_divergence_records_the_native_interaction_boundary() {
+fn tooltip_divergence_records_the_remaining_hint_badge_boundary() {
     let declaration = capability_declaration();
     let tooltip = declaration
         .entries
@@ -69,9 +93,27 @@ fn tooltip_divergence_records_the_native_interaction_boundary() {
     assert!(matches!(
         tooltip.support,
         CapabilitySupport::Divergent { reason }
-            if reason == "Iced widget::tooltip opens immediately on pointer hover and closes on \
-                          pointer exit; it has no keyboard-focus trigger and ignores \
-                          pointer-click and Escape dismissal"
+            if reason == "the focused Performance rail readout opens on keyboard focus and \
+                          dismisses on pointer click/Escape; footer and row hint badges remain \
+                          hover-only because their triggers are not focusable"
+    ));
+}
+
+#[test]
+fn text_selection_divergence_records_the_keyboard_focus_boundary() {
+    let declaration = capability_declaration();
+    let selection = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.capability == ComponentCapability::TextSelection)
+        .expect("TextSelection capability is registered");
+    assert!(matches!(
+        selection.support,
+        CapabilitySupport::Divergent { reason }
+            if reason == "Iced ports pointer/word/block selection, multi-line spans, and \
+                          Ctrl/Cmd-A once a readout owns the window selection; an unowned \
+                          readout keeps Ctrl-A on the shared row-summary command because \
+                          readouts are not keyboard-focusable"
     ));
 }
 
@@ -93,8 +135,7 @@ fn every_capability_is_classified_correctly() {
             }
             ComponentCapability::Tooltip
             | ComponentCapability::Toast
-            | ComponentCapability::TextSelection
-            | ComponentCapability::DropdownMenu => {
+            | ComponentCapability::TextSelection => {
                 assert!(
                     matches!(entry.support, CapabilitySupport::Divergent { reason } if !reason.is_empty()),
                     "{capability:?} must be Divergent with a non-empty reason"

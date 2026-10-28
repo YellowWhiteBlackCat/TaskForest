@@ -216,11 +216,14 @@ fn distinct(values: impl Iterator<Item = f32>) -> usize {
 /// The text the page states, in mount order.
 fn stated_texts(app: &mut App) -> Vec<String> {
     let world = app.world_mut();
-    world
+    let mut stated: Vec<String> = world
         .query::<&Text>()
         .iter(world)
         .map(|text| text.0.clone())
-        .collect()
+        .collect();
+    let mut readouts = world.query::<&bevy::text::EditableText>();
+    stated.extend(readouts.iter(world).map(|text| text.value().to_string()));
+    stated
 }
 
 /// The masking toggle the page's control strip mounts.

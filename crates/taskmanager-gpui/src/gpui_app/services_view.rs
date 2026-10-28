@@ -2,16 +2,17 @@
 //! native service records (status badge + name + description) with an action
 //! bar (Start / Stop / Restart / Enable / Disable).
 //!
-//! **State ownership:** the per-page UI state (status filter, search query)
-//! lives on `RootView` (`services.filter` / `services.query`), threaded into
-//! [`render_services`] by value each render; the action feedback lives in the
-//! shell-owned typed slot (folded at render by `RootView::services_feedback`).
+//! **State ownership:** the per-page UI state (status filter) lives on
+//! `RootView` (`services_state.filter`); the search query is shell-owned
+//! (`shell.services`) and threaded into [`filter_services`] by value each
+//! render. The action feedback lives in the shell-owned typed slot (folded at
+//! render by `RootView::services_feedback`).
 //! The search box
 //! (`Entity<TextInputState>`) and the table (`Entity<TableState<ServicesDelegate>>`) are
 //! per-window too: both are created lazily by `RootView::render` and owned on the
 //! `RootView` fields (`services_search` / `services_table`), so two windows never share an
 //! entity (`Entity` is `!Send`). An `InputEvent::Change` subscription writes the new value back
-//! into `RootView.services_state.query` so [`filter_services`] keeps working.
+//! into the shell's Services query so [`filter_services`] keeps working.
 
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -73,7 +74,7 @@ pub(crate) fn init_search_entity(cx: &mut Context<RootView>) -> gpui::Entity<Tex
         state
     });
     crate::gpui_app::root::wire_debounced_search(&entity, cx, |rv, value| {
-        rv.services_state.query = value
+        rv.shell.services.set_query(value)
     });
     entity
 }

@@ -57,7 +57,7 @@ impl IcedApp {
                 {
                     // SearchInput's cross-frontend contract uses Escape to
                     // clear the active filter and return to the restored list.
-                    self.process_presentation.services_query.clear();
+                    self.shell.set_services_query("");
                 }
                 InputScope::Content => {}
             }

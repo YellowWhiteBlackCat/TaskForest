@@ -57,13 +57,13 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::text::TextColor;
+use bevy::text::{FontSize, TextBackgroundColor, TextColor, TextFont, TextSpan};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px, rem,
+    PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, TextInput};
 use taskmanager_application::AppAction;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
@@ -78,7 +78,7 @@ use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::sort_indicator_scene;
-use crate::window::{Role, TextRole, WindowPalette};
+use crate::window::{CustomTextInk, Role, TextRole, WindowPalette};
 use taskmanager_ui_contract::IconId;
 
 pub(crate) mod action_glyph;
@@ -95,6 +95,7 @@ pub(crate) mod status_dot;
 pub(crate) mod unit_filter;
 
 use scene::{services_body_scene, services_search_input_scene};
+use taskmanager_shell::matches_service_query;
 use taskmanager_shell::service_cycle_members;
 
 // ---- pure core: row view model, chips, empty/notice/status copy ----
@@ -111,7 +112,7 @@ pub(crate) struct ServiceRowModel {
 
 /// Project the table's whole material through the shared sort order and query filter.
 pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRowModel> {
-    service_rows_filtered(shell, &shell.query)
+    service_rows_filtered(shell, &shell.services_query)
 }
 
 /// The rows the table shows under the active query AND the active unit-type
@@ -125,7 +126,6 @@ pub(crate) fn service_rows_for(
 }
 
 pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<ServiceRowModel> {
-    let q = query.trim().to_lowercase();
     let cycle_members = shell
         .projection()
         .services
@@ -135,14 +135,7 @@ pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<Servic
     shell
         .sorted_services()
         .into_iter()
-        .filter(|service| {
-            if q.is_empty() {
-                true
-            } else {
-                service.name.to_lowercase().contains(&q)
-                    || service.description.to_lowercase().contains(&q)
-            }
-        })
+        .filter(|service| matches_service_query(service, query))
         .map(|service: &ServiceItem| ServiceRowModel {
             target: service.id.clone(),
             name: service.name.clone(),
@@ -365,7 +358,7 @@ pub(crate) struct ServicesSearchInput;
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Services.title();
     let waiting = t("common.waiting_inventory").to_owned();
-    let search = services_search_input_scene(context.palette, &context.shell.query);
+    let search = services_search_input_scene(context.palette, &context.shell.services_query);
     bsn! {
         Node {
             width: percent(100),

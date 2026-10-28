@@ -145,8 +145,12 @@ pub enum FeatureEvidenceFinding {
         frontend: FrontendShape,
         line: usize,
     },
-    /// An anchored row names a feature whose binding can never deliver
-    /// (`NotApplicable`/`NotInVocabulary`), so no cell could carry the anchor.
+    /// An anchored row names a feature whose platform vocabulary is missing
+    /// (`NotInVocabulary`): the delivery claim has no defined operating-system
+    /// source, so the table refuses the anchor until the binding is defined.
+    /// A `NotApplicable` delivery (shared projection / derivation) may carry a
+    /// frontend behaviour anchor: its surface is fully defined without a
+    /// platform source step.
     AnchorOnNonDeliveryBinding {
         feature: FeatureId,
         frontend: FrontendShape,
@@ -242,9 +246,9 @@ impl FeatureEvidenceTable {
                             frontend,
                             line,
                         });
-                    } else if !matches!(
+                    } else if matches!(
                         feature.platform_binding(),
-                        PlatformBinding::Requires(capabilities) if !capabilities.is_empty()
+                        PlatformBinding::NotInVocabulary(_)
                     ) {
                         defect = Some(FeatureEvidenceFinding::AnchorOnNonDeliveryBinding {
                             feature,
