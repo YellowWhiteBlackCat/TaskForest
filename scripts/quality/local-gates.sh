@@ -692,10 +692,6 @@ if maybe scene-registry-self; then
     # self-test proves missing/extra/reordered rows and dangling anchors fail.
     run_stage scene-registry-self quick run_py scripts/quality/scene_registry_guard.py --self-test
 fi
-if maybe scene-registry; then
-    # Exact scene set/order against the audit plus real GPUI nextest discovery.
-    run_stage scene-registry quick run_py scripts/quality/scene_registry_guard.py
-fi
 if maybe blueprint-scope-self; then
     # The 225-slot census (ADR-059) must keep every adopted row unique and every
     # unsupported row explicitly reasoned; the self-test proves damaged fixtures fail.
@@ -792,6 +788,12 @@ if maybe parity-evidence; then
             --requirements scripts/interaction_requirements.tsv \
             --require-requirement-coverage \
             --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
+    fi
+fi
+if maybe scene-registry; then
+    # Exact scene set/order against the audit plus real nextest discovery.
+    if scope_skip scene-registry "merge-owner scene evidence surface" standard; then
+        run_stage scene-registry standard run_py scripts/quality/scene_registry_guard.py
     fi
 fi
 if maybe deny; then
