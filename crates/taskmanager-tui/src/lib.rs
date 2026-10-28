@@ -264,7 +264,7 @@ pub struct TuiApp {
     /// session-local presentation state; the shell owns the sort value.
     pub column_order: Vec<SortCol>,
     /// Session-local tail-column width overrides set by the column menu's
-    /// `-`/`+` stepper. Missing entries use [`Self::default_column_width`].
+    /// `-`/`+` stepper. Missing entries use default column widths.
     pub column_widths: std::collections::HashMap<SortCol, u16>,
     /// Which Applications-page panel owns the keyboard (Tab cycles the
     /// focus; the details panel consumes Up/Down as panel scroll).
