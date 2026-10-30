@@ -6,6 +6,18 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.5.1] — 2026-10-30
+
+### 修复与适配
+
+- **CI 与文档门禁强化**：
+  - 将 `scene-registry` 校验门禁重定位至 standard tier，消除在轻量 lint 运行环境中因缺少 `cargo-nextest` 导致的快速失败阻断。
+  - 修复 TUI 前端中对私有函数 `default_column_width` 的 intra-doc 超链接解析警告。
+- **Bevy UI 与运行时生态补丁升级**：
+  - 将 Bevy 核心引擎与 ECS 依赖锁定升级至 `=0.20.1`（`taskmanager-bevy-ui` 与 `taskmanager-platform-runtime`）。
+  - 同步升级 `zhuge-ui-kit-bevy` 至 `0.1.1`，同步将 `patches/bevy_clipboard` 补丁升级至 `0.20.1`，维持严格 Wayland-only 与零 X11 约束。
+  - 同步更新 `crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md` 架构契约文档。
+
 ## [0.5.0] — 2026-10-28
 
 > 本次为**重要次版本（四端 225 项全景蓝图平权收官）**：全系统 225 项功能槽位在 GPUI、

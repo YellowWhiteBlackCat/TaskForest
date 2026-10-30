@@ -33,7 +33,7 @@ unused_must_use = "deny"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -128,4 +128,4 @@ gpui = { package = "gpui-kit", version = "0.8.1", default-features = false }
 zhuge-ui-core = "0.1.3"
 zhuge-ui-tokens = "0.1.0"
 zhuge-ui-kit-iced = "0.1.0"
-zhuge-ui-kit-bevy = "0.1.0"
+zhuge-ui-kit-bevy = "0.1.1"
