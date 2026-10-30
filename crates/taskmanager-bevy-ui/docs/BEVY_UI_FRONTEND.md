@@ -27,7 +27,7 @@
   状态变更经 typed observer/system 同步更新其明确拥有的资源；实体变更由 `Commands` 提交。
   Bevy 应用的组合入口只负责注册资源、系统与插件；业务不能通过 `App::world()` /
   `App::world_mut()` 借回整个世界。测试夹具可操作测试 App，但不能成为生产业务入口。
-- Bevy 锁定 `=0.20.0`，与 `taskmanager-platform-runtime`
+- Bevy 锁定 `=0.20.1`，与 `taskmanager-platform-runtime`
   的 `bevy_app`/`bevy_ecs` 保持单一 workspace 解析；后续升级需架构与发布评审。
 - Feature 闭包显式声明：`bevy_ui`、`bevy_ui_widgets`、`bevy_scene`（`bsn!` 宏）、
   `bevy_ui_render`、`bevy_core_pipeline`、`bevy_render`、`bevy_asset`、`bevy_winit`、
