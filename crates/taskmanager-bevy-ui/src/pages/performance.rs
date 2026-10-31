@@ -445,6 +445,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     selection::register(app);
     device_curves::register(app);
     sidebar_editor::register(app);
+    metrics::battery::register(app);
     // The battery icon's charge flow: the band travels the fill while the
     // observed charge state says the pack is charging.
     scene::battery::register(app);

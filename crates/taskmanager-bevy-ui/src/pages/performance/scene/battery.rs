@@ -22,7 +22,7 @@ use bevy::ui::prelude::{
 };
 use taskmanager_core::core::power::BatteryInfo;
 
-use crate::app::ShellTrack;
+use crate::pages::performance::metrics::battery::BatteryChargeStates;
 use crate::palette::{UiPalette, space_1};
 
 /// How long the band takes to travel the fill, in seconds.
@@ -41,15 +41,6 @@ pub(crate) struct BatteryChargeFlow {
     pub(crate) phase: f32,
     /// Whether the observed charge state asks for the flow.
     pub(crate) charging: bool,
-}
-
-/// The observed charge state: the provider's own verdict on the pack.
-///
-/// The status word is the platform's reading (`Charging` on the Linux
-/// power-supply class), so the flow follows the same fact the rest of the
-/// page reads. A pack whose state was never observed carries no flow.
-pub(crate) fn is_charging(battery: &BatteryInfo) -> bool {
-    battery.status.eq_ignore_ascii_case("Charging")
 }
 
 /// The battery icon: the body, the terminal nub, the charge fill, and — while
@@ -139,24 +130,13 @@ pub(crate) fn battery_icon_scene(
 /// The state comes from the folded projection, not from a timer: a pack that
 /// stops charging stops flowing on the next frame.
 fn advance_charge_flow(
-    track: ShellTrack,
     time: Res<Time>,
+    charge_states: Res<BatteryChargeStates>,
     mut flows: Query<(&mut BatteryChargeFlow, &mut Node)>,
 ) {
     let delta = time.delta_secs();
-    let batteries = track
-        .shell()
-        .projection()
-        .power_supplies
-        .as_ref()
-        .map(|power| power.batteries.as_slice());
     for (mut flow, mut node) in &mut flows {
-        let charging = batteries
-            .map(|rows| {
-                rows.iter()
-                    .any(|battery| battery.id == flow.battery && is_charging(battery))
-            })
-            .unwrap_or(false);
+        let charging = charge_states.is_charging(&flow.battery);
         flow.charging = charging;
         if !charging {
             continue;

@@ -1,10 +1,54 @@
 //! Battery device projection and formatting for the Performance page.
 
+use std::collections::BTreeSet;
+
+use bevy::app::App;
+use bevy::ecs::observer::On;
+use bevy::ecs::resource::Resource;
+use bevy::ecs::system::ResMut;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_shell::presentation::duration;
 
+use crate::app::ShellTrack;
+use crate::drain::ShellProjectionFolded;
+
 use super::missing_value;
+
+/// The battery ids whose folded status asks the presentation to animate.
+#[derive(Resource, Default)]
+pub(crate) struct BatteryChargeStates {
+    charging_ids: BTreeSet<String>,
+}
+
+impl BatteryChargeStates {
+    pub(crate) fn is_charging(&self, battery_id: &str) -> bool {
+        self.charging_ids.contains(battery_id)
+    }
+}
+
+/// Refresh charge animation inputs only when the shared shell projection folds.
+pub(crate) fn refresh_charge_states(
+    _fold: On<ShellProjectionFolded>,
+    track: ShellTrack,
+    mut states: ResMut<BatteryChargeStates>,
+) {
+    states.charging_ids = super::batteries(track.shell())
+        .into_iter()
+        .flatten()
+        .filter(|battery| battery_is_charging(battery))
+        .map(|battery| battery.id.clone())
+        .collect();
+}
+
+pub(crate) fn register(app: &mut App) {
+    app.init_resource::<BatteryChargeStates>();
+    app.add_observer(refresh_charge_states);
+}
+
+fn battery_is_charging(battery: &BatteryInfo) -> bool {
+    battery.status.eq_ignore_ascii_case("Charging")
+}
 
 /// The observed charge percentage of one battery.
 ///
