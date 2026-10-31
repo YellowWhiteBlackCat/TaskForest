@@ -31,7 +31,7 @@
         "cargo build --release -p taskmanager-gpui --bin taskforest-g",
         "install -Dm755 target/release/taskforest-g /app/bin/taskforest-g",
         "install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.desktop /app/share/applications/io.github.YellowWhiteBlackCat.TaskForest.desktop",
-        "install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml /app/share/metainfo/io.github.YellowWhiteBlackCat.TaskForest.metainfo.xml",
+        "install -Dm644 packaging/flatpak/io.github.YellowWhiteBlackCat.TaskForest.metainfo.xml /app/share/metainfo/io.github.YellowWhiteBlackCat.TaskForest.metainfo.xml",
         "install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg /app/share/icons/hicolor/scalable/apps/io.github.YellowWhiteBlackCat.TaskForest.svg",
         "for size in 16 24 32 48 64 128 256 512; do install -Dm644 packaging/linux/icons/hicolor/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png /app/share/icons/hicolor/${size}x${size}/apps/io.github.YellowWhiteBlackCat.TaskForest.png; done"
       ],

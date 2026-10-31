@@ -217,6 +217,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.1
+      # The semver gate's default flow generates BOTH rustdoc JSON sides itself
+      # with `cargo rustdoc --locked` (scripts/quality/semver-api-gate.sh), so
+      # each side is pinned by its own tree's lockfile. Emitting rustdoc JSON is
+      # an unstable rustdoc feature that only nightly exposes; installing it
+      # here does not change the job's default (pinned 1.99.1) toolchain,
+      # because the script selects the nightly via SEMVER_RUSTDOC_TOOLCHAIN.
+      - name: Install the nightly toolchain for rustdoc JSON
+        run: rustup toolchain install nightly --profile minimal
       - name: Fetch private shared UI kit dependency
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}

@@ -44,7 +44,7 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及公共 API 兼容门禁 `semver-checks`（相对基线的 Rust 签名级破坏即失败），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管），以及 Flatpak 清单门 `flatpak-manifest` 与长效浸泡防泄漏门 `soak-stability`，以及 Bevy 场景律法门 `bevy-bsn-guard`（唯一 `bsn!` 构造路线）、`bevy-rem-guard`（rem 尺寸轴：零 `FontSize::Px`、px 派生值不作布局长度、图标适配器不收裸数字尺寸）与 `bevy-scene-gate`（共享包 `zhuge-ui-kit` 随 crate 发布的唯一执行器：禁硬编码非零 px 字面量，存量记在 `bevy_scene_ratchet.json` 棘轮台账，台账外新增即失败）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity` 和 production-config 接线守卫 `production-config-wiring`（断言本地 standard stage、CI `lint` job 与 portability macOS job 三处仍调用 helper），以及结构棘轮阈值上限守卫 `clippy-ratchet`（断言 `clippy.toml` 的复杂度/行数阈值不超过已审计上限，抬高阈值必须同变更改守卫），以及裸 `allow` 上限守卫 `allow-ceiling`（`dead_code` 一律禁止，其余 lint 种类按已审计计数只降不升，新增种类必须同变更登记），以及公共 API 兼容门禁 `semver-checks`（相对基线的 Rust 签名级破坏即失败），以及 owner 路径守卫 `inline-path`（owner 类型必须用 `use` 在模块边界导入，禁止内联全名，也禁止 `as` 别名——后者由 `rust-surface-guard` 管），以及 Flatpak 清单门 `flatpak-manifest` 与 Linux 沙箱分发面门 `linux-sandbox-packaging`（Flatpak 清单/AppStream 组件 id/安装路径与 AppImage 发行名 + 无 linuxdeploy 的 AppDir 无头自检），与长效浸泡防泄漏门 `soak-stability`（宿主 RSS/FD 探针）和根浸泡套件 `tests/soak.rs`（100ms 节奏驱动真实采集循环，断言历史环按容量淘汰、描述符/RSS 不漂移、资源物化不累积；`TM_SOAK_TICKS`/`TM_SOAK_TICK_MS` 可把默认 60 tick 拉成长驻留浸泡），以及 Bevy 场景律法门 `bevy-bsn-guard`（唯一 `bsn!` 构造路线）、`bevy-rem-guard`（rem 尺寸轴：零 `FontSize::Px`、px 派生值不作布局长度、图标适配器不收裸数字尺寸）与 `bevy-scene-gate`（共享包 `zhuge-ui-kit` 随 crate 发布的唯一执行器：禁硬编码非零 px 字面量，存量记在 `bevy_scene_ratchet.json` 棘轮台账，台账外新增即失败）；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
 - `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build、平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
 
@@ -71,15 +71,8 @@ Bevy UI 资源访问由 `scripts/quality/bevy_world_access_guard.py` 在 quick �
 
 ### 依赖解析与 API 兼容门禁
 
-- **公共 API 兼容门禁（semver）**：阶段名 `semver-checks`，属 standard 层（要重建当前树与基线树，放不进
-  quick 的时间预算）；本地缺少 `cargo-semver-checks` 时记 SKIP，CI 必须安装并执行，失败即阻塞。
-  基线选择遵循 ADR-060：发布库 crate 使用保留的 `taskforest-*` 命名空间，而**首次发布之前**基线是 git rev
-  （`--baseline-rev`），因为 crates.io 上还没有可比版本；**首次发布之后**，该已发布版本即成为它的基线，改用
-  「已发布版本」基线。基线里不存在的包名按新 crate 记 SKIP（改名后的首批发布正属这一形态），但**一个都没
-  比较就判失败**——门禁不接受「全员 SKIP 读成绿色」。通过只表示相对基线没有 Rust 签名级破坏，不证明行为
-  兼容、存档或协议兼容、平台运行正确性。该工具在自带的占位工作区里解析基线侧依赖（0.51.0 无 `--locked`），
-  因此本次扫描的**基线侧不受仓库锁文件钉住**，这是"所有 Cargo 验证使用锁文件"的一条显式例外；当前侧仍走
-  仓库锁文件。撤掉该例外需要仓库自行生成两侧 rustdoc JSON 的流程。
+- **公共 API 兼容门禁（semver）**：阶段名 `semver-checks`，属 standard 层（要重建当前树与基线树，放不进 quick 预算）；缺 `cargo-semver-checks` 时本地 SKIP、CI 必装并阻塞。基线遵循 ADR-060：发布库用 `taskforest-*` 命名空间，**首次发布前**基线是 git rev（`--baseline-rev`），**首次发布后**改用该已发布版本；基线里不存在的包名按新 crate 记 SKIP（改名后首批发布正属此形态），但**一个都没比较就判失败**——不接受「全员 SKIP 读成绿色」。通过只表示相对基线没有 Rust 签名级破坏，不证明行为/存档/协议兼容或平台运行正确性。
+  **锁文件钉住的两侧构建**：0.51.0 无 `--locked`（基线侧本由工具占位工作区解析，不受仓库锁文件钉住）；门禁默认改走 `--current-rustdoc`/`--baseline-rustdoc`：`git archive` 落地基线树，两侧各以**自己那棵树**的 `cargo rustdoc --locked` 生成 rustdoc JSON（需 nightly；`SEMVER_RUSTDOC_TOOLCHAIN`/`SEMVER_RUSTDOC_JSON` 可控），工具只比对两份 JSON，于是**两侧都受各自锁文件钉住**，"所有 Cargo 验证使用锁文件"不再有例外；该流程不可用（工具太旧/缺 nightly/python3）时显式记录并回退 `--baseline-rev`，只改变基线侧钉法，不改变结论口径。
 - **依赖解析与 lint 事实源门禁**：resolver v3（ADR-057）让依赖解析尊重 `rust-version` 下限；根
   `[workspace.lints]`（ADR-056）是唯一 lint 事实源，业务 crate 继承它，四个 unsafe 信任根 crate 显式声明例外，
   测试期 unsafe 必须登记。
@@ -126,13 +119,12 @@ job 才能创建或更新 GitHub Release，避免半成品发布。
 
 捕获后端按能力分类，不得用一个后端的成功替代另一个后端的语义验证：
 
-- nested Niri 已建立 IPC socket，但在客户端映射后 `niri msg` 超时：标记为 `BLOCKED (compositor/backend)`。这不是产品
-  PASS，也不把 TaskForest 判为产品 FAIL；保留本地证据，不更新 accepted screenshots，等待真实 compositor 或后端修复后重跑。
-- gamescope 可以作为单应用、固定输出尺寸的辅助像素捕获后端。只有真实应用 marker、PNG、source manifest 和独立验证器
-  全部通过时，结果才覆盖 standalone 渲染与弹性布局审查。
-- gamescope 即使广播 `zwlr_layer_shell_v1`，也不能单独证明 layer surface 已正确合成。anchor、margin、exclusive zone、
-  keyboard interactivity、output 选择、close/restart 和桌面窗口管理仍必须在目标桌面 compositor 上验证；未建立专用、
-  可复现的 layer-shell capture receipt 前，gamescope 结果只能报告 `SKIP`，不能冒充 Layer-Shell PASS。
+- nested Niri 已建立 IPC socket 但 `niri msg` 超时：记 `BLOCKED (compositor/backend)`，既不判产品 PASS 也不判 FAIL，
+  保留本地证据等待真实 compositor 或后端修复后重跑。
+- gamescope 可作为单应用、固定输出尺寸的辅助像素捕获后端：只有真实 marker、PNG、source manifest 与独立验证器全通过，
+  结果才覆盖 standalone 渲染与弹性布局审查；即使广播 `zwlr_layer_shell_v1` 也不能单独证明 layer surface 已合成——
+  anchor、margin、exclusive zone、keyboard interactivity、output 选择、close/restart 与窗口管理仍须在目标 compositor
+  验证，未建立可复现 receipt 前只能报 `SKIP`，不能冒充 Layer-Shell PASS。
 
 ## 7. 前端交互与像素证据
 

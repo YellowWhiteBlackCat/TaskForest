@@ -60,6 +60,10 @@ path = "tests/logic.rs"
 name = "performance"
 path = "tests/performance.rs"
 
+[[test]]
+name = "soak"
+path = "tests/soak.rs"
+
 [dev-dependencies]
 # The gate suites compile against real owner types; every workspace fact they
 # touch is imported from its owner crate. Product-scoped tests live in the
@@ -92,6 +96,8 @@ taskmanager-assets = { path = "crates/taskmanager-assets" }
 taskmanager-platform-native = { path = "crates/taskmanager-platform-native" }
 taskmanager-platform-conformance = { path = "crates/taskmanager-platform-conformance" }
 taskmanager-test-support = { path = "crates/taskmanager-test-support" }
+# Owner contract for the typed submission outcomes the soak gate inspects.
+taskforest-contract = { path = "crates/taskforest-contract" }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 taskmanager-platform-linux = { path = "crates/taskmanager-platform-linux", default-features = false, features = ["test-support"] }

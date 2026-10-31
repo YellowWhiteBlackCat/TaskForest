@@ -16,7 +16,6 @@
 正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、Iced、TUI、Bevy）全量 DEB 与
 RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。三大图形前端（GPUI、Iced、Bevy）严格保持 Wayland-only，
 彻底不含 X11 依赖；TUI 为零图形栈终端渲染，不依赖任何显示服务器（X11 同样不受支持）。
-所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
 四端须实现同一产品合同的入口、事实与控制结果；toolkit 的布局和手势可以不同。三个平台的系统级能力按来源分别判定。
 发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed 能力状态作答（五种 `CapabilityStatus` 不可用变体与
@@ -28,8 +27,6 @@ RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。三大�
 GitHub prerelease）并生成 28 项构建产物（四端各 4 个 DEB/RPM 与 2 架构 MSI、`taskforest-common` 两架构 DEB/RPM）加
 4 份 sha256 校验清单，共 32 个发布附件。所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为
 `G`、`I`、`T`、`B`，共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
-包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为 `x86_64`/`aarch64`，与文件名中的
-`x64`/`arm64` 是固定映射。
 
 | 平台 | 架构 | 产物 | 包内 arch | 构建入口 |
 |---|---|---|---|---|
@@ -67,6 +64,8 @@ GitHub prerelease）并生成 28 项构建产物（四端各 4 个 DEB/RPM 与 2
 
 Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 runner，
 构建 target 与包架构由同一矩阵项绑定，不能用 x64 二进制伪装 arm64 包。
+
+沙箱渠道（Flatpak/AppImage）已有构建入口与机械自测（`packaging/flatpak/**`、`packaging/linux/build-appimage.sh`、quick 门禁 `linux-sandbox-packaging`），但**当前不在自动发布矩阵内**：便携单文件按上文暂不进发行面，Flatpak 需在构建沙箱内取得私有共享 UI kit 依赖。
 
 ## Linux 安装树
 

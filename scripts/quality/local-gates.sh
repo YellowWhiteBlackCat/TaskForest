@@ -556,6 +556,12 @@ fi
 if maybe flatpak-manifest; then
     run_stage flatpak-manifest quick run_py scripts/quality/test_flatpak_manifest.py
 fi
+if maybe linux-sandbox-packaging-self; then
+    run_stage linux-sandbox-packaging-self quick run_py scripts/quality/test_linux_sandbox_packaging.py --self-test
+fi
+if maybe linux-sandbox-packaging; then
+    run_stage linux-sandbox-packaging quick run_py scripts/quality/test_linux_sandbox_packaging.py
+fi
 if maybe soak-stability-self; then
     run_stage soak-stability-self quick run_py scripts/quality/soak_stability_guard.py --self-test
 fi
