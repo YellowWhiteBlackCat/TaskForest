@@ -5,11 +5,11 @@
 //! offset such as `-3`.
 
 use crate::presentation::trend;
-use taskmanager_core::MetricSample;
-use taskmanager_core::core::metrics::{
+use taskforest_core::MetricSample;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, ScalarObservation,
 };
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 

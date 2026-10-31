@@ -6,10 +6,10 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     SmartAvailability, StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_core::{
+use taskforest_core::{
     DiskSmart, FailureKind, ProviderId, SmartProviderFailureKind, SourceOutcome, SourceStatus,
 };
 

@@ -10,7 +10,7 @@ use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crossbeam_channel::{Receiver, Sender, bounded, select, tick};
-use taskmanager_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
+use taskforest_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
 use taskmanager_history_store::{
     HistoryStoreError, HistoryStoreErrorKind, PersistentHistoryStore, RecordSampleOutcome,
     RetentionPolicy,

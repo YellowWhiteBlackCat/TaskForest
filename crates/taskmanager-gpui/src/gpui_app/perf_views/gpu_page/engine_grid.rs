@@ -6,10 +6,10 @@
 //! accepted-session precedence, honest missing values, row bounding) be
 //! asserted without a window while the paint path stays a 1:1 consumer.
 
+use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_application::GpuEngineRowsState;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::GpuMetrics;
-use taskmanager_platform_contract::CapabilityStatus;
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsPresentation, present_gpu_engine_rows,
 };

@@ -6,12 +6,12 @@
 use std::time::Instant;
 
 use sysinfo::System;
-use taskmanager_core::{CpuMetrics, CpuTelemetryObservation};
+use taskforest_core::{CpuMetrics, CpuTelemetryObservation};
 
 use super::{LinuxSystemDomainCollector, SourceQuality, source_quality};
 use crate::engine::collector::compute::collect_cpu;
 use crate::engine::hardware::{detect_cpu_cache, read_sysfs_u64};
-use taskmanager_core::CpuIdleState;
+use taskforest_core::CpuIdleState;
 
 /// CPU-only Linux collector with a private sysinfo refresh and RAPL baseline.
 pub(crate) struct LinuxCpuTelemetryCollector {

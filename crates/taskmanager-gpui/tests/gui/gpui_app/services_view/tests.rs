@@ -7,7 +7,7 @@
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use crate::gpui_app::root::{RootView, TopPage};
 use taskmanager_theme::Theme;
 

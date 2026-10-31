@@ -40,7 +40,7 @@ pub(crate) struct EscalationReadouts {
 pub(super) use details_panel::{cpu_identity_rows, heterogeneous_core_rows, sockets_row};
 
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, ScrollHandle, Styled, div, px};
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::gpui_app::formatting::{self, GraphUnit};
@@ -54,11 +54,11 @@ pub(crate) use per_core::per_core_cell_label;
 use stats::CpuLiveStats;
 use std::cell::RefCell;
 use std::rc::Rc;
-use taskmanager_application::i18n;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{
     CpuFrequencySource, CpuMetrics, CpuTemperatureSource, SystemSnapshot,
 };
+use taskmanager_application::i18n;
 use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;

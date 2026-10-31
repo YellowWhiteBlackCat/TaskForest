@@ -2,16 +2,16 @@ use super::health_support::render_health_overlay;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_core::core::metrics::{MemoryScalarObservations, ScalarObservation};
+use taskforest_core::core::metrics::{MemoryScalarObservations, ScalarObservation};
 
 use crate::demo_app;
-use taskmanager_application::AlertEventSeed;
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
 };
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_application::AlertEventSeed;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::fixture::health::seed_shell_health;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -224,9 +224,9 @@ fn health_overlay_keeps_a_disabled_canonical_rule_visible() {
 /// token through the kind reroute.
 #[test]
 fn provider_line_tokens_follow_the_neutral_kind() {
+    use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+    use taskforest_core::core::identity::ProviderId;
     use taskmanager_application::{SourceStateKind, device_source_line};
-    use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-    use taskmanager_core::core::identity::ProviderId;
 
     let cases = [
         (DeviceStatus::Healthy, "ok", SourceStateKind::Ok),
@@ -262,8 +262,8 @@ fn provider_line_tokens_follow_the_neutral_kind() {
 
 #[test]
 fn health_overlay_renders_provider_diagnostics_tokens() {
-    use taskmanager_core::core::device_state::DeviceStatus;
-    use taskmanager_core::core::identity::ProviderId;
+    use taskforest_core::core::device_state::DeviceStatus;
+    use taskforest_core::core::identity::ProviderId;
 
     let mut app = TuiApp::new();
     let snapshot = SystemSnapshot {

@@ -9,15 +9,15 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::aggregate::aggregate_u32_widened;
+use taskforest_core::core::process::{
+    ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode, build_process_tree, process_category,
+};
 use taskmanager_application::process_category_projection::{
     category_buckets, category_expansion_key, process_memory_observation_for_display,
 };
 use taskmanager_application::process_sort::compare_processes;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::aggregate::aggregate_u32_widened;
-use taskmanager_core::core::process::{
-    ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode, build_process_tree, process_category,
-};
 
 use super::ProcessRowId;
 use crate::app::{SortCol, SortDir, sort_axis};

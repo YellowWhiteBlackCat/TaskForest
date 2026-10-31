@@ -11,7 +11,7 @@
 
 use iced::widget::{container, row, text};
 use iced::{Element, Length};
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionState, ConnectionTransport, ProcessConnection,
 };
 use taskmanager_theme::color::on_accent;

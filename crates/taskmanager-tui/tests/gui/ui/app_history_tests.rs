@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskforest_core::core::history::ApplicationHistoryIdentity;
 use taskmanager_application::{ApplicationHistoryMetricSeries, ApplicationHistoryRow};
-use taskmanager_core::core::history::ApplicationHistoryIdentity;
 
 use super::*;
 use crate::TuiColorMode;

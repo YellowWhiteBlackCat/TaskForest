@@ -14,10 +14,10 @@
 //!
 //! [`SemanticSnapshot`]: taskmanager_ui_contract::SemanticSnapshot
 
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
-use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::{ProcessRowAggregate, process_semantic_key};
 use taskmanager_ui_contract::{
     GraphSummary, ModalInput, ProcessAggregateSemantics, ProcessGroupRowInput, ProcessRowInput,

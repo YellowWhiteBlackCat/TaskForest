@@ -11,18 +11,18 @@ use iced::advanced::widget::operation::Scrollable;
 use iced::advanced::widget::operation::scrollable::{AbsoluteOffset, scroll_to};
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Rectangle, Size, Vector};
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::metrics::CpuPackageMetrics;
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::metrics::PressureWindow;
+use taskforest_core::core::metrics::ResourcePressure;
+use taskforest_core::core::metrics::{MsrReadoutSnapshot, MsrThermalStatusReadout};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     AppPage, CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
 };
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::metrics::CpuPackageMetrics;
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::metrics::PressureWindow;
-use taskmanager_core::core::metrics::ResourcePressure;
-use taskmanager_core::core::metrics::{MsrReadoutSnapshot, MsrThermalStatusReadout};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{edit_hardware, edit_snapshot};
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
@@ -65,8 +65,8 @@ mod graph_summary_tests {
 
 mod memory_stats_tests {
     use super::*;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::metrics::{OptionalObservation, ScalarObservation};
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::metrics::{OptionalObservation, ScalarObservation};
 
     use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
@@ -268,7 +268,7 @@ mod cpu_frequency_source_tests {
     use crate::app::FocusTarget;
     use crate::focus::focus_id;
     use iced::advanced::widget::operation::Focusable;
-    use taskmanager_core::core::failure::FailureKind;
+    use taskforest_core::core::failure::FailureKind;
 
     #[test]
     fn speed_row_relabels_bogomips_and_never_fakes_a_mhz_clock() {

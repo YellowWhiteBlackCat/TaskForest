@@ -4,19 +4,19 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, bounded};
-use taskmanager_application::{
-    PlatformEvent, ProcessEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
-};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
-    CpuMetrics, CpuTelemetryObservation, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
-    DirectoryUsageSnapshot, FailureKind, FrozenProcessIdentity,
-};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilityScheduler, CapabilityStatus, EventPort,
     EventSequence, PartialSourceSnapshot, ProviderFailure, RequestId, RequestScope,
     RequestTracking, SidebandPolicy,
+};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
+    CpuMetrics, CpuTelemetryObservation, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
+    DirectoryUsageSnapshot, FailureKind, FrozenProcessIdentity,
+};
+use taskmanager_application::{
+    PlatformEvent, ProcessEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
 
 use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPublisher};

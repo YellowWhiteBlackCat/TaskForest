@@ -1,12 +1,12 @@
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, px};
-use taskmanager_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::metrics::ScalarAvailability;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 use crate::gpui_app::root::RootView;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
-use taskmanager_core::core::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::{DiskMetrics, ScalarObservation};
+use taskforest_core::core::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
     DirectoryUsageSnapshot, FailureKind,
 };

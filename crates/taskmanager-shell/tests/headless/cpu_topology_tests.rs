@@ -1,6 +1,6 @@
 //! Deterministic CPU-topology fixture invariants (shell fixture boundary).
 
-use taskmanager_core::core::hardware::CpuType;
+use taskforest_core::core::hardware::CpuType;
 
 use super::{CpuClusterSpec, CpuTopologySpec, demo_cpu_topology};
 

@@ -1,8 +1,8 @@
-use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityStatus, DeviceDiscovery, RequestEnvelope, RequestId,
 };
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};

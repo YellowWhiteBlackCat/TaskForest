@@ -5,8 +5,8 @@ use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::{focus, theme};
 use iced::widget::{column, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::alerts::AlertMetric;
 use taskmanager_application::{ManagedAlertRule, i18n::t};
-use taskmanager_core::core::alerts::AlertMetric;
 use taskmanager_theme::{Theme, tokens};
 
 pub(super) fn card<'a>(

@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
 
 /// Every skin × mode resolves a valid terminal palette with the semantic

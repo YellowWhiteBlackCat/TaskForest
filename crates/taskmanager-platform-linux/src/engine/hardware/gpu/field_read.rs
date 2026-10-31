@@ -1,6 +1,6 @@
 //! Provider-neutral native GPU field read receipts.
 
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 /// One native scalar/group read before it enters provider merge.
 ///

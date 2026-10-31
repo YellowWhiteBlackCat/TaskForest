@@ -5,10 +5,10 @@
 //! field that simply does not exist here (no IPv6 address, unknown link
 //! speed) omits its row entirely instead of parking a permanent dash.
 
+use taskforest_core::core::metrics::NetworkMetrics;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::NetworkMetrics;
 
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::wifi_signal_quality_percent;
 use taskmanager_shell::viewmodel::StatRow;
 

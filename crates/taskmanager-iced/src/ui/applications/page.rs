@@ -6,7 +6,7 @@ use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::scrollable::Direction;
 use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
-use taskmanager_core::core::process::ProcessBatchAction;
+use taskforest_core::core::process::ProcessBatchAction;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body};
 

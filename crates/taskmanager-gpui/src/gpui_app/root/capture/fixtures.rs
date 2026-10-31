@@ -1,12 +1,12 @@
 //! Deterministic hardware fixtures used only by capture scenarios.
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations, GpuEngine,
     GpuEngineKind, GpuGraphicsApi, GpuMetrics, GpuScalarObservations, SmartAvailability,
     SystemSnapshot,
 };
-use taskmanager_core::core::{
+use taskforest_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceId, FailureKind, NpuDevice,
     NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport, PowerSupplySnapshot,
     ScalarObservation, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,

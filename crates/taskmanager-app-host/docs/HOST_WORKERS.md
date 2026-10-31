@@ -49,7 +49,7 @@ adapter selected by the
 The worker validates the staged PNG and atomically renames it to the
 requested path; it never falls back to a display-wide or fabricated capture.
 The receipt records backend provenance in the vocabulary owned by
-`taskmanager-platform-contract`.
+`taskforest-contract`.
 
 ## Local time cache
 

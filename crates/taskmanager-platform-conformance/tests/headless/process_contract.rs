@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::{ProcessScalarObservations, ScalarObservation};
+use taskforest_core::{ProcessScalarObservations, ScalarObservation};
 
 fn row(pid: u32, parent_pid: Option<u32>) -> ProcessItem {
     let mut item = ProcessItem::new(pid, format!("worker-{pid}"));

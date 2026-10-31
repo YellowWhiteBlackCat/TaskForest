@@ -14,12 +14,12 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use taskforest_core::core::services::{ServiceDeps, ServiceRelationKind};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
 
 use super::super::{panel, text};
 use crate::{TuiApp, TuiTheme};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_shell::presentation::{missing_value, service_diagnostics_rows};
 
 /// The details column's fixed width: the widest localized label plus a

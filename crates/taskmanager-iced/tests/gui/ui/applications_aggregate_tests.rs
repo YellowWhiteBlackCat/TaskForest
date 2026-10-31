@@ -1,13 +1,13 @@
 use crate::ui::applications::aggregate_projection::project_group_aggregate_cells;
 use crate::ui::process_projection::{ProcessProjection, ProjectedRow};
 use std::collections::HashSet;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
 };
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ProcessRowAggregate;
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{SortCol, SortDir};

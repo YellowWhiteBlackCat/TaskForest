@@ -1,6 +1,6 @@
 //! Structured clipboard process export for Iced.
 
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// Format a single process item as tab-separated values (TSV).

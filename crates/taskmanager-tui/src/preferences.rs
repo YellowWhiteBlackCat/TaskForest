@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::TuiApp;
 use crate::theme::ThemeParams;
 use crate::ui::settings::SettingsForm;
+use taskforest_core::core::config::Config;
 use taskmanager_application::i18n::t;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppPage, TelemetryInterval};
@@ -18,7 +19,6 @@ use taskmanager_application::{
     ConfigRecovery, ConfigRecoveryNotice, ConfigRevision, ConfigStoreErrorKind,
     ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
 };
-use taskmanager_core::core::config::Config;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
 
 /// Stable token for one shell [`SortCol`], compatible with the GPUI frontend's

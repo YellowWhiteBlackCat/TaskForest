@@ -24,12 +24,12 @@ use bevy::text::{Font, TextFont};
 use bevy::time::TimeUpdateStrategy;
 use bevy::ui::prelude::{Node, UiTransform, Val};
 use bevy::ui::widget::Text;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
     ProcessMetadataObservation, ProcessScalarObservations,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::edit_processes;
 use taskmanager_test_support::pin_english;

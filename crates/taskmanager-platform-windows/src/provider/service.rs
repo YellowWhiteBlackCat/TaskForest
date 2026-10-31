@@ -12,20 +12,20 @@
 
 use std::time::{Duration, Instant};
 
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+#[cfg(windows)]
+use taskforest_core::ServiceStatus;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{FailureKind, ProviderId, ServiceDeps, ServiceId, ServiceItem};
+#[cfg(any(windows, test))]
+use taskforest_core::{ServiceLogEntry, ServiceLogLevel};
+#[cfg(windows)]
+use taskforest_core::{ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind};
 use taskmanager_application::{
     ServiceControlRequest, ServiceDependenciesRequest, ServiceInventoryRequest,
     ServiceLogSnapshotRequest, ServiceLogStreamRequest,
 };
-#[cfg(windows)]
-use taskmanager_core::ServiceStatus;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{FailureKind, ProviderId, ServiceDeps, ServiceId, ServiceItem};
-#[cfg(any(windows, test))]
-use taskmanager_core::{ServiceLogEntry, ServiceLogLevel};
-#[cfg(windows)]
-use taskmanager_core::{ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind};
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ServiceControlProvider, ServiceDependenciesProvider, ServiceInventoryProvider,
     ServiceLogSnapshotProvider, ServiceLogStreamProvider,

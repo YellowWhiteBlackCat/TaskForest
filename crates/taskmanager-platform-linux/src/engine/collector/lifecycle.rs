@@ -2,11 +2,11 @@
 
 use std::collections::{HashMap, HashSet};
 
-use taskmanager_core::core::device_state::{
+use taskforest_core::core::device_state::{
     DeviceLifecycleDelta, DeviceLifecycleRegistry, DeviceRefreshOutcome, DeviceState,
 };
-use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics};
-use taskmanager_core::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics};
+use taskforest_core::{DeviceGeneration, DeviceId};
 
 pub(super) trait LifecycleMetric {
     fn stable_id(&self) -> &str;

@@ -1,6 +1,6 @@
 use super::*;
 use crate::engine::process::telemetry::state_for_status;
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 
 const FDINFO_RENDER_VIDEO: &str = "\
 pos:\t0

@@ -413,7 +413,7 @@ fn inconsistent_surface_declarations_are_reported_never_silently_ready() {
     }
 
     // (3) The typed constructor that refuses the same contradiction is owned
-    // by `taskmanager-platform-contract`, next to the capability identity; the
+    // by `taskforest-contract`, next to the capability identity; the
     // fold only preserves what the surface declared.
     let error = PlatformSource::absent(CapabilityStatus::Available)
         .expect_err("a runtime status cannot be a static absence");
@@ -487,7 +487,7 @@ fn ready_is_a_static_commitment_with_the_stable_report_id() {
 /// retry.
 #[test]
 fn absence_retry_matches_the_provider_failure_authority() {
-    use taskmanager_platform_contract::ProviderFailure;
+    use taskforest_contract::ProviderFailure;
     for (status, failure) in [
         (CapabilityStatus::Unsupported, ProviderFailure::Unsupported),
         (

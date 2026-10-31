@@ -1,7 +1,7 @@
 //! Power capture follows the same correlated history writer as live ingestion.
 use super::dynamic_power_fixture;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::BatteryScalarObservations;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,

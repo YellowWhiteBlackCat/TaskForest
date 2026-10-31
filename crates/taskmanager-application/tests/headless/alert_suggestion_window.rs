@@ -1,8 +1,8 @@
 use super::*;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertMetric, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold,
 };
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
 use taskmanager_test_support::DiskMetricsFixtureBuilder;

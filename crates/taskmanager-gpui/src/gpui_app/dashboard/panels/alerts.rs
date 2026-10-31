@@ -14,10 +14,10 @@ use taskmanager_ui::theme_binding::length;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

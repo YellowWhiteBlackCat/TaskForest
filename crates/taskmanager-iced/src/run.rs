@@ -14,12 +14,12 @@ use taskmanager_app_host::NativeAppHost;
 use taskmanager_assets::product;
 
 use crate::{IcedApp, Message, ui};
+use taskforest_contract::InstanceEvent;
+use taskforest_contract::InstanceGuard;
+use taskforest_contract::InstanceRole;
+use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_assets::embedded_fonts;
-use taskmanager_ipc::SubscriptionMask;
-use taskmanager_platform_contract::InstanceEvent;
-use taskmanager_platform_contract::InstanceGuard;
-use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;

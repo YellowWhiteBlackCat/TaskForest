@@ -13,10 +13,10 @@
 
 use proptest::prelude::*;
 use proptest::string::string_regex;
-use taskmanager_core::core::metrics::SmartAvailability;
+use taskforest_core::core::metrics::SmartAvailability;
 
 use super::{parse_ata_attributes, parse_smartctl_json, smartctl_device_path};
-use taskmanager_core::core::smart::DiskSmart;
+use taskforest_core::core::smart::DiskSmart;
 
 /// Any byte sequence up to `max_bytes`, lossily converted to UTF-8. Models the
 /// shell-out boundary: corrupt stdout either becomes a replacement char or

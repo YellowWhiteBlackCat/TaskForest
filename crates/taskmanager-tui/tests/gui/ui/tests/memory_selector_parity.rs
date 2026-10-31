@@ -5,20 +5,20 @@
 //! — behavior, never source text — and every render pins its language through
 //! the shared guard.
 
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading,
 };
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::frame_text;
-use taskmanager_core::core::metrics::NetworkWirelessObservations;
-use taskmanager_core::core::power::BatteryScalarObservations;
-use taskmanager_core::core::sensors::SensorScale;
+use taskforest_core::core::metrics::NetworkWirelessObservations;
+use taskforest_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::sensors::SensorScale;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
@@ -398,7 +398,7 @@ fn selector_strip_lists_battery_and_fan_instances() {
 /// strip, so no ghost instance renders beside the filtered detail panel.
 #[test]
 fn selector_strip_honors_the_applied_device_visibility() {
-    use taskmanager_core::core::metrics::NetworkAdapterType;
+    use taskforest_core::core::metrics::NetworkAdapterType;
 
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Network;

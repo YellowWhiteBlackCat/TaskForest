@@ -17,10 +17,10 @@
 use bevy::app::App;
 use bevy::asset::AssetPlugin;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
 use taskmanager_shell::ShellApp;

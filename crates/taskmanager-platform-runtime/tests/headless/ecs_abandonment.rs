@@ -1,9 +1,7 @@
 //! Behavior tests for the scheduler-owned stall-abandonment deadline.
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
-    CapabilityId, RequestId, RequestScope, RequestTracking, SidebandPolicy,
-};
+use taskforest_contract::{CapabilityId, RequestId, RequestScope, RequestTracking, SidebandPolicy};
+use taskforest_core::core::identity::ProviderId;
 
 use crate::config::{CapabilityRoute, DeliveryClass, RuntimeBudgets, RuntimeDomain};
 use crate::health::CapabilityHealth;

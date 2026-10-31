@@ -20,7 +20,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, FlexDirection, Node, Overflow,
     PositionType, UiRect, Val, percent, px, rem,
 };
-use taskmanager_core::core::power::BatteryInfo;
+use taskforest_core::core::power::BatteryInfo;
 
 use crate::pages::performance::metrics::battery::BatteryChargeStates;
 use crate::palette::{UiPalette, space_1};

@@ -1,12 +1,12 @@
 //! Concrete device preferences over the shared configuration authority.
 
 use super::{IcedApp, LocalSurfaceKind, PerfDevice};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::config::sidebar::{
+use taskforest_core::core::config::sidebar::{
     move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override,
 };
-use taskmanager_core::core::metrics::NetworkAdapterType;
-use taskmanager_core::core::sensors::SensorQuantity;
+use taskforest_core::core::metrics::NetworkAdapterType;
+use taskforest_core::core::sensors::SensorQuantity;
+use taskmanager_application::i18n::t;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SidebarEntry {

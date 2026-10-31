@@ -8,8 +8,8 @@
 
 use std::path::Path;
 
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::{OpenFileEntry, OpenFileKind, ProcessOpenFiles};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::{OpenFileEntry, OpenFileKind, ProcessOpenFiles};
 
 use super::{state_for_status, status_from_io_error};
 

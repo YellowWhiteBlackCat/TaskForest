@@ -6,12 +6,12 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceLogQuery};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestTracking,
     RequestTrackingError,
 };
+use taskforest_core::core::services::{ServiceAction, ServiceItem, ServiceLogQuery};
+use taskforest_core::core::target::ServiceId;
 
 use crate::ServiceUpdate;
 

@@ -1,8 +1,8 @@
+use taskforest_core::core::FilesystemHealthSnapshot;
+use taskforest_core::core::PowerSupplySnapshot;
+use taskforest_core::core::SensorCenterSnapshot;
+use taskforest_core::core::SensorQuantity;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::FilesystemHealthSnapshot;
-use taskmanager_core::core::PowerSupplySnapshot;
-use taskmanager_core::core::SensorCenterSnapshot;
-use taskmanager_core::core::SensorQuantity;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
 use taskmanager_telemetry_store::{HistoryRetention, TelemetryStore};
@@ -26,11 +26,11 @@ use super::{
     SystemSnapshot, TopPage,
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskforest_core::core::startup::{StartupImpactEvidence, StartupImpactUnknownReason};
+use taskforest_core::core::{ScalarObservation, SmartAvailability};
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
-use taskmanager_core::core::startup::{StartupImpactEvidence, StartupImpactUnknownReason};
-use taskmanager_core::core::{ScalarObservation, SmartAvailability};
 use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::presentation::msr_thermal_status_segments;
 
@@ -851,7 +851,7 @@ fn intel_and_alert_capture_states_keep_optional_values_honest() {
 #[test]
 fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
     use crate::gpui_app::history_samples::gpu_engine_samples;
-    use taskmanager_core::core::DeviceGeneration;
+    use taskforest_core::core::DeviceGeneration;
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
     use taskmanager_telemetry_store::TelemetryStore;
     use taskmanager_telemetry_store::live_graph::LiveGraphHistory;

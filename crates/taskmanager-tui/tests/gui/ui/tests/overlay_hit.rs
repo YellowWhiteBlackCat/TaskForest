@@ -17,10 +17,10 @@ use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::ui::{TuiFramePlan, TuiHitTarget};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::SortCol;
 
 const FRAME: Rect = Rect::new(0, 0, 120, 40);

@@ -1,19 +1,17 @@
 use super::{TopPage, page_refresh_request};
 use crate::gpui_app::root::RootView;
 use gpui::AppContext;
-use taskmanager_application::{
-    CorrelatedServiceEvent, CorrelatedSessionEvent, CorrelatedStartupEvent, PlatformEventBatch,
-    RefreshRequest, ServiceEvent, SessionEvent, StartupEvent,
-};
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::{
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,
 };
-use taskmanager_core::core::target::SessionId;
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
+use taskforest_core::core::target::SessionId;
+use taskmanager_application::{
+    CorrelatedServiceEvent, CorrelatedSessionEvent, CorrelatedStartupEvent, PlatformEventBatch,
+    RefreshRequest, ServiceEvent, SessionEvent, StartupEvent,
 };
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::page_descriptors;

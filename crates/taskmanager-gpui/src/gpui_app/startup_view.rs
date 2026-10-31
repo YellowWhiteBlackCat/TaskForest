@@ -16,8 +16,8 @@
 //! `RootView.startup_state.query` so [`filter_startup`] keeps working.
 
 use std::rc::Rc;
-use taskmanager_core::core::BootTimeline;
-use taskmanager_core::core::text::contains_ascii_ci;
+use taskforest_core::core::BootTimeline;
+use taskforest_core::core::text::contains_ascii_ci;
 use taskmanager_shell::InfoTable;
 use taskmanager_shell::order_startup_rows;
 use taskmanager_ui::theme_binding::definite_length;
@@ -39,13 +39,13 @@ use taskmanager_ui_contract::IconId;
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view::{self, FilterSpec};
 use crate::gpui_app::root::{Hover, RootView};
-use taskmanager_application::RefreshRequest;
-use taskmanager_application::i18n;
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact, StartupImpactEvidence,
 };
+use taskmanager_application::RefreshRequest;
+use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

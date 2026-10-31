@@ -16,7 +16,7 @@ use crate::capabilities::CapabilitySupport;
 use crate::feature_coverage::{
     FeatureCoverageDeclaration, FeatureCoverageEntry, NO_EVIDENCE, PartialCause,
 };
-use taskmanager_platform_contract::RetryDisposition;
+use taskforest_contract::RetryDisposition;
 
 fn declaration(
     frontend: FrontendShape,

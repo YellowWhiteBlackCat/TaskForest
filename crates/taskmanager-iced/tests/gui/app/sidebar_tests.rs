@@ -3,8 +3,8 @@
 
 use super::*;
 use crate::app::{InputScope, Message, SettingsChange};
+use taskforest_core::core::config::Config;
 use taskmanager_application::ConfigStore;
-use taskmanager_core::core::config::Config;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]

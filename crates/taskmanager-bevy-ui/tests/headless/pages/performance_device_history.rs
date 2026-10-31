@@ -8,11 +8,11 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::world::World;
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::sensors::SensorReading;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::sensors::SensorReading;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
@@ -42,7 +42,7 @@ fn scaled_segment_count(samples: &[f32], ceiling: f32) -> usize {
 
 /// Build one fan `SensorReading` whose typed measurement projects to `FanRpm`.
 fn fan_sensor_reading(id: &str, label: &str, device_id: &str, rpm: u32) -> SensorReading {
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
@@ -70,11 +70,11 @@ fn battery_and_fan_blocks_paint_their_own_history_curve() {
     use crate::pages::performance::device_curves::{
         DeviceCurve, DeviceCurveKind, DeviceCurveStatus,
     };
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::power::{
         BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot,
     };
-    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskforest_core::core::sensors::SensorCenterSnapshot;
     use taskmanager_shell::fixture::{
         ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
     };
@@ -212,8 +212,8 @@ fn gpu_curve_metric_selection_drives_the_shared_graph() {
     // selection, the card's graph resolves the selected family's own window,
     // and a device-generation advance resets the selection to the default.
     use crate::pages::performance::device_curves::{DeviceCurve, DeviceCurveKind};
-    use taskmanager_core::core::identity::DeviceGeneration;
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::metrics::{
         GpuEngine, GpuEngineKind, GpuMetrics, GpuScalarObservations,
     };
     use taskmanager_shell::fixture::{

@@ -5,9 +5,9 @@ use super::super::{CaptureEvidence, CaptureMode, HistoryReplayOpenState};
 use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
 use std::path::PathBuf;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::{StartupEntry, StartupImpactEvidence};
 use taskmanager_application::ApplicationHistoryStatus;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
 impl CaptureEvidence {
     pub(crate) fn active_alert_capture_enabled(&self) -> bool {

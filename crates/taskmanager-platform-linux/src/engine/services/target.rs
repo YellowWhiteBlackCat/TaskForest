@@ -1,11 +1,11 @@
 //! Canonical Linux service targets carried opaquely through shared layers.
 
-use taskmanager_core::ServiceId;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::ServiceId;
 
 use super::init_runtime::detection_provider_failure;
 use super::{InitSystem, ServiceManager};
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 const SYSTEMD_PREFIX: &str = "linux.service.systemd:";
 const SYSTEMD_USER_PREFIX: &str = "linux.service.systemd-user:";

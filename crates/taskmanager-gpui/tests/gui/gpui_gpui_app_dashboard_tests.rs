@@ -1,7 +1,7 @@
 use super::{DashboardState, EventCenterState};
-use taskmanager_core::core::AlertEventKind;
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+use taskforest_core::core::AlertEventKind;
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 use taskmanager_shell::{DirectTrackState, ProcessStatusFilter, SortCol};
 
 #[test]

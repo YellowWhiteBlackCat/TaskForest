@@ -12,11 +12,11 @@ use super::{
     OptionalObservation, ScalarObservation, SmartAvailability,
 };
 use crate::{GroupBaseOpen, NamedOverrides};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
-use taskmanager_core::core::smart::SmartProviderFailureKind;
-use taskmanager_core::core::smart::SmartSelfTestCapabilities;
-use taskmanager_core::core::storage::{StorageConnection, StorageIdentityStability};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::{DeviceGeneration, ProviderId};
+use taskforest_core::core::smart::SmartProviderFailureKind;
+use taskforest_core::core::smart::SmartSelfTestCapabilities;
+use taskforest_core::core::storage::{StorageConnection, StorageIdentityStability};
 
 const FIXTURE_OBSERVED_AT: u64 = 1;
 

@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     NativeWindowCapture, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,
 };
 

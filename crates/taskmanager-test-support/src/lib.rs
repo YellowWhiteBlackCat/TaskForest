@@ -2,7 +2,7 @@
 
 #![forbid(unsafe_code)]
 
-use taskmanager_core::{
+use taskforest_core::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,
     MemoryMetrics, MemoryOptionalObservations, MemoryScalarObservations, NetworkAdapterType,
     NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations, OptionalObservation,

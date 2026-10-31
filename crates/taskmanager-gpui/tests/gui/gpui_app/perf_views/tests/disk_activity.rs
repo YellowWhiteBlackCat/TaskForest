@@ -6,7 +6,7 @@ use super::*;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 use std::collections::BTreeMap;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceLifecycle, DevicePresence, DiskScalarObservations, StorageTelemetryObservation,
 };
 

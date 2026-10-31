@@ -15,6 +15,9 @@ use gpui::{
     App, AppContext, Bounds, Entity, TitlebarOptions, Window, WindowBounds, WindowOptions, point,
     px, size,
 };
+use taskforest_contract::{InstanceEvent, InstanceGuard};
+use taskforest_core::core::config::Config;
+use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::{
     DaemonSubscriptionWorker, DiagnosticBundleClient, SnapshotExportClient, WindowCaptureClient,
     WindowPresentation,
@@ -23,9 +26,6 @@ use taskmanager_application::{
     ConfigClient, ConfigRevision, PlatformClient, TelemetryRefreshPolicy,
 };
 use taskmanager_assets::product;
-use taskmanager_core::core::config::Config;
-use taskmanager_ipc::DaemonMessage;
-use taskmanager_platform_contract::{InstanceEvent, InstanceGuard};
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::background_appearance;

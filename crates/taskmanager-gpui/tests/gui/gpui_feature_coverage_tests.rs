@@ -6,8 +6,8 @@
 //! undelivered item is a reasoned `Unsupported` gap - never source text.
 
 use super::*;
+use taskforest_contract::PlatformAxis;
 use taskmanager_app_host::native_capability_surface;
-use taskmanager_platform_contract::PlatformAxis;
 use taskmanager_ui_contract::{
     FeatureCoverageFindingKind, FeaturePlatformLedger, FeaturePlatformStatus,
     PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY, PlatformGateRule, feature_coverage_drift,

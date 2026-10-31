@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
+use taskforest_contract::{CapabilityId, CapabilityRequest, ProviderFailure, RequestId};
 use taskmanager_application::PlatformEvent;
-use taskmanager_platform_contract::{CapabilityId, CapabilityRequest, ProviderFailure, RequestId};
 
 use super::registry::{recv_or_shutdown_with_idle, spawn_or_register_lane};
 use super::{

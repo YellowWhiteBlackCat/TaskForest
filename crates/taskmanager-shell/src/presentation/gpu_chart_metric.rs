@@ -31,7 +31,7 @@
 //! “此阶段不触碰任何 renderer”; stage 2 wires the frontends onto this
 //! contract; Bevy does not yet expose this selection surface).
 
-use taskmanager_core::core::metrics::GpuMetrics;
+use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_telemetry_store::GpuMetricPoint;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 

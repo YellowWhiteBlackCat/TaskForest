@@ -1,7 +1,7 @@
 use super::*;
 
 /// Parity with the neutral core single source: a fixed input × preference
-/// matrix must render byte-identical to calling `taskmanager-core`
+/// matrix must render byte-identical to calling `taskforest-core`
 /// directly, so the same data + preference renders the same string in
 /// every frontend.
 #[test]

@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_core::{
     CpuMetrics, CpuTelemetryObservation, DeviceId, FailureKind, GpuEngineMetricPoint,
     GpuTelemetryObservation, HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey,
     HostRuntimeObservation, MAX_TRACKED_LOGICAL_CPUS, MemoryMetrics, MemoryTelemetryObservation,

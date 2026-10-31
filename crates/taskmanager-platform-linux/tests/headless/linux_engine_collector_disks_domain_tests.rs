@@ -3,10 +3,10 @@ use std::time::Duration;
 
 use super::*;
 use crate::engine::collector::sources::parse_diskstats_observation;
-use taskmanager_core::ScalarAvailability;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::ScalarAvailability;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::source::SourceOutcome;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn diskstats(

@@ -1,9 +1,7 @@
 //! Environment-axis request submission on `PlatformClient`: startup evidence
 //! and startup/session inventory and control.
 
-use taskmanager_platform_contract::{
-    CapabilityId, RequestId, SubmissionError, SubmissionErrorKind,
-};
+use taskforest_contract::{CapabilityId, RequestId, SubmissionError, SubmissionErrorKind};
 
 use crate::platform::{
     SessionInventoryRequest, StartupEvidenceRequest, StartupEvidenceUnavailable,

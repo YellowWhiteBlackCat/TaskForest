@@ -80,7 +80,7 @@ fn gpu_page_g_cycles_the_shared_chart_metric_selection() {
 /// live batch drives.
 #[test]
 fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
-    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::identity::DeviceGeneration;
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 
     let mut app = crate::demo_app();

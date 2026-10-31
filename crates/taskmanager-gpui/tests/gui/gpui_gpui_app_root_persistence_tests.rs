@@ -1,17 +1,17 @@
 use super::super::startup::FONT_TOKEN_SYSTEM;
 use super::*;
 use std::collections::HashSet;
+use taskforest_core::core::alerts::NotificationPolicy;
+use taskforest_core::core::alerts::QuietHours;
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_application::i18n::Language;
-use taskmanager_core::core::alerts::NotificationPolicy;
-use taskmanager_core::core::alerts::QuietHours;
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_shell::ProcessViewing;
 use taskmanager_shell::SortDir;
 
 use gpui::{AppContext, SharedString, TestAppContext};
 
 use crate::gpui_app::root::ProcessesState;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE,
     WINDOW_DECORATIONS_SYSTEM,

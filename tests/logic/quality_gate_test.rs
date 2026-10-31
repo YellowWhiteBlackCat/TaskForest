@@ -230,10 +230,10 @@ macro_rules! enumerate_variants {
 /// `device_label_key`, …) are not reachable from this host and stay uncovered;
 /// see the guard's report for that residual gap.
 fn dynamic_key_producers() -> Vec<(&'static str, Vec<&'static str>)> {
-    use taskmanager_application::CommandId;
-    use taskmanager_core::core::{
+    use taskforest_core::core::{
         DeviceStatus, PriorityTier, ProcessAnomalyKind, SmartAvailability, StartupImpact,
     };
+    use taskmanager_application::CommandId;
     use taskmanager_shell::presentation::{
         device_action_i18n_key, device_status_i18n_key, smart_availability_i18n_key,
     };

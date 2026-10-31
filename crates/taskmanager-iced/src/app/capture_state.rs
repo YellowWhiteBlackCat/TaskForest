@@ -2,11 +2,11 @@
 
 use crate::ui::system_dashboard::SystemDashboardMessage;
 use std::path::PathBuf;
+use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
@@ -15,15 +15,15 @@ use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
-use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
-use taskmanager_core::core::SmartSelfTestKind;
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::process::{
+use taskforest_core::core::SmartSelfTestKind;
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessLiveKey,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::target::SessionId;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::target::SessionId;
+use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::smart::self_test_intent;
 

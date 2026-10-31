@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{HistoricalSeries, HistorySeriesKey, HistoryWindow, PeakSummary};
+use taskforest_core::{HistoricalSeries, HistorySeriesKey, HistoryWindow, PeakSummary};
 
 use crate::HistoryStoreError;
 use crate::bounded_io;

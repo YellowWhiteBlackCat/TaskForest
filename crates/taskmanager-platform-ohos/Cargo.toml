@@ -14,7 +14,7 @@ publish = false
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
 
 [lib]

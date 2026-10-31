@@ -5,9 +5,9 @@ Status: accepted
 ## Context
 
 The Android Rust target is available as `aarch64-linux-android`, and the
-platform-neutral `taskmanager-core`, application, shell, contract, runtime,
+platform-neutral `taskforest-core`, application, shell, contract, runtime,
 telemetry-store, and history-store layers cross-compile without Android-only
-source changes. `taskmanager-core` has no OS or UI dependency and is therefore
+source changes. `taskforest-core` has no OS or UI dependency and is therefore
 the strongest reuse boundary.
 
 The current desktop composition is not an Android build: the native selector
@@ -30,7 +30,7 @@ desktop-equivalent foreign-process visibility and control to ordinary apps.
 3. Keep the initial Android runtime capability-absent. Until a target-device
    source has a verified permission, identity/generation, lifecycle, timeout,
    and failure mapping, requests return typed `Unsupported` outcomes.
-4. Reuse `taskmanager-core`, application contracts, shell projections, and the
+4. Reuse `taskforest-core`, application contracts, shell projections, and the
    bounded runtime where their Android lifecycle and path/context contracts
    remain valid. Android app-private paths must be injected by the Android
    host; desktop home-directory discovery is not reused.

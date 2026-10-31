@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use taskforest_core::core::config::Config;
 use taskmanager_application::ConfigWorkerState;
 use taskmanager_application::{
     ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigDrain, ConfigLoadSource,
     ConfigPublication, ConfigPublicationOutcome, ConfigRecoveryNotice, ConfigRuntimeOptions,
     ConfigStore, ConfigSubmissionStatus, ConfigSubmitError,
 };
-use taskmanager_core::core::config::Config;
 
 fn test_path(label: &str) -> PathBuf {
     static NEXT_PATH: AtomicU64 = AtomicU64::new(0);

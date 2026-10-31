@@ -1,11 +1,11 @@
 use crate::CapabilityHealth;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::target::StorageDeviceKey;
 use taskmanager_application::{SmartControlRequest, SmartObservationBatch, SmartObservationIssue};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::StorageDeviceKey;
 
 use super::{batch_health, control};
 use crate::storage::smart_state::SharedSmartRuntimeState;
@@ -91,4 +91,4 @@ fn capacity_rejection_happens_before_the_drive_side_effect() {
 }
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;

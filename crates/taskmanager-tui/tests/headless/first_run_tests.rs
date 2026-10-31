@@ -1,12 +1,12 @@
 //! test-intent: behavior
 
 use super::*;
+use taskforest_contract::{CapabilityId, EventSequence};
+use taskforest_core::core::setup::SetupScriptEvent;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::{
     CorrelatedSetupScriptEvent, PlatformEventBatch, PlatformEventContext,
 };
-use taskmanager_core::core::setup::SetupScriptEvent;
-use taskmanager_platform_contract::{CapabilityId, EventSequence};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_test_support::setup_script::platform;
 

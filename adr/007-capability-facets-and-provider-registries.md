@@ -15,9 +15,9 @@ Split the system by ownership and change reason:
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| `taskmanager-core` | domain facts, identity, availability, lifecycle and pure rules | OS I/O, queues, frontend state |
+| `taskforest-core` | domain facts, identity, availability, lifecycle and pure rules | OS I/O, queues, frontend state |
 | `taskmanager-telemetry-store` | bounded, gap-aware time-series read models | refresh policy, provider selection, frontend mutation |
-| `taskmanager-platform-contract` | capability IDs, typed requests/events, failures and provider-neutral ports | domain DTOs, UI concepts, OS APIs |
+| `taskforest-contract` | capability IDs, typed requests/events, failures and provider-neutral ports | domain DTOs, UI concepts, OS APIs |
 | `taskmanager-application` | commands, request correlation, reducers, projections and bounded host jobs | `/proc`, `/sys`, native commands and vendor SDKs |
 | `taskmanager-platform-provider` | blocking provider SPI and capability registration | OS discovery, scheduling and UI state |
 | `taskmanager-platform-runtime` | bounded lanes, fairness, correlation and delivery | provider implementations and frontend rendering |

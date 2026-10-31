@@ -5,7 +5,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::{HistoricalSample, HistorySeriesKey};
+use taskforest_core::{HistoricalSample, HistorySeriesKey};
 
 use super::pending::PendingSample;
 use super::{PersistentHistoryStore, SERIES_EXTENSION, temporary_extension};

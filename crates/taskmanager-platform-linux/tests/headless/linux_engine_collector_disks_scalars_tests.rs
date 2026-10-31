@@ -1,4 +1,4 @@
-use taskmanager_core::{FailureKind, ScalarAvailability, ScalarObservation};
+use taskforest_core::{FailureKind, ScalarAvailability, ScalarObservation};
 
 use super::*;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;

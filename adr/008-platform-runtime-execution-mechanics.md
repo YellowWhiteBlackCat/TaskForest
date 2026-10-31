@@ -141,8 +141,8 @@ The production dependency edges are:
 
 ```mermaid
 graph LR
-    CORE[taskmanager-core]
-    CONTRACT[taskmanager-platform-contract] --> CORE
+    CORE[taskforest-core]
+    CONTRACT[taskforest-contract] --> CORE
     APP[taskmanager-application] --> CONTRACT
     APP --> CORE
     RUNTIME[taskmanager-platform-runtime] --> APP
@@ -168,7 +168,7 @@ adapters. Adding an adapter still requires real provider implementations and exp
 provider attribution, but it no longer requires recreating the application runtime.
 
 The runtime has a deliberate dependency on application payloads. It is not a lower
-level replacement for `taskmanager-platform-contract`; it is the reusable execution
+level replacement for `taskforest-contract`; it is the reusable execution
 layer immediately outside application. Provider SPI remains independently reusable
 and contains no channel or application orchestration policy. In particular, the
 runtime must not depend on `taskmanager-platform-provider`: doing so would turn native

@@ -1,7 +1,7 @@
 //! Private Iced ownership for coordinator state and persisted projections.
 
+use taskforest_core::core::config::Config;
 use taskmanager_application::{ConfigClient, ConfigRevision};
-use taskmanager_core::core::config::Config;
 
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::MotionPolicy;

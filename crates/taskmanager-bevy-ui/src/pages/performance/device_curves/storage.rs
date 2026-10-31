@@ -48,9 +48,9 @@ use crate::widgets::chart::geometry::ChartVertex;
 use crate::widgets::chart::{ChartCanvas, ChartContent, ChartPaintState, ChartStyle};
 use crate::window::{Role, TextRole};
 
+use taskforest_core::core::metrics::{DiskMetrics, DiskPartition};
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition};
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_ui_contract::IconId;
 

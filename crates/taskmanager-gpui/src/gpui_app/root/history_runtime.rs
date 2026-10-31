@@ -1,6 +1,7 @@
 //! Typed non-blocking persistent-history resources owned by one GPUI root.
 
 use crate::gpui_app::perf_views::history_replay::HistoryReplayState;
+use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
     HistoryFrontendSession, HistoryReplayClient,
@@ -8,7 +9,6 @@ use taskmanager_app_host::{
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryUnavailableReason;
 use taskmanager_application::HistoryReplayRequest;
-use taskmanager_core::core::history::HistoryRecordSink;
 
 enum HistoryRuntimeResources {
     Disabled,

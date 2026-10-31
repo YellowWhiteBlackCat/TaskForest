@@ -7,8 +7,8 @@
 //! permission center. `Hidden` renders no card at all.
 
 use gpui::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Styled, div};
+use taskforest_contract::{CapabilityId, SubmissionErrorKind};
 use taskmanager_application::{SmbiosMemoryRequest, i18n, request_submission_failure};
-use taskmanager_platform_contract::{CapabilityId, SubmissionErrorKind};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -18,7 +18,7 @@ use super::sections::memory_inventory::{
     MemoryInventoryInputs, MemoryInventoryModel, memory_inventory_model,
 };
 use crate::gpui_app::root::RootView;
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_theme::{Length, Theme, tokens};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;

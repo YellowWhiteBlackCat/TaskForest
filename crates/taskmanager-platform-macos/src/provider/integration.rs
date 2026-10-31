@@ -12,16 +12,16 @@
 use std::path::Path;
 use std::time::Duration;
 
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
+    AlertSeverity, DesktopAppearance, DesktopFamily, FailureKind, FrozenProcessIdentity,
+    PreferredColorScheme, ProviderId, SetupScriptAction, SetupScriptEvent,
+};
 use taskmanager_application::{
     CommandLaunchRequest, DesktopAppearanceRequest, DesktopNotificationRequest,
     ResourceRevealRequest, SetupScriptRequest, UrlOpenRequest,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
-    AlertSeverity, DesktopAppearance, DesktopFamily, FailureKind, FrozenProcessIdentity,
-    PreferredColorScheme, ProviderId, SetupScriptAction, SetupScriptEvent,
-};
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     CommandLaunchProvider, DesktopAppearanceProvider, DesktopNotificationProvider,
     ResourceRevealProvider, SetupScriptProvider, UrlOpenProvider,

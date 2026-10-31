@@ -11,10 +11,10 @@
 //! all rather than a 0% fill.
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
-use taskmanager_core::core::{DeviceGeneration, DeviceState};
+use taskforest_core::core::{DeviceGeneration, DeviceState};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 

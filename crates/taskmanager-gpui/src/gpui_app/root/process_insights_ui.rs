@@ -6,12 +6,12 @@ use crate::gpui_app::process_insights::{
     ProcessInsightsError, ProcessInsightsErrorKind, ProcessInsightsRenderState,
 };
 use gpui::Context;
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{
     ProcessInsightsRevision, ProjectedProcessInsights, request_submission_failure,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessDetailsSection, RootView, platform_submission_time_ms};
 

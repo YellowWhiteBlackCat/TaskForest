@@ -1,8 +1,8 @@
 //! Registered-pending SMBIOS memory-inventory provider (macOS side of the
 //! MemorySmbios request lane).
 
-use taskmanager_core::SmbiosMemorySnapshot;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::SmbiosMemorySnapshot;
 use taskmanager_platform_provider::SmbiosMemoryProvider;
 
 /// Registered-pending SMBIOS memory-inventory provider: the lane is backed on

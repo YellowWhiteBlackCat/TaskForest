@@ -1,10 +1,10 @@
 use super::*;
-use taskmanager_core::ServiceLogLevel;
-use taskmanager_core::ServiceLogLevelFilter;
+use taskforest_core::ServiceLogLevel;
+use taskforest_core::ServiceLogLevelFilter;
 #[cfg(windows)]
-use taskmanager_core::ServiceLogState;
-use taskmanager_core::ServiceLogTimeFilter;
-use taskmanager_core::core::services::ServiceLogQuery;
+use taskforest_core::ServiceLogState;
+use taskforest_core::ServiceLogTimeFilter;
+use taskforest_core::core::services::ServiceLogQuery;
 use taskmanager_windows_api::WindowsEventLogEntry;
 
 #[test]

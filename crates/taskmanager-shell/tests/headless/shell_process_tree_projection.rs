@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation, ProcessScalarObservations,
 };
 
@@ -10,7 +10,7 @@ use crate::{
     ProcessProjectionGeneration, ProcessRowId, ProcessTreeRow, SortCol, SortDir,
     app_tree_expansion_key, append_process_semantic_rows, project_process_tree_rows,
 };
-use taskmanager_core::core::process::{ProcessCategory, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessCategory, ProcessLiveKey};
 use taskmanager_ui_contract::{
     SemanticAction, SemanticNodeId, SemanticRole, SemanticSnapshotBuilder,
 };

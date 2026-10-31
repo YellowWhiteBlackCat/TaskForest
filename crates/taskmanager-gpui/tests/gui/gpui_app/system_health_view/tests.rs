@@ -1,11 +1,11 @@
 use gpui::{
     AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, Window, px, size,
 };
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_shell::fixture::health::{HealthFixture, health_fixture};
 
 use crate::gpui_app::root::responsive::{PageLayoutBudget, SystemPageBudget};
-use taskmanager_core::core::SmartSelfTestKind;
+use taskforest_core::core::SmartSelfTestKind;
 use taskmanager_theme::Theme;
 
 use super::{

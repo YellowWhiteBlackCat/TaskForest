@@ -1,8 +1,8 @@
 use super::*;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ProcessTreeRow;
 use taskmanager_shell::app_tree_expansion_key;
@@ -28,7 +28,7 @@ fn proc(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {
 }
 
 fn app_proc(pid: u32, name: &str) -> ProcessItem {
-    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 
     let identity =
         ProcessApplicationIdentity::new("org.example.App", name, None).expect("identity fixture");
@@ -55,7 +55,7 @@ fn project(
 
 #[test]
 fn category_projection_has_one_fixed_bucket_order() {
-    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 
     pin_english();
     let mut background = proc(20, "daemon", None);
@@ -200,7 +200,7 @@ fn row_cells_keep_unavailable_values_honest() {
 #[test]
 fn shared_application_rows_sort_disk_columns_by_typed_group_metrics() {
     fn app(pid: u32, disk_read: u64, disk_write: u64) -> ProcessItem {
-        use taskmanager_core::core::process::{
+        use taskforest_core::core::process::{
             ProcessApplicationIdentity, ProcessMetadataObservation,
         };
 

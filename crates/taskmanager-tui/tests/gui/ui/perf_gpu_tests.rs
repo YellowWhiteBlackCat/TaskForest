@@ -2,13 +2,13 @@ use super::perf_gpu_support::gpu_fact_lines;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::{
     GpuEngine, GpuEngineRowsSnapshot, GpuMetrics, GpuScalarObservations, GpuThrottleReason,
     ScalarObservation, SystemSnapshot,
 };
-use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuGraphicsApi};
+use taskforest_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuGraphicsApi};
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;

@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::{RequestId, SubmissionError};
+use taskforest_contract::{RequestId, SubmissionError};
 
 use crate::platform::SensorRequest;
 

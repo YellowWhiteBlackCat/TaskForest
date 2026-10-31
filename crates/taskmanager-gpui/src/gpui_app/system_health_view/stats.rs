@@ -3,13 +3,13 @@
 //! live here so the render module only paints folded strings.
 
 use std::path::Path;
-use taskmanager_core::core::units::bytes_percent;
+use taskforest_core::core::units::bytes_percent;
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::power_w_precise;
 use taskmanager_shell::presentation::temperature_c_precise;
 
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::{DeviceStatus, FilesystemHealth, SensorQuantity, SensorReading};
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::{DeviceStatus, FilesystemHealth, SensorQuantity, SensorReading};
 
 use super::{SensorGroup, SystemHealthText};
 

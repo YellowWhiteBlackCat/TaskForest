@@ -16,13 +16,13 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_application::DirectoryUsageRequest;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::directory_usage::{
+use taskforest_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus, DirectoryUsageEntry,
     DirectoryUsageSnapshot,
 };
-use taskmanager_core::core::metrics::{DiskMetrics, ScalarAvailability};
+use taskforest_core::core::metrics::{DiskMetrics, ScalarAvailability};
+use taskmanager_application::DirectoryUsageRequest;
+use taskmanager_application::i18n::t;
 
 use taskmanager_theme::tokens;
 

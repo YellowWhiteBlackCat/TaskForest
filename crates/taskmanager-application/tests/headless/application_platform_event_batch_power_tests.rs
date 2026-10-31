@@ -1,18 +1,16 @@
 use std::collections::HashMap;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::{
+use taskforest_contract::{CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceLifecycle, DevicePresence,
     PowerSupplyKind, PowerSupplySnapshot, ScalarObservation,
-};
-use taskmanager_platform_contract::{
-    CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, RequestId,
 };
 
 use super::super::super::{PlatformEvent, PowerSupplyEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};
-use taskmanager_core::DeviceId;
-use taskmanager_core::DeviceState;
+use taskforest_core::DeviceId;
+use taskforest_core::DeviceState;
 
 #[test]
 fn power_supply_event_preserves_devices_and_source_status() {

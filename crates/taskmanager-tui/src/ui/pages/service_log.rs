@@ -5,9 +5,9 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use taskforest_core::core::services::{ServiceLogAvailability, ServiceLogLevel};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{ServiceLogAvailability, ServiceLogLevel};
-use taskmanager_core::core::target::ServiceId;
 
 use super::super::panel;
 use crate::{TuiApp, TuiTheme};

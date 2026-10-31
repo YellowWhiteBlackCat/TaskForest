@@ -3,15 +3,15 @@
 use crate::{ShellApp, fixture::edit_processes};
 
 use std::net::SocketAddr;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskforest_core::core::process_telemetry::ProcessInsightSnapshot;
 use taskmanager_application::{
     ProcessInsightFacetEvent, ProcessInsightObservation, ProcessInsightsProjection,
     ProcessInsightsRevision, ProjectedProcessInsights,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
-use taskmanager_core::core::process_telemetry::ProcessInsightSnapshot;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
     IsolationKind, LimitValue, LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry,
     NamespaceAuditStatus, OpenFileEntry, OpenFileKind, ProcessCapabilities, ProcessConnection,
@@ -21,8 +21,8 @@ use taskmanager_core::core::process_telemetry::{
     ResourceGroupMembership, ThreadState,
 };
 
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::{
     ProcessGpuEngineUsage, ProcessGpuEngines, ProcessResourceObservations, ResourceObservation,
     ScalarObservation,
 };

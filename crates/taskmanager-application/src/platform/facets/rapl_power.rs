@@ -10,9 +10,9 @@
 //! lane is system-scoped: the request is a unit `Refresh` payload mirroring
 //! [`super::system::HardwareInventoryRequest`].
 
-use taskmanager_core::RaplPowerSnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::RaplPowerSnapshot;
 
 /// One CPU package-power read for the host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

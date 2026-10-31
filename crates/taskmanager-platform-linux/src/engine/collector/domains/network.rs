@@ -6,7 +6,7 @@
 use std::time::Instant;
 
 use sysinfo::Networks;
-use taskmanager_core::{
+use taskforest_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceLifecycleRegistry, DeviceRefreshOutcome,
     NetworkMetrics, NetworkTelemetryObservation,
 };

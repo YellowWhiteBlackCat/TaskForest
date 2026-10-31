@@ -1,8 +1,8 @@
+use taskforest_contract::CapabilityRequest;
+use taskforest_core::core::identity::ProviderId;
 use taskmanager_application::{
     DirectoryUsageRequest, automatic_schedules, default_automatic_cadence_ms,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::CapabilityRequest;
 
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
 

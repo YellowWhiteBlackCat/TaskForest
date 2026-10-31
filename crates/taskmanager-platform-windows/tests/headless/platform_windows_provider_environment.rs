@@ -1,7 +1,7 @@
 use super::*;
 #[cfg(windows)]
-use taskmanager_core::StartupImpactUnknownReason;
-use taskmanager_core::{
+use taskforest_core::StartupImpactUnknownReason;
+use taskforest_core::{
     DeviceState, DeviceStatus, SessionControlAction, SessionId, SessionIdentity,
     SessionIncarnation, StartupEvidenceFailure,
 };

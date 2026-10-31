@@ -1,9 +1,9 @@
 //! Pure Performance-page metric projections and formatting.
 
 use super::*;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::power::BatteryInfo;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::power::BatteryInfo;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;

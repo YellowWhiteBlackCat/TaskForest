@@ -1,14 +1,14 @@
 //! Behavior tests for the Bevy selected-process details projection.
 
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
 
 use taskmanager_shell::{ShellApp, fixture};
 
 use super::projection;
-use taskmanager_core::core::process_telemetry::ConnectionState;
+use taskforest_core::core::process_telemetry::ConnectionState;
 use taskmanager_shell::presentation::MISSING_VALUE;
 
 fn shell_with(mut process: ProcessItem) -> ShellApp {
@@ -120,17 +120,17 @@ fn field_label(field: ProcessDetailsField) -> &'static str {
 
 #[test]
 fn resources_summary_empty_keeps_honest_gap() {
-    use taskmanager_core::core::process_telemetry::ProcessResourceSnapshot;
+    use taskforest_core::core::process_telemetry::ProcessResourceSnapshot;
     let snapshot = ProcessResourceSnapshot::default();
     assert_eq!(super::resources_summary(&snapshot), MISSING_VALUE);
 }
 
 #[test]
 fn resources_summary_exposes_memory_cpu_pids_and_cgroup_locator() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::identity::ProviderId;
-    use taskmanager_core::core::process_telemetry::ResourceObservation;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::identity::ProviderId;
+    use taskforest_core::core::process_telemetry::ResourceObservation;
+    use taskforest_core::core::process_telemetry::{
         LimitValue, ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
     };
 
@@ -171,9 +171,9 @@ fn resources_summary_exposes_memory_cpu_pids_and_cgroup_locator() {
 
 #[test]
 fn resources_summary_handles_unlimited_quotas_and_limits() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::ResourceObservation;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::ResourceObservation;
+    use taskforest_core::core::process_telemetry::{
         LimitValue, ProcessResourceObservations, ProcessResourceSnapshot,
     };
 
@@ -198,9 +198,9 @@ fn resources_summary_handles_unlimited_quotas_and_limits() {
 
 #[test]
 fn resources_summary_partial_observations_never_fabricate_missing_values() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::ResourceObservation;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::ResourceObservation;
+    use taskforest_core::core::process_telemetry::{
         ProcessResourceObservations, ProcessResourceSnapshot,
     };
 
@@ -222,8 +222,8 @@ fn resources_summary_partial_observations_never_fabricate_missing_values() {
 
 #[test]
 fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
 
     let host_process = t("proc_insights.host_process");
     let not_sandboxed = "not sandboxed";
@@ -367,9 +367,9 @@ fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
 
 #[test]
 fn isolation_summary_renders_the_linux_namespace_audit() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::process_telemetry::{
         IsolationKind, LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry,
         NamespaceAuditStatus, ProcessIsolation,
     };
@@ -451,8 +451,8 @@ fn isolation_summary_renders_the_linux_namespace_audit() {
 
 #[test]
 fn isolation_summary_renders_posix_capabilities() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
 
     let isolation = ProcessIsolation {
         state: DeviceState::healthy(1),
@@ -481,8 +481,8 @@ fn isolation_summary_renders_posix_capabilities() {
 
 #[test]
 fn format_thread_line_renders_runqueue_and_wait_diagnostics() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{
         ProcessThreadInfo, ProcessThreads, ThreadState, ThreadWaitKind,
     };
 
@@ -507,8 +507,8 @@ fn format_thread_line_renders_runqueue_and_wait_diagnostics() {
 
 #[test]
 fn isolation_summary_renders_seccomp_filter() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::ProcessIsolation;
 
     let isolation = ProcessIsolation {
         state: DeviceState::healthy(1),
@@ -521,7 +521,7 @@ fn isolation_summary_renders_seccomp_filter() {
 
 #[test]
 fn process_details_renders_command_identity_mismatch() {
-    use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+    use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 
     let mut item = ProcessItem::new(42, "worker");
     item.apply_metadata_observations(ProcessMetadataObservations::current(
@@ -542,8 +542,8 @@ fn process_details_renders_command_identity_mismatch() {
 
 #[test]
 fn threads_summary_empty_and_populated_with_gap_honesty() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{
         ProcessThreadInfo, ProcessThreads, ThreadState,
     };
 
@@ -611,10 +611,8 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
 
 #[test]
 fn open_files_summary_empty_unreadable_and_populated() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
-        OpenFileEntry, OpenFileKind, ProcessOpenFiles,
-    };
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{OpenFileEntry, OpenFileKind, ProcessOpenFiles};
 
     let empty = ProcessOpenFiles::default();
     assert_eq!(
@@ -668,13 +666,13 @@ fn open_files_summary_empty_unreadable_and_populated() {
 
 #[test]
 fn open_files_summary_renders_fd_limit_saturation() {
-    use taskmanager_application::project_process_resources;
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{
         OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations,
         ResourceObservation,
     };
-    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+    use taskforest_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+    use taskmanager_application::project_process_resources;
 
     let files = ProcessOpenFiles {
         state: DeviceState::healthy(1000),
@@ -719,9 +717,9 @@ fn open_files_summary_renders_fd_limit_saturation() {
 #[test]
 fn network_summary_formats_rates_endpoints_and_escalation() {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::process_telemetry::{
         ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, ProcessConnection,
         ProcessNetworkSnapshot,
     };
@@ -797,8 +795,8 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
 
 #[test]
 fn environment_summary_formats_entries_and_truncation() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 
     let empty = ProcessEnvironment::default();
     assert_eq!(
@@ -842,9 +840,9 @@ fn environment_summary_formats_entries_and_truncation() {
 
 #[test]
 fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::process_telemetry::{
         ProcessGpuDevice, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessGpuSnapshot,
     };
 
@@ -914,13 +912,13 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
 
 #[test]
 fn insight_cards_wires_network_escalation_action() {
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::ProcessNetworkSnapshot;
     use taskmanager_application::{
         ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
         ProcessInsightsRevision,
     };
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::ProcessNetworkSnapshot;
 
     let target = FrozenProcessIdentity::from_authoritative_parts(42, "test", 1, 1).unwrap();
 

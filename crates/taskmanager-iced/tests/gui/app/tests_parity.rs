@@ -13,18 +13,18 @@
 use super::focus_state::service_control_focus_target;
 use super::*;
 use crate::test_support::temp_dir;
+use taskforest_core::core::config::Config;
+use taskforest_core::core::metrics::CpuMetrics;
+use taskforest_core::core::metrics::CpuScalarObservations;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessSignal;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_application::ConfigStore;
 use taskmanager_application::KeyCode;
 use taskmanager_application::Modifiers;
 use taskmanager_application::PlatformEffect;
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_core::core::metrics::CpuScalarObservations;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessSignal;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -164,7 +164,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
 /// EfficiencyMode, Affinity, OpenLocation, and SearchOnline.
 #[test]
 fn process_action_menu_popover_provides_complete_action_coverage() {
-    use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
+    use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));

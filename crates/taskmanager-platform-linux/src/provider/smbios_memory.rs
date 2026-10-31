@@ -17,8 +17,9 @@
 //! but the live privileged read needs sudo and is an integrator on-box receipt
 //! item. No fabricated rows exist on any path: failures stay typed failures.
 
-use taskmanager_core::FailureKind;
-use taskmanager_core::{DmiIdentityFacts, SmbiosMemorySnapshot, SmbiosModuleRow};
+use taskforest_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_core::FailureKind;
+use taskforest_core::{DmiIdentityFacts, SmbiosMemorySnapshot, SmbiosModuleRow};
 use taskmanager_escalation::polkit;
 use taskmanager_escalation::polkit::{
     PolkitGate, SmbiosHelperErrorKind, SmbiosHelperOutcome, invoke_smbios_helper,
@@ -26,7 +27,6 @@ use taskmanager_escalation::polkit::{
 use taskmanager_escalation::{
     EscalationAvailability, EscalationDenialReason, EscalationFeature, PrivilegeGate,
 };
-use taskmanager_platform_contract::{CapabilityStatus, ProviderFailure};
 use taskmanager_platform_provider::SmbiosMemoryProvider;
 
 pub(super) struct NativeSmbiosMemoryProvider {

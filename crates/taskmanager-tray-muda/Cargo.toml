@@ -14,8 +14,8 @@ publish = false
 # are disabled, so Linux CI never pulls GTK/libappindicator through this seam.
 
 [dependencies]
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = { version = "0.24", default-features = false }

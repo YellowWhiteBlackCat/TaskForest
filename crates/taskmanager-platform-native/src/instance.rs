@@ -10,7 +10,7 @@
 
 use std::sync::mpsc::Sender;
 
-use taskmanager_platform_contract::{InstanceEvent, InstanceFailure, InstanceRole};
+use taskforest_contract::{InstanceEvent, InstanceFailure, InstanceRole};
 
 /// Acquire single-instance ownership.
 ///

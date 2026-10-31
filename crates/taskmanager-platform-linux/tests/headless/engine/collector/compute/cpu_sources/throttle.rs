@@ -1,7 +1,7 @@
 use super::*;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use taskmanager_core::CpuThrottlePackageCounters;
+use taskforest_core::CpuThrottlePackageCounters;
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(1);
 

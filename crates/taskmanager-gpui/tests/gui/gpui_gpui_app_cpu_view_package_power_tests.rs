@@ -1,8 +1,8 @@
 use super::*;
+use taskforest_contract::{CapabilityStatus, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{RaplPackageRow, RaplPowerSnapshot};
 use taskmanager_application::{RaplPowerRequestFailure, RaplPowerSession, RaplPowerState};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{RaplPackageRow, RaplPowerSnapshot};
-use taskmanager_platform_contract::{CapabilityStatus, RequestId};
 use taskmanager_theme::Theme;
 
 fn inputs<'a>(

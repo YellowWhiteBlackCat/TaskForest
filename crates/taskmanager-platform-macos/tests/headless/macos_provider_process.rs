@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::PriorityTier;
-use taskmanager_core::ProcessBatchAction;
-use taskmanager_core::ResourceGroupLimitRequest;
+use taskforest_core::PriorityTier;
+use taskforest_core::ProcessBatchAction;
+use taskforest_core::ResourceGroupLimitRequest;
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessGpuProvider,
     ProcessIsolationProvider, ProcessNetworkProvider, ProcessOpenFilesProvider,
@@ -179,7 +179,7 @@ fn application_identity_is_decided_whenever_the_executable_path_is_current() {
     // Unknown application identity — the provider either matched a bundle
     // layout (Available) or confirmed a non-bundle path (Absent). Only a
     // missing executable path may honestly stay Unknown.
-    use taskmanager_core::ProcessMetadataAvailability;
+    use taskforest_core::ProcessMetadataAvailability;
 
     let mut provider = MacProcessListProvider::new();
     provider.process_facts = ProcessFactsCache::with_map(HashMap::new(), Instant::now());

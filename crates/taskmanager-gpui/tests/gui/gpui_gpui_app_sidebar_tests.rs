@@ -1,11 +1,11 @@
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_core::core::metrics::CpuScalarObservations;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::CpuMetrics;
+use taskforest_core::core::metrics::CpuScalarObservations;
+use taskforest_core::core::metrics::{
     GpuMetrics, GpuScalarObservations, NetworkAdapterType, NetworkScalarObservations,
     NetworkWirelessObservations, OptionalObservation, ScalarObservation, SystemSnapshot,
 };
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 

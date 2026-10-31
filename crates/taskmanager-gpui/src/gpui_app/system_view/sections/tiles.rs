@@ -1,10 +1,10 @@
 //! Static hardware summary tiles for the System page.
 
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_application::truncate_text;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_ui_contract::IconId;
 
 /// One static hardware-parameter tile's data (the row beneath the hero card).

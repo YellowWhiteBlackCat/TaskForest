@@ -8,10 +8,10 @@ use gpui::{
     AnyElement, App, ClipboardItem, Context, Div, Entity, InteractiveElement, IntoElement,
     ParentElement, ScrollHandle, Styled, Window, div, px,
 };
+use taskforest_core::core::AlertEventKind;
+use taskforest_core::core::{AlertEvent, AlertMetric, AlertSeverity};
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::i18n;
-use taskmanager_core::core::AlertEventKind;
-use taskmanager_core::core::{AlertEvent, AlertMetric, AlertSeverity};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortDir;
 use taskmanager_theme::Theme;

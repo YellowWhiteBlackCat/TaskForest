@@ -5,9 +5,9 @@
 //! surface or dangerous confirmation may be active, and only an explicit,
 //! branch-matched confirm transition can produce platform work.
 
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskforest_core::core::session::{SessionControlAction, SessionItem};
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 
 use crate::{
     ControlRequestId, PlatformEffect, ServiceControlTarget, SessionControlTarget,

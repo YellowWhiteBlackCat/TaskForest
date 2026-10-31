@@ -1,8 +1,8 @@
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     ServiceAction, ServiceDeps, ServiceId, ServiceItem, ServiceLogQuery, ServiceLogState,
     ServiceLogStreamState,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 
 pub trait ServiceInventoryProvider: Send + 'static {
     fn refresh(&mut self) -> Result<PartialSourceSnapshot<ServiceItem>, ProviderFailure>;

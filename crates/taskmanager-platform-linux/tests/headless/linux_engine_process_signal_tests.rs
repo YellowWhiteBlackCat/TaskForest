@@ -9,7 +9,7 @@ use super::{
     classify_nix_process_errno, classify_rustix_process_errno, cpus_to_cpuset, cpuset_to_cpus,
     validated_raw_pid,
 };
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 /// Empty input round-trips to an empty Vec — the documented "no cpus" case.
 #[test]

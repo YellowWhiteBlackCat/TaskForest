@@ -31,8 +31,8 @@ use bevy::ui::{
     AlignItems, BackgroundColor, BorderRadius, ComputedNode, Display, FlexDirection, Node,
     Overflow, PositionType, UiSystems, Val, percent, px, rem,
 };
+use taskforest_core::core::identity::DeviceGeneration;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::identity::DeviceGeneration;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetricUnit, gpu_chart_metric_history,

@@ -1,11 +1,11 @@
 //! Owner facts that make a device row identity stable across refreshes.
 
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::{DiskMetrics, DiskPartition, GpuMetrics, NetworkMetrics};
+use taskforest_core::core::npu::NpuDevice;
+use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::sensors::SensorReading;
 use taskmanager_application::DeviceLifecyclePartition;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, GpuMetrics, NetworkMetrics};
-use taskmanager_core::core::npu::NpuDevice;
-use taskmanager_core::core::power::BatteryInfo;
-use taskmanager_core::core::sensors::SensorReading;
 
 /// Device family whose owner facts supply a renderer-neutral row.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -16,12 +16,12 @@ use crate::gpui_app::processes_view::rows::aggregate_display::{
     cpu_aggregate_summary, memory_aggregate_summary,
 };
 use crate::gpui_app::processes_view::rows::projection::category_label;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::units::bytes_percent;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::units::bytes_percent;
 use taskmanager_shell::process_semantic_key;
 use taskmanager_shell::{
     ProcessProjectionGeneration, ProcessTreeRow, append_process_semantic_rows,
@@ -33,8 +33,8 @@ use taskmanager_ui_contract::{
 };
 
 use super::RootView;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::PendingConfirmation;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::presentation::process_batch_action_label;
 
 /// Maximum number of process rows published to the accessibility tree. The

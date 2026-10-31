@@ -25,7 +25,7 @@ use gpui::{
     App, Context, Div, InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba,
     StatefulInteractiveElement, Styled, Window, div, px, rgb,
 };
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
 };
 use taskmanager_theme::WindowControls;
@@ -63,7 +63,7 @@ pub enum WindowDecorationsPreference {
 }
 
 impl WindowDecorationsPreference {
-    /// Parse a persisted [`taskmanager_core::core::config::Config::window_decorations`]
+    /// Parse a persisted [`taskforest_core::core::config::Config::window_decorations`]
     /// token. Empty and unknown values fail closed to [`Self::System`] (the
     /// negotiation default) so a hand-edited or newer config can never force a
     /// frame this build cannot deliver.

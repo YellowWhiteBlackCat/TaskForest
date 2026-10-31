@@ -2,9 +2,9 @@
 
 use super::RootView;
 use gpui::{ClipboardItem, Context};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_application::i18n;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 
 impl RootView {
     /// Look up the process captured by the menu action and apply `f` to its

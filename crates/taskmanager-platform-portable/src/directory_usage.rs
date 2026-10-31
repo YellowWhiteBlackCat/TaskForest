@@ -23,12 +23,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     DirectoryScanBounds, DirectoryScanControl, DirectoryScanId, DirectoryScanSpec,
     DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry, DirectoryUsageSnapshot,
     FailureKind, ScalarObservation, report_entries,
 };
-use taskmanager_platform_contract::ProviderFailure;
 
 use taskmanager_platform_provider::DirectoryUsageProvider;
 

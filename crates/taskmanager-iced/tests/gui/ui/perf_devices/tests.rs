@@ -8,20 +8,20 @@ use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Rectangle, Size};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::GpuScalarObservations;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::{
+    DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, GpuEngineMetric, GpuMetrics,
+};
+use taskforest_core::core::power::BatteryScalarObservations;
 use taskmanager_application::AppPage;
 use taskmanager_application::GpuEngineRowsState;
 use taskmanager_application::i18n::set_language;
 use taskmanager_application::i18n::{Language, with_language};
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::GpuScalarObservations;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::{
-    DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, GpuEngineMetric, GpuMetrics,
-};
-use taskmanager_core::core::power::BatteryScalarObservations;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -83,7 +83,7 @@ fn rendered_gpu_page_text(
 /// second failure-kind mapping.
 #[test]
 fn engine_rows_failure_keys_cover_every_typed_kind() {
-    use taskmanager_platform_contract::CapabilityStatus;
+    use taskforest_contract::CapabilityStatus;
     use taskmanager_shell::presentation::gpu_engine_rows::{
         GpuEngineRowsPresentation, present_gpu_engine_rows,
     };
@@ -428,9 +428,9 @@ fn row_value(rows: &[StatRow], label: &str) -> String {
 #[test]
 fn battery_health_and_estimate_rows_follow_typed_availability() {
     pin_english();
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::power::BatteryInfo;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::power::BatteryInfo;
 
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(1));
     battery.apply_scalar_observations(BatteryScalarObservations {
@@ -748,7 +748,7 @@ fn gpu_chart_metric_selected_unavailable_stays_explicit() {
 /// note in `engine_graph`), so no Iced message carries a selection.
 #[test]
 fn gpu_chart_metric_generation_change_resets_to_the_default() {
-    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::identity::DeviceGeneration;
 
     let mut app = gpu_selected_demo();
     let gate = gpu_chart_metric_gate(app.viewed_gpu());

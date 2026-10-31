@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::alerts::{AlertInstanceId, AlertMetric, AlertSeverity, AlertTargetIdentity};
+use taskforest_core::alerts::{AlertInstanceId, AlertMetric, AlertSeverity, AlertTargetIdentity};
 
 fn alert(instance: &str, severity: AlertSeverity) -> Alert {
     Alert {

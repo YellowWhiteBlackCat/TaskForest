@@ -1,8 +1,8 @@
-use taskmanager_core::SessionItem;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, RequestId};
+use taskforest_contract::{CapabilityId, PartialSourceSnapshot, RequestId};
+use taskforest_core::SessionItem;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::super::super::{PlatformEvent, SessionEvent, StartupEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};

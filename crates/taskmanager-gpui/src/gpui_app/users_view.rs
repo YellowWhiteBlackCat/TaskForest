@@ -37,10 +37,10 @@ use gpui::{
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::source::SourceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

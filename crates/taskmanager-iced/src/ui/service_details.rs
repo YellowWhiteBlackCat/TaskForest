@@ -6,11 +6,11 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::services::{
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::services::{
     ServiceItem, ServiceLogLevelFilter, ServiceLogState, ServiceLogTimeFilter, ServiceRelationKind,
 };
+use taskmanager_application::i18n::t;
 
 use taskmanager_shell::presentation::{control_error_detail, missing_value};
 use taskmanager_theme::{Theme, tokens};

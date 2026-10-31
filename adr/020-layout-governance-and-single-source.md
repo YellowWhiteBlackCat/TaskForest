@@ -19,7 +19,7 @@ display filtering:
   TUI processes, services/startup filters).
 
 Rule: a utility with more than one prospective caller lives in ONE place —
-`taskmanager-core` (the shared floor) — with unit tests. Every frontend imports
+`taskforest-core` (the shared floor) — with unit tests. Every frontend imports
 that owner directly; no application model facade or private copy is used.
 Display filters are allowed to stay in the frontend layer but must share the
 core matcher, not re-implement matching.

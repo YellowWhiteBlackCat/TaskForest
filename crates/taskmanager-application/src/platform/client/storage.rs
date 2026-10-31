@@ -1,7 +1,7 @@
 //! Storage-axis request submission on `PlatformClient`: filesystem health,
 //! SMART observation/control, and directory-usage scan lifecycle.
 
-use taskmanager_platform_contract::{RequestId, SubmissionError};
+use taskforest_contract::{RequestId, SubmissionError};
 
 use crate::platform::{
     DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,

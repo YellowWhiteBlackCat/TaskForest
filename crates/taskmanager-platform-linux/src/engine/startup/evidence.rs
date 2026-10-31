@@ -3,9 +3,9 @@
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::FailureKind;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::startup::{
+use taskforest_core::FailureKind;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
     StartupFailedUnit,
 };

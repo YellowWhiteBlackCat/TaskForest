@@ -2,14 +2,14 @@
 //! vocabulary (ADR-020).
 //!
 //! Match geometry comes exclusively from the shared
-//! `taskmanager_core::core::text::match_ranges_ascii_ci`; this module only
+//! `taskforest_core::core::text::match_ranges_ascii_ci`; this module only
 //! turns those byte ranges into segments and maps them onto iced [`Span`]s.
 //! Iced 0.14's plain `text` widget cannot restyle substrings, so highlighted
 //! cells render as one `Rich` span run: a single widget with the same fixed
 //! width and wrapping behavior as the plain `text` cell it replaces.
 
 use iced::{Element, Length};
-use taskmanager_core::core::text::match_ranges_ascii_ci;
+use taskforest_core::core::text::match_ranges_ascii_ci;
 use zhuge_ui_core::text::{SearchTextRun, project_byte_ranges};
 use zhuge_ui_kit_iced::text::highlighted;
 

@@ -9,15 +9,15 @@
 
 use super::frame_text;
 
-use taskmanager_application::{AppAction, PlatformEffect};
-use taskmanager_application::{AppPage, i18n};
-use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::process::{ProcessBatchAction, ProcessLiveKey};
+use taskforest_core::core::services::{
     ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus,
 };
-use taskmanager_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::{AppAction, PlatformEffect};
+use taskmanager_application::{AppPage, i18n};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_ui_contract::{ProductIntent, SurfaceDecision};
 

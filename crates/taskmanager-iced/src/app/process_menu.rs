@@ -4,20 +4,20 @@
 //! shared application/shell operation in `IcedApp::update`. Keeping this enum
 //! toolkit-local avoids importing GPUI menu entities into the Iced graph.
 
-use taskmanager_core::core::process::ProcessSignal;
+use taskforest_core::core::process::ProcessSignal;
 
 use iced::Task;
-use taskmanager_application::{AppAction, PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessItem, ProcessLiveKey,
 };
+use taskmanager_application::{AppAction, PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
 
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 use super::{IcedApp, Message};
+use taskforest_core::core::process::PriorityTier;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::PriorityTier;
 
 /// One action exposed by the Applications-row context menu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

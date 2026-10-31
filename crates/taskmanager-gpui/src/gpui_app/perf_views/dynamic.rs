@@ -5,7 +5,7 @@
 //! provider and application layers remain unaware of GPUI layout concerns.
 
 use std::{cell::RefCell, rc::Rc};
-use taskmanager_core::core::DeviceStatus;
+use taskforest_core::core::DeviceStatus;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
@@ -26,8 +26,8 @@ use crate::gpui_app::history_samples::{
     battery_capacity_samples, battery_power_samples, fan_rpm_samples, fan_temperature_samples,
 };
 use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
+use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
-use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;

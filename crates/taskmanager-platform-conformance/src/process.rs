@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::process::ProcessItem;
+use taskforest_core::process::ProcessItem;
 
 /// A process's CPU percentage is normalised **per core** (the `top`/`htop`
 /// convention): the Linux adapter divides the CPU-tick delta by the elapsed

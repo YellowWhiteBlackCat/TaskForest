@@ -20,23 +20,23 @@ use crate::ui::applications::{
     apps_columns, apps_table_width, localized_sort_column_label, sort_arrow,
     trend_header_index_for, visible_apps_columns,
 };
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::services::{ServiceAction, ServiceStatus};
 use taskmanager_shell::PageHelp;
 use taskmanager_shell::presentation::{bytes, duration};
 
+use taskforest_contract::RequestId;
+use taskforest_core::core::alerts::AlertMetric;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::CommandId;
 use taskmanager_application::Modifiers;
 use taskmanager_application::ProcessAffinityReady;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::AlertMetric;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_icons::asset_bytes;
-use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::command_help;
 use taskmanager_shell::demo_app;
@@ -62,10 +62,10 @@ fn byte_and_duration_formatting_matches_the_other_frontends() {
 
 #[test]
 fn npu_view_model_keeps_all_current_facts_and_marks_missing_values() {
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::identity::DeviceId;
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::npu::{
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::identity::DeviceId;
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::npu::{
         NpuDevice, NpuEngineKind, NpuInventorySnapshot, NpuMemoryReport,
     };
 
@@ -611,7 +611,7 @@ fn system_projection_distinguishes_unloaded_and_empty_hardware() {
 
 #[test]
 fn system_projection_keeps_display_identity_and_mode_in_one_row() {
-    use taskmanager_core::core::hardware::DisplayInfo;
+    use taskforest_core::core::hardware::DisplayInfo;
 
     let hardware = HardwareInfo {
         displays: vec![DisplayInfo {
@@ -700,7 +700,7 @@ fn service_projection_preserves_fixture_rows_and_typed_status() {
     // The definition's ordering-cycle clause: both members of a typed
     // Before-cycle are flagged through the shared fold, so the row can paint
     // the conflict instead of silently rendering a normal unit.
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
     };
     let cyclic = |id: &str, name: &str, other: &str| {

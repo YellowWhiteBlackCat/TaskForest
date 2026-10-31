@@ -1,9 +1,9 @@
 //! test-intent: behavior
 
 use super::*;
-use taskmanager_core::core::hardware::ComputeTopology;
-use taskmanager_core::core::hardware::DisplayInfo;
-use taskmanager_core::core::hardware::{CoreBreakdown, FirmwareInfo, HostIdentity, KernelInfo};
+use taskforest_core::core::hardware::ComputeTopology;
+use taskforest_core::core::hardware::DisplayInfo;
+use taskforest_core::core::hardware::{CoreBreakdown, FirmwareInfo, HostIdentity, KernelInfo};
 
 fn hardware() -> HardwareInfo {
     HardwareInfo::from_fragments(

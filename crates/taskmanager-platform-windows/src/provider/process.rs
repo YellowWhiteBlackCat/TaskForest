@@ -10,21 +10,21 @@
 //! only File-type objects are reported, and sockets stay to the connections
 //! insight, which owns that fact on Windows.
 
-use taskmanager_application::{
-    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
-    ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
-    ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
-    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DeviceState, FailureKind, FrozenProcessIdentity, PriorityTier, ProcessBatchAction,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessGpuDevice,
     ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot,
     ProcessResourceObservations, ProcessResourceSnapshot, ProcessSignal, ProviderId,
     ResourceObservation,
 };
-use taskmanager_platform_contract::ProviderFailure;
+use taskmanager_application::{
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
+    ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
+    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
+};
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessControlProvider,
     ProcessEnvironmentProvider, ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,

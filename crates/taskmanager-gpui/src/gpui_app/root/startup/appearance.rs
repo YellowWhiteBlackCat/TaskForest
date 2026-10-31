@@ -2,10 +2,10 @@
 
 use std::time::Duration;
 
+use taskforest_contract::OperationFailure;
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily};
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::PlatformClient;
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_platform_contract::OperationFailure;
 
 pub(super) struct StartupAppearanceObservation {
     pub(super) value: DesktopAppearance,

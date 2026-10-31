@@ -3,7 +3,7 @@
 use std::fs;
 use std::path::Path;
 
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, PressureWindow, ProviderId, ResourcePressure, ScalarObservation, SourceOutcome,
     SourceStatus, SystemPressureSnapshot,
 };

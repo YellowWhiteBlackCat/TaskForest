@@ -3,7 +3,7 @@
 ## Role
 
 Dev-only typed fixture assembly for cross-crate behavior tests. The crate
-depends on `taskmanager-core` and exposes builders that write canonical
+depends on `taskforest-core` and exposes builders that write canonical
 observations through named domain assembly. It is never a product dependency.
 `pin_english()` pins the shared i18n global to English for tests that assert
 catalog strings — the app correctly follows the host locale, so such tests

@@ -18,8 +18,8 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::services::ServiceItem;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::ServiceItem;
 
 use crate::app::FrontendTrack;
 use crate::palette::{UiPalette, space_4, space_8, space_24};

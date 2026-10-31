@@ -1,5 +1,5 @@
-use taskmanager_core::PowerSupplySnapshot;
-use taskmanager_platform_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::PowerSupplySnapshot;
 
 /// Dynamic power-supply discovery, including every battery in one OS build.
 pub trait PowerSupplyProvider: Send + 'static {

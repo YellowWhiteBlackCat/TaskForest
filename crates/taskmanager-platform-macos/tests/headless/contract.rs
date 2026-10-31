@@ -17,6 +17,22 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+use taskforest_contract::{
+    CapabilityId, CapabilitySnapshot, CapabilityStatus, OperationFailure, PlatformAxis,
+    PlatformSource, RetryDisposition,
+};
+use taskforest_core::DeviceStatus;
+use taskforest_core::core::alerts::{
+    AlertInstanceId, AlertRuleId, AlertSeverity, AlertTargetIdentity,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+use taskforest_core::core::setup::SetupScriptAction;
+use taskforest_core::core::target::{ServiceId, SessionId};
 use taskmanager_application::SmartEvent;
 use taskmanager_application::{
     CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, EnvironmentFacets,
@@ -27,23 +43,7 @@ use taskmanager_application::{
     SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
     SmartObservationBatch, StorageFacets, SystemFacets,
 };
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::core::alerts::{
-    AlertInstanceId, AlertRuleId, AlertSeverity, AlertTargetIdentity,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
-use taskmanager_core::core::setup::SetupScriptAction;
-use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilitySnapshot, CapabilityStatus, OperationFailure, PlatformAxis,
-    PlatformSource, RetryDisposition,
-};
 use taskmanager_platform_macos::{MacOsPlatformRuntime, capability_surface};
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);

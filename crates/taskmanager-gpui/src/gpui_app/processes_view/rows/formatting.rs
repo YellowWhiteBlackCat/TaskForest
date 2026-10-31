@@ -1,7 +1,7 @@
 //! Process-table numeric and local start-time formatting.
 
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::cpu_time_compact;
 use taskmanager_shell::presentation::start_clock_local;
 

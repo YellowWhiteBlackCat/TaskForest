@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 
 #[test]
 fn disabled_frontend_history_is_inert_before_any_path_or_worker_lookup() {

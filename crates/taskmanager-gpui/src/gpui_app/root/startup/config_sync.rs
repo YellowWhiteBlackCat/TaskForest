@@ -3,7 +3,7 @@
 use std::borrow::BorrowMut;
 
 use gpui::{App, Context};
-use taskmanager_core::core::config::sidebar::normalize_sidebar_preferences;
+use taskforest_core::core::config::sidebar::normalize_sidebar_preferences;
 
 use super::super::{
     DeviceVisibilityPreferences, GraphPreferences, PresentationFingerprint, SIDEBAR_MAX_WIDTH,
@@ -14,6 +14,8 @@ use super::{
     config_from_view, i18n, normalize_graph_data_points, startup_page_from_token,
     text_rendering_from_token, text_rendering_mode_from_token,
 };
+use taskforest_core::core::config::Config;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigPublicationOutcome;
 use taskmanager_application::ConfigRecovery;
@@ -22,8 +24,6 @@ use taskmanager_application::ConfigRevision;
 use taskmanager_application::ConfigStoreErrorKind;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::TelemetryRefreshPolicyChange;
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens::UiSize;
 
 pub(super) fn apply_root_persisted_projection(

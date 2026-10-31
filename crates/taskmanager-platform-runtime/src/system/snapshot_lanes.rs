@@ -8,15 +8,15 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
+use taskforest_contract::{CapabilityId, ProviderFailure};
+use taskforest_core::{
+    CpuThrottleSnapshot, MsrReadoutSnapshot, NpuInventorySnapshot, RaplPowerSnapshot,
+    SmbiosMemorySnapshot,
+};
 use taskmanager_application::{
     CpuThrottleEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent, RaplPowerEvent,
     SmbiosMemoryEvent,
 };
-use taskmanager_core::{
-    CpuThrottleSnapshot, MsrReadoutSnapshot, NpuInventorySnapshot, RaplPowerSnapshot,
-    SmbiosMemorySnapshot,
-};
-use taskmanager_platform_contract::{CapabilityId, ProviderFailure};
 
 use super::{
     CpuThrottleRequest, MsrReadoutRequest, NpuInventoryRequest, RaplPowerRequest,

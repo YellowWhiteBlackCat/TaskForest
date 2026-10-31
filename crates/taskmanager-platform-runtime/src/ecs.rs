@@ -14,12 +14,12 @@ use bevy_ecs::component::Component;
 use bevy_ecs::prelude::{Entity, Resource};
 use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::world::World;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, DomainSchedulingSnapshot, MAX_RECENT_SCHEDULING_STALLS, RequestId, RequestScope,
     RuntimeSchedulingSnapshot, SchedulingAdmissionSnapshot, SchedulingBudgetSnapshot,
     SchedulingDomain, SchedulingScope, SchedulingStall, SidebandPolicy,
 };
+use taskforest_core::core::identity::ProviderId;
 
 use crate::config::{CapabilityRoute, DeliveryClass, RuntimeBudgets, RuntimeDomain};
 

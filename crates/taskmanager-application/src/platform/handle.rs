@@ -3,7 +3,7 @@
 use std::any::Any;
 use std::sync::Arc;
 
-use taskmanager_platform_contract::{CapabilityCatalog, CapabilityScheduler};
+use taskforest_contract::{CapabilityCatalog, CapabilityScheduler};
 
 use super::{
     CommandLaunchRequestPort, CpuTelemetryRequestPort, DesktopAppearanceRequestPort,

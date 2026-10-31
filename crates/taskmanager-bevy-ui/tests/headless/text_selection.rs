@@ -5,10 +5,10 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
 

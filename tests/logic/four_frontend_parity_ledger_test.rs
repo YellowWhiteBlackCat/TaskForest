@@ -9,9 +9,9 @@
 //! 4. Performance chart fidelity (smooth Catmull-Rom / Bezier curves, fixed ceiling scaling, shared-scale sparklines, honest gap preservation).
 //! 5. Responsive layout properties (typed viewport budgets, compact breakpoints, rail collapsing, minimum usable chart floors).
 
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_accessibility_linux::snapshot_to_tree_update;
 use taskmanager_application::CommandId;
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_shell::presentation::{command_help, page_help};
 use taskmanager_shell::presentation::{graph_summary, peak_of};
 use taskmanager_theme::color::contrast_ratio;

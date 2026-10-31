@@ -9,13 +9,13 @@ use taskmanager_application::AppAction;
 
 use crate::render;
 use crate::{TuiApp, TuiTheme};
-use taskmanager_application::i18n::{Language, set_language, t};
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceAction, ServiceItem, ServiceLogEntries, ServiceLogEntry, ServiceLogLevel,
     ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState,
     ServiceLogTimeFilter, ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{FeedbackSeverity, InfoSortCol, PAGE_STEP, SortCol, SortDir, queue_effect};
 
@@ -146,12 +146,12 @@ fn service_confirmation_n_dismisses_without_a_platform_effect() {
 #[test]
 fn service_control_round_trip_submits_through_queue_effect() {
     use std::sync::{Arc, Mutex};
-    use taskmanager_application::{
-        PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
-    };
-    use taskmanager_platform_contract::{
+    use taskforest_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
         RequestEnvelope, RequestPort, SubmissionError,
+    };
+    use taskmanager_application::{
+        PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
     };
 
     #[derive(Default)]
@@ -353,7 +353,7 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
 
 #[test]
 fn service_log_panel_paints_the_stream_and_the_level_filter_drops_lower_rows() {
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceLogEntries, ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter,
         ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
     };

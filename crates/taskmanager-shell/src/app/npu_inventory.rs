@@ -9,7 +9,7 @@ use taskmanager_application::{
 
 use super::SystemProjectionStore;
 use super::device_rows::DeviceRowFamily;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 
 impl SystemProjectionStore {
     /// Fold NPU accelerator inventory publications: latest-wins in event

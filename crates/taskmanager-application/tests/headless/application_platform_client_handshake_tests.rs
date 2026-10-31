@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, CompositeSourceSnapshot, EventEnvelope,
     EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
     RequestId, RequestPort, SubmissionError,
@@ -11,10 +11,10 @@ use crate::platform::{
     DesktopAppearanceEvent, DesktopAppearanceRequest, IntegrationFacets, PlatformClient,
     PlatformEvent, PlatformFacets, PlatformHandle,
 };
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::submitted_at_ms;
 

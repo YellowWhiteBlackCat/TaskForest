@@ -9,10 +9,10 @@
 
 use std::time::{Duration, Instant};
 
+use taskforest_core::core::services::ServiceLogErrorKind;
+use taskforest_core::core::services::ServiceLogFailure;
 use taskmanager_application::AppPage;
 use taskmanager_application::service_submission_failure;
-use taskmanager_core::core::services::ServiceLogErrorKind;
-use taskmanager_core::core::services::ServiceLogFailure;
 use taskmanager_theme::tokens::{DURATION_MEDIUM, MotionPolicy};
 
 /// The persisted `Config::motion` token for one policy — the shared core

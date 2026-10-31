@@ -4,7 +4,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use taskmanager_core::core::hardware::FirmwareInfo;
+use taskforest_core::core::hardware::FirmwareInfo;
 
 use super::inventory::{FailureSummary, read_optional_text};
 

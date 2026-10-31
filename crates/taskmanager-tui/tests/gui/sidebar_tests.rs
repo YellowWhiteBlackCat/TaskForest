@@ -5,10 +5,10 @@ use super::*;
 use crate::ui::test_support::{install_config_store, repo_temp_dir};
 use ratatui::crossterm::event::KeyModifiers;
 use ratatui::{Terminal, backend::TestBackend};
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage, ConfigDrain};
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 fn key(app: &mut TuiApp, code: KeyCode) {

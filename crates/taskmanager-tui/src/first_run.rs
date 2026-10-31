@@ -2,11 +2,11 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskforest_core::core::setup::SetupScriptAction;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunPhase};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformClient, PlatformEffect, SetupScriptRequest, UrlOpenRequest};
 use taskmanager_assets::product::REPOSITORY_URL;
-use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, QuitReason};
 
 #[derive(Clone, Debug, Default)]

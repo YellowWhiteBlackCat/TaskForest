@@ -1,7 +1,7 @@
 use super::super::{CaptureEvidence, CaptureScenario, SystemSnapshot, TopPage};
 use super::PROCESSES_OBSERVED_AT_MS;
-use taskmanager_core::core::metrics::DiskPartition;
-use taskmanager_core::core::{DeviceId, PowerSupplySnapshot, SensorCenterSnapshot};
+use taskforest_core::core::metrics::DiskPartition;
+use taskforest_core::core::{DeviceId, PowerSupplySnapshot, SensorCenterSnapshot};
 use taskmanager_telemetry_store::{HistoryRetention, TelemetryStore};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 

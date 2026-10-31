@@ -4,13 +4,13 @@ use std::io;
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
 
 use super::log_fetch::permission_denied;
 use super::parsing::parse_systemctl_show_deps_for_scope;
 use super::target::resolve_active_service_target;
 use super::{InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceDeps, ServiceManager};
-use taskmanager_core::ServiceId;
+use taskforest_core::ServiceId;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const SYSTEMD_DEPENDENCY_PROPERTIES: &str =

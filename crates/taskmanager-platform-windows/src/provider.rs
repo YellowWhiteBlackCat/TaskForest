@@ -16,6 +16,10 @@
 //! `DirectoryUsageScanner` on 2026-08-18 (the ADR-018 roadmap item after the
 //! G-20 history ring). See `adr/018-windows-telemetry-safety.md`.
 
+use taskforest_contract::{
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+};
+use taskforest_core::ProviderId;
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, DesktopNotificationRequest,
     GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest,
@@ -27,10 +31,6 @@ use taskmanager_application::{
     RaplPowerRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
     SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
     StorageTelemetryRequest,
-};
-use taskmanager_core::ProviderId;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
 use taskmanager_platform_provider::{
     CpuThrottleProvider, GpuEngineRowsProvider, HardwareInventoryProvider, MsrReadoutProvider,

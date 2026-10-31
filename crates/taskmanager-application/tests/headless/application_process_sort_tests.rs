@@ -1,6 +1,6 @@
 use super::{ProcessSortAxis, compare_axis, compare_processes};
 use std::cmp::Ordering;
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_test_support::{SortFixtureMetrics, sort_fixture_row, sort_parity_fixture};
 
 /// Pid order of the fixture sorted directly by the neutral comparator.

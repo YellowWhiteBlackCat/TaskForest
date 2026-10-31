@@ -6,16 +6,16 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{
+    CapabilityId, CompositeSourceSnapshot, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{
     CpuTelemetryObservation, GpuTelemetryObservation, HostRuntimeObservation,
     MemoryTelemetryObservation, NetworkTelemetryObservation, StorageTelemetryObservation,
 };
-use taskmanager_core::core::process_telemetry::ContainerRollup;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{
-    CapabilityId, CompositeSourceSnapshot, RequestId, RequestPort, SubmissionError,
-};
+use taskforest_core::core::process_telemetry::ContainerRollup;
 
 use super::cpu_throttle::CpuThrottleRequestPort;
 use super::gpu_engine_rows::GpuEngineRowsRequestPort;

@@ -9,7 +9,7 @@
 //!
 //! Fixed semantics (the "same" every frontend consumes):
 //! - Buckets are emitted in the fixed
-//!   [`taskmanager_core::core::process::ProcessCategory::ALL`] order
+//!   [`taskforest_core::core::process::ProcessCategory::ALL`] order
 //!   (Application → Background → Uncategorized).
 //! - An empty bucket is omitted entirely (no fabricated header).
 //! - Each bucket keeps its members in INPUT order — the caller passes the
@@ -18,7 +18,7 @@
 //! - Aggregation is typed: `CategoryBucketProjection::aggregate_f32` and
 //!   `CategoryBucketProjection::aggregate_u64` delegate to core's
 //!   availability-preserving
-//!   [`taskmanager_core::core::process::aggregate::AggregateMetric`] folds. A missing member is
+//!   [`taskforest_core::core::process::aggregate::AggregateMetric`] folds. A missing member is
 //!   therefore not silently converted into a successful zero. Callers choose
 //!   the typed observation field, while core remains the sole authority for
 //!   coverage, freshness, failure, and saturating-add semantics.
@@ -28,12 +28,12 @@
 //!
 //! Frontends reach this projection through `taskmanager-application` and
 //! import the underlying
-//! [`taskmanager_core::core::process::ProcessCategory`] facts directly from their owner
-//! module in `taskmanager-core`.
+//! [`taskforest_core::core::process::ProcessCategory`] facts directly from their owner
+//! module in `taskforest-core`.
 
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::aggregate::{AggregateMetric, aggregate_f32, aggregate_u64};
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::aggregate::{AggregateMetric, aggregate_f32, aggregate_u64};
+use taskforest_core::core::process::{ProcessCategory, ProcessItem};
 
 /// Prefix of every category expansion key (see [`category_expansion_key`]).
 pub const CATEGORY_EXPANSION_KEY_PREFIX: &str = "category:";

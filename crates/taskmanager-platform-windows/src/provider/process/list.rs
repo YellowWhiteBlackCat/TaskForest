@@ -10,20 +10,20 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     CumulativeCounter, FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessItem,
     ProcessLiveKey, ProcessMetadataFailure, ProcessMetadataObservation,
     ProcessMetadataObservations, ProcessScalarObservations, ScalarObservation,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::ProcessListProvider;
 
 use super::{PROCESS_LIST_PROVIDER, source};
-use taskmanager_core::ApplicationIconAsset;
-use taskmanager_core::ApplicationIconFormat;
-use taskmanager_core::ProcessApplicationIdentity;
-use taskmanager_core::ProcessOwner;
-use taskmanager_core::ProcessOwnerIdentity;
+use taskforest_core::ApplicationIconAsset;
+use taskforest_core::ApplicationIconFormat;
+use taskforest_core::ProcessApplicationIdentity;
+use taskforest_core::ProcessOwner;
+use taskforest_core::ProcessOwnerIdentity;
 use taskmanager_windows_api::ProcessPriorityClass;
 use taskmanager_windows_api::WindowsApiError;
 use taskmanager_windows_api::enumerate_all_process_thread_counts;

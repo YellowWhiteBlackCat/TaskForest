@@ -28,8 +28,8 @@ use bevy::ui::widget::Text;
 use bevy::ui::{IsDefaultUiCamera, UiPlugin};
 use bevy::ui_widgets::Activate;
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-use taskmanager_core::core::hardware::{CpuType, HardwareInfo};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::{CpuType, HardwareInfo};
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuPackageMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
 };
 use taskmanager_shell::fixture;

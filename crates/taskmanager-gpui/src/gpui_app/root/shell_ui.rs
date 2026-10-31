@@ -2,18 +2,16 @@
 //! completion of command-launch, resource-reveal, and URL-open intents, plus
 //! failure feedback.
 
+use taskforest_contract::{CapabilityId, OperationFailure, RequestId, SubmissionErrorKind};
 use taskmanager_application::RequestCorrelation;
 use taskmanager_application::{
     CommandLaunchRequest, CorrelatedShellEvent, RefreshRequest, RequestAttemptId,
     ResourceRevealRequest, ShellUiActionIntent, ShellUiActionReceipt, ShellUiActionState,
     UrlOpenRequest, request_submission_failure,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, OperationFailure, RequestId, SubmissionErrorKind,
-};
 
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use super::clipboard::process_failure_message;
 use super::{RootView, platform_submission_time_ms};

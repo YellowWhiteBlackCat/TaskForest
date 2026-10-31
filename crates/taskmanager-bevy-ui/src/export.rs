@@ -3,12 +3,12 @@
 //! Provides formatting helpers for multi-format process and snapshot export,
 //! delegating pure serialization to the core export engine.
 
-use taskmanager_core::core::export::{
+use taskforest_core::core::export::{
     ExportExtras, processes_to_csv, processes_to_html, snapshot_to_json,
     snapshot_to_json_with_extras,
 };
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// Format a single process item as tab-separated values (TSV).

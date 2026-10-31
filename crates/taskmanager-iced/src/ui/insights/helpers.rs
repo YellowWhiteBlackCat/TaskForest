@@ -2,11 +2,11 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics;
+use taskforest_core::core::process_telemetry;
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics;
-use taskmanager_core::core::process_telemetry;
-use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::missing_value;

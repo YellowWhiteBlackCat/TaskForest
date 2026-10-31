@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::HistoryRetention;
-use taskmanager_core::SmartAvailability;
+use taskforest_core::SmartAvailability;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 

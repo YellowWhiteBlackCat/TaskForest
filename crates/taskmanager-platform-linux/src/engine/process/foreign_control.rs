@@ -5,7 +5,7 @@
 //! feature-specific pkexec helper; identity races and unsupported operations
 //! never trigger escalation.
 
-use taskmanager_core::{FailureKind, FrozenProcessIdentity, ProcessBatchAction, ProcessSignal};
+use taskforest_core::{FailureKind, FrozenProcessIdentity, ProcessBatchAction, ProcessSignal};
 use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::{
     ForeignProcessControlFailure, ForeignProcessControlOperation, ForeignProcessControlOutcome,

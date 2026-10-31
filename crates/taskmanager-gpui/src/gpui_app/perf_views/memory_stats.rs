@@ -1,9 +1,9 @@
 //! Pure Memory-page observation projection.
 
 use crate::gpui_app::formatting::{self, missing_value};
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::memory_details::{

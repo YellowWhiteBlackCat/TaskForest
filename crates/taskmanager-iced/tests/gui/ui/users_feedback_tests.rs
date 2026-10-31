@@ -1,12 +1,12 @@
 use super::*;
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::{
     CorrelatedEvent, PlatformEffect, PlatformEventBatch, PlatformEventContext,
     SessionControlOutcome, SessionEvent,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
@@ -110,8 +110,8 @@ fn request_session_control_clears_stale_feedback_and_captures_the_target() {
 
 #[test]
 fn empty_sessions_from_a_failed_source_report_the_typed_reason() {
+    use taskforest_core::core::identity::ProviderId;
     use taskmanager_application::{RefreshRequest, SourceNotice, source_notice};
-    use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
     seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
@@ -147,8 +147,8 @@ fn empty_sessions_from_a_failed_source_report_the_typed_reason() {
 
 #[test]
 fn empty_sessions_from_an_available_source_stay_a_genuine_empty_state() {
+    use taskforest_core::core::identity::ProviderId;
     use taskmanager_application::source_notice;
-    use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
     seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));
@@ -174,8 +174,8 @@ fn empty_sessions_from_an_available_source_stay_a_genuine_empty_state() {
 
 #[test]
 fn retryable_source_state_exposes_a_page_scoped_refresh_surface() {
+    use taskforest_core::core::identity::ProviderId;
     use taskmanager_application::{RefreshRequest, source_notice};
-    use taskmanager_core::core::identity::ProviderId;
 
     let mut shell = ShellApp::new();
     seed_projection_fact(&mut shell, ProjectionSeedFact::Sessions(Some(Vec::new())));

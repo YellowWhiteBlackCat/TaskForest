@@ -9,9 +9,9 @@ use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{AlignItems, AlignSelf, FlexDirection, Node, Overflow, percent, px, rem};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::presentation::control_error_detail;
 
 use crate::input_contract::{SemanticAddress, stable_semantic_address};

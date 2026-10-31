@@ -17,17 +17,17 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use taskmanager_application::{
-    DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot,
     FailureKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus, ProviderId,
     SmartSelfTestFailure, SmartSelfTestIntent, SmartSelfTestKind, SmartSelfTestPhase,
     SmartSelfTestReport, StorageDeviceTarget,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskmanager_application::{
+    DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,
+};
 use taskmanager_platform_portable::DirectoryUsageScanner;
 use taskmanager_platform_provider::{
     DirectoryUsageProvider, FilesystemHealthProvider, SmartSelfTestControlProvider,
@@ -40,7 +40,7 @@ use taskmanager_platform_runtime::{
 use taskmanager_platform_portable::BoundedCommandError;
 
 use crate::command::run_with_timeout;
-use taskmanager_core::core::storage_health::FilesystemBackingKind;
+use taskforest_core::core::storage_health::FilesystemBackingKind;
 
 const FILESYSTEM_HEALTH_PROVIDER: ProviderId =
     ProviderId::borrowed("windows.storage.filesystem.sysinfo");

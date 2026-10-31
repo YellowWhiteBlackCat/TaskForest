@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, DeviceSourceSnapshot, RequestPort};
+use taskforest_core::core::sensors::SensorCenterSnapshot;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SensorRequest {

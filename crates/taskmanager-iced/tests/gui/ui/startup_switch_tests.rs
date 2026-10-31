@@ -4,7 +4,7 @@
 //! startup-control state change (the shared confirmation gate is armed).
 
 use super::*;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupImpact,
     StartupImpactEvidence, StartupScope, StartupSource,
 };
@@ -93,7 +93,7 @@ fn switch_toggle_arms_the_shared_startup_control_gate() {
 /// row — never the provider's entry at the same index.
 #[test]
 fn a_row_switch_requests_the_entry_of_its_own_row() {
-    use taskmanager_core::core::startup::StartupControlPolicy;
+    use taskforest_core::core::startup::StartupControlPolicy;
 
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Startup));

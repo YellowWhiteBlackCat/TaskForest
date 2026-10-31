@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::CapabilityRequest;
+use taskforest_contract::CapabilityRequest;
 
 use super::*;
 

@@ -13,8 +13,8 @@ use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::sidebar::SelectedDevice;
+use taskforest_core::core::{Alert, AlertMetric, AlertSeverity, SystemSnapshot};
 use taskmanager_application::i18n;
-use taskmanager_core::core::{Alert, AlertMetric, AlertSeverity, SystemSnapshot};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

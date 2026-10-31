@@ -32,7 +32,7 @@ use crate::input::ShellInteractionApplied;
 use crate::input::sync_search_editor;
 use crate::scene_attach::attach_child;
 use crate::window::WindowPalette;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 /// Last published selection identity, so keyboard-driven shell mutations
 /// publish the details seam only on a real identity change.

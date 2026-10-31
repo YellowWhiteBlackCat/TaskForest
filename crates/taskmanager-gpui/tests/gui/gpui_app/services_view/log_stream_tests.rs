@@ -9,15 +9,15 @@
 
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
-use taskmanager_application::ServiceDependenciesLifecycle;
-use taskmanager_application::ServiceUpdate;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
     ServiceItem, ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogStreamSnapshot,
     ServiceLogStreamState, ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::ServiceDependenciesLifecycle;
+use taskmanager_application::ServiceUpdate;
 use taskmanager_theme::Theme;
 
 const SERVICE: &str = "fixture.service:log-stream";

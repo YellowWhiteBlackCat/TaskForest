@@ -1,7 +1,7 @@
 //! Deterministic, non-destructive Users confirmation capture.
 
 use super::{CaptureEvidence, CaptureScenario};
-use taskmanager_core::core::session::{SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{SessionIncarnation, SessionItem};
 
 impl CaptureEvidence {
     pub(crate) fn session_control_confirmation_requested(&self) -> bool {

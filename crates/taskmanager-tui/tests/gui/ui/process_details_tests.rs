@@ -3,13 +3,13 @@
 //! and the verified-start wrapper) must equal the VM fold.
 use super::*;
 use std::path::PathBuf;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_application::process_details_vm::{
     DetailValue, detail_value, process_details_rows,
 };
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {

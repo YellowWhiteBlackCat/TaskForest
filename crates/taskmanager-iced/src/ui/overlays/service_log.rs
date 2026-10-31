@@ -2,11 +2,11 @@
 
 use iced::widget::{column, row, text};
 use iced::{Element, Length};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceLogAvailability, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogTimeFilter,
 };
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::i18n::t;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::tokens;

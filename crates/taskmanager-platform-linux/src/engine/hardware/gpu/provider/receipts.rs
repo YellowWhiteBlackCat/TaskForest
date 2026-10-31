@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::{FailureKind, GpuMetricField, GpuMetrics};
+use taskforest_core::{FailureKind, GpuMetricField, GpuMetrics};
 
 use super::super::GpuProviderSample;
 

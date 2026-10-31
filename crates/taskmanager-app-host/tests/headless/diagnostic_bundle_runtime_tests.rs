@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
+use taskforest_core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
-use taskmanager_core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
 
 use super::*;
 use taskmanager_application::DiagnosticBundleCompletion;

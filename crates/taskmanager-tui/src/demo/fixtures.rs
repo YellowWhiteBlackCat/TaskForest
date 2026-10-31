@@ -1,33 +1,33 @@
 //! Deterministic fixtures for TUI demo and capture scene composition.
 
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::SystemSnapshot;
+use taskforest_core::core::alerts::{
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
+};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::directory_usage::{
+    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
+    DirectoryUsageSnapshot,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::{GpuEngine, GpuEngineKind};
+use taskforest_core::core::npu::{
+    NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
+};
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
+};
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::{
     CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
 };
-use taskmanager_core::SystemSnapshot;
-use taskmanager_core::core::alerts::{
-    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
-    AlertTargetIdentity,
-};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
-    DirectoryUsageSnapshot,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind};
-use taskmanager_core::core::npu::{
-    NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
-};
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::sensors::{
-    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
-    SensorReading, SensorScale,
-};
-use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
@@ -36,7 +36,7 @@ use taskmanager_shell::fixture::{
 use crate::TuiApp;
 
 pub(super) fn seed_hotplug(shell: &mut ShellApp) {
-    use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations};
+    use taskforest_core::core::metrics::{DiskMetrics, DiskScalarObservations};
     let Some(mut snapshot) = shell.projection().snapshot.clone() else {
         return;
     };
@@ -288,7 +288,7 @@ pub(super) fn demo_boot_evidence() -> StartupBootEvidenceSnapshot {
 }
 
 pub(super) fn seed_service_log_fixture(shell: &mut ShellApp) {
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
         ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
     };
@@ -334,8 +334,8 @@ pub(super) fn seed_service_log_fixture(shell: &mut ShellApp) {
 }
 
 pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, target: &str) {
-    use taskmanager_core::core::device_state::DeviceStatus;
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::device_state::DeviceStatus;
+    use taskforest_core::core::metrics::{
         DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, SmartAvailability,
     };
     if target == "smart-missing-tool" {
@@ -398,9 +398,7 @@ pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, targe
 }
 
 pub(super) fn seed_capture_identity_matrix(processes: &mut Vec<ProcessItem>) {
-    use taskmanager_core::core::process::{
-        ProcessMetadataObservation, ProcessMetadataObservations,
-    };
+    use taskforest_core::core::process::{ProcessMetadataObservation, ProcessMetadataObservations};
     let mut p1 = ProcessItem::new(93401, "chrome-mail");
     p1.cmdline = "/usr/bin/chrome-wrapper --profile-directory=Default --app-id=abc123".into();
     p1.apply_metadata_observations(ProcessMetadataObservations {

@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_core::DeviceGeneration;
-use taskmanager_core::core::device_state::{DevicePresence, DeviceRefreshOutcome, DeviceStatus};
+use taskforest_core::DeviceGeneration;
+use taskforest_core::core::device_state::{DevicePresence, DeviceRefreshOutcome, DeviceStatus};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 

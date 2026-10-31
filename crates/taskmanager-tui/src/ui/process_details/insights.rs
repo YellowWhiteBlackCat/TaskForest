@@ -7,25 +7,25 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process_telemetry::{
+    ConnectionEndpoint, ConnectionTransport, ProcessThreadInfo, ProcessThreads,
+};
 use taskmanager_application::{
     ProcessInsightFacet, ProcessInsightUnavailable, i18n::t, project_process_resources,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process_telemetry::{
-    ConnectionEndpoint, ConnectionTransport, ProcessThreadInfo, ProcessThreads,
 };
 use taskmanager_shell::presentation::{bytes, missing_value, process_resource_rows};
 
 use crate::TuiTheme;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 mod formatting;
 pub(crate) use formatting::{
     capabilities_preview_lines_with_limit, environment_preview_lines_with_limit,
     format_engine_usage_line, format_gpu_device_row, open_files_preview_lines_with_limit,
 };
+use taskforest_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_application::ProcessAffinityState;
-use taskmanager_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_shell::presentation::{
     capabilities_summary, namespaces_summary, network_connection_counters_summary,
     sandbox_details_summary,
@@ -452,7 +452,7 @@ fn insight_unavailable(
     theme: TuiTheme,
     reason: &ProcessInsightUnavailable,
 ) -> ratatui::text::Line<'static> {
-    use taskmanager_platform_contract::SubmissionErrorKind;
+    use taskforest_contract::SubmissionErrorKind;
     let text = match reason {
         ProcessInsightUnavailable::Provider(
             FailureKind::PermissionDenied | FailureKind::RequiresEscalation,

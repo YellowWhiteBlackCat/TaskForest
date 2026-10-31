@@ -2,10 +2,10 @@
 //! menu action fan-out (signals, termination, open-file, properties).
 
 use gpui::{AppContext, Context, Entity};
-use taskmanager_application::ProcessControlRequest;
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessLiveKey, ProcessSignal,
 };
+use taskmanager_application::ProcessControlRequest;
 
 use super::{Hover, ProcMenuAction, ProcessDetailsSection, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;

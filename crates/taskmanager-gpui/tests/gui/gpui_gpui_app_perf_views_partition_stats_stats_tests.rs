@@ -1,6 +1,6 @@
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::{DiskPartitionScalarObservations, ScalarObservation};
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::{DiskPartitionScalarObservations, ScalarObservation};
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 
 use super::{PartitionUsage, partition_usage};

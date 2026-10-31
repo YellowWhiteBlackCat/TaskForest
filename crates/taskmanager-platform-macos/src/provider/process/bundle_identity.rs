@@ -15,7 +15,7 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path};
 
-use taskmanager_core::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskforest_core::{ProcessApplicationIdentity, ProcessMetadataObservation};
 
 const APP_SUFFIX: &[u8] = b".app";
 const CONTENTS_DIR: &[u8] = b"Contents";

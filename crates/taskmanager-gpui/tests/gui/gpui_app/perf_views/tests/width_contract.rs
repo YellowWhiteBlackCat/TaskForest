@@ -14,8 +14,8 @@
 use super::*;
 use crate::gpui_app::perf_views::PERF_MAIN_VIEWPORT_SELECTOR;
 use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MIN_WIDTH;
-use taskmanager_core::core::hardware::CpuType;
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn contract_page_snapshot() -> SystemSnapshot {

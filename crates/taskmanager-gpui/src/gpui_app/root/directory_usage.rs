@@ -12,7 +12,7 @@
 use taskmanager_application::DirectoryUsageRequest;
 
 use crate::gpui_app::root::RootView;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus,
     DirectoryUsageSnapshot,
 };

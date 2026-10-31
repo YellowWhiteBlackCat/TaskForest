@@ -1,13 +1,13 @@
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionState, PendingConfirmation, PlatformEffect,
     SmartControlRequest, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
-};
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 fn frozen(pid: u32, name: &str) -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(pid, name, 10, u64::from(pid) + 100)

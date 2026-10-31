@@ -6,8 +6,8 @@ use bevy::app::App;
 use bevy::ecs::observer::On;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::ResMut;
+use taskforest_core::core::power::BatteryInfo;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_shell::presentation::duration;
 
 use crate::app::ShellTrack;

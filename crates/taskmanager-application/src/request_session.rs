@@ -2,13 +2,13 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult,
 };
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 
 mod gpu_engine_rows;
 mod msr_readout;

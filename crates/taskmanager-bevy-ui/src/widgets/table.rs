@@ -26,7 +26,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
-use taskmanager_core::core::text::match_ranges_ascii_ci;
+use taskforest_core::core::text::match_ranges_ascii_ci;
 use taskmanager_shell::SortCol;
 use taskmanager_ui_contract::{IconId, PROCESS_COLUMNS, ProcessColumnSpec};
 

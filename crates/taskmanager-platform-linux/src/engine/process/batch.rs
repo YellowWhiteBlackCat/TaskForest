@@ -5,7 +5,7 @@ use std::thread;
 
 #[cfg(feature = "test-support")]
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult, execute_process_batch_with,
 };
 

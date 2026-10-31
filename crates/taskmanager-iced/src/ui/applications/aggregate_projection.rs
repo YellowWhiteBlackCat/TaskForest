@@ -4,10 +4,10 @@
 //! produces the full value/status text consumed by the Applications row and
 //! marks cells whose detail needs a tooltip when the table width clips them.
 
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::ProcessRowAggregate;
 use taskmanager_shell::presentation::{control_error_detail, optional_bytes, optional_duration};
 

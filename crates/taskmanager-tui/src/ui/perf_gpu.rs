@@ -12,8 +12,8 @@ use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Wrap};
 
+use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricUnit, gpu_chart_metric_history,
@@ -23,8 +23,8 @@ use taskmanager_ui_contract::IconId;
 
 use super::containers::{StatePanel, StatePanelKind};
 use crate::{TuiApp, TuiTheme};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsPresentation, present_gpu_engine_rows,

@@ -4,17 +4,17 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use sysinfo::Disks;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
-use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskforest_contract::DeviceSourceSnapshot;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::{DiskMetrics, ScalarObservation};
+use taskforest_core::core::source::SourceOutcome;
 
 use super::super::sources::{DiskstatsObservation, apply_smart, parse_proc_diskstats};
 use super::super::{DiskCollectionState, DiskStatsState};
 use super::inventory::{collect_storage_inventory, reconcile_storage_snapshot_identity};
 use crate::engine::smart;
-use taskmanager_core::core::smart::refresh_state;
+use taskforest_core::core::smart::refresh_state;
 
 /// Collect one storage domain refresh with sysfs as its sole discovery source.
 ///

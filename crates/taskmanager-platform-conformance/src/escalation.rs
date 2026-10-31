@@ -11,8 +11,8 @@
 //! this module consume. The assertion therefore pins the shared rule instead of
 //! reproducing it, so a drift in either consumer fails here.
 
-use taskmanager_core::FailureKind;
-use taskmanager_platform_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_core::FailureKind;
 
 /// Whether a provider failure proves the per-feature escalation seam (ADR-023,
 /// permission-model Boundary 2) can still reach the data.

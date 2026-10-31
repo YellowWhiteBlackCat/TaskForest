@@ -3,19 +3,19 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilitySnapshot, CapabilityStatus, SubmissionErrorKind,
 };
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::source::SourceOutcome;
 
 use crate::platform::{
     ProjectedSystemTelemetry, SystemTelemetryDomainState, SystemTelemetryUnavailable,
 };
-use taskmanager_core::detect_process_anomalies;
+use taskforest_core::detect_process_anomalies;
 
 /// Structured system overview projection facts for the diagnostic bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]

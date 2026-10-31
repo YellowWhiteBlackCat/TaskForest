@@ -1,7 +1,7 @@
 //! TUI guards for the shared SMART self-test confirmation.
 
-use taskmanager_core::core::smart::self_test::SmartSelfTestPhase;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::smart::self_test::SmartSelfTestPhase;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 
 use crate::TuiApp;
 

@@ -1,14 +1,14 @@
 //! Behavior tests for RAPL package power and MSR readouts authorization in Iced.
 
+use taskforest_contract::{CapabilityId, CapabilityStatus, EventSequence, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{
+    MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow, RaplPowerSnapshot,
+};
 use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, MsrReadoutRequest, PlatformEffect, PlatformEventBatch,
     PlatformEventContext, RaplPowerEvent, RaplPowerRequest,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{
-    MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow, RaplPowerSnapshot,
-};
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, EventSequence, RequestId};
 
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus::focus_id;

@@ -2,7 +2,7 @@
 
 use super::super::begin_observations;
 use crate::{TuiApp, TuiSurface};
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_shell::ShellApp;
 use taskmanager_test_support::desktop_appearance::platform;
 

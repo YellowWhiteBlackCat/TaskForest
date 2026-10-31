@@ -8,8 +8,8 @@
 use super::super::*;
 use super::{available_perf_devices, resolved_perf_device};
 use crate::test_support::temp_dir;
+use taskforest_core::core::metrics::NetworkWirelessObservations;
 use taskmanager_application::ConfigStore;
-use taskmanager_core::core::metrics::NetworkWirelessObservations;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 
@@ -80,7 +80,7 @@ fn device_visibility_preferences_filter_the_selector_rail() {
 #[test]
 fn network_subcategory_toggles_filter_by_adapter_type() {
     use crate::app::{DeviceKind, Message, SettingsChange};
-    use taskmanager_core::core::metrics::NetworkAdapterType;
+    use taskforest_core::core::metrics::NetworkAdapterType;
     let (mut app, dir) = visibility_test_app("visibility-network");
 
     // Give the fixture a VPN and a loopback interface alongside the demo NIC.

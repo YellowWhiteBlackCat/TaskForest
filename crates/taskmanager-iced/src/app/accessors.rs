@@ -7,13 +7,13 @@
 use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::perf_history::ProcessPerfHistory;
+use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_application::{
     i18n::t,
     process_details_vm::{ProcessDetailsField, detail_value, process_details_rows_with_local_time},
 };
-use taskmanager_core::core::metrics::GpuMetrics;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_shell::presentation::{MISSING_VALUE, peak_of, value_with_peak};
 use taskmanager_theme::FontAvailability;
 use taskmanager_ui_contract::SemanticSnapshot;

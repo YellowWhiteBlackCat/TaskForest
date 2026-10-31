@@ -1,6 +1,6 @@
 //! Pure application effects emitted by the reducer.
 //!
-//! Native request/event ports live in `taskmanager-platform-contract` and are
+//! Native request/event ports live in `taskforest-contract` and are
 //! composed through [`crate::PlatformHandle`]. This module intentionally
 //! contains no adapter trait and no all-capabilities supertrait.
 
@@ -12,10 +12,10 @@ use crate::platform::{
     SetupScriptRequest, SmartControlRequest, SmbiosMemoryRequest, UrlOpenRequest,
 };
 use crate::{ControlRequestId, RefreshRequest, StartupControlRequest};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity};
+use taskforest_core::core::target::ServiceId;
 
 /// Immutable service-control target captured when a destructive service action
 /// (Stop / Restart / Disable) is requested. The provider-issued id and action
@@ -90,7 +90,7 @@ pub enum PlatformEffect {
     /// `ServiceUpdate::Logs` / `LogStream` back into the batch.
     ServiceLogStream(ServiceLogStreamRequest),
     /// Deliver a desktop notification for a fired alert that passed the pure
-    /// [`taskmanager_core::alerts::NotificationGate`] (BN-07). The gate lives in the command/reducer
+    /// [`taskforest_core::alerts::NotificationGate`] (BN-07). The gate lives in the command/reducer
     /// path so every frontend gets the same cooldown/quiet-hours policy.
     DesktopNotification(DesktopNotificationRequest),
     /// Submit a directory-usage scan lifecycle request (start / resume /

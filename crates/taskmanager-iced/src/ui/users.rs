@@ -11,9 +11,9 @@ use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 // Shared locale catalog for the Users-page body chrome (column headers, action
 // buttons, Yes/No) that was previously hard-coded English.
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::session::SessionControlAction;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;

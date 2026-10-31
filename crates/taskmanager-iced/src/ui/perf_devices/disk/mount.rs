@@ -8,8 +8,8 @@
 //! keeps its bounds so the panel's other facts (the filesystem segment and
 //! the capacity row) are never pushed out of the frame.
 
+use taskforest_core::core::metrics::DiskPartition;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::DiskPartition;
 use taskmanager_theme::tokens;
 
 /// The bounded slot a partition's mount path may occupy inside its

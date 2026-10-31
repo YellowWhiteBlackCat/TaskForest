@@ -162,7 +162,7 @@ fn information_reviews_keep_all_actions_in_frame_and_scroll_only_the_body() {
 
 #[test]
 fn native_boot_observes_desktop_appearance_once_and_information_uses_the_response() {
-    use taskmanager_core::core::appearance::{
+    use taskforest_core::core::appearance::{
         DesktopAppearance, DesktopFamily, PreferredColorScheme,
     };
     use taskmanager_test_support::desktop_appearance::platform;

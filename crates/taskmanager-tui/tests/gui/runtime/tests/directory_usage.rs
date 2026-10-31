@@ -7,12 +7,12 @@
 
 use super::super::*;
 
-use taskmanager_application::PlatformClient;
-use taskmanager_application::{AppAction, AppPage, DirectoryUsageRequest};
-use taskmanager_core::core::directory_usage::{
+use taskforest_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
     DirectoryUsageSnapshot,
 };
+use taskmanager_application::PlatformClient;
+use taskmanager_application::{AppAction, AppPage, DirectoryUsageRequest};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::queue_effect;
 
@@ -117,11 +117,11 @@ fn d_on_cpu_device_yields_nothing() {
 #[test]
 fn directory_scan_round_trips_through_queue_effect_to_the_provider() {
     use std::sync::{Arc, Mutex};
-    use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle, StorageFacets};
-    use taskmanager_platform_contract::{
+    use taskforest_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
         RequestEnvelope, RequestPort, SubmissionError,
     };
+    use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle, StorageFacets};
 
     #[derive(Default)]
     struct EmptyCapabilities;

@@ -511,8 +511,8 @@ fn health_controls_keep_measured_bounds_and_reject_a_replaced_physical_disk() {
         DashboardControl, DashboardControlButton, SystemDashboardState,
     };
     use crate::pages::system::health::HealthSelfTest;
+    use taskforest_core::core::identity::DeviceGeneration;
     use taskmanager_application::system_timeline::SystemPageSection;
-    use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_shell::fixture::health::seed_shell_health;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     use taskmanager_shell::presentation::health_review::HealthReviewSection;
@@ -763,8 +763,8 @@ fn native_navigation_toggle_keeps_route_and_content_within_the_remaining_viewpor
 #[test]
 fn application_table_measures_complete_rows_and_keeps_the_footer_inside_every_window() {
     use crate::pages::processes::{ProcessRowLink, ProcessRowsRoot, ProcessScrollState};
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     pin_english();
     for (width, height) in [(480, 360), (720, 480), (1280, 720), (1600, 400), (720, 960)] {

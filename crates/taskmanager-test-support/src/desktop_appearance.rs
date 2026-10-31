@@ -2,15 +2,15 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use taskmanager_application::{
-    DesktopAppearanceEvent, DesktopAppearanceRequest, IntegrationFacets, PlatformClient,
-    PlatformEvent, PlatformFacets, PlatformHandle,
-};
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     CompositeSourceSnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
     RequestEnvelope, RequestPort, SubmissionError, SubmissionErrorKind,
+};
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskmanager_application::{
+    DesktopAppearanceEvent, DesktopAppearanceRequest, IntegrationFacets, PlatformClient,
+    PlatformEvent, PlatformFacets, PlatformHandle,
 };
 
 #[derive(Clone, Default)]

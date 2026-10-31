@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::{DeviceGeneration, DevicePresence, ScalarAvailability};
+use taskforest_core::{DeviceGeneration, DevicePresence, ScalarAvailability};
 
 fn trusted_adapter(identity: &str, brand: &str) -> MacGpuAdapter {
     MacGpuAdapter {

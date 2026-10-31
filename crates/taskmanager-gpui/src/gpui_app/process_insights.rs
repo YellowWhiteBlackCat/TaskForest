@@ -6,8 +6,8 @@
 //! the responsive Properties body. The test-only worker exercises the same
 //! capacity-one latest-request semantics without a native provider.
 
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::ProjectedProcessInsights;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 pub(crate) mod view;
 

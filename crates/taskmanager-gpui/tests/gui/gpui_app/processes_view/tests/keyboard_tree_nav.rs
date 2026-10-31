@@ -15,9 +15,9 @@
 //! can lag a count change by one frame, hence the double draw there.
 
 use super::*;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

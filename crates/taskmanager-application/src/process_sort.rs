@@ -6,9 +6,9 @@
 //! live here exactly once: every frontend maps its column enum onto
 //! [`crate::process_sort::ProcessSortAxis`] with a compiler-exhaustive match and delegates the
 //! comparison. CPU uses
-//! [`taskmanager_core::core::process::ProcessItem::current_cpu_percentage`] with total
+//! [`taskforest_core::core::process::ProcessItem::current_cpu_percentage`] with total
 //! `f32` ordering; memory sorts resident RSS through
-//! [`taskmanager_core::core::process::ProcessItem::current_memory_bytes`]; text uses the shared ASCII
+//! [`taskforest_core::core::process::ProcessItem::current_memory_bytes`]; text uses the shared ASCII
 //! case-insensitive comparator; every optional scalar sorts as `Option`; and
 //! PID is the direction-independent tie-break.
 //!
@@ -19,12 +19,12 @@
 //! measurement kinds (RSS vs PSS vs swap) never stand in for each other.
 //!
 //! Everything here is toolkit-neutral, allocation-free, and panic-free; it
-//! depends only on [`taskmanager_core::core::process::ProcessItem`] and the shared text comparator.
+//! depends only on [`taskforest_core::core::process::ProcessItem`] and the shared text comparator.
 
 use std::cmp::Ordering;
 
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::text::cmp_ascii_ci;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::text::cmp_ascii_ci;
 
 /// One sortable projection of a [`ProcessItem`] — the neutral vocabulary every
 /// frontend's column enum maps onto. Each variant documents the field it reads

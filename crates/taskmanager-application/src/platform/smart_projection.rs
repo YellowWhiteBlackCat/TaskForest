@@ -5,8 +5,8 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::system_health::SmartSelfTestObservation;
 
 use super::{SmartObservationBatch, SmartStateRevision};
 

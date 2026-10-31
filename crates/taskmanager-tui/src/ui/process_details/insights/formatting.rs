@@ -2,9 +2,9 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
+use taskforest_core::core::process_telemetry::{ProcessGpuDevice, ProcessGpuEngineUsage};
 use taskmanager_application::ProjectedProcessResources;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process_telemetry::{ProcessGpuDevice, ProcessGpuEngineUsage};
 use taskmanager_shell::presentation::{bytes, format_open_files_saturation, missing_value};
 
 use crate::TuiTheme;
@@ -141,7 +141,7 @@ pub(crate) fn capabilities_preview_lines_with_limit(
     out
 }
 
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::{
     OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
 };
 /// Compact open-file row: `fd [kind] → target`. A descriptor whose readlink failed

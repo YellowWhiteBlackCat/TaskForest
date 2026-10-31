@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use taskmanager_core::{DeviceGeneration, DeviceId, DiskMetrics, DiskScalarObservations};
+use taskforest_core::{DeviceGeneration, DeviceId, DiskMetrics, DiskScalarObservations};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct DiskScalarKey {

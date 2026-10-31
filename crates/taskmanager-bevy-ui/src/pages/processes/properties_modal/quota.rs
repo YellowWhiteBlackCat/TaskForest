@@ -14,11 +14,11 @@ use bevy::ui::widget::Text;
 use crate::icons::icon_scene;
 use crate::palette::{UiPalette, space_4, space_8, space_24, theme_color};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskforest_core::core::LimitValue;
 use taskmanager_application::{
     ProcessInsightFacetState, ProjectedProcessInsights, ProjectedProcessResources, i18n::t,
     project_process_resources,
 };
-use taskmanager_core::core::LimitValue;
 use taskmanager_shell::presentation::bytes;
 use taskmanager_ui_contract::IconId;
 

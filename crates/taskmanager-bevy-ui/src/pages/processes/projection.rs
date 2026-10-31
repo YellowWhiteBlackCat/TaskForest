@@ -5,9 +5,9 @@
 //! while painting. The projection is deliberately independent of Bevy scene
 //! types so the same behavior can be tested without a window.
 
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, bytes, optional_cpu_time_seconds, optional_nice, process_anomaly_summary,
     start_clock_local, uninterruptible_process_summary,

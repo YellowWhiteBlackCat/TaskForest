@@ -6,14 +6,14 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
-use taskmanager_core::core::system_health::{SmartSelfTestIntent, SmartSelfTestObservation};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, CompositeSourceSnapshot, RequestPort, RequestScope,
     RequestTracking, RequestTrackingError,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
+use taskforest_core::core::system_health::{SmartSelfTestIntent, SmartSelfTestObservation};
 
 use crate::DirectoryUsageRequestPort;
 

@@ -1,12 +1,12 @@
 //! Canonical category-tree render tests.
 
 use super::frame_text;
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation, ProcessScalarObservations,
 };
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
 

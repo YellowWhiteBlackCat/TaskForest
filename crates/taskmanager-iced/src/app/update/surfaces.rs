@@ -4,9 +4,9 @@
 //! primary surface. Payload editing remains in its domain state (affinity,
 //! run-task, first-run); visibility and input ownership never do.
 
+use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::{PlatformEffect, RefreshRequest, UrlOpenRequest};
 use taskmanager_assets::product::REPOSITORY_URL;
-use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_shell::presentation::system_information::groups;
 
 use super::super::{IcedApp, LocalSurface, LocalSurfaceKind, Message};

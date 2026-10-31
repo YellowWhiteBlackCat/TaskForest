@@ -3,8 +3,8 @@
 
 use super::super::*;
 
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_application::AppAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::queue_effect;
 
@@ -135,12 +135,12 @@ fn session_confirmation_n_dismisses_without_a_platform_effect() {
 #[test]
 fn session_control_round_trip_submits_through_queue_effect() {
     use std::sync::{Arc, Mutex};
-    use taskmanager_application::{
-        EnvironmentFacets, PlatformEvent, PlatformFacets, PlatformHandle, SessionControlRequest,
-    };
-    use taskmanager_platform_contract::{
+    use taskforest_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
         RequestEnvelope, RequestPort, SubmissionError,
+    };
+    use taskmanager_application::{
+        EnvironmentFacets, PlatformEvent, PlatformFacets, PlatformHandle, SessionControlRequest,
     };
 
     #[derive(Default)]

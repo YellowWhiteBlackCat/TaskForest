@@ -5,10 +5,10 @@
 //! surface.
 
 use super::*;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary, IsolationKind};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary, IsolationKind};
 
 fn populated_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);

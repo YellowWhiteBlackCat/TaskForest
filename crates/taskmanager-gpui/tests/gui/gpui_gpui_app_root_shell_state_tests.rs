@@ -1,11 +1,11 @@
 use super::*;
 use gpui::AppContext;
 use std::collections::HashSet;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{LatestControlRequest, ServiceControlOutcome};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
 use taskmanager_theme::Theme;
@@ -141,7 +141,7 @@ fn table_sort_events_map_verbatim_onto_the_shell_sorts(cx: &mut gpui::TestAppCon
 /// provider id), and errors render as copy — never a raw debug blob.
 #[gpui::test]
 fn services_feedback_folds_the_typed_outcome_into_localized_copy(cx: &mut gpui::TestAppContext) {
-    use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+    use taskforest_core::core::services::{ServiceItem, ServiceStatus};
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _| {
         assert!(view.services_feedback().is_none());

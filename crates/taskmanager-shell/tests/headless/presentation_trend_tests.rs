@@ -1,7 +1,7 @@
 //! Behavior tests for the shell trend projections (ADR-027 behavior seam).
 
 use crate::presentation::trend;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, MemoryMetrics,
     MemoryScalarObservations, MemoryTelemetryObservation, ScalarObservation,
     ScalarObservationGroup,

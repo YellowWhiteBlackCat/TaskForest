@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceLifecycle, DeviceStatus, FailureKind, ProviderId, ProviderRuntimeState,
     SourceOutcome, SourceStatus,
 };
@@ -27,7 +27,7 @@ pub(crate) use host::LinuxHostTelemetryCollector;
 pub(crate) use memory::LinuxMemoryTelemetryCollector;
 pub(crate) use network::LinuxNetworkTelemetryCollector;
 pub(crate) use storage::LinuxStorageTelemetryCollector;
-use taskmanager_core::DeviceLifecycleRegistry;
+use taskforest_core::DeviceLifecycleRegistry;
 
 /// Uniform synchronous boundary used by the six independent provider lanes.
 ///

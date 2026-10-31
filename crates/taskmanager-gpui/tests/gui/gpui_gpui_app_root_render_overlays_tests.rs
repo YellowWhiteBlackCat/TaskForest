@@ -1,7 +1,7 @@
 use super::*;
 use crate::gpui_app::root::TopPage;
 use std::time::{Duration, Instant};
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 
 #[gpui::test]

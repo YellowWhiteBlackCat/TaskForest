@@ -27,10 +27,10 @@ use crate::gpui_app::root::responsive::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskforest_core::core::DirectoryUsageSnapshot;
+use taskforest_core::core::metrics::{DiskMetrics, NetworkAdapterType, SystemSnapshot};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::DirectoryUsageSnapshot;
-use taskmanager_core::core::metrics::{DiskMetrics, NetworkAdapterType, SystemSnapshot};
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 
 mod directory_usage;

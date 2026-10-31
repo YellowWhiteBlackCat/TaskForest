@@ -21,20 +21,20 @@ use bevy::ecs::query::With;
 use bevy::text::TextColor;
 use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, Node};
-use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
-    StartupEvent, SystemFacets,
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupEntry,
     StartupEntryId, StartupEntryLocator, StartupFailedUnit, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource, StartupTimelineSnapshot,
 };
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
-    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+use taskmanager_application::i18n::t;
+use taskmanager_application::{
+    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    StartupEvent, SystemFacets,
 };
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;

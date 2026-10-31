@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 /// The full composition edge must construct headlessly on real Windows:
 /// all eight lane groups spawn and the handle reports capabilities from

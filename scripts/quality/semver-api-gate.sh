@@ -13,7 +13,7 @@
 # `SEMVER_BASELINE_REV` (default: `origin/main`). The revision must resolve
 # in the local clone; fetch the missing history first (`git fetch origin`).
 #
-# Local triage: `SEMVER_ONLY="taskmanager-core taskmanager-ipc"` restricts the
+# Local triage: `SEMVER_ONLY="taskforest-core taskforest-ipc"` restricts the
 # run to the named packages. It exists so a maintainer can reproduce a single
 # failure without rebuilding all publishable crates; CI never sets it.
 #

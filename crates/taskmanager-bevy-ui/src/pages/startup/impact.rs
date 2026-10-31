@@ -21,7 +21,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, px, rem,
 };
 use bevy::ui::widget::Text;
-use taskmanager_core::core::startup::StartupImpact;
+use taskforest_core::core::startup::StartupImpact;
 
 use super::inks::{InkRole, StartupInk};
 use super::tinted;

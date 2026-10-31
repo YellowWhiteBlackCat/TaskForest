@@ -1,12 +1,12 @@
 //! Pure text projections for Performance rail cards.
 
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{
     CpuMetrics, DiskMetrics, GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics,
 };
-use taskmanager_core::core::power::BatteryInfo;
-use taskmanager_core::core::sensors::SensorReading;
+use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::sensors::SensorReading;
+use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_shell::presentation::{

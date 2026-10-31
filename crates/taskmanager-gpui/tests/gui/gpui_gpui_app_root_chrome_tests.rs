@@ -7,16 +7,16 @@ use super::{
     COMMAND_FIELDS, OVERVIEW_FIELDS, ProcessDetailsField, kv_label_value, missing_value,
     properties_unit_preferences, vm_display, vm_rows,
 };
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
+use taskforest_core::core::process::process_ancestor_lineage;
+use taskforest_core::core::time::LocalTimeRules;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
-use taskmanager_core::core::process::process_ancestor_lineage;
-use taskmanager_core::core::time::LocalTimeRules;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::start_clock_local;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
@@ -25,8 +25,8 @@ use taskmanager_test_support::ProcessItemFixtureBuilder;
 /// exactly the VM's values (behavior parity, not source text).
 #[test]
 fn overview_and_command_rows_mirror_the_neutral_vm() {
+    use taskforest_core::core::metrics::ScalarObservation;
     use taskmanager_application::process_details_vm::{DetailValue, detail_value};
-    use taskmanager_core::core::metrics::ScalarObservation;
 
     let mut item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
         .pid(4242)
@@ -104,8 +104,8 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
 /// `0 B`.
 #[test]
 fn memory_breakdown_rows_render_every_narrowed_facet() {
+    use taskforest_core::core::metrics::ScalarObservation;
     use taskmanager_application::process_details_vm::{DetailValue, detail_value};
-    use taskmanager_core::core::metrics::ScalarObservation;
 
     let mut item = ProcessItemFixtureBuilder::from_item(ProcessItem::default())
         .pid(4242)
@@ -269,7 +269,7 @@ fn process_ancestor_lineage_renders_in_overview_and_handles_root() {
 
 #[test]
 fn observed_fault_and_huge_page_counters_reach_the_overview_rows() {
-    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::metrics::ScalarObservation;
 
     let mut process = ProcessItem::new(77, "faulty");
     process.minor_page_faults = Some(1_234);

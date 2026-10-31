@@ -1,8 +1,8 @@
 use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext};
-use taskmanager_core::core::DeviceId;
-use taskmanager_core::core::HistoryMetric;
+use taskforest_core::core::DeviceId;
+use taskforest_core::core::HistoryMetric;
 use taskmanager_theme::Theme;
 
 #[test]
@@ -52,9 +52,9 @@ async fn real_replay_keeps_toolbar_and_viewport_bounds_and_reaches_last_curve(
 ) {
     use gpui::{Keystroke, VisualTestContext, px, size};
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+    use taskforest_core::core::history::ApplicationHistoryIdentity;
+    use taskforest_core::core::time::LocalTimeRulesObservation;
     use taskmanager_app_host::NativeAppHost;
-    use taskmanager_core::core::history::ApplicationHistoryIdentity;
-    use taskmanager_core::core::time::LocalTimeRulesObservation;
     let root = crate::test_support::scratch_dir("history-review-layout");
     let history = root.join("history");
     std::fs::create_dir_all(&history).expect("private history directory");

@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
-use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
-use taskmanager_core::{
+use taskforest_contract::{CapabilityId, DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceRefreshOutcome, SensorCenterSnapshot,
     SensorLifecycleTracker,
 };
-use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, ProviderFailure};
+use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
 
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,

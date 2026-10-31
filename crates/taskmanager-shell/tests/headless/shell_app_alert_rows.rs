@@ -1,14 +1,14 @@
 use std::time::Duration;
 
-use taskmanager_application::{
-    AlertEventSeed, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
-};
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
 };
-use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+use taskforest_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+use taskmanager_application::{
+    AlertEventSeed, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
+};
 
 use crate::app::ShellApp;
 use crate::app::alert_rows::{AlertRowFamily, AlertRowId};

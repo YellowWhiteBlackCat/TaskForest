@@ -1,9 +1,9 @@
 //! CPU all-facts composition and short-terminal core viewport behavior.
 
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuTemperatureSource, ScalarObservation, ScalarObservationGroup,
 };
+use taskmanager_application::{AppAction, AppPage};
 
 use super::frame_text;
 use taskmanager_shell::fixture::{edit_snapshot, record_demo_history_frame};

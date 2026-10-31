@@ -12,7 +12,7 @@
 use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
 use crate::gpui_app::processes_view::{effective_process_hidden_cols, effective_process_sort_col};
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::ProcessControlAvailability;
 use taskmanager_shell::{
     InfoSortCol, InfoTable, ProcessRowId, ProcessStatusFilter, SortCol, SortDir,

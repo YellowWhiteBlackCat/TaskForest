@@ -1,9 +1,9 @@
 use super::*;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_test_support::{DiskMetricsFixtureBuilder, pin_english};

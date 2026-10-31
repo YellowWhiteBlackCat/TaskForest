@@ -8,7 +8,7 @@
 //! Applications subtitle counts as `proc.d_state`), and it is read from the
 //! live process facts — never from a synthetic renderer flag.
 
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::ShellApp;
 
 /// Whether one process is in the platform's "not responding" state.

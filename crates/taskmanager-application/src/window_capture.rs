@@ -7,7 +7,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use taskmanager_platform_contract::{WindowCaptureBackend, WindowCaptureFailureKind};
+use taskforest_contract::{WindowCaptureBackend, WindowCaptureFailureKind};
 
 pub const MAX_WINDOW_CAPTURE_ERROR_CHARS: usize = 512;
 

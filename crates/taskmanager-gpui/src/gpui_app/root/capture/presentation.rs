@@ -4,8 +4,8 @@ use super::state::SurfacePresentation;
 use crate::gpui_app::root::{RootView, TopPage, WindowSurfaceKind};
 use crate::gpui_app::sidebar::SelectedDevice;
 use gpui::{Context, Window};
+use taskforest_core::core::device_state::DeviceStatus;
 use taskmanager_application::PendingConfirmation;
-use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_shell::presentation::effective_smart_status;
 
 fn ready(view: &RootView) -> bool {

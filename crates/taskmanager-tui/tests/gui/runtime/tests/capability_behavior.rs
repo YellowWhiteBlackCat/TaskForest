@@ -12,9 +12,9 @@ use ratatui::crossterm::event::{
 };
 use ratatui::layout::Rect;
 use std::time::Duration;
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::SortCol;
 
 use crate::{TuiApp, TuiTheme, render};

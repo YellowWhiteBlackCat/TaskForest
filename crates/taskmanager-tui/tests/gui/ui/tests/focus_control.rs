@@ -9,8 +9,8 @@
 //! re-testing the key flow itself.
 
 use ratatui::layout::Rect;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppAction, AppPage, ConfirmationKind, SurfaceKind};
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::TuiApp;
 use crate::ui::frame_plan::{TuiFocusControl, TuiFocusTarget, TuiFramePlan};

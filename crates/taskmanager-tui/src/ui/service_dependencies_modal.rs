@@ -5,13 +5,13 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskforest_core::core::services::{ServiceDeps, ServiceRelationKind};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
 use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};
 use crate::{ServiceDependenciesTarget, TuiApp, TuiTheme};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::target::ServiceId;
 
 /// Render the service dependencies modal overlay.
 pub(super) fn render_service_dependencies_at(

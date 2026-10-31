@@ -2,21 +2,21 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crossbeam_channel::bounded;
+use taskforest_contract::{CapabilityId, CapabilityScheduler, EventPort, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::{CpuMetrics, CpuTelemetryObservation, FrozenProcessIdentity};
 use taskmanager_application::{
     PlatformEvent, ProcessEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::{CpuMetrics, CpuTelemetryObservation, FrozenProcessIdentity};
-use taskmanager_platform_contract::{CapabilityId, CapabilityScheduler, EventPort, RequestId};
 
 use super::event_queue::EventQueueState;
 use super::worker::{WorkerQuota, WorkerRuntime};
 use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPublisher, spawn_lane};
 use crate::Queued;
 use crate::config::{CapabilityRoute, DeliveryClass, RuntimeBudgets, RuntimeDomain};
-use taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES;
-use taskmanager_platform_contract::RequestTracking;
-use taskmanager_platform_contract::SidebandPolicy;
+use taskforest_contract::MAX_REQUEST_SCOPE_BYTES;
+use taskforest_contract::RequestTracking;
+use taskforest_contract::SidebandPolicy;
 
 fn fixed_clock() -> u64 {
     42

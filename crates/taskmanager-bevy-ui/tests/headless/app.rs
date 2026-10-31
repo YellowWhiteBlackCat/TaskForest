@@ -20,14 +20,14 @@ use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::query::With;
 use bevy::input::keyboard::KeyCode;
 use bevy::ui_widgets::{Activate, SelectedTab, ValueChange};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SystemFacets,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_theme::tokens::UiSize;
 

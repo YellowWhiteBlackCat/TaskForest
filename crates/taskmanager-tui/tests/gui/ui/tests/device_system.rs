@@ -1,11 +1,11 @@
 //! System-page storage, locale, and diagnostic export render tests.
 
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::{
     PressureWindow, ResourcePressure, SystemPressureSnapshot, SystemSnapshot,
 };
+use taskmanager_application::{AppAction, AppPage};
 
 use super::frame_text;
 use taskmanager_application::i18n::{Language, set_language, t};
@@ -262,7 +262,7 @@ fn system_storage_section_follows_the_active_locale() {
 
 #[test]
 fn system_sections_include_smbios_memory_slots_when_provided() {
-    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
+    use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
 
     let smbios = SmbiosMemorySnapshot {
         slots_total: 4,
@@ -302,7 +302,7 @@ fn system_sections_include_smbios_memory_slots_when_provided() {
 
 #[test]
 fn diagnostic_failure_feedback_keys_stay_localized_and_keep_paths_private() {
-    use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+    use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
     use taskmanager_shell::presentation::diagnostics::{
         diagnostic_failure_feedback_key, diagnostic_failure_message,
     };

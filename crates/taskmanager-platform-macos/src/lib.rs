@@ -51,7 +51,7 @@ pub mod instance;
 pub use config::{system_daemon_history_dir, user_config_path, user_history_dir};
 pub use provider::capability_surface;
 pub use provider::{MacOsProviderRegistry, MacOsProviderRegistryParams};
-use taskmanager_core::core::time::unix_millis;
+use taskforest_core::core::time::unix_millis;
 
 fn wall_clock_ms() -> u64 {
     unix_millis(std::time::SystemTime::now())

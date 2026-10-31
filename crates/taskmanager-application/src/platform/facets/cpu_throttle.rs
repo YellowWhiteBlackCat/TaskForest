@@ -9,9 +9,9 @@
 //! One request = exactly one bounded sysfs read; request pacing belongs to the
 //! frontend.
 
-use taskmanager_core::CpuThrottleSnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::CpuThrottleSnapshot;
 
 /// One CPU thermal-throttle trigger-counter read for the host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

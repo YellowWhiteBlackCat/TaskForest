@@ -14,15 +14,15 @@ use std::sync::{Arc, Mutex};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    EventSequence, RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     AppAction, AppPage, CorrelatedEvent, PlatformEffect, PlatformEvent, PlatformEventBatch,
     PlatformFacets, ProcessAffinityEvent, ProcessAffinityRequest, ProcessFacets,
-};
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    EventSequence, RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 use crate::render;

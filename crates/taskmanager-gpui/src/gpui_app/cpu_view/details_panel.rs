@@ -16,10 +16,10 @@ use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
+use taskforest_core::core::hardware::{CoreBreakdown, HardwareInfo};
+use taskforest_core::core::metrics::{CpuMetrics, SystemSnapshot};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
-use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Length, Theme};
 use taskmanager_ui::data::key_value_row::KeyValueRow;

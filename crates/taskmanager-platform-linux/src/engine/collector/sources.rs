@@ -1,7 +1,7 @@
 //! Linux/procfs/sysfs source adapters used by the collector.
 
 use super::*;
-use taskmanager_core::core::smart::DiskSmart;
+use taskforest_core::core::smart::DiskSmart;
 
 const DISKSTATS_PROVIDER: ProviderId = ProviderId::borrowed("linux.storage.proc.diskstats");
 

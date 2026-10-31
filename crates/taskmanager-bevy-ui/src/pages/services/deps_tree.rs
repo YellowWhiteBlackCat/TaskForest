@@ -35,9 +35,9 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 
+use taskforest_core::core::services::{ServiceDeps, ServiceRelationKind};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{ServiceDeps, ServiceRelationKind};
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::IconId;
 

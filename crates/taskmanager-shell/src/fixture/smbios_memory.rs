@@ -1,10 +1,10 @@
 //! Synthetic hardware-review facts, accepted through the shared request session.
 
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
 use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, SmbiosMemoryEvent,
 };
-use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use crate::{DirectTrackState, ShellApp};
 

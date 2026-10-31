@@ -1,24 +1,24 @@
 use super::{MenuControlRequest, menu_control_submission};
 use gpui::AppContext;
 use std::sync::{Arc, Mutex};
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessScalarObservations;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_theme::Theme;
 
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessSignal;
 use taskmanager_application::{
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessControlRequest,
     ProcessFacets, TelemetryRefreshPolicy,
-};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessSignal;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
 };
 
 struct NoCapabilities;

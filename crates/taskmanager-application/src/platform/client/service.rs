@@ -1,7 +1,7 @@
 //! Service-axis request submission on `PlatformClient`: inventory,
 //! dependencies, control, and log snapshot/stream.
 
-use taskmanager_platform_contract::{RequestId, SubmissionError};
+use taskforest_contract::{RequestId, SubmissionError};
 
 use crate::platform::{
     ServiceControlRequest, ServiceDependenciesRequest, ServiceInventoryRequest,

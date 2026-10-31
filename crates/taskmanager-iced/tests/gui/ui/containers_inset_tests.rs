@@ -3,8 +3,8 @@
 //! block's projection never fabricates members it could not enumerate.
 
 use super::*;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_theme::color::Color;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::fonts::ResolvedFonts;

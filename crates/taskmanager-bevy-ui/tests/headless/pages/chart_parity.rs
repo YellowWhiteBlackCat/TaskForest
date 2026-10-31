@@ -301,9 +301,9 @@ fn the_npu_card_carries_its_own_realtime_curve() {
     // usage history: two observed inventories make a real trend, and an
     // unobserved accelerator makes no curve at all.
     use crate::pages::performance::curve_samples;
-    use taskmanager_core::core::DeviceGeneration;
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+    use taskforest_core::core::DeviceGeneration;
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::npu::{NpuDevice, NpuInventorySnapshot};
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
     assert!(

@@ -1,8 +1,8 @@
 use super::*;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, process_category};
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, process_category};
 use taskmanager_test_support::{
     category_fixture_with_empty_bucket, mixed_availability_category_fixture,
 };

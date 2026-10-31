@@ -12,15 +12,15 @@ use std::process::Command;
 use std::time::Duration;
 
 use sysinfo::System;
-use taskmanager_core::core::cpu_features::CpuInstructionFeature;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::hardware::{
+use taskforest_contract::CompositeSourceSnapshot;
+use taskforest_core::core::cpu_features::CpuInstructionFeature;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::hardware::{
     ComputeTopology, CoreBreakdown, CpuIdentity, CpuType, FirmwareInfo, HardwareInfo, HostIdentity,
     KernelInfo,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::CompositeSourceSnapshot;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_portable::run_with_timeout;
 
 use super::display;
@@ -39,9 +39,9 @@ use system_info::{
     detect_window_manager, detect_window_manager_version, normalize_desktop_environment,
     normalize_optional_text, normalize_virtual_terminal,
 };
-use taskmanager_core::DisplayInfo;
-use taskmanager_core::KernelLogEntry;
-use taskmanager_core::KernelLogPriority;
+use taskforest_core::DisplayInfo;
+use taskforest_core::KernelLogEntry;
+use taskforest_core::KernelLogPriority;
 
 const SYSTEM_PROVIDER: &str = "linux.hardware.system";
 const KERNEL_PROVIDER: &str = "linux.hardware.kernel";

@@ -2,18 +2,18 @@
 
 use std::time::Instant;
 
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{
+    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuTelemetryObservation,
+    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
+    ProviderId, StorageTelemetryObservation,
+};
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
     GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
     MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
     SmbiosMemoryRequest, StorageTelemetryRequest,
 };
-use taskmanager_core::{
-    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuTelemetryObservation,
-    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
-    ProviderId, StorageTelemetryObservation,
-};
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
     GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
-use taskmanager_core::{ApplicationHistoryIdentity, HistoryMetric, HistoryWindow};
+use taskforest_core::{ApplicationHistoryIdentity, HistoryMetric, HistoryWindow};
 
 use crate::{HistoryReplayError, HistoryReplayRequestId, HistoryReplayRow};
 

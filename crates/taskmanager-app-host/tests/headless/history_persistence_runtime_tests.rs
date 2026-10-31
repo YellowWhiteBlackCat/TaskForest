@@ -1,8 +1,8 @@
 use std::sync::{Arc, Barrier};
 use std::time::{Duration, Instant};
 
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
-use taskmanager_core::{HistoricalSample, HistoryRecordSink};
+use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
+use taskforest_core::{HistoricalSample, HistoryRecordSink};
 use taskmanager_history_store::HistoryQuery;
 
 use super::{

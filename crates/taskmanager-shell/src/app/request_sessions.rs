@@ -4,6 +4,11 @@
 //! accepts only terminals matching the active application-owned session and
 //! removes stale or duplicate terminals before any renderer sees them.
 
+use taskforest_contract::{CapabilityId, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::{
     GpuEngineRowsEvent, GpuEngineRowsSession, GpuEngineRowsState, MsrReadoutEvent,
     MsrReadoutSession, MsrReadoutState, NetworkEscalationSession, NetworkEscalationState,
@@ -13,11 +18,6 @@ use taskmanager_application::{
     SmartSelfTestSession, SmartSelfTestState, SmbiosMemoryEvent, SmbiosMemorySession,
     SmbiosMemoryState,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 use super::{BatchFoldOutput, ShellApp};
 use taskmanager_application::ProcessAffinityReady;

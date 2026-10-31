@@ -1,7 +1,7 @@
 //! The per-NPU Performance-page detail panel for the Iced frontend.
 
 use super::*;
-use taskmanager_core::core::npu::{NpuDevice, NpuEngineKind};
+use taskforest_core::core::npu::{NpuDevice, NpuEngineKind};
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_shell::viewmodel::StatRow;
 

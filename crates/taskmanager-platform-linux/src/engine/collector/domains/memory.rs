@@ -6,7 +6,7 @@
 use std::time::Instant;
 
 use sysinfo::System;
-use taskmanager_core::{MemoryMetrics, MemoryTelemetryObservation};
+use taskforest_core::{MemoryMetrics, MemoryTelemetryObservation};
 
 use super::{LinuxSystemDomainCollector, SourceQuality, source_quality};
 use crate::engine::collector::compute::collect_memory;

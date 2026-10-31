@@ -5,7 +5,7 @@ use crate::{
     ApplicationHistoryCapability, ApplicationHistoryStatus, ApplicationHistoryUnavailableReason,
     HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
 };
-use taskmanager_core::core::history::{
+use taskforest_core::core::history::{
     ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey, HistoryWindow,
 };
 

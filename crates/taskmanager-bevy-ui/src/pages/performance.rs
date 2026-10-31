@@ -47,12 +47,12 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 use bevy::window::{PrimaryWindow, Window};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
     MemoryMetrics, MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation,
 };
-use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;

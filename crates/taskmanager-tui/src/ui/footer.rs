@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 
 use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
-use taskmanager_core::core::alerts::AlertSeverity;
+use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_shell::{FeedbackSource, FeedbackTone};
 
 pub(super) fn render(

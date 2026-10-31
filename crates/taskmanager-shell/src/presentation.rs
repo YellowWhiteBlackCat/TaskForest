@@ -5,19 +5,19 @@
 
 use std::collections::BTreeSet;
 
-use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bindings, i18n};
-use taskmanager_core::ServiceId;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{
+use taskforest_core::ServiceId;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{
     DiskMetrics, GpuMetrics, SmartAvailability, SmbiosMemorySnapshot,
 };
-use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
-use taskmanager_core::core::services::{
+use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
+use taskforest_core::core::services::{
     ServiceItem, detect_ordering_cycles, detect_requirement_cycles,
 };
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bindings, i18n};
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
 pub mod about;
@@ -47,8 +47,8 @@ pub use cpu::*;
 pub use network::*;
 pub use process::*;
 pub use storage::*;
+use taskforest_core::core::metrics::ResourcePressure;
 use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
-use taskmanager_core::core::metrics::ResourcePressure;
 pub use telemetry::*;
 
 /// Stable service IDs participating in an observed ordering or strict

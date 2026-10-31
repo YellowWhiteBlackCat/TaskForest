@@ -1,7 +1,7 @@
 //! Memory statistics rows for the Iced Performance overview.
 
+use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_shell::viewmodel::StatRow;
 
 use crate::ui::format::memory_text_pref;

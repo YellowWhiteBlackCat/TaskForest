@@ -24,10 +24,10 @@ use std::thread::{self, JoinHandle};
 #[cfg(windows)]
 use std::time::Duration;
 
+use taskforest_contract::{TrayController, TrayFailure};
 #[cfg(windows)]
-use taskmanager_core::tray::TrayActionId;
-use taskmanager_core::tray::{TrayEvent, TraySpec};
-use taskmanager_platform_contract::{TrayController, TrayFailure};
+use taskforest_core::tray::TrayActionId;
+use taskforest_core::tray::{TrayEvent, TraySpec};
 #[cfg(windows)]
 use taskmanager_tray_muda::{RadioState, build_menu, decode_menu_id};
 #[cfg(windows)]

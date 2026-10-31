@@ -6,14 +6,14 @@
 
 use super::{ProcMenuAction, RootView, TopPage};
 use gpui::Entity;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
 
 use crate::gpui_app::sidebar::SelectedDevice;
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::process::ProcessSignal;
+use taskforest_core::core::process::ProcessSignal;
 
 /// Initial top-level page, overridable via `TM_PAGE` (values: `performance`, `apps`/
 /// `processes`, `services`, `system`, `startup`, `users`, `app-history`). Useful for

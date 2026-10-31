@@ -12,10 +12,10 @@ use bevy::app::App;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, ResMut};
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::core::startup::StartupEntryId;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::startup::StartupEntryId;
 use taskmanager_shell::ShellApp;
 
 use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalTrigger};

@@ -1,13 +1,13 @@
 //! Quiet typed setup port with observable submissions for frontend behavior tests.
 
 use std::sync::{Arc, Mutex};
+use taskforest_contract::{
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventEnvelope,
+    EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError, SubmissionErrorKind,
+};
 use taskmanager_application::{
     IntegrationFacets, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SetupScriptRequest,
-};
-use taskmanager_platform_contract::{
-    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventEnvelope,
-    EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError, SubmissionErrorKind,
 };
 
 #[derive(Clone, Default)]

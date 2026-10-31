@@ -1,15 +1,15 @@
 //! Startup-entry and session control lane isolation contracts.
 
 use super::*;
+use taskforest_core::StartupControlPolicy;
+use taskforest_core::StartupImpact;
+use taskforest_core::StartupImpactEvidence;
+use taskforest_core::StartupImpactUnknownReason;
+use taskforest_core::StartupScope;
+use taskforest_core::StartupSource;
 use taskmanager_application::SessionEvent;
 use taskmanager_application::StartupEvent;
 use taskmanager_application::StartupEvidenceEvent;
-use taskmanager_core::StartupControlPolicy;
-use taskmanager_core::StartupImpact;
-use taskmanager_core::StartupImpactEvidence;
-use taskmanager_core::StartupImpactUnknownReason;
-use taskmanager_core::StartupScope;
-use taskmanager_core::StartupSource;
 
 #[test]
 fn environment_catalog_keeps_five_distinct_registration_identities() {

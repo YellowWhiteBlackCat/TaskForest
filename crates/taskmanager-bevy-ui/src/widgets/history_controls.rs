@@ -13,8 +13,8 @@ use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::history::HistoryWindow;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct HistoryControl(pub(crate) Option<HistoryCommand>);

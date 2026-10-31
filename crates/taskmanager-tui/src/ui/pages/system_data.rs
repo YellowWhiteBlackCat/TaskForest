@@ -3,12 +3,12 @@
 //! The renderer consumes ordered sections and a bounded viewport; observation
 //! availability and NPU engine/memory folds live here instead of paint code.
 
+use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, duration, health_score_for_snapshot, health_score_summary, missing_value,
     optional_bytes,

@@ -3,7 +3,7 @@
 use taskmanager_application::InteractionEvent;
 
 use super::*;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 impl ShellApp {
     /// Project the selected Applications row into the shared process-control

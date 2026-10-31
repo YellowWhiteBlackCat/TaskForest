@@ -3,7 +3,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey,
     PowerSupplySnapshot, SensorCenterSnapshot, SensorMagnitude, SensorQuantity,
 };
@@ -13,7 +13,7 @@ use crate::system_history::{
     CorrelatedTelemetryStamp, DeviceMetricHistory, DynamicHistoryDomain, DynamicIngestionError,
     DynamicIngestionReport, MAX_DYNAMIC_HISTORY_IDENTITIES,
 };
-use taskmanager_core::DeviceStatus;
+use taskforest_core::DeviceStatus;
 
 impl CorrelatedSystemTelemetryIngestor {
     /// Append application-correlated battery observations to runtime-device history.

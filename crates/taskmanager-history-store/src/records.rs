@@ -5,7 +5,7 @@
 //! skipped and counted by the caller (typed honesty, not a store-down error).
 
 use serde::{Deserialize, Serialize};
-use taskmanager_core::HistoricalSample;
+use taskforest_core::HistoricalSample;
 
 /// Serialized form of one sample (one JSONL line). Field names are the stable
 /// wire contract: `r` revision, `c` completed_at_ms, `m` measured_at_ms,

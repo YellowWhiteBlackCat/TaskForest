@@ -11,8 +11,8 @@ use bevy::ui::widget::Text;
 
 use crate::palette::{UiPalette, space_4, space_8, space_24};
 use crate::window::{Role, TextRole};
+use taskforest_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_application::{ProcessInsightFacetState, ProjectedProcessInsights, i18n::t};
-use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_shell::presentation::bytes;
 
 /// What one GPU micro bar measures.

@@ -1,11 +1,11 @@
 //! Windows WTS session inventory and session-control providers.
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::session::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::session::{
     SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_provider::{SessionControlProvider, SessionInventoryProvider};
 use taskmanager_windows_api::{
     WindowsApiError, WindowsSession, WindowsSessionIdentity, WindowsSessionIncarnation,

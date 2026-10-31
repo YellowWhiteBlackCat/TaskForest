@@ -16,9 +16,9 @@
 
 use super::*;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerCpuQuota, ContainerQuota, ContainerSummary, IsolationKind,
 };
 

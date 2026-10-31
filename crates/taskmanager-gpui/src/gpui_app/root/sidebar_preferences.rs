@@ -3,7 +3,7 @@
 use gpui::Context;
 
 use crate::gpui_app::sidebar::NetworkVisibility;
-use taskmanager_core::core::config::sidebar::{
+use taskforest_core::core::config::sidebar::{
     normalize_sidebar_preferences, reordered_sidebar_order, set_sidebar_override,
 };
 

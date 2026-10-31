@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::LimitValue;
+use taskforest_core::LimitValue;
 
 #[test]
 fn format_open_files_saturation_variants() {

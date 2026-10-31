@@ -11,9 +11,9 @@ use super::{
     ProcessMetadataObservations, ProcessScalarObservations,
 };
 use crate::{GroupBaseOpen, NamedOverrides};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::{ProcessMetadataFailure, ProcessOwner, ProcessOwnerIdentity};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::{ProcessMetadataFailure, ProcessOwner, ProcessOwnerIdentity};
 
 const FIXTURE_OBSERVED_AT: u64 = 1;
 

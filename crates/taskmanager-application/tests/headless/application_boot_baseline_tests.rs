@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use taskforest_core::core::startup::{BootTimeline, BootTimelineSegment};
 use taskmanager_application::{
     BootBaselineCompletion, BootBaselineCompletionDisposition, BootBaselineCompletionOutcome,
     BootBaselineController, BootBaselineError, BootBaselineErrorKind, BootBaselineRecordKind,
     BootBaselineState, BootBaselineSubmission,
 };
-use taskmanager_core::core::startup::{BootTimeline, BootTimelineSegment};
 
 fn timeline(duration_ms: u64) -> BootTimeline {
     BootTimeline {

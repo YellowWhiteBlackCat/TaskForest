@@ -1,7 +1,7 @@
 //! Pure projection of discovered NPU facts for the System page.
 
+use taskforest_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
 
 use taskmanager_shell::presentation::{bytes, missing_value};
 

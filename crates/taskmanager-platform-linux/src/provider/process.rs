@@ -2,15 +2,15 @@
 
 use std::path::PathBuf;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::{
     FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, ProcessEnvironment,
     ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation, ProcessItem,
     ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessSignal,
     ProcessThreads, ResourceGroupLimitRequest,
 };
 use taskmanager_escalation::polkit::NetLauncherProcess;
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessControlProvider,
     ProcessEnvironmentProvider, ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,
@@ -36,7 +36,7 @@ use crate::engine::process::{
     validate_exact_start_token,
 };
 #[cfg(target_os = "linux")]
-use taskmanager_core::ProcessIdentity;
+use taskforest_core::ProcessIdentity;
 
 use super::process_target::validate_process_identity;
 use taskmanager_afpacket::PacketSource;

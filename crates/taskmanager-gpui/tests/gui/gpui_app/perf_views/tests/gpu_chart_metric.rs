@@ -5,12 +5,12 @@
 //! capacities — the same shell contract the Iced and TUI frontends consume.
 
 use super::*;
-use taskmanager_core::core::DeviceId;
-use taskmanager_core::core::DeviceLifecycle;
-use taskmanager_core::core::DevicePresence;
-use taskmanager_core::core::DeviceState;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::GpuTelemetryObservation;
+use taskforest_core::core::DeviceId;
+use taskforest_core::core::DeviceLifecycle;
+use taskforest_core::core::DevicePresence;
+use taskforest_core::core::DeviceState;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::GpuTelemetryObservation;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 

@@ -10,14 +10,14 @@
 //! under the test hard limit.
 
 use bevy::app::App;
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::metrics::{MsrReadoutSnapshot, MsrThermalStatusReadout};
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
 };
-use taskmanager_core::core::metrics::{MsrReadoutSnapshot, MsrThermalStatusReadout};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::msr_thermal_status_summary;
 

@@ -28,7 +28,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
-use taskmanager_core::alerts::AlertSeverity;
+use taskforest_core::alerts::AlertSeverity;
 
 /// The two locales this app ships. Add a variant + a matching `locales/<code>.json`
 /// (and a wire value below) to extend.

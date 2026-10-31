@@ -1,5 +1,6 @@
 //! Read-only persistent-history adapter for the terminal frontend.
 
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
 };
@@ -8,12 +9,11 @@ use taskmanager_application::{
     ApplicationHistoryUnavailableReason, HistoryReplayCompletionDisposition,
     HistoryReplayController, HistoryReplayRequest, PerformanceHistoryProjection,
 };
-use taskmanager_core::core::history::HistoryWindow;
 
 use crate::TuiApp;
+use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_app_host::HistoryFrontendSession;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::history::HistoryRecordSink;
 
 enum HistoryResources {
     Disabled,

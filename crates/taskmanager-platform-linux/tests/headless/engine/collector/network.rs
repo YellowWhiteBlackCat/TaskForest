@@ -1,8 +1,8 @@
 use super::*;
-use taskmanager_core::DeviceRefreshOutcome;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::OptionalObservationState;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::DeviceRefreshOutcome;
+use taskforest_core::DeviceStatus;
+use taskforest_core::OptionalObservationState;
+use taskforest_core::ScalarAvailability;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn interface(name: &str, arp_type: u64) -> SysfsInterface {

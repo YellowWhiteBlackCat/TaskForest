@@ -2,8 +2,8 @@
 
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div};
 use std::collections::HashSet;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::ProcessAffinityState;
-use taskmanager_core::core::failure::FailureKind;
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -12,8 +12,8 @@ use taskmanager_ui::theme_binding::hsla;
 use super::{ActionBtnProps, action_btn};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

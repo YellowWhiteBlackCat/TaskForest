@@ -4,13 +4,13 @@
 //! `taskmanager-telemetry-store`; this module maps application-correlated
 //! outcomes onto its deliberately separate write capability.
 
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::{
     CorrelatedPowerSupplyEvent, CorrelatedSensorEvent, CorrelatedSystemTelemetryOutcome,
     PowerSupplyEvent, SensorEvent, SystemTelemetryDomain, SystemTelemetryDomainEvent,
     SystemTelemetryDomainOutcome, SystemTelemetryUnavailable,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_telemetry_store::{
     CorrelatedIngestionError, CorrelatedIngestionReport, CorrelatedSystemTelemetryIngestor,
     CorrelatedTelemetryStamp, DynamicIngestionError, DynamicIngestionReport, SystemHistoryDomain,

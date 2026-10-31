@@ -1,8 +1,8 @@
 use super::*;
+use taskforest_core::core::metrics::CpuFrequencySource;
 use taskmanager_application::i18n::Language::En;
 use taskmanager_application::i18n::set_language;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::CpuFrequencySource;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
@@ -330,7 +330,7 @@ fn health_shared_catalog_carries_the_same_terms() {
 /// named in the same tongue as the rest of the panel.
 #[test]
 fn thermal_reading_labels_resolve_in_both_locales() {
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations, ScalarObservation,
     };
 
@@ -371,9 +371,9 @@ fn thermal_reading_labels_resolve_in_both_locales() {
 
 mod thermal_zone_tests {
     use super::*;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::identity::DeviceGeneration;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::sensors::{
         SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
         SensorReading, SensorScale,
     };
@@ -615,7 +615,7 @@ fn thermal_zone_surface_key_differs_from_the_quantity() {
 
 #[test]
 fn health_rows_render_the_memory_full_stall_deduction_bill() {
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot, SystemSnapshot,
     };
 

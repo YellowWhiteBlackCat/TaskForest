@@ -2,23 +2,23 @@
 //! battery/fan/system sections, the resource selector, and the history
 //! graph. Extracted from `ui/tests.rs` to respect the source line budget.
 
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     GpuGraphicsApi, GpuScalarObservations, GpuThrottleReason, OptionalObservation,
     ScalarObservation,
 };
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::frame_text;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::hardware::DisplayInfo;
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::hardware::DisplayInfo;
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::{
     DiskPartitionScalarObservations, NetworkAdapterType, NetworkWirelessObservations,
     SmartAvailability,
 };
-use taskmanager_core::core::power::BatteryScalarObservations;
-use taskmanager_core::core::sensors::SensorScale;
+use taskforest_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::sensors::SensorScale;
 use taskmanager_shell::fixture::{ProjectionSeedFact, edit_snapshot, seed_projection_fact};
 
 #[test]
@@ -270,7 +270,7 @@ fn missing_gpu_observations_render_as_dashes() {
 
 #[test]
 fn gpu_detail_section_renders_utilization_vram_clocks_and_engines() {
-    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind};
+    use taskforest_core::core::metrics::{GpuEngine, GpuEngineKind};
 
     let mut app = crate::demo_app();
     // The dedicated GPU panel only renders under the Gpu selector.
@@ -669,8 +669,8 @@ fn disk_and_network_selectors_render_honest_empty_state_when_absent() {
 
 #[test]
 fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 
     let mut app = crate::demo_app();
     // The dedicated battery panel only renders under the Battery selector.
@@ -741,8 +741,8 @@ fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
 
 #[test]
 fn battery_detail_section_renders_honest_empty_state_when_no_power_snapshot() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::PowerSupplySnapshot;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::power::PowerSupplySnapshot;
 
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Battery;
@@ -784,8 +784,8 @@ fn battery_detail_section_renders_honest_empty_state_when_no_power_snapshot() {
 
 #[test]
 fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::sensors::{
         SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
         SensorReading,
     };
@@ -902,8 +902,8 @@ fn fan_detail_section_renders_honest_empty_state_without_sensor_data() {
     );
 
     // A snapshot with no fan channels is the same honest empty state.
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::sensors::{
         SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
         SensorReading, SensorScale,
     };
@@ -938,7 +938,7 @@ fn fan_detail_section_renders_honest_empty_state_without_sensor_data() {
 
 #[test]
 fn network_subcategory_visibility_filters_the_nic_panel() {
-    use taskmanager_core::core::metrics::NetworkAdapterType;
+    use taskforest_core::core::metrics::NetworkAdapterType;
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));
     app.perf_device = crate::PerfDevice::Network;
@@ -1072,7 +1072,7 @@ fn gpu_panel_names_proven_graphics_apis_and_pci_slot() {
 
 #[test]
 fn gpu_selector_enumerates_every_projected_adapter() {
-    use taskmanager_core::core::metrics::GpuMetrics;
+    use taskforest_core::core::metrics::GpuMetrics;
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Gpu;
     let mut g1 = GpuMetrics::new("card0", "Intel");

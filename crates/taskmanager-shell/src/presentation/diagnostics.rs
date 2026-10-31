@@ -1,9 +1,9 @@
 //! Shared sanitized preview text and privacy-safe error presentation.
 
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::diagnostics::{
+use taskforest_core::core::diagnostics::{
     DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticPreview,
 };
+use taskmanager_application::i18n::t;
 
 #[must_use]
 pub const fn diagnostic_failure_feedback_key(kind: DiagnosticBundleErrorKind) -> &'static str {

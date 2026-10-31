@@ -9,12 +9,12 @@
 
 use crate::gpui_app::root::TopPage;
 use gpui::TextRenderingMode;
-use taskmanager_assets::product;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
 };
+use taskmanager_assets::product;
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, LightDark,
     Skin, Theme,

@@ -20,8 +20,8 @@ use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{Node, UiRect, px, rem};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 
 use super::paint::SystemPaint;
 use super::{SystemFactGroup, SystemFactRow};

@@ -1,7 +1,7 @@
 //! Shared discovery-authority coherence contract.
 
-use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskforest_contract::DeviceSourceSnapshot;
+use taskforest_core::core::source::SourceOutcome;
 
 /// Verify that discovery outcome, stable IDs and item count tell one coherent
 /// story. The value-specific assembler remains responsible for proving that

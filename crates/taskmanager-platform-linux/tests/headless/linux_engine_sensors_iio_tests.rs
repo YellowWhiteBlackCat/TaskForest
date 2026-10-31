@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 #[test]
 fn classifies_indexed_axis_and_named_channels_without_vendor_tables() {
@@ -136,8 +136,8 @@ fn decimal_scales_become_exact_rationals() {
 fn fake_iio_tree_collects_scaled_known_and_opaque_raw_channels() {
     use std::os::unix::fs::PermissionsExt;
 
-    use taskmanager_core::core::sensors::SensorQuantity;
-    use taskmanager_core::core::source::SourceOutcome;
+    use taskforest_core::core::sensors::SensorQuantity;
+    use taskforest_core::core::source::SourceOutcome;
 
     let root = crate::test_support::repo_temp_dir().join(format!(
         "tm-iio-{}-{}",

@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_platform_contract::CapabilityDescriptor;
+use taskforest_contract::CapabilityDescriptor;
 
 /// The fresh-runtime shape with M3.2 semantics: every declared lane is
 /// registered with its typed initial status and provider, and every other

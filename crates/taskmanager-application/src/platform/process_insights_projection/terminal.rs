@@ -7,12 +7,12 @@
 //! snapshot so a partial terminal projection stays renderable.
 
 use super::{ProcessInsightFacetState, ProcessInsightUnavailable};
-use taskmanager_core::{
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::{
     DeviceState, DeviceStatus, FailureKind, ProcessEnvironment, ProcessGpuSnapshot,
     ProcessIsolation, ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceObservations,
     ProcessResourceSnapshot, ProcessThreads, ResourceObservation,
 };
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 pub(super) fn terminal_network(
     state: &ProcessInsightFacetState<ProcessNetworkSnapshot>,

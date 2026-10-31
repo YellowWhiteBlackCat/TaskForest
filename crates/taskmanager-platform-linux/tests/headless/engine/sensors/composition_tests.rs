@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 #[cfg(target_os = "linux")]
 fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {

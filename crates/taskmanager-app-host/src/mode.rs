@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 
 use crossbeam_channel::{Receiver, bounded};
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
-use taskmanager_ipc::service::IpcClient;
-use taskmanager_ipc::transport::{IpcEndpoint, connect_transport};
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
+use taskforest_ipc::service::IpcClient;
+use taskforest_ipc::transport::{IpcEndpoint, connect_transport};
 
 /// Environment variable that forces the frontend to run in standalone in-process mode.
 pub const ENV_FORCE_STANDALONE: &str = "TASKFOREST_FORCE_STANDALONE";

@@ -1,8 +1,8 @@
 //! Shared reset for Iced's renderer-local menu surfaces.
 
 use super::*;
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::{AppPage, KeyCode};
-use taskmanager_core::core::session::SessionControlAction;
 
 impl IcedApp {
     pub(super) fn close_context_menus(&mut self) {

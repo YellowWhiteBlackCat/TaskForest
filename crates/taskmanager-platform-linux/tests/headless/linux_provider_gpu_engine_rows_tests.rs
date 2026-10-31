@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::failure::FailureKind;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_escalation::EscalationDenialReason;
 use taskmanager_escalation::polkit::PerfHelperSuccess;
 use taskmanager_escalation::polkit::{EngineReading, PerfHelperError, PerfHelperErrorKind};

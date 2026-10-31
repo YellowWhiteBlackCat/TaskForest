@@ -1,4 +1,4 @@
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 use super::*;
 use taskmanager_test_support::ProcessItemFixtureBuilder;

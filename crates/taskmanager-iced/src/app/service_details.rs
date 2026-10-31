@@ -5,18 +5,18 @@
 //! lifecycles; provider I/O never runs from the Iced view.
 
 use iced::Task;
-use taskmanager_application::{
-    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceLogStreamRequest, ServiceUpdate,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
     ServiceDeps, ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure,
     ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge,
     ServiceRelationGraph, ServiceRelationKind,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::{
+    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceLogStreamRequest, ServiceUpdate,
+};
 
 use taskmanager_shell::app::service_log::{
     SERVICE_LOG_POLL_INTERVAL_MS, next_log_level, next_log_time,

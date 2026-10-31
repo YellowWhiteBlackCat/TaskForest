@@ -23,13 +23,13 @@ use bevy::text::Font;
 use bevy::ui::prelude::{FlexWrap, Node, OverflowAxis, Val};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ScrollArea};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::services::{
     ServiceDeps, ServiceItem, ServiceLogEntry, ServiceLogLevel, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceRelationKind, ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::i18n::t;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
@@ -50,16 +50,16 @@ use super::unit_filter::{
 };
 use crate::app::FrontendTrack;
 use crate::palette::ui_palette;
+use taskforest_contract::CapabilityId;
+use taskforest_contract::EventSequence;
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_core::core::services::ServiceLogLevelFilter;
+use taskforest_core::core::services::ServiceLogTimeFilter;
+use taskforest_core::core::services::ServiceRelationEdge;
+use taskforest_core::core::services::ServiceRelationGraph;
 use taskmanager_application::CorrelatedServiceEvent;
 use taskmanager_application::PlatformEventBatch;
 use taskmanager_application::ServiceEvent;
-use taskmanager_core::core::services::ServiceLogLevelFilter;
-use taskmanager_core::core::services::ServiceLogTimeFilter;
-use taskmanager_core::core::services::ServiceRelationEdge;
-use taskmanager_core::core::services::ServiceRelationGraph;
-use taskmanager_platform_contract::CapabilityId;
-use taskmanager_platform_contract::EventSequence;
-use taskmanager_platform_contract::PartialSourceSnapshot;
 use taskmanager_shell::ShellApp;
 
 // ---- fixtures ------------------------------------------------------------

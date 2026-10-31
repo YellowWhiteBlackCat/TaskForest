@@ -1,7 +1,7 @@
 //! Ordered adapter from the canonical process tree rows to the shared
 //! semantic snapshot input.
 
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_ui_contract::{
     ProcessAggregateSemantics, ProcessGroupRowInput, ProcessRowBehavior, ProcessRowInput,
     ProcessRowObservations, SemanticSnapshotBuilder,

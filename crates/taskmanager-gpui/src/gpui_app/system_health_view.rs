@@ -16,9 +16,9 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 
 use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
-use taskmanager_core::core::{
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorQuantity,
     SensorReading, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,

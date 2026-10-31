@@ -1,5 +1,5 @@
-use taskmanager_core::{DeviceGeneration, DeviceId, SmartSelfTestObservation, SmartSelfTestReport};
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
+use taskforest_core::{DeviceGeneration, DeviceId, SmartSelfTestObservation, SmartSelfTestReport};
 
 use super::super::super::{PlatformEvent, SmartEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};

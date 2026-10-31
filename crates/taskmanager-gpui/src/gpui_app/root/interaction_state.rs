@@ -1,12 +1,12 @@
 //! Root-owned interaction vocabulary and per-window text-input initialization.
 
 use gpui::{AppContext, Context, Entity};
-use taskmanager_core::core::process::{ProcessLiveKey, ProcessSignal};
+use taskforest_core::core::process::{ProcessLiveKey, ProcessSignal};
 use taskmanager_ui::inputs::text_input::{InputEvent, TextInputState};
 
 use crate::gpui_app::sidebar::SelectedDevice;
+use taskforest_core::core::startup::StartupEntryId;
 use taskmanager_application::i18n;
-use taskmanager_core::core::startup::StartupEntryId;
 
 use super::RootView;
 

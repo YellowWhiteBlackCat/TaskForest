@@ -3,13 +3,13 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::{GpuMetricField, GpuMetrics, ProviderId};
+use taskforest_core::{GpuMetricField, GpuMetrics, ProviderId};
 
 use super::super::{GpuProviderSample, build_drm_identity_metrics, scan_drm_cards};
 use super::drm::verify_directory;
 use super::{GpuProviderFailure, GpuTelemetryProvider};
 use crate::engine::hardware::gpu::api::probe_graphics_api;
-use taskmanager_core::GpuGraphicsApi;
+use taskforest_core::GpuGraphicsApi;
 
 pub(super) const GRAPHICS_API_PROVIDER_ID: ProviderId =
     ProviderId::borrowed("linux.gpu.graphics-api.runtime");

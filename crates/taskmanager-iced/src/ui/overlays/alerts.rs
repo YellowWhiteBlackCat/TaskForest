@@ -4,10 +4,10 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertEvent, AlertEventKind, AlertSeverity, NotificationPolicy,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 
 use crate::app::{FocusTarget, Message};

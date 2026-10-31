@@ -8,7 +8,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use taskmanager_core::{ProcessItem, SystemSnapshot};
+use taskforest_core::{ProcessItem, SystemSnapshot};
 
 use crate::path_contract::is_single_filename;
 

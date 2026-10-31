@@ -5,7 +5,7 @@ use super::system_info::{
     package_manager_candidates, parse_rpm_package_version, parse_version_token,
 };
 use super::*;
-use taskmanager_core::KernelLogPriority;
+use taskforest_core::KernelLogPriority;
 
 static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(1);
 

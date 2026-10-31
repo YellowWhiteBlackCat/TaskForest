@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_core::DiskMetrics;
-use taskmanager_core::metrics::SmartAvailability;
+use taskforest_core::DiskMetrics;
+use taskforest_core::metrics::SmartAvailability;
 
 #[test]
 fn smartctl_tokens_are_stable() {

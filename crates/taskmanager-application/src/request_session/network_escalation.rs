@@ -1,8 +1,8 @@
 //! Request-correlated process-network escalation lifecycle.
 
 use crate::{RequestAttemptId, RequestCorrelation};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NetworkEscalationReady {

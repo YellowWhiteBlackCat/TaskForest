@@ -5,11 +5,11 @@
 //! produced its geometry, so delayed events from an older projection fail
 //! closed. Display names and row positions never become identity.
 
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::session::SessionIdentity;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::{StartupEntry, StartupEntryId};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::session::SessionIdentity;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::{StartupEntry, StartupEntryId};
+use taskforest_core::core::target::ServiceId;
 
 use super::ShellApp;
 use super::sorting::{InfoSortCol, InfoTable, SortDir};

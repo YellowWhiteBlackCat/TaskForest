@@ -3,23 +3,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use taskmanager_application::{
-    CommandLaunchRequest, CpuTelemetryRequest, DesktopAppearanceEvent, DesktopAppearanceRequest,
-    HardwareInventoryRequest, LatestControlRequest, PlatformEvent, PlatformHandle,
-    PowerSupplyEvent, PowerSupplyRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
-    ProcessControlRequest, ProcessEvent, ProcessGpuRequest, ProcessInsightFacetEvent,
-    ProcessInsightsRevision, ProcessListRequest, ProcessNetworkRequest, ResourceRevealRequest,
-    SensorEvent, SensorRequest, ServiceControlRequest, ServiceDependenciesRequest, ServiceEvent,
-    ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
-    SessionControlRequest, ShellEvent, SmartControlRequest, SmartEvent, SmartObservationRequest,
-    SmartTrackingEndReason, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
-    StorageHealthEvent, StorageHealthRequest, SystemTelemetryRevision, UrlOpenRequest,
+use taskforest_contract::{
+    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, DeviceSourceSnapshot, EventEnvelope,
+    PartialSourceSnapshot, ProviderFailure, RequestEnvelope, RequestId, RequestIdGenerator,
+    SubmissionErrorKind,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     ContainerRollup, CpuMetrics, CpuTelemetryObservation, CpuThrottleSnapshot, DesktopAppearance,
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec,
     DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot, FilesystemHealthSnapshot,
@@ -36,10 +29,17 @@ use taskmanager_core::{
     SmbiosMemorySnapshot, StartupBootEvidenceSnapshot, StartupEntry, StorageDeviceTarget,
     StorageTelemetryObservation,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, DeviceSourceSnapshot, EventEnvelope,
-    PartialSourceSnapshot, ProviderFailure, RequestEnvelope, RequestId, RequestIdGenerator,
-    SubmissionErrorKind,
+use taskmanager_application::{
+    CommandLaunchRequest, CpuTelemetryRequest, DesktopAppearanceEvent, DesktopAppearanceRequest,
+    HardwareInventoryRequest, LatestControlRequest, PlatformEvent, PlatformHandle,
+    PowerSupplyEvent, PowerSupplyRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
+    ProcessControlRequest, ProcessEvent, ProcessGpuRequest, ProcessInsightFacetEvent,
+    ProcessInsightsRevision, ProcessListRequest, ProcessNetworkRequest, ResourceRevealRequest,
+    SensorEvent, SensorRequest, ServiceControlRequest, ServiceDependenciesRequest, ServiceEvent,
+    ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
+    SessionControlRequest, ShellEvent, SmartControlRequest, SmartEvent, SmartObservationRequest,
+    SmartTrackingEndReason, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
+    StorageHealthEvent, StorageHealthRequest, SystemTelemetryRevision, UrlOpenRequest,
 };
 use taskmanager_platform_linux::{
     EnvironmentProviders, IntegrationProviders, LinuxPlatformRuntime, LinuxProviderRegistry,
@@ -78,7 +78,7 @@ use provider_registration::{
     fixture_environment_provider, fixture_process_provider, fixture_service_provider,
     fixture_system_provider,
 };
-use taskmanager_core::SmartSelfTestKind;
+use taskforest_core::SmartSelfTestKind;
 #[path = "ports_contract/service_inventory.rs"]
 mod service_inventory;
 #[path = "ports_contract/smart_tracking.rs"]

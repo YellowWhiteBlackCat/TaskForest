@@ -1,6 +1,6 @@
 use super::*;
 use gpui::AppContext;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::ProcessControlFeedback;

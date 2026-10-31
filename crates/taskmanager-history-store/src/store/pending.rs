@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use taskmanager_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
+use taskforest_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
 
 use super::{PersistentHistoryStore, StoreState};
 use crate::records::encode_line;

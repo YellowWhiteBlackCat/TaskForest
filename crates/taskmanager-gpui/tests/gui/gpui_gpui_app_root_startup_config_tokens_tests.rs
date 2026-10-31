@@ -8,7 +8,7 @@ use super::{
     color_scheme_from_token,
 };
 use crate::gpui_app::root::navigation::TopPage;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
 };
@@ -86,7 +86,7 @@ fn color_scheme_tokens_preserve_system_and_legacy_modes() {
 #[test]
 fn text_rendering_tokens_map_to_supported_gpui_modes_and_unknown_values_fall_back() {
     use gpui::TextRenderingMode;
-    use taskmanager_core::core::config::{TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_SUBPIXEL};
+    use taskforest_core::core::config::{TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_SUBPIXEL};
     assert_eq!(
         text_rendering_from_token(TEXT_RENDERING_SUBPIXEL),
         TEXT_RENDERING_SUBPIXEL

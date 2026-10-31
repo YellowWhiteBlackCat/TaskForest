@@ -3,8 +3,8 @@
 
 use std::time::{Duration, Instant};
 
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_platform_contract::{CompositeSourceSnapshot, OperationFailure};
+use taskforest_contract::{CompositeSourceSnapshot, OperationFailure};
+use taskforest_core::core::appearance::DesktopAppearance;
 
 use crate::PlatformClient;
 use crate::platform::{DesktopAppearanceEvent, DesktopAppearanceRequest};

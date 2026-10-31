@@ -15,7 +15,7 @@
 //! a remote session the globe (`IconId::Remote`).
 
 use bevy::ecs::component::Component;
-use taskmanager_core::core::session::SessionItem;
+use taskforest_core::core::session::SessionItem;
 use taskmanager_ui_contract::IconId;
 
 /// The terminal family a login session belongs to.

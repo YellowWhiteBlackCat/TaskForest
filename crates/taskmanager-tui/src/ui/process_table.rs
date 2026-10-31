@@ -10,8 +10,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_ui_contract::IconId;
 
 use crate::TuiTheme;

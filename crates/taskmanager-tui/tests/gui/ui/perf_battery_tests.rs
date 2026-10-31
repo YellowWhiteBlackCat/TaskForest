@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::core::metrics::{ScalarObservation, SystemSnapshot};
-use taskmanager_core::core::power::BatteryScalarObservations;
-use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskforest_core::core::metrics::{ScalarObservation, SystemSnapshot};
+use taskforest_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 

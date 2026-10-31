@@ -12,14 +12,14 @@
 use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceId, DeviceLifecycle, DeviceLifecycleRegistry,
     DeviceRefreshOutcome, DeviceState, DeviceStatus, FailureKind, GpuMetricField,
     GpuMetricProvenance, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation, ProviderId,
     ScalarObservation,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::GpuTelemetryProvider;
 
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};

@@ -10,8 +10,8 @@
 //! byte-for-byte identical to the previous per-adapter copy -- the single
 //! source of truth (and its corrected test suite) lives in the shared crate.
 
-use taskmanager_core::{DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot};
 use taskmanager_platform_portable::DirectoryUsageScanner;
 use taskmanager_platform_provider::DirectoryUsageProvider;
 

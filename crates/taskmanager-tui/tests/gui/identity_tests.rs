@@ -14,17 +14,15 @@
 //! assertion.
 
 use super::*;
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{
     CorrelatedEvent, CorrelatedServiceEvent, KeyCode, Modifiers, PlatformEventContext,
     ProcessEvent, ServiceEvent,
-};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
 };
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ShellApp;

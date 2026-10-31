@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 fn source(outcome: SourceOutcome, item_count: usize) -> SourceStatus {
     SourceStatus {

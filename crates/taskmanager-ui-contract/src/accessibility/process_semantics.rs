@@ -1,7 +1,7 @@
 //! Typed process facts retained by toolkit-neutral semantic rows.
 
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::aggregate::AggregateMetric;
 
 /// Current and retained facts for the process scalar columns.
 ///

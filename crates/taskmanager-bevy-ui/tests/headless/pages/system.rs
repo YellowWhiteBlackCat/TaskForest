@@ -12,13 +12,13 @@ use bevy::ecs::query::With;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
-use taskmanager_application::i18n::{Language, set_language, t};
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{
     PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot, SystemSnapshot,
 };
-use taskmanager_core::core::sensors::SensorReading;
+use taskforest_core::core::sensors::SensorReading;
+use taskmanager_application::i18n::{Language, set_language, t};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
@@ -108,7 +108,7 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
 
 #[test]
 fn cpu_instruction_features_row_is_projected_when_present() {
-    use taskmanager_core::core::CpuInstructionFeature;
+    use taskforest_core::core::CpuInstructionFeature;
     let mut hw = fixture_hardware();
     hw.instruction_features = vec![CpuInstructionFeature::Avx2, CpuInstructionFeature::AesNi];
     let rows = system_fact_rows(Some(&hw), None, None);
@@ -260,8 +260,8 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
 
 #[test]
 fn system_fact_rows_include_smbios_slots_and_npu_when_provided() {
-    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
-    use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+    use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
+    use taskforest_core::core::npu::{NpuDevice, NpuInventorySnapshot};
 
     let smbios = SmbiosMemorySnapshot {
         slots_total: 4,
@@ -334,9 +334,9 @@ fn system_summary_model_mirrors_gpui_and_iced_parity() {
 }
 
 fn zone_reading(id: &str, label: &str, temperature_c: Option<f64>) -> SensorReading {
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::identity::DeviceGeneration;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
@@ -362,7 +362,7 @@ fn zone_reading(id: &str, label: &str, temperature_c: Option<f64>) -> SensorRead
 }
 
 fn fan_reading() -> SensorReading {
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
@@ -381,7 +381,7 @@ fn fan_reading() -> SensorReading {
 
 #[test]
 fn thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source() {
-    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskforest_core::core::sensors::SensorCenterSnapshot;
     use taskmanager_shell::presentation::missing_value;
 
     let sensors = SensorCenterSnapshot {
@@ -431,7 +431,7 @@ fn thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source() {
 
 #[test]
 fn thermal_zone_card_paints_the_observed_zone_and_skips_a_fan_only_snapshot() {
-    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskforest_core::core::sensors::SensorCenterSnapshot;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
     set_language(Language::En);

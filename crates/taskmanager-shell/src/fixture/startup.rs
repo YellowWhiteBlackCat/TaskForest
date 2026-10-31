@@ -1,7 +1,7 @@
 //! Shared deterministic failed-unit and boot-chain observations.
 
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupFailedUnit,
 };
 

@@ -1,8 +1,8 @@
 //! Pure data-layer folds for the performance overview.
 
+use taskforest_core::core::hardware::{CoreBreakdown, HardwareInfo};
+use taskforest_core::core::metrics::{CpuMetrics, SystemSnapshot};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
-use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
 use taskmanager_shell::presentation::{duration, missing_value, power_w};
 
 use super::units::{

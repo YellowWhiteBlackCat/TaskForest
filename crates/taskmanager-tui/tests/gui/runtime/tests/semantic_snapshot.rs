@@ -24,15 +24,15 @@ use taskmanager_application::ProcessInsightFacet;
 
 use std::collections::HashSet;
 
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     SystemSnapshot,
 };
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 

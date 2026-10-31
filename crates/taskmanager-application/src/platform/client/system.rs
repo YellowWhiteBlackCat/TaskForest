@@ -1,7 +1,7 @@
 //! System-axis request submission on `PlatformClient`: six-domain telemetry
 //! under one revision plus hardware-inventory refresh.
 
-use taskmanager_platform_contract::{CapabilityId, RequestId, SubmissionError};
+use taskforest_contract::{CapabilityId, RequestId, SubmissionError};
 
 use crate::platform::{
     ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
@@ -12,7 +12,7 @@ use crate::platform::{
 };
 
 use super::{PendingSystemTelemetryRequest, PlatformClient, submit_request};
-use taskmanager_platform_contract::SubmissionErrorKind;
+use taskforest_contract::SubmissionErrorKind;
 
 impl PlatformClient {
     /// Schedule all six domains under one application-owned revision.

@@ -27,7 +27,7 @@ path = "src/smart_self_test_main.rs"
 # of the trust root alongside taskmanager-platform-linux (see the dependency
 # firewall test, which allowlists both).
 taskmanager-perf-ioctl = { path = "../taskmanager-perf-ioctl" }
-taskmanager-core = { path = "../taskmanager-core" }
+taskforest-core = { path = "../taskforest-core" }
 taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

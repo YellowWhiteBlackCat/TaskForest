@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use sysinfo::Disks;
-use taskmanager_core::{
+use taskforest_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceId, DeviceLifecycleRegistry, DeviceRefreshOutcome,
     DiskMetrics, StorageTelemetryObservation,
 };

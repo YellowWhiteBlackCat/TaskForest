@@ -3,16 +3,16 @@
 //! Declares the compute, disk, network, lifecycle, and host-domain collectors
 //! and owns the cross-tick disk-stats and SMART provider state they share.
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceId, ProviderId};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceId, ProviderId};
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuPerformancePolicy, DiskMetrics, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryModuleObservations,
     MemoryOptionalObservations, MemoryScalarObservations, OptionalObservation, ScalarObservation,
     VirtualMemoryCommitObservations,
 };
-use taskmanager_core::core::smart::DiskSmart;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::smart::DiskSmart;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use crate::engine::smart;
 use std::collections::HashMap;

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use taskmanager_core::{
+use taskforest_core::{
     ApplicationIconAsset, ApplicationIconFormat, MAX_APPLICATION_ICON_BYTES, ProcessMetadataFailure,
 };
 

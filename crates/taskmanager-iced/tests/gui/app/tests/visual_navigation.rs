@@ -5,10 +5,10 @@ use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers};
 
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;

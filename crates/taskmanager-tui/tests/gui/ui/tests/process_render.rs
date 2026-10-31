@@ -5,21 +5,21 @@
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessLiveKey, ProcessMetadataObservations, ProcessOwner};
 use taskmanager_application::{AppAction, AppPage, ConfigStore};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessLiveKey, ProcessMetadataObservations, ProcessOwner};
 use taskmanager_shell::{SortCol, SortDir};
 
 use crate::ui::*;
 use crate::{TuiApp, TuiTheme};
 
 use super::frame_text;
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process_telemetry::ContainerRollup;
+use taskforest_core::core::services::ServiceAction;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::i18n::{Language, set_language, t};
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process_telemetry::ContainerRollup;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_platform_contract::CapabilityId;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, edit_processes, record_demo_history_frame, seed_projection_fact,
 };
@@ -188,9 +188,9 @@ fn process_action_menu_opens_for_the_selected_row_and_renders_actions() {
 #[test]
 fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() {
     use crate::ui::process_menu::{ProcessMenuAction, ProcessMenuTarget, resolve_action};
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::process::FrozenProcessIdentity;
     use taskmanager_application::PlatformEffect;
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
 
     let mut item = ProcessItemFixtureBuilder::new()
         .pid(4321)
@@ -613,9 +613,9 @@ fn applications_empty_state_panel_separates_unreported_from_query_mismatch() {
 
 #[test]
 fn containers_event_drains_into_tui_state_through_the_batch() {
+    use taskforest_contract::{EventSequence, RequestId};
+    use taskforest_core::core::device_state::DeviceState;
     use taskmanager_application::{ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_platform_contract::{EventSequence, RequestId};
 
     let mut app = crate::demo_app();
     seed_projection_fact(&mut app.shell, ProjectionSeedFact::Containers(None));
@@ -644,11 +644,11 @@ fn performance_graph_renders_honest_empty_state_before_first_sample() {
     // here directly instead of through `demo_app`. The graph reads the SHARED
     // `MetricHistory` window (G-02); one point is not a trend and the graph
     // must say so honestly.
-    use taskmanager_application::{AppAction, AppPage};
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         CpuMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
         SystemSnapshot,
     };
+    use taskmanager_application::{AppAction, AppPage};
     use taskmanager_shell::fixture::{edit_snapshot, record_demo_history_frame};
     use taskmanager_telemetry_store::live_graph::MetricSeries;
 

@@ -2,7 +2,7 @@
 
 use std::io;
 
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 fn parse_boot_time(text: &str) -> Option<u64> {
     text.lines()

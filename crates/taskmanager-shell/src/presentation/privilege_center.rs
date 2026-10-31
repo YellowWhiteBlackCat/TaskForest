@@ -1,12 +1,12 @@
 //! One permission-state fold and identity-frozen action for every frontend.
 
+use taskforest_contract::{CapabilityId, CapabilityStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_application::{
     GpuEngineRowsState, MsrReadoutRequestFailure, MsrReadoutState, PlatformEffect,
     RaplPowerRequestFailure, RaplPowerState, SmbiosMemoryRequestFailure, SmbiosMemoryState,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 
 use super::gpu_engine_rows::{GpuEngineRowsPresentation, present_gpu_engine_rows};
 use crate::ShellApp;

@@ -4,11 +4,11 @@
 //! untouched.
 
 use super::*;
+use taskforest_core::core::metrics::GpuEngineRowsSnapshot;
 use taskmanager_application::{
     CorrelatedGpuEngineRowsEvent, GpuEngineRowsEvent, GpuEngineRowsRequestFailure,
     GpuEngineRowsState,
 };
-use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
 
 fn gpu_engine_rows_event(
     sequence: u64,
@@ -28,7 +28,7 @@ fn gpu_engine_rows_event(
 
 #[test]
 fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
-    use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric};
+    use taskforest_core::core::metrics::{GpuEngineKind, GpuEngineMetric};
     let mut app = ShellApp::new();
     let attempt = app.begin_gpu_engine_rows_request(DeviceId::new("gpu:0"));
     assert!(app.accept_gpu_engine_rows_request(

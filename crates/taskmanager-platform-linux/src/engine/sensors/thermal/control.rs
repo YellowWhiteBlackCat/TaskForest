@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, FailureKind, ScalarObservation, ThermalCoolingActivity, ThermalCoolingDeviceStatus,
     ThermalCoolingKind, ThermalPolicy, ThermalTripKind, ThermalTripPoint, ThermalTripPointSet,
     ThermalZoneMode, ThermalZoneStatus,

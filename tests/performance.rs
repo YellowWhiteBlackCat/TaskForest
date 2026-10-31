@@ -6,7 +6,7 @@
 //!
 //! Three production performance areas are covered:
 //! - **Shared data algorithms** (filter / fuzzy / sort / tree): the pure-logic
-//!   helpers under `taskmanager_core::core::process` plus the UI's substring filter.
+//!   helpers under `taskforest_core::core::process` plus the UI's substring filter.
 //! - **Hot collect path**: the per-tick `/proc/{pid}/{stat,status,io}` parse that
 //!   drives the process table. A quadratic parser rewrite gets its own
 //!   `Instant`-timed gate below.
@@ -37,24 +37,24 @@ use std::alloc::{GlobalAlloc, Layout, System};
 #[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::CpuTelemetryObservation;
+use taskforest_core::core::CpuTelemetryObservation;
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::MemoryTelemetryObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::MemoryTelemetryObservation;
+use taskforest_core::core::process::{
     ProcessItem, ProcessSortKey, build_process_tree, flatten_tree_visible, fuzzy_filter_processes,
     sort_processes,
 };
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::{
+use taskforest_core::core::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     ScalarObservationGroup,
 };
 // Imports consumed only by the Linux-gated `/proc` collect-path tests below.
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::HostRuntimeFacts;
+use taskforest_core::core::HostRuntimeFacts;
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::HostRuntimeObservation;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskforest_core::core::HostRuntimeObservation;
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{parse_proc_io, parse_proc_stat, parse_proc_status_memory};
 use taskmanager_shell::matches_process_query;

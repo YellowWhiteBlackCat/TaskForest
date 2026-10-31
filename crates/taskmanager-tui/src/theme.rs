@@ -11,13 +11,13 @@
 //! `Theme::detect(NativeAppearance)` and pass it to
 //! [`TuiTheme::from_theme`] — nothing else in the renderer changes.
 
-use taskmanager_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::appearance::DesktopAppearance;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use crate::TuiApp;
 use crate::TuiTerminalProfile;
-use taskmanager_core::core::appearance::PreferredColorScheme;
+use taskforest_core::core::appearance::PreferredColorScheme;
 use taskmanager_ui_contract::IconId;
 
 /// Runtime-resolved theme construction parameters (ADR-026): the neutral

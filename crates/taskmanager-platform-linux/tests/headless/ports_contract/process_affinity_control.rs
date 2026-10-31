@@ -1,8 +1,8 @@
 //! Process affinity mutation capability and lane-isolation contracts.
 
 use super::*;
-use taskmanager_core::ProcessBatchAction;
-use taskmanager_core::ProcessBatchIntent;
+use taskforest_core::ProcessBatchAction;
+use taskforest_core::ProcessBatchIntent;
 
 #[test]
 fn slow_batch_control_cannot_block_affinity_mutation_lane() {

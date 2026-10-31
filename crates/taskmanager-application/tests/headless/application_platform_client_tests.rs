@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilityScheduler, CapabilitySnapshot, EventEnvelope,
     EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError, SubmissionErrorKind,
 };
@@ -10,12 +10,12 @@ use crate::platform::{
     ProcessAffinityRequest, ProcessControlRequest, ProcessFacets, ProcessInsightFacetState,
     ProcessInsightUnavailable, ProcessNetworkRequest,
 };
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process::FrozenProcessIdentity;
 
 use super::PlatformClient;
-use taskmanager_platform_contract::CapabilityRecoveryOutcome;
-use taskmanager_platform_contract::CapabilityRecoveryTrigger;
-use taskmanager_platform_contract::RuntimeSchedulingSnapshot;
+use taskforest_contract::CapabilityRecoveryOutcome;
+use taskforest_contract::CapabilityRecoveryTrigger;
+use taskforest_contract::RuntimeSchedulingSnapshot;
 
 #[derive(Default)]
 struct EmptyCapabilities;

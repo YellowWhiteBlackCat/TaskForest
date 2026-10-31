@@ -8,9 +8,9 @@ use gpui::Context;
 
 use super::{AppearancePreferences, RootView};
 use crate::gpui_app::theme::skin_for_appearance;
-use taskmanager_core::core::PreferredColorScheme;
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::config::{
+use taskforest_core::core::PreferredColorScheme;
+use taskforest_core::core::config::Config;
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
 };
 use taskmanager_theme::{

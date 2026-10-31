@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_contract::{CapabilityStatus, ProviderFailure};
 
 use super::{admits_escalation, assert_capability_failure_status, projected_capability_status};
 

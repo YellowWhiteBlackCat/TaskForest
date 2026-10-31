@@ -27,6 +27,27 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
+use taskforest_contract::{
+    CapabilityId, CapabilityStatus, OperationFailure, PlatformAxis, PlatformSource,
+    RetryDisposition,
+};
+use taskforest_core::DirectoryScanStatus;
+use taskforest_core::DirectoryUsageSnapshot;
+use taskforest_core::NpuInventorySnapshot;
+use taskforest_core::ScalarAvailability;
+use taskforest_core::core::alerts::{
+    AlertInstanceId, AlertRuleId, AlertSeverity, AlertTargetIdentity,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceId, ProviderId};
+use taskforest_core::core::metrics::GpuEngineRowsSnapshot;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+use taskforest_core::core::setup::SetupScriptAction;
+use taskforest_core::core::target::{ServiceId, SessionId};
+use taskforest_core::{DeviceStatus, DirectoryScanSpec};
 use taskmanager_application::DirectoryUsageEvent;
 use taskmanager_application::GpuEngineRowsEvent;
 use taskmanager_application::GpuEngineRowsRequest;
@@ -42,28 +63,7 @@ use taskmanager_application::{
     SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
     SmartObservationBatch, StorageFacets, SystemFacets,
 };
-use taskmanager_core::DirectoryScanStatus;
-use taskmanager_core::DirectoryUsageSnapshot;
-use taskmanager_core::NpuInventorySnapshot;
-use taskmanager_core::ScalarAvailability;
-use taskmanager_core::core::alerts::{
-    AlertInstanceId, AlertRuleId, AlertSeverity, AlertTargetIdentity,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceId, ProviderId};
-use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
-use taskmanager_core::core::setup::SetupScriptAction;
-use taskmanager_core::core::target::{ServiceId, SessionId};
-use taskmanager_core::{DeviceStatus, DirectoryScanSpec};
 use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, OperationFailure, PlatformAxis, PlatformSource,
-    RetryDisposition,
-};
 use taskmanager_platform_windows::{WindowsPlatformRuntime, capability_surface};
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);

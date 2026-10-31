@@ -1,4 +1,4 @@
-use taskmanager_core::core::hardware::CpuType;
+use taskforest_core::core::hardware::CpuType;
 
 pub mod cpu;
 pub mod disk;
@@ -8,9 +8,9 @@ mod display;
 mod display {
     use std::path::Path;
 
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::hardware::DisplayInfo;
-    use taskmanager_core::core::source::SourceOutcome;
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::hardware::DisplayInfo;
+    use taskforest_core::core::source::SourceOutcome;
 
     #[derive(Debug, Default)]
     pub(super) struct WaylandSessionFacts {

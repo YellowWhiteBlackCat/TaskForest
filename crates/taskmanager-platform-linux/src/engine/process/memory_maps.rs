@@ -3,7 +3,7 @@
 //! Mission Center's Apps memory value is a hybrid PSS estimate: anonymous and
 //! shared-memory RSS stay private, while file-backed RSS is divided by a
 //! periodically sampled sharing factor. This module owns only Linux I/O and
-//! the approximation. The typed scalar contract remains in `taskmanager-core`.
+//! the approximation. The typed scalar contract remains in `taskforest-core`.
 
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
@@ -12,7 +12,7 @@ use std::hash::Hash;
 use std::io::Read;
 use std::sync::Arc;
 
-use taskmanager_core::{FailureKind, SourceOutcome};
+use taskforest_core::{FailureKind, SourceOutcome};
 
 use super::procfs::{
     ProcMemoryObservations, ProcStatusMemoryFields, read_proc_memory_observations, read_proc_stat,

@@ -36,16 +36,16 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use taskmanager_application::{
-    DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DeviceState, DeviceStatus, FailureKind, FilesystemHealth, FilesystemHealthSnapshot,
     FilesystemHealthStatus, ProviderId, SmartSelfTestFailure, SmartSelfTestIntent,
     SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport, StorageDeviceTarget,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskmanager_application::{
+    DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,
+};
 use taskmanager_platform_provider::{
     DirectoryUsageProvider, FilesystemHealthProvider, SmartSelfTestControlProvider,
     SmartSelfTestObservationProvider,
@@ -553,12 +553,12 @@ impl SmartSelfTestObservationProvider for MacSmartSelfTestObservationProvider {
 /// The type is re-exported here so the existing storage composition and the
 /// `pub use storage::{..., MacDirectoryUsageProvider, ...}` facade stay stable.
 pub use crate::provider::directory_usage::MacDirectoryUsageProvider;
-use taskmanager_core::DiskMetrics;
-use taskmanager_core::DiskScalarObservations;
-use taskmanager_core::ScalarObservation;
-use taskmanager_core::StorageTelemetryObservation;
-use taskmanager_core::core::storage_health::FilesystemBackingKind;
-use taskmanager_core::metrics::SmartAvailability;
+use taskforest_core::DiskMetrics;
+use taskforest_core::DiskScalarObservations;
+use taskforest_core::ScalarObservation;
+use taskforest_core::StorageTelemetryObservation;
+use taskforest_core::core::storage_health::FilesystemBackingKind;
+use taskforest_core::metrics::SmartAvailability;
 use taskmanager_platform_provider::StorageTelemetryProvider;
 
 fn parse_phase(status: &str) -> SmartSelfTestPhase {

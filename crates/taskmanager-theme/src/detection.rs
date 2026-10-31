@@ -9,7 +9,7 @@
 use crate::theme::{HighContrast, LightDark, Skin};
 
 /// Host appearance facts in the theme's own vocabulary. `None` means the
-/// adapter could not observe the preference (taskmanager-core's
+/// adapter could not observe the preference (taskforest-core's
 /// `DesktopFamily::Unknown` / `PreferredColorScheme::Unknown`), deliberately
 /// distinct from a confirmed value.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]

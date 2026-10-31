@@ -1,23 +1,23 @@
 //! Shared presentation folds for pressure, load, kernel/service diagnostics,
 //! network counters, process isolation, and system health.
 
-use taskmanager_application::i18n;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{
     PressureWindow, ResourcePressure, SystemLoadAverage, SystemSnapshot,
 };
-use taskmanager_core::core::process::detect_process_anomalies;
-use taskmanager_core::core::process_telemetry::NetworkConnectionCounters;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process::detect_process_anomalies;
+use taskforest_core::core::process_telemetry::NetworkConnectionCounters;
+use taskforest_core::core::process_telemetry::{
     LinuxNamespaceAudit, NamespaceAuditStatus, ProcessCapabilities, ProcessIsolation,
 };
-use taskmanager_core::core::services::{ServiceDiagnostics, ServiceFailureCause};
-use taskmanager_core::{HealthScoreInput, SystemHealthScore};
+use taskforest_core::core::services::{ServiceDiagnostics, ServiceFailureCause};
+use taskforest_core::{HealthScoreInput, SystemHealthScore};
+use taskmanager_application::i18n;
 
 use super::{MISSING_VALUE, service_exit};
+use taskforest_core::ProcessItem;
+use taskforest_core::core::process_telemetry::CapabilityRiskLevel;
 use taskmanager_application::process_details_vm::command_identity_comparison;
-use taskmanager_core::ProcessItem;
-use taskmanager_core::core::process_telemetry::CapabilityRiskLevel;
 
 /// Compact shared process-anomaly banner. It is intentionally a triage hint:
 /// the typed core heuristic owns the evidence and the renderer only localizes

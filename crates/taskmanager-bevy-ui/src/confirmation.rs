@@ -36,10 +36,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::process_batch_action_label;
 
@@ -50,9 +50,9 @@ use crate::scene_attach::attach_child;
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::layout::MODAL_PANEL_WIDTH_REM;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_shell::ShellApp;
 
 /// Renderer-neutral view of one armed gate: the exact copy the dialog shows,

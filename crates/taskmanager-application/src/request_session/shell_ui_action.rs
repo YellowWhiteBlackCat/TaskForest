@@ -4,8 +4,8 @@ use crate::{
     CommandLaunchRequest, RequestAttemptId, RequestCorrelation, ResourceRevealRequest, ShellEvent,
     UrlOpenRequest,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
+use taskforest_core::core::failure::FailureKind;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ShellUiActionIntent {

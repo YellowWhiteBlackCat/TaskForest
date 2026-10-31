@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilityScheduler, CapabilitySnapshot,
     EventEnvelope, EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure,
     RequestEnvelope, RequestId, RequestPort, RuntimeSchedulingSnapshot, SubmissionError,
@@ -14,14 +14,14 @@ use crate::platform::{
     StorageTelemetryRequest, SystemFacets, SystemTelemetryDomain, SystemTelemetryDomainEvent,
     SystemTelemetryDomainOutcome, SystemTelemetryRevision, SystemTelemetryUnavailable,
 };
-use taskmanager_core::FailureKind::IdentityChanged;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::CapabilityRecoveryOutcome;
+use taskforest_contract::CapabilityRecoveryTrigger;
+use taskforest_core::FailureKind::IdentityChanged;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, ScalarObservation,
 };
-use taskmanager_platform_contract::CapabilityRecoveryOutcome;
-use taskmanager_platform_contract::CapabilityRecoveryTrigger;
 
 #[derive(Default)]
 struct EmptyCapabilities;

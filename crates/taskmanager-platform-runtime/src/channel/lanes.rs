@@ -1,5 +1,5 @@
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
+use taskforest_core::core::identity::ProviderId;
 
 use crate::environment::PendingEnvironmentRuntimeLanes;
 use crate::integration::PendingIntegrationRuntimeLanes;

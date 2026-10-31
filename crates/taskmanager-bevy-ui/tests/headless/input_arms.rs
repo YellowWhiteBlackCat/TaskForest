@@ -18,22 +18,22 @@ use bevy::ecs::observer::On;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::ResMut;
 use bevy::input::keyboard::KeyCode;
-use taskmanager_application::{
-    AppAction, AppPage, ConfirmationKind, PlatformEffect, SmartControlRequest,
-};
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::metrics::{DiskMetrics, SystemSnapshot};
-use taskmanager_core::core::services::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::metrics::{DiskMetrics, SystemSnapshot};
+use taskforest_core::core::services::{
     ServiceAction, ServiceItem, ServiceLogEntry, ServiceLogFeed, ServiceLogLevel,
     ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState,
     ServiceLogTimeFilter, ServiceStatus,
 };
-use taskmanager_core::core::session::SessionIncarnation;
-use taskmanager_core::core::smart::{
+use taskforest_core::core::session::SessionIncarnation;
+use taskforest_core::core::smart::{
     SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
 };
-use taskmanager_core::core::startup::StartupEntryId;
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::startup::StartupEntryId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::{
+    AppAction, AppPage, ConfirmationKind, PlatformEffect, SmartControlRequest,
+};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{self, ProjectionSeedFact, seed_projection_fact};

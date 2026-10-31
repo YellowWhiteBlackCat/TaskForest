@@ -2,11 +2,11 @@ use super::{
     MergedSourceState, SourceNotice, SourceStateKind, device_source_line, merge_source_lines,
     source_line, source_lines, source_notice, source_status_from_operation_failure, truncate_text,
 };
-use taskmanager_core::DeviceState;
-use taskmanager_core::{DeviceStatus, FailureKind, ProviderId, SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventSequence, OperationFailure, RequestIdGenerator, RetryDisposition,
 };
+use taskforest_core::DeviceState;
+use taskforest_core::{DeviceStatus, FailureKind, ProviderId, SourceOutcome, SourceStatus};
 
 fn source(outcome: SourceOutcome) -> SourceStatus {
     SourceStatus {

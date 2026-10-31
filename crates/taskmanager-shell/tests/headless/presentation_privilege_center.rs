@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
 
 #[test]
 fn unobserved_capabilities_never_render_enabled_or_offer_authorization() {

@@ -27,7 +27,7 @@ hot-plug capability bit, and a missing bit must not become a believable false.
 
 ### Orthogonal storage facts
 
-`taskmanager-core::storage` owns four portable axes:
+`taskforest-core::storage` owns four portable axes:
 
 - `StorageProtocol`: NVMe, ATA, SCSI, MMC, SD, UFS, other, or unknown;
 - `StorageInterconnect`: PCIe, SATA, SAS, USB, MMC, SD, UFS, IDE, Virtio,

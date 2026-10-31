@@ -8,9 +8,9 @@
 //! utilization stays a typed observation inside each device and is
 //! `Unavailable(Unsupported)` until a stable kernel interface exists.
 
-use taskmanager_core::NpuInventorySnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::NpuInventorySnapshot;
 
 /// One accelerator inventory read for the host.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]

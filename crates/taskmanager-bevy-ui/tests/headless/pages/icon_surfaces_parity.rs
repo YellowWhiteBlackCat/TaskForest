@@ -27,21 +27,19 @@ use bevy::ecs::query::With;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::{BackgroundColor, Node, Val};
-use taskmanager_application::{CorrelatedSessionEvent, PlatformEventBatch, SessionEvent};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::{
     ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::storage_health::{
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::storage_health::{
     FilesystemBackingKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
-};
+use taskmanager_application::{CorrelatedSessionEvent, PlatformEventBatch, SessionEvent};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_theme::Theme;

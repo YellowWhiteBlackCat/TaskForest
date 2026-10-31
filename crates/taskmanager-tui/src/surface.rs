@@ -13,8 +13,8 @@ use crate::{
     BatchMenuTarget, CommandPalette, ProcessMenuTarget, ServiceMenuTarget, SessionMenuTarget,
     StartupMenuTarget, TuiApp,
 };
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::target::ServiceId;
 
 /// Target for the interactive service-dependencies modal.
 #[derive(Clone, Debug)]

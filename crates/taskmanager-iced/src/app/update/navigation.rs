@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessRowId;
 
 use super::super::IcedApp;

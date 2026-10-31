@@ -2,12 +2,12 @@
 
 use std::path::PathBuf;
 
-use taskmanager_core::core::services::ServiceLogEntry;
-use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
+use taskforest_core::core::services::ServiceLogEntry;
+use taskforest_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 
 use crate::path_contract::is_single_filename;
-use taskmanager_core::DiagnosticSource;
-use taskmanager_core::core::diagnostics::DiagnosticPreview;
+use taskforest_core::DiagnosticSource;
+use taskforest_core::core::diagnostics::DiagnosticPreview;
 
 /// One review/export lifecycle; a renderer stores it in its sole surface slot.
 #[derive(Debug, Clone, PartialEq, Eq)]

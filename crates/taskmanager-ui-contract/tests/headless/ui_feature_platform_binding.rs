@@ -82,7 +82,7 @@ fn platform_binding_is_total_typed_and_explained() {
 
 /// The forwarded capability expectation surface is exactly the pinned set:
 /// `Requires` may only name capability identities that really exist in
-/// `taskmanager-platform-contract`, and dropping or adding one is visible.
+/// `taskforest-contract`, and dropping or adding one is visible.
 #[test]
 fn required_capabilities_are_a_pinned_product_expectation_surface() {
     let mut required: Vec<_> = FeatureId::ALL

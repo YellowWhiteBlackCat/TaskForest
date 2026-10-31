@@ -20,30 +20,30 @@
 
 #![forbid(unsafe_code)]
 
-use taskmanager_core::core::ContainerSummary;
-use taskmanager_core::core::export::{
+use taskforest_core::core::ContainerSummary;
+use taskforest_core::core::export::{
     ExportExtras, ProcessGpuEnginesEntry, snapshot_to_json_with_extras,
 };
-use taskmanager_core::core::process_telemetry::ProcessGpuEngines;
-use taskmanager_core::{ProcessItem, SystemSnapshot};
+use taskforest_core::core::process_telemetry::ProcessGpuEngines;
+use taskforest_core::{ProcessItem, SystemSnapshot};
 // The four contracts below are referenced only by the Linux /proc bulk reader
 // (and its unit tests). On macOS/Windows that reader is cfg'd out, so these
 // imports must follow it — otherwise `-D unused-imports` fires on those targets.
 #[cfg(any(target_os = "linux", test))]
-use taskmanager_core::core::FailureKind;
+use taskforest_core::core::FailureKind;
 #[cfg(any(target_os = "linux", test))]
-use taskmanager_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::ScalarObservation;
 #[cfg(any(target_os = "linux", test))]
-use taskmanager_core::core::process_telemetry::ProcessGpuEngineUsage;
+use taskforest_core::core::process_telemetry::ProcessGpuEngineUsage;
 // DeviceState is referenced only by the Linux /proc bulk reader and its
 // Linux-only tests, never by the cross-platform tests (one_gpu_proc uses
 // FailureKind, not DeviceState). Keep it Linux-gated rather than
 // `any(linux, test)` so it is not an unused import on macOS/Windows test
 // builds under -D warnings.
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::DeviceState;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::DeviceState;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 
 /// Hard cap on how many processes the one-shot bulk GPU scan opens. Keeps the
 /// stateless CLI fast on hosts with thousands of processes; a GPU process past

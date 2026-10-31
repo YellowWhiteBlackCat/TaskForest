@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, ProviderFailure, RequestTracking,
     SchedulingDomain, SidebandPolicy,
 };

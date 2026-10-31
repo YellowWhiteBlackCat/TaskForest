@@ -128,11 +128,18 @@ fn production_workspace_dependencies(manifest: &str) -> BTreeSet<String> {
     dependencies
 }
 
-/// Accept a manifest dependency key only if it names a `taskmanager-*` crate
-/// (strips trailing inheritance suffixes already handled by the caller).
+/// Accept a manifest dependency key only if it names a workspace crate of this
+/// repository (strips trailing inheritance suffixes already handled by the
+/// caller).
+///
+/// Two reserved prefixes coexist after the CORE-44 hard cutover: the published
+/// library crates carry `taskforest-*` and the application/helper crates still
+/// carry `taskmanager-*`. Both must be recognized, because the reverse
+/// firewalls assert an exact dependency set — a prefix this helper ignored
+/// would look like "no dependency" and silently weaken the check.
 fn taskmanager_dep_name(name: &str) -> Option<&str> {
     let trimmed = name.trim();
-    trimmed.starts_with("taskmanager-").then_some(trimmed)
+    (trimmed.starts_with("taskmanager-") || trimmed.starts_with("taskforest-")).then_some(trimmed)
 }
 
 /// Every workspace package manifest: the root `Cargo.toml` plus each
@@ -269,7 +276,7 @@ fn dependency_parser_catches_both_toml_forms_and_build_deps() {
     // simply using the idiomatic table syntax. This pins both forms + dev-exclusion.
     let manifest = "\
 [dependencies]
-taskmanager-core = { path = \"../taskmanager-core\" }
+taskforest-core = { path = \"../taskforest-core\" }
 [dependencies.taskmanager-afpacket]
 path = \"../taskmanager-afpacket\"
 [build-dependencies]
@@ -284,7 +291,7 @@ taskmanager-platform-linux = { path = \"../taskmanager-platform-linux\" }
     let deps = production_workspace_dependencies(manifest);
     for (crate_name, reason) in [
         (
-            "taskmanager-core",
+            "taskforest-core",
             "inline [dependencies] form must be caught",
         ),
         (
@@ -338,8 +345,8 @@ fn command_constructor_policy_uses_an_independent_identifier_boundary() {
 /// macOS and the Windows third-OS adapter share the same inward edges.
 const MACOS_WINDOWS_ADAPTER_DEPS: &[&str] = &[
     "taskmanager-application",
-    "taskmanager-core",
-    "taskmanager-platform-contract",
+    "taskforest-core",
+    "taskforest-contract",
     "taskmanager-platform-portable",
     "taskmanager-platform-provider",
     "taskmanager-platform-runtime",
@@ -366,25 +373,25 @@ fn assert_workspace_dependencies(repository: &std::path::Path, package: &str, ex
 fn workspace_dependency_dag_matches_the_inward_firewall() {
     let repository = repository();
     for (package, expected) in [
-        ("taskmanager-core", &[][..]),
-        ("taskmanager-telemetry-store", &["taskmanager-core"][..]),
+        ("taskforest-core", &[][..]),
+        ("taskmanager-telemetry-store", &["taskforest-core"][..]),
         // ADR-028: opt-in history persistence is a pure-safe core-only leaf;
         // the composition edge (root crate) wires it into the ingestor sink.
-        ("taskmanager-history-store", &["taskmanager-core"][..]),
-        ("taskmanager-platform-contract", &["taskmanager-core"][..]),
+        ("taskmanager-history-store", &["taskforest-core"][..]),
+        ("taskforest-contract", &["taskforest-core"][..]),
         (
             "taskmanager-application",
-            &["taskmanager-core", "taskmanager-platform-contract"][..],
+            &["taskforest-core", "taskforest-contract"][..],
         ),
         (
             "taskmanager-platform-provider",
-            &["taskmanager-core", "taskmanager-platform-contract"][..],
+            &["taskforest-core", "taskforest-contract"][..],
         ),
         (
             "taskmanager-platform-portable",
             &[
-                "taskmanager-core",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-contract",
                 "taskmanager-platform-provider",
             ][..],
         ),
@@ -392,16 +399,16 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-platform-runtime",
             &[
                 "taskmanager-application",
-                "taskmanager-core",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-contract",
             ][..],
         ),
         (
             "taskmanager-ui-contract",
             &[
                 "taskmanager-application",
-                "taskmanager-core",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-contract",
             ][..],
         ),
         (
@@ -420,9 +427,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-shell",
             &[
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-application",
-                "taskmanager-platform-contract",
+                "taskforest-contract",
                 "taskmanager-telemetry-store",
                 "taskmanager-ui-contract",
             ][..],
@@ -436,7 +443,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-privilege-helper",
             &[
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-perf-ioctl",
                 "taskmanager-platform-portable",
             ][..],
@@ -472,11 +479,11 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-platform-linux",
             &[
                 "taskmanager-application",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-escalation",
                 "taskmanager-afpacket",
                 "taskmanager-perf-ioctl",
-                "taskmanager-platform-contract",
+                "taskforest-contract",
                 "taskmanager-platform-portable",
                 "taskmanager-platform-provider",
                 "taskmanager-platform-runtime",
@@ -486,9 +493,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-platform-native",
             &[
-                "taskmanager-core",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-platform-linux",
                 "taskmanager-platform-macos",
                 "taskmanager-platform-windows",
@@ -498,22 +505,22 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-app-host",
             &[
                 "taskmanager-application",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-history-store",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-platform-native",
                 "taskmanager-platform-runtime",
             ][..],
         ),
-        ("taskmanager-ipc", &["taskmanager-core"][..]),
+        ("taskforest-ipc", &["taskforest-core"][..]),
         (
-            "taskmanager-daemon",
+            "taskforest-daemon",
             &[
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-history-store",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-platform-native",
                 "taskmanager-platform-runtime",
             ][..],
@@ -526,9 +533,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             // no Linux shapes, no store.
             &[
                 "taskmanager-application",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-escalation",
-                "taskmanager-platform-contract",
+                "taskforest-contract",
                 "taskmanager-platform-portable",
                 "taskmanager-platform-provider",
                 "taskmanager-platform-runtime",
@@ -545,9 +552,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
-                "taskmanager-core",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-shell",
                 // The neutral design system (ADR-026): the TUI takes the theme
                 // with default features, so this edge links zero toolkit.
@@ -567,9 +574,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 // ADR-026 fonts policy: run.rs registers the bundled font bytes
                 // into iced's font database — the same pure leaf GPUI embeds.
                 "taskmanager-assets",
-                "taskmanager-core",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-core",
+                "taskforest-ipc",
+                "taskforest-contract",
                 // ADR-051: taskmanager-icons is neutral on every target; the
                 // iced frontend resolves its own bytes for rendering.
                 "taskmanager-icons",
@@ -588,10 +595,10 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-icons",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-shell",
                 "taskmanager-telemetry-store",
                 "taskmanager-theme",
@@ -608,10 +615,10 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-icons",
-                "taskmanager-ipc",
-                "taskmanager-platform-contract",
+                "taskforest-ipc",
+                "taskforest-contract",
                 "taskmanager-shell",
                 "taskmanager-theme",
                 "taskmanager-ui-contract",
@@ -634,7 +641,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
-                "taskmanager-core",
+                "taskforest-core",
                 "taskmanager-escalation",
             ][..],
         ),
@@ -667,7 +674,7 @@ fn linux_engine_does_not_depend_on_application_use_cases() {
 
     assert!(
         !code.contains("taskmanager_application"),
-        "Linux engine code must import shared facts from taskmanager-core or taskmanager-platform-contract, not from the application use-case layer"
+        "Linux engine code must import shared facts from taskforest-core or taskforest-contract, not from the application use-case layer"
     );
 }
 
@@ -675,10 +682,10 @@ fn linux_engine_does_not_depend_on_application_use_cases() {
 fn shared_layers_cannot_select_linux_io_or_hardware_vendor_binaries() {
     let repository = repository();
     for package in [
-        "taskmanager-core",
+        "taskforest-core",
         "taskmanager-telemetry-store",
         "taskmanager-history-store",
-        "taskmanager-platform-contract",
+        "taskforest-contract",
         "taskmanager-application",
         "taskmanager-platform-portable",
         "taskmanager-platform-provider",
@@ -731,7 +738,7 @@ fn gpui_frontend_never_reaches_platform_adapter_crates() {
     // taskmanager-app-host is the shared composition edge and is the only
     // crate that names taskmanager-platform-native. Every UI source must
     // route platform behavior through taskmanager_application /
-    // taskmanager_ui_contract / taskmanager_core.
+    // taskmanager_ui_contract / taskforest_core.
     let repository = repository();
     let mut code =
         rust_code_without_line_comments(&repository.join("crates/taskmanager-gpui/src/gpui_app"));
@@ -758,7 +765,7 @@ fn gpui_frontend_never_reaches_platform_adapter_crates() {
         assert!(
             !code.contains(forbidden),
             "GPUI frontend reached a platform-adapter crate ({forbidden}); UI sources must cross \
-             taskmanager_application / taskmanager_ui_contract / taskmanager_core, and only \
+             taskmanager_application / taskmanager_ui_contract / taskforest_core, and only \
              src/main.rs may wire the native adapter"
         );
     }

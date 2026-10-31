@@ -1,16 +1,16 @@
 //! Renderer-local resource, focus, and process-layout selectors.
 
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus,
+};
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, SystemPageSection, TimelineMetric,
 };
 use taskmanager_application::{AppPage, DirectoryUsageRequest, PlatformEffect, i18n::t};
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus,
-};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::GpuMetrics;
-use taskmanager_core::core::sensors::SensorQuantity;
-use taskmanager_platform_contract::CapabilityId;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use crate::TuiApp;

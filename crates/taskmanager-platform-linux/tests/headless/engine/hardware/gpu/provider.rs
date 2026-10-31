@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceRefreshOutcome, DeviceState, DeviceStatus, FailureKind, GpuMetricField,
     GpuMetrics, GpuScalarObservations, ProviderId, ScalarAvailability, ScalarObservation,
 };
@@ -13,7 +13,7 @@ use super::nvidia::NVIDIA_PROCFS_PROVIDER_ID;
 #[cfg(feature = "nvidia")]
 use super::nvidia::NVML_PROVIDER_ID;
 use super::{GpuProviderFailure, GpuProviderRegistry, GpuTelemetryProvider};
-use taskmanager_core::SourceOutcome;
+use taskforest_core::SourceOutcome;
 
 struct FixtureProvider {
     id: &'static str,

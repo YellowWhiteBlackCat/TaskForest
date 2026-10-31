@@ -20,16 +20,16 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ValueChange};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use taskforest_contract::{
+    CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
+    OperationFailure, ProviderFailure, RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::process_telemetry::{ProcessIdentity, ProcessInsightSnapshot};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessFacets,
     ProcessInsightFacetEvent, ProcessInsightObservation, ProcessNetworkRequest, i18n::t,
-};
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::process_telemetry::{ProcessIdentity, ProcessInsightSnapshot};
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
-    OperationFailure, ProviderFailure, RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::{fixture, queue_effect};
 use taskmanager_theme::Theme;

@@ -2,12 +2,12 @@ use crossbeam_channel::{TrySendError, bounded};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::{
+use taskforest_contract::{EventEnvelope, RequestScope, RequestTracking, SidebandPolicy};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::{
     DirectoryScanBounds, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
     DirectoryUsageSnapshot,
 };
-use taskmanager_platform_contract::{EventEnvelope, RequestScope, RequestTracking, SidebandPolicy};
 
 use super::*;
 use crate::channel::Queued;

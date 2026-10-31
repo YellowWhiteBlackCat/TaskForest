@@ -3,10 +3,10 @@
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
-use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_shell::presentation::about::metadata;
 use taskmanager_shell::presentation::system_information::{
     SystemInformationGroup, copy_all_text, groups,

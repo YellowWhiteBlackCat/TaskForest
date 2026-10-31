@@ -9,20 +9,20 @@ use std::time::Instant;
 
 use std::sync::Arc;
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     CumulativeCounter, FailureKind, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
     NetworkTelemetryObservation, NetworkWirelessObservations, ScalarObservation,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::NetworkTelemetryProvider;
 
 use super::{NETWORK_TELEMETRY_PROVIDER, available_source, unavailable_source};
-use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
-use taskmanager_core::DeviceId;
-use taskmanager_core::DeviceLifecycleRegistry;
-use taskmanager_core::DeviceRefreshOutcome;
-use taskmanager_core::DeviceState;
-use taskmanager_core::DeviceStatus;
+use taskforest_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskforest_core::DeviceId;
+use taskforest_core::DeviceLifecycleRegistry;
+use taskforest_core::DeviceRefreshOutcome;
+use taskforest_core::DeviceState;
+use taskforest_core::DeviceStatus;
 use taskmanager_windows_api::WindowsAdapterType;
 use taskmanager_windows_api::WindowsApiError;
 use taskmanager_windows_api::WindowsNetworkAdapter;

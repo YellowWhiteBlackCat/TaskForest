@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 #[test]
 fn cpu_factory_picks_group_availability_by_live_slot_coverage() {

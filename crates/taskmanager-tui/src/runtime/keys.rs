@@ -19,8 +19,8 @@
 //! the TUI registry — one chord, one declaring layer.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppPage, Modifiers, PlatformEffect};
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoTable, InputDispatch, SearchSlot,
 };
@@ -31,8 +31,8 @@ use crate::ui::chart_cursor::chart_cursor_system;
 use crate::{FocusPanel, PerfDevice, TuiApp, TuiInputScope};
 
 use super::{HELP_PAGE_STEP, inline_network_escalation_ready, key_to_terminal, modals, navigation};
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::SurfaceKind;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::ShellApp;
 
 mod direct;

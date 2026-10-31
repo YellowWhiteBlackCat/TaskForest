@@ -37,15 +37,15 @@ use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::{Activate, UiWidgetsPlugins, ValueChange};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::process_telemetry::{
+    LimitValue, ProcessResourceSnapshot, ResourceObservation,
+};
+use taskforest_core::core::{ProcessResourceObservations, ScalarObservation};
 use taskmanager_application::{
     AppAction, AppPage, ProcessInsightFacet, ProcessInsightFacetState, i18n::t,
 };
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
-use taskmanager_core::core::process_telemetry::{
-    LimitValue, ProcessResourceSnapshot, ResourceObservation,
-};
-use taskmanager_core::core::{ProcessResourceObservations, ScalarObservation};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;

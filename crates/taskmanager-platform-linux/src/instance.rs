@@ -12,7 +12,7 @@
 
 use std::{sync::mpsc::Sender, time::Duration};
 
-use taskmanager_platform_contract::{InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole};
+use taskforest_contract::{InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole};
 
 const DBUS_INTERFACE: &str = "org.taskforest.Instance";
 const DBUS_PATH: &str = "/org/taskforest/Instance";

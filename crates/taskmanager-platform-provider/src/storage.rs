@@ -1,8 +1,8 @@
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     DeviceState, DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot,
     FilesystemHealthSnapshot, SmartSelfTestIntent, SmartSelfTestReport, StorageDeviceTarget,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 
 pub trait FilesystemHealthProvider: Send + 'static {
     fn refresh(

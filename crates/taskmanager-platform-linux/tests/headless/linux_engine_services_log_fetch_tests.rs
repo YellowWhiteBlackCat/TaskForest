@@ -4,7 +4,7 @@ use super::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use taskmanager_core::ServiceId;
+use taskforest_core::ServiceId;
 
 #[test]
 fn idle_consumer_keeps_result_queue_bounded_and_newest_snapshots_win() {

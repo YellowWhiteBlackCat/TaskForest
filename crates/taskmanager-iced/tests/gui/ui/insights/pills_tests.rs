@@ -8,12 +8,12 @@ use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Element, Rectangle, Size};
-use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::process_telemetry::{
     CapabilityRiskLevel, ConnectionAddressFamily, ConnectionEndpoint, ConnectionState,
     ConnectionTransport, ProcessCapabilities, ProcessConnection,
 };
+use taskmanager_assets::embedded_fonts;
 use taskmanager_test_support::pin_english;
 use taskmanager_theme::Theme;
 

@@ -8,9 +8,9 @@ use std::cell::RefCell;
 use std::{rc::Rc, sync::Arc};
 use taskmanager_application::ApplicationHistoryRow;
 
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::StartupEntry;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::StartupEntry;
 
 use taskmanager_shell::{InfoSortCol, SortDir};
 
@@ -19,8 +19,8 @@ use crate::gpui_app::app_history_view::AppHistoryRow;
 use crate::gpui_app::processes_view::rows::ProjectionCache;
 use crate::gpui_app::services_view::ServiceFilter;
 use crate::gpui_app::startup_view::StartupFilter;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
 
 struct ServicesEntry {
     generation: u64,

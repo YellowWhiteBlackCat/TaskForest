@@ -39,11 +39,11 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
-use taskmanager_core::core::process::{
+use taskforest_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
 };
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;

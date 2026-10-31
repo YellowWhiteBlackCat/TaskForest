@@ -16,11 +16,11 @@ use std::time::Duration;
 
 use ratatui::crossterm::event::{Event, KeyModifiers};
 use ratatui::layout::Rect;
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
 };
-use taskmanager_core::core::services::{ServiceLogLevelFilter, ServiceLogTimeFilter};
+use taskforest_core::core::services::{ServiceLogLevelFilter, ServiceLogTimeFilter};
+use taskmanager_application::{AppAction, AppPage};
 
 use super::super::seam::seam_support::apply_terminal_event;
 use crate::command_palette::{
@@ -449,7 +449,7 @@ fn about_protocol_routes_repository_and_independent_information_without_global_c
 #[test]
 fn event_review_native_navigation_reaches_every_complete_transition_in_compact_view() {
     use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-    use taskmanager_core::core::alerts::AlertEventKind;
+    use taskforest_core::core::alerts::AlertEventKind;
     let mut app = crate::demo_app();
     crate::demo::capture_overrides::apply_capture_scene_override(&mut app, "event-center");
     let events = app.projection().alert_center.event_history().to_vec();

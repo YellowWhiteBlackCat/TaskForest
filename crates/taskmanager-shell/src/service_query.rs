@@ -5,8 +5,8 @@
 //! decides which rows that query keeps. GPUI, Iced, Bevy, and the TUI all
 //! consume it so one typed name can never filter differently per renderer.
 
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::text::contains_ascii_ci;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::text::contains_ascii_ci;
 
 /// Whether one service's text survives the Services-page search query.
 ///

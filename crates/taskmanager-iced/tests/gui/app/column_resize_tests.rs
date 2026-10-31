@@ -14,8 +14,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use iced::Point;
+use taskforest_core::core::config::ColumnWidthConfig;
 use taskmanager_application::ConfigStore;
-use taskmanager_core::core::config::ColumnWidthConfig;
 
 use taskmanager_shell::SortCol;
 

@@ -30,8 +30,8 @@ use crate::gpui_app::root::responsive::{
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
 use crate::gpui_app::timeline::GraphTimelineSeries;
+use taskforest_core::core::AlertEvent;
 use taskmanager_application::i18n;
-use taskmanager_core::core::AlertEvent;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};

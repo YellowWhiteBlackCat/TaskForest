@@ -29,19 +29,19 @@ use bevy::scene::WorldSceneExt;
 use bevy::text::Font;
 use bevy::ui::Checked;
 use bevy::ui::widget::Text;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
+};
+use taskforest_core::core::alerts::{
+    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleId, AlertSeverity,
+    AlertTargetIdentity,
+};
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_application::{
     AlertEventSeed, AlertRuleEditResult, HostTelemetryRequest, ManagedAlertRule,
     ManagedAlertRuleEdit, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SystemFacets,
-};
-use taskmanager_core::core::alerts::{
-    Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleId, AlertSeverity,
-    AlertTargetIdentity,
-};
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
 };
 use taskmanager_theme::tokens::UiSize;
 
@@ -54,13 +54,13 @@ use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskforest_contract::RequestEnvelope;
+use taskforest_core::core::alerts::AlertRuleTransferEntry;
+use taskforest_core::core::alerts::AlertRuleTransferError;
+use taskforest_core::core::alerts::export_alert_rules_json;
+use taskforest_core::core::alerts::import_alert_rules_json;
 use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::ManagedAlertRuleEditOutcome;
-use taskmanager_core::core::alerts::AlertRuleTransferEntry;
-use taskmanager_core::core::alerts::AlertRuleTransferError;
-use taskmanager_core::core::alerts::export_alert_rules_json;
-use taskmanager_core::core::alerts::import_alert_rules_json;
-use taskmanager_platform_contract::RequestEnvelope;
 use taskmanager_ui_contract::ProductIntent;
 use taskmanager_ui_contract::SurfaceDecision;
 

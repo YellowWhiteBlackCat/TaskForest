@@ -9,8 +9,8 @@
 //! rendered as the engine's `TooFewSamples` verdict — never a fabricated
 //! threshold.
 
-use taskmanager_core::SystemSnapshot;
-use taskmanager_core::core::alerts::{
+use taskforest_core::SystemSnapshot;
+use taskforest_core::core::alerts::{
     AlertEngine, AlertMetric, InsufficientReason, RollingStatSnapshot, SUGGESTION_MIN_SAMPLES,
     SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };

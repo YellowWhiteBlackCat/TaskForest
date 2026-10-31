@@ -6,23 +6,23 @@ use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::widgets::Paragraph;
+use taskforest_contract::RequestId;
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::{
+    OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
+};
+use taskforest_core::core::process_telemetry::{
+    OpenFileKind, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessGpuSnapshot,
+    ThreadState,
+};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
     ProcessInsightsRevision, project_process_resources,
 };
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::{
-    OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
-};
-use taskmanager_core::core::process_telemetry::{
-    OpenFileKind, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessGpuSnapshot,
-    ThreadState,
-};
-use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::missing_value;
 
@@ -433,10 +433,10 @@ fn open_files_preview_renders_empty_state_for_no_descriptors() {
 
 #[test]
 fn open_files_preview_renders_fd_limit_saturation() {
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::process_telemetry::{
         ProcessResourceObservations, ResourceObservation,
     };
-    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+    use taskforest_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
 
     let _guard = en();
     let open_files = ProcessOpenFiles {
@@ -929,8 +929,8 @@ fn capabilities_preview_renders_header_rows_and_ellipsis() {
 /// are highlighted with visible warning markers.
 #[test]
 fn insights_lines_renders_capabilities_with_warning_markers() {
-    use taskmanager_core::core::identity::ProviderId;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::identity::ProviderId;
+    use taskforest_core::core::process_telemetry::{
         ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
         ResourceObservation,
     };
@@ -995,9 +995,9 @@ fn insights_lines_renders_capabilities_with_warning_markers() {
 
 #[test]
 fn insights_lines_renders_resource_limits_with_quota_pids_and_cgroup() {
-    use taskmanager_core::core::identity::ProviderId;
-    use taskmanager_core::core::process_telemetry::ResourceObservation;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::identity::ProviderId;
+    use taskforest_core::core::process_telemetry::ResourceObservation;
+    use taskforest_core::core::process_telemetry::{
         LimitValue, ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
     };
 

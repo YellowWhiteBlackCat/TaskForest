@@ -20,15 +20,15 @@ use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::ui::widget::Text;
-use taskmanager_application::{AppAction, AppPage, ConfirmationKind};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
     ProcessScalarObservations,
 };
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::{DeviceGeneration, StorageDeviceKey};
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::{DeviceGeneration, StorageDeviceKey};
+use taskmanager_application::{AppAction, AppPage, ConfirmationKind};
 use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
@@ -44,13 +44,13 @@ use crate::app::FrontendTrack;
 use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
 use crate::input::PendingEffects;
 use crate::window::{FeedbackLine, FrontendWindowPlugin};
+use taskforest_core::core::process::PriorityTier;
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::SmartControlRequest;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::PriorityTier;
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 // ---- fixtures -----------------------------------------------------------
 

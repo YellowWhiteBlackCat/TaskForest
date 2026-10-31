@@ -7,6 +7,10 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
+use taskforest_contract::{
+    CapabilityId, CapabilityRequest, CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, SidebandPolicy,
+};
+use taskforest_core::core::identity::ProviderId;
 use taskmanager_application::{
     CommandLaunchRequest, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest,
     DesktopAppearanceRequest, DesktopNotificationRequest, DirectoryUsageRequest,
@@ -22,10 +26,6 @@ use taskmanager_application::{
     SessionInventoryRequest, SetupScriptRequest, SmartControlRequest, SmartObservationRequest,
     SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
     StorageHealthRequest, StorageTelemetryRequest, UrlOpenRequest,
-};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityRequest, CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, SidebandPolicy,
 };
 
 use crate::registration::ProviderBinding;

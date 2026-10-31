@@ -1,6 +1,6 @@
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::storage_health::FilesystemBackingKind;
-use taskmanager_core::core::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::storage_health::FilesystemBackingKind;
+use taskforest_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthStatus, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,

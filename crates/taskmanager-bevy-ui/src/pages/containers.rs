@@ -43,10 +43,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_ui_contract::IconId;
 

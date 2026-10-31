@@ -1,7 +1,7 @@
 //! Static hardware facts independent from on-demand memory and NPU lanes.
 
+use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_shell::presentation::{kernel_error_summary, missing_value};
 
 use super::{SystemFactGroup, SystemFactRow, clean_memory_size, joined, optional};

@@ -1,13 +1,11 @@
 use super::*;
 use crate::fixture::health::seed_shell_health;
 use crate::fixture::{ProjectionSeedFact, demo_app, seed_projection_fact};
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::smart::{SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport};
+use taskforest_core::core::system_health::SmartSelfTestObservation;
+use taskforest_core::core::target::StorageDeviceKey;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::smart::{
-    SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport,
-};
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
-use taskmanager_core::core::target::StorageDeviceKey;
 
 #[test]
 fn normal_health_fold_preserves_integrity_sensor_failure_and_report_identity() {

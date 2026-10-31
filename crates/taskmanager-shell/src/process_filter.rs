@@ -4,9 +4,9 @@
 //! control that selects a bucket. Keeping the classifier here means selection,
 //! keyboard navigation, actions, and rendered rows all consume the same list.
 
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::text::contains_ascii_ci;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::text::contains_ascii_ci;
 
 /// The six process-state buckets exposed by the Applications filter.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

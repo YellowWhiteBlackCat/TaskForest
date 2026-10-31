@@ -1,7 +1,7 @@
 //! Rendering for the root application shell.
 
+use taskforest_contract::CapabilityId;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::fill;
@@ -33,7 +33,7 @@ use gpui::{
     Animation, AnimationExt, Context, Div, InteractiveElement, IntoElement, MouseMoveEvent,
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
-use taskmanager_core::core::SystemSnapshot;
+use taskforest_core::core::SystemSnapshot;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::window_chrome_state;

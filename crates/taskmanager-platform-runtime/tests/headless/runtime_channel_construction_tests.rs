@@ -1,10 +1,10 @@
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::identity::ProviderId;
 
 use crate::{ProviderBinding, RuntimeBudgets};
 
 use super::*;
-use taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES;
+use taskforest_contract::MAX_REQUEST_SCOPE_BYTES;
 
 impl ChannelRuntime {
     pub(crate) fn new(bindings: RuntimeProviderBindings, config: RuntimeConfig) -> Self {

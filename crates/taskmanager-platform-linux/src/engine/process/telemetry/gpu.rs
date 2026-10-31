@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
 
 use super::{
     ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity, state_for_status,

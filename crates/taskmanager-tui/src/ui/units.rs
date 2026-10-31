@@ -4,13 +4,13 @@
 //! family) resolves into these pure text formatters; the device renderers
 //! (`perf_memory`, `perf_disks`, `perf_networks`) read `app.prefs.units` at
 //! render entry and pass the pair down. The formatting itself is the
-//! `taskmanager-core` single source (`core::units`): every frontend renders
+//! `taskforest-core` single source (`core::units`): every frontend renders
 //! the same string for the same value + preference pair. These wrappers keep the
 //! historical `(value, use_bytes, use_base2)` call shape.
 
+use taskforest_core::core::metrics::{CpuFrequencySource, CpuTemperatureSource};
+use taskforest_core::core::units::format_quantity_with;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{CpuFrequencySource, CpuTemperatureSource};
-use taskmanager_core::core::units::format_quantity_with;
 use taskmanager_shell::presentation::missing_value;
 
 /// Format a memory quantity honoring the persisted unit preferences: bytes

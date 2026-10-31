@@ -1,13 +1,13 @@
 //! Frozen process properties follow canonical identity across filtering and PID reuse.
 
 use super::{ProcessPropertiesSection, view_model};
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::process_telemetry::ConnectionTransport;
+use taskforest_core::core::process_telemetry::ProcessEnvironmentEntry;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{AppAction, AppPage, i18n::t};
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
-use taskmanager_core::core::process_telemetry::ConnectionTransport;
-use taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry;
 use taskmanager_shell::{ShellApp, fixture};
 
 fn process(name: &str, token: u64) -> ProcessItem {
@@ -280,8 +280,8 @@ fn complete_inspection_preserves_tail_entries_and_separates_resource_and_securit
 
 #[test]
 fn independent_availability_and_mismatched_targets_remain_honest() {
+    use taskforest_core::core::FailureKind;
     use taskmanager_application::{ProcessInsightFacetState, ProcessInsightUnavailable};
-    use taskmanager_core::core::FailureKind;
     let mut shell = opened_shell();
     let target = shell.process_properties_target().expect("target").clone();
     let mut projection =

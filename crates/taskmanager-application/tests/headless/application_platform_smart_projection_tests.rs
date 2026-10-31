@@ -1,4 +1,4 @@
-use taskmanager_core::{SmartSelfTestReport, StorageDeviceKey};
+use taskforest_core::{SmartSelfTestReport, StorageDeviceKey};
 
 use super::*;
 

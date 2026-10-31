@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey, HistoryWindow,
 };
 use taskmanager_history_store::MAX_RECORDED_BOOTS;
@@ -433,7 +433,7 @@ fn shared_as_sink_trait_object_records_normally() {
 
 #[test]
 fn boot_history_deduplicates_content_and_returns_the_previous_baseline() {
-    use taskmanager_core::{BootTimeline, BootTimelineSegment};
+    use taskforest_core::{BootTimeline, BootTimelineSegment};
     use taskmanager_history_store::{BootEvidenceHistory, RecordBootOutcome};
 
     fn timeline(total_ms: u64, units: &[(&str, u64)]) -> BootTimeline {
@@ -501,7 +501,7 @@ fn boot_history_deduplicates_content_and_returns_the_previous_baseline() {
 
 #[test]
 fn boot_history_treats_a_completing_chain_as_the_same_boot() {
-    use taskmanager_core::{BootTimeline, BootTimelineSegment};
+    use taskforest_core::{BootTimeline, BootTimelineSegment};
     use taskmanager_history_store::{BootEvidenceHistory, RecordBootOutcome};
 
     fn timeline(units: &[(&str, u64)]) -> BootTimeline {

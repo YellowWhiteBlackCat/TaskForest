@@ -1,9 +1,9 @@
 //! Per-event row-snapshot parity for the canonical category tree.
 
 use super::super::*;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessScalarObservations;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessScalarObservations;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

@@ -6,8 +6,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use taskforest_core::core::alerts::{AlertEventId, AlertInstanceId, AlertRuleId};
 use taskmanager_application::{AlertCenter, AlertProjectionChanges};
-use taskmanager_core::core::alerts::{AlertEventId, AlertInstanceId, AlertRuleId};
 
 use super::SystemProjectionStore;
 

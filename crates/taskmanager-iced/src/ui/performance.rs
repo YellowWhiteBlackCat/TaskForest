@@ -23,7 +23,7 @@ use super::{
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
 use iced::Length;
-use taskmanager_core::core::sensors::SensorQuantity;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_theme::Theme;
 
 /// Compact detail viewport ownership. CPU and GPU use elastic, non-scrolling

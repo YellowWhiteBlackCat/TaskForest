@@ -43,7 +43,7 @@ use super::{
 use crate::first_run_modal::SetupState;
 use crate::text_selection::ReadoutInput;
 use crate::window_surface::WindowSurfaceState;
-use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::smart::SmartSelfTestKind;
 
 #[path = "dispatch/diagnostics.rs"]
 mod diagnostics;

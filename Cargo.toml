@@ -73,7 +73,7 @@ chrono = "0.4"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "visit"] }
-taskmanager-core = { path = "crates/taskmanager-core" }
+taskforest-core = { path = "crates/taskforest-core" }
 taskmanager-application = { path = "crates/taskmanager-application" }
 taskmanager-app-host = { path = "crates/taskmanager-app-host" }
 taskmanager-escalation = { path = "crates/taskmanager-escalation" }

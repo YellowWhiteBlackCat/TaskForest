@@ -5,9 +5,9 @@
 //! survives replacement and provider failures.
 
 use crate::{RequestAttemptId, RequestCorrelation};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{MsrReadoutFailure, MsrReadoutSnapshot};
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{MsrReadoutFailure, MsrReadoutSnapshot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MsrReadoutRequestFailure {

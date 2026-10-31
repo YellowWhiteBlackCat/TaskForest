@@ -15,9 +15,9 @@
 
 use super::super::*;
 use ratatui::crossterm::event::KeyModifiers;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::command_palette::{ROW_TARGET_SHORTCUT, TUI_LOCAL_COMMANDS, TuiDirectScope};
 use taskmanager_application::i18n::{Language, set_language};

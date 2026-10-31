@@ -5,7 +5,7 @@
 //! current-value accessors so an unavailable channel renders an honest dash
 //! instead of a fabricated idle RPM — mirroring
 //! `crates/taskmanager-gpui/src/gpui_app/perf_views/dynamic.rs` (`render_fan`). Read-only consume of
-//! `taskmanager_core::core::sensors::SensorReading`; this crate never mutates the
+//! `taskforest_core::core::sensors::SensorReading`; this crate never mutates the
 //! shared snapshot shape.
 //!
 //! Render contract: the Performance resource selector hands this section the
@@ -28,10 +28,10 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 

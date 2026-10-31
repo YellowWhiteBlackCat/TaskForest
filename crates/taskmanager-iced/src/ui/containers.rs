@@ -21,10 +21,10 @@
 use iced::widget::canvas::{self, Geometry, Path, Stroke};
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length, Point, Rectangle, Size};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 use taskmanager_application::container_row_window;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 
 // Shared locale catalog for the per-container table column headers and the
 // typed source states (the page title and status messages stay on the

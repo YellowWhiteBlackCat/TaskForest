@@ -40,11 +40,11 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::target::SessionId;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::SessionId;
 
 use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};

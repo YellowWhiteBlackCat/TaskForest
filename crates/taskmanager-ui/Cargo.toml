@@ -14,7 +14,7 @@ test-support = []
 
 [dependencies]
 # gpui + theme + icons + ui-contract only (ADR-017 §1 dependency direction): no
-# gpui-component, no taskmanager-core/application. Colors come exclusively from
+# gpui-component, no taskforest-core/application. Colors come exclusively from
 # taskmanager-theme's Palette; icon semantics from taskmanager-icons; focus/
 # overlay contracts from taskmanager-ui-contract. This crate owns the GPUI
 # theme binding (`theme_binding`, ADR-051): the token→gpui conversions and

@@ -2,8 +2,8 @@
 //!
 //! Process CPU affinity editor modal behavior over the shell's renderer-neutral lifecycle.
 
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::PlatformEffect;
-use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::tokens::UiSize;
 

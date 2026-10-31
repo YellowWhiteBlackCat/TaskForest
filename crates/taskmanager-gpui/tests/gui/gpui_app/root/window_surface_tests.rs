@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_core::core::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::target::ServiceId;
+use taskforest_core::core::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
 fn surface_fixture(kind: WindowSurfaceKind) -> WindowSurface {
     match kind {

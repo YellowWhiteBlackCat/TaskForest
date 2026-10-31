@@ -7,32 +7,32 @@
 
 | 事实或生命周期 | 唯一 owner | 唯一写入口 | 消费边界 | 代码锚点 |
 |---|---|---|---|---|
-| Canonical domain fact | `taskmanager-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor | `taskmanager-core/src/core.rs`（owner module 索引） |
-| 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API | `taskmanager-core/src/core/metrics/*/wire.rs` |
+| Canonical domain fact | `taskforest-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor | `taskforest-core/src/core.rs`（owner module 索引） |
+| 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API | `taskforest-core/src/core/metrics/*/wire.rs` |
 | 全局配置 | app-host 的单一 `ConfigCoordinator` | base→local typed submission | revisioned immutable snapshot | `taskmanager-application/src/config_runtime.rs` |
 | 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 四前端只投影或提交 intent | `taskmanager-application/src/interaction.rs` |
 | 相关异步请求 | application typed request session；每条 shell track 一个实例 | begin/accept/reject/terminal/close | frontend 只读状态；terminal payload 仅接受一次 | `taskmanager-application/src/request_session.rs`；track 实例在 `taskmanager-shell/src/app/request_sessions.rs` |
 | quit 与用户反馈 | shell `ShellLifecycleState` | typed lifecycle event | `should_quit` / immutable feedback | `taskmanager-shell/src/app/lifecycle.rs` |
 | 当前系统投影 | 每条前端轨私有的 `SystemProjectionStore` | platform batch 与命名 reducer | immutable `projection()` | `taskmanager-shell/src/app.rs` |
 | live graph 历史 | `taskmanager-telemetry-store` | composition-owned ingestor | revision-keyed immutable series；per-device 曲线是双侧纪律——写侧 ingest 事务换环、读时 generation 过滤（`requested != 0 && ring == requested`），任何 per-device 读边必须携带 generation，单侧防护不成立 | `taskmanager-telemetry-store/src/live_graph.rs`、`system_history/ingest.rs` |
-| 容器 cgroup 配额 | `taskmanager-core` 的 `ContainerQuota` | provider 读取并冻结声明值 | **缺省＝未声明**（不是零）；读不到＝类型化不可用；前端**不得**用宿主内存等无关测量自造上限 | `taskmanager-core/src/core/process_telemetry/quota.rs` |
-| 逐阶段启动耗时 | `taskmanager-core` 的 `StartupTimelineSnapshot` | provider 解析启动摘要并发布阶段切分 | 每段**可缺省**（未测量≠零）；测得总时长只计已测阶段；该平台无此分析器＝类型化缺席 | `taskmanager-core/src/core/startup/timeline.rs` |
-| 进程树连带集合（冻结层级） | `taskmanager-core` 的 `FrozenProcessCollateral` | arming 时随执行集合**同一次闭包遍历**冻结 | 确认面只读冻结行，**不读实时行**；两个视图永不相矛盾 | `taskmanager-core/src/core/process/collateral.rs` |
-| 采样时刻 | `taskmanager-telemetry-store` 的 live graph 读边 | 被采纳观测自带 `measured_at_ms` | 接受时刻**不得**改标为采样时刻；无测量时刻＝缺口（共享破折号，不是 `-N` 偏移） | `taskmanager-telemetry-store/src/live_graph.rs`、`taskmanager-core/src/core/metrics/sample.rs` |
-| NPU 功耗 / 能耗 | `taskmanager-core` 的 `NpuPowerReport` | provider 按能力填充 | 无该计数器＝**没有观测**（序列缺省），**不得**用利用率顶替 | `taskmanager-core/src/core/npu.rs` |
-| SMART 修复提示 | `taskmanager-core` 的 `SmartToolRemediation` | 平台在**真看见**包管理器时补安装命令 | 平台中立探针在合同里；前端**不拼命令**；未装工具时字段缺省而非编造 | `taskmanager-core/src/core/metrics/disk.rs` |
-| 分区 ↔ 文件系统健康关联 | `taskmanager-core` 的 `DiskPartition::filesystem_health` | 合同层做一次关联 | 前端**不按挂载点字符串匹配**；无观测＝没有事实（不是健康） | `taskmanager-core/src/core/metrics/disk.rs` |
+| 容器 cgroup 配额 | `taskforest-core` 的 `ContainerQuota` | provider 读取并冻结声明值 | **缺省＝未声明**（不是零）；读不到＝类型化不可用；前端**不得**用宿主内存等无关测量自造上限 | `taskforest-core/src/core/process_telemetry/quota.rs` |
+| 逐阶段启动耗时 | `taskforest-core` 的 `StartupTimelineSnapshot` | provider 解析启动摘要并发布阶段切分 | 每段**可缺省**（未测量≠零）；测得总时长只计已测阶段；该平台无此分析器＝类型化缺席 | `taskforest-core/src/core/startup/timeline.rs` |
+| 进程树连带集合（冻结层级） | `taskforest-core` 的 `FrozenProcessCollateral` | arming 时随执行集合**同一次闭包遍历**冻结 | 确认面只读冻结行，**不读实时行**；两个视图永不相矛盾 | `taskforest-core/src/core/process/collateral.rs` |
+| 采样时刻 | `taskmanager-telemetry-store` 的 live graph 读边 | 被采纳观测自带 `measured_at_ms` | 接受时刻**不得**改标为采样时刻；无测量时刻＝缺口（共享破折号，不是 `-N` 偏移） | `taskmanager-telemetry-store/src/live_graph.rs`、`taskforest-core/src/core/metrics/sample.rs` |
+| NPU 功耗 / 能耗 | `taskforest-core` 的 `NpuPowerReport` | provider 按能力填充 | 无该计数器＝**没有观测**（序列缺省），**不得**用利用率顶替 | `taskforest-core/src/core/npu.rs` |
+| SMART 修复提示 | `taskforest-core` 的 `SmartToolRemediation` | 平台在**真看见**包管理器时补安装命令 | 平台中立探针在合同里；前端**不拼命令**；未装工具时字段缺省而非编造 | `taskforest-core/src/core/metrics/disk.rs` |
+| 分区 ↔ 文件系统健康关联 | `taskforest-core` 的 `DiskPartition::filesystem_health` | 合同层做一次关联 | 前端**不按挂载点字符串匹配**；无观测＝没有事实（不是健康） | `taskforest-core/src/core/metrics/disk.rs` |
 | System 趋势投影 | `taskmanager-application` | 权威 host 环 identity/revision + typed window | 四端同源时间格、缺口、最新值、峰值与覆盖；前端只持有原生绘图缓存 | `taskmanager-application/src/system_timeline.rs` |
 | 可选系统设置 | application `FirstRunController` | quiet Observe / explicit typed action / matching terminal | 四端设置页显式入口；surface 独立拥有可见性，迟到结果不重开 | `application/src/first_run.rs`（ADR-040） |
 | 诊断审阅与导出 | application `DiagnosticBundleUiState` + correlated session | cached projection preparation / explicit confirm / matching completion | 四端单一 surface 保存同一脱敏 plan；关闭丢弃迟到结果；app-host worker 唯一写入 | `application/src/diagnostics.rs`、`shell/src/app/diagnostics.rs` |
 | 前端历史采集 generation | active frontend typed lifecycle | config Enable/Disable + bounded start/stop | app-host read-only replay client | `taskmanager-app-host/src/history_frontend.rs` |
-| 持久历史 writer/lock | daemon 进程（ADR-055）或 standalone 下活动 frontend | correlated system/process/sensor/power ingestion | history-store JSONL/query；守护进程模式独占单写，单机单写 | `taskmanager-daemon/src/persistence.rs` 与 `taskmanager-app-host/src/history_persistence_runtime.rs` |
+| 持久历史 writer/lock | daemon 进程（ADR-055）或 standalone 下活动 frontend | correlated system/process/sensor/power ingestion | history-store JSONL/query；守护进程模式独占单写，单机单写 | `taskforest-daemon/src/persistence.rs` 与 `taskmanager-app-host/src/history_persistence_runtime.rs` |
 | runtime work | ECS `WorkState` | admission/renew/terminal/recovery system | scheduler snapshot 与 typed verdict | `taskmanager-platform-runtime/src/ecs.rs` |
-| runtime delivery | `FairEventPort` | bounded primary/mailbox publication | typed partition turn + sequence merge | `taskmanager-platform-runtime/src/delivery/event_port.rs`、`delivery/event_queue.rs`；`EventSequence` 在 `taskmanager-platform-contract/src/envelope.rs` |
+| runtime delivery | `FairEventPort` | bounded primary/mailbox publication | typed partition turn + sequence merge | `taskmanager-platform-runtime/src/delivery/event_port.rs`、`delivery/event_queue.rs`；`EventSequence` 在 `taskforest-contract/src/envelope.rs` |
 | 本地时区规则 | app-host `StartupLocalTimeCache` | 宿主启动时一次捕获 | cloned host 共享同一 `Arc` observation | `taskmanager-app-host/src/lib.rs` |
 | 窗口事件时间 | frontend window-time component | tick/event 注入 | renderer filter/format，只读 | 对应 frontend crate 的 window-time 模块 |
 | renderer projection cache | 对应 frontend component | revision/fingerprint miss | owned `Rc`/value，不返回可变 guard | 如 `taskmanager-iced/src/app/projection_caches.rs` |
-| 外部 saved-view 输入 | config/preset 私有 read DTO | ingress canonicalization | canonical 只有一套 category/tree projection | `taskmanager-core/src/core/config.rs` |
+| 外部 saved-view 输入 | config/preset 私有 read DTO | ingress canonicalization | canonical 只有一套 category/tree projection | `taskforest-core/src/core/config.rs` |
 
 GPU engine、网络提权及 command/reveal/open-url correlation 同样走该 request session owner；前端
 不得另存 request map、pending bool、error 或 accepted payload。一个事实不得同时出现在 domain

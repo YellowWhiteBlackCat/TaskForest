@@ -1,7 +1,7 @@
 use super::network_stats;
+use taskforest_core::core::metrics::NetworkMetrics;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::NetworkMetrics;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn labels_of(metrics: &NetworkMetrics) -> Vec<String> {
@@ -37,7 +37,7 @@ fn absent_address_and_link_facts_omit_their_rows() {
 /// panel renders the shared dash), and existing facts render with values.
 #[test]
 fn rate_rows_keep_none_for_first_sample_gaps() {
-    use taskmanager_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
+    use taskforest_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
     let scalar_observations = NetworkScalarObservations {
         link_speed_mbps: ScalarObservation::available(1_000, 0),
         ..NetworkScalarObservations::default()
@@ -72,7 +72,7 @@ fn rate_rows_keep_none_for_first_sample_gaps() {
 
 #[test]
 fn mtu_and_queue_rows_keep_measured_zero_visible() {
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         NetworkAdapterType, NetworkScalarObservations, ScalarObservation,
     };
     let metrics = NetworkMetricsFixtureBuilder::new()
@@ -95,7 +95,7 @@ fn mtu_and_queue_rows_keep_measured_zero_visible() {
 
 #[test]
 fn packet_error_rows_are_omitted_until_a_counter_is_observed() {
-    use taskmanager_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
+    use taskforest_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
     let metrics = NetworkMetricsFixtureBuilder::new()
         .scalar_observations(NetworkScalarObservations {
             rx_drops: ScalarObservation::available(3, 1),

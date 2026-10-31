@@ -1,8 +1,8 @@
 //! Rule gestures resolve stable identities against the current shared projection.
 use super::IcedApp;
 use std::time::Duration;
+use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

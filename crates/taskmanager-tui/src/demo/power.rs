@@ -1,8 +1,8 @@
 //! Controlled power samples enter the normal correlated history writer.
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,

@@ -1,5 +1,5 @@
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{
     MemoryCompositionObservations, MemoryMetrics, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation,
 };

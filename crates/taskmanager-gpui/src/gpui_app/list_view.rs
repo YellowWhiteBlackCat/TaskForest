@@ -32,10 +32,10 @@ use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n;
 use taskmanager_application::{RefreshRequest, SourceStateKind, merge_source_lines};
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::source::SourceStatus;
 use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;

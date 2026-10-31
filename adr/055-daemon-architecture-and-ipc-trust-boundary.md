@@ -51,7 +51,7 @@ privileges into desktop UI toolkits and drops all metrics the moment a window is
      cadence for fundamental CPU/RAM/Disk health), keeping background resource consumption < 0.2% CPU.
 
 5. **Transport and Framing Contract**:
-   - IPC communication is owned by `taskmanager-ipc`.
+   - IPC communication is owned by `taskforest-ipc`.
    - Every message uses 20-byte framing (`TFIP` magic, monotonic sequence ID, CRC32 verification,
      and strict 16 MiB payload ceilings) to prevent buffer corruption or memory exhaustion.
 

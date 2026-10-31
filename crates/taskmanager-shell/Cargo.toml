@@ -17,9 +17,9 @@ publish = false
 # mapping concern).
 
 [dependencies]
-taskmanager-core = { path = "../taskmanager-core" }
+taskforest-core = { path = "../taskforest-core" }
 taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 

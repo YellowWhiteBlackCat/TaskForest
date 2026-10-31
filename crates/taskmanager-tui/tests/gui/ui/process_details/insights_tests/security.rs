@@ -47,7 +47,7 @@ fn insights_lines_renders_cpu_affinity_when_observed() {
 
 #[test]
 fn insights_lines_renders_sandbox_detection() {
-    use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
+    use taskforest_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
 
     let _guard = en();
     let target = FrozenProcessIdentity::from_authoritative_parts(301, "box-proc", 1000, 1000)
@@ -92,7 +92,7 @@ fn insights_lines_renders_sandbox_detection() {
 
 #[test]
 fn insights_lines_renders_namespace_audit() {
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::process_telemetry::{
         LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry, NamespaceAuditStatus,
         ProcessIsolation,
     };
@@ -140,7 +140,7 @@ fn insights_lines_renders_namespace_audit() {
 
 #[test]
 fn insights_lines_renders_seccomp_filter() {
-    use taskmanager_core::core::process_telemetry::ProcessIsolation;
+    use taskforest_core::core::process_telemetry::ProcessIsolation;
 
     let _guard = en();
     let target = FrozenProcessIdentity::from_authoritative_parts(303, "sec-proc", 1000, 1000)

@@ -131,30 +131,30 @@ def check(measured: dict[str, tuple[int, int]], floors: dict[str, float]) -> int
 def self_test() -> int:
     failures: list[str] = []
     sample = """\
-SF:{repo}/crates/taskmanager-core/src/lib.rs
+SF:{repo}/crates/taskforest-core/src/lib.rs
 DA:1,1
 DA:2,0
 DA:3,1
-SF:{repo}/crates/taskmanager-core/src/other.rs
+SF:{repo}/crates/taskforest-core/src/other.rs
 DA:1,1
 SF:{repo}/src/main.rs
 DA:1,1
 end_of_record
 """.format(repo=REPO)
     measured = parse_lcov(sample)
-    if measured != {"taskmanager-core": (3, 4), "taskmanager-gates": (1, 1)}:
+    if measured != {"taskforest-core": (3, 4), "taskmanager-gates": (1, 1)}:
         failures.append(f"parse_lcov mapping wrong: {measured}")
     if crate_of_path(Path("/elsewhere/x.rs")) is not None:
         failures.append("crate_of_path must ignore outside paths")
     with tempfile.TemporaryDirectory() as scratch:
         floors_path = Path(scratch) / "floors.toml"
-        floors_path.write_text("[floors]\ntaskmanager-core = 74.0\n", encoding="utf-8")
+        floors_path.write_text("[floors]\ntaskforest-core = 74.0\n", encoding="utf-8")
         floors = read_floors(floors_path)
-        if floors != {"taskmanager-core": 74.0}:
+        if floors != {"taskforest-core": 74.0}:
             failures.append(f"read_floors wrong: {floors}")
         if check(measured, floors) != 0:
             failures.append("check must pass 75% vs 74% floor")
-        if check(measured, {"taskmanager-core": 76.0}) != 1:
+        if check(measured, {"taskforest-core": 76.0}) != 1:
             failures.append("check must flag 75% vs 76% floor")
         floors_path.write_text("[floors]\nmissing-crate = 80.0\n", encoding="utf-8")
         if check(measured, read_floors(floors_path)) != 1:

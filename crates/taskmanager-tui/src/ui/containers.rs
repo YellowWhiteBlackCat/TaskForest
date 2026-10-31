@@ -36,9 +36,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, Borders, Cell, Clear, HighlightSpacing, Paragraph, Row, Table, TableState,
 };
+use taskforest_core::core::process_telemetry::{ContainerRollup, IsolationKind};
 use taskmanager_application::container_row_window;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process_telemetry::{ContainerRollup, IsolationKind};
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_ui_contract::IconId;
 

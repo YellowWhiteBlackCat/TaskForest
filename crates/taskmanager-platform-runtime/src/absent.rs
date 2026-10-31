@@ -6,7 +6,7 @@
 //!
 //! It is deliberately NOT the product-surface answer: the three product
 //! platforms must compose the real runtime, whose capability catalog seeds
-//! every [`taskmanager_platform_contract::CapabilityId::EXPECTED_SURFACE`]
+//! every [`taskforest_contract::CapabilityId::EXPECTED_SURFACE`]
 //! entry with a typed absence. This empty-catalog handle exists for targets
 //! outside the product platform axis (for example the placeholder
 //! Android/OpenHarmony adapters), where there is no product capability promise
@@ -14,10 +14,10 @@
 
 use std::sync::Arc;
 
-use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
 };
+use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle};
 
 #[derive(Default)]
 struct AbsentCapabilityCatalog;

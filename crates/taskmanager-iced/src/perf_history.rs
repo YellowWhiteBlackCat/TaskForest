@@ -28,7 +28,7 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 /// The upper bound for a persisted graph-data-points window (GPUI parity:
 /// `MAX_GRAPH_DATA_POINTS = 600`).

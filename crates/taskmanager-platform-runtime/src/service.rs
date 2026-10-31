@@ -3,19 +3,17 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
-use taskmanager_application::{
-    PlatformEvent, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
-    ServiceEvent, ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
-    ServiceUpdate,
-};
-use taskmanager_core::core::services::{
+use taskforest_contract::{CapabilityId, PartialSourceSnapshot, ProviderFailure, RequestId};
+use taskforest_core::core::services::{
     ServiceAction, ServiceDeps, ServiceItem, ServiceLogErrorKind, ServiceLogFailure,
     ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
     ServiceLogStreamSnapshot, ServiceLogStreamState,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityId, PartialSourceSnapshot, ProviderFailure, RequestId,
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::{
+    PlatformEvent, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
+    ServiceEvent, ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
+    ServiceUpdate,
 };
 
 use crate::{

@@ -3,7 +3,7 @@ use gpui::{
     AppContext, Context, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render,
     Styled, TestAppContext, VisualTestContext, Window, div,
 };
-use taskmanager_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
 
 struct FocusTargetHarness {
@@ -251,7 +251,7 @@ async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut 
 
 use gpui::px;
 
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuScalarObservations, MemoryOptionalObservations, MemoryScalarObservations, ScalarObservation,
 };
 

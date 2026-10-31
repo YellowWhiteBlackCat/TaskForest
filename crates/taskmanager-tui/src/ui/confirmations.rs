@@ -13,11 +13,11 @@ use super::containers::{KeyHint, KeyHintTone, Modal};
 use super::{service_menu, session_menu};
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskforest_core::core::process::ProcessBatchIntent;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::{
     ServiceControlTarget, SessionControlConfirmation, StartupControlRequest,
 };
-use taskmanager_core::core::process::ProcessBatchIntent;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::process_batch_action_label;
 

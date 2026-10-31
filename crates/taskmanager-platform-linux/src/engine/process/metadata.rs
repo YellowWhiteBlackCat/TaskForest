@@ -5,8 +5,8 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use taskmanager_core::core::process::{ContainerMetadata, parse_cgroup_container_metadata};
-use taskmanager_core::{
+use taskforest_core::core::process::{ContainerMetadata, parse_cgroup_container_metadata};
+use taskforest_core::{
     FailureKind, ProcessMetadataFailure, ProcessMetadataObservation, ProcessMetadataObservations,
     ProcessOwner, ProcessOwnerIdentity, SourceOutcome,
 };
@@ -264,7 +264,7 @@ fn label_outcome(
 }
 
 fn observation_outcome<T>(observation: &ProcessMetadataObservation<T>) -> SourceOutcome {
-    use taskmanager_core::ProcessMetadataAvailability;
+    use taskforest_core::ProcessMetadataAvailability;
 
     match observation.availability() {
         ProcessMetadataAvailability::Available => SourceOutcome::Available,
@@ -283,7 +283,7 @@ fn observation_outcome<T>(observation: &ProcessMetadataObservation<T>) -> Source
 }
 
 const fn shared_failure(failure: ProcessMetadataFailure) -> FailureKind {
-    use taskmanager_core::FailureKind;
+    use taskforest_core::FailureKind;
 
     match failure {
         ProcessMetadataFailure::Unsupported => FailureKind::Unsupported,

@@ -8,8 +8,8 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::services::ServiceAction;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::ServiceAction;
 
 use taskmanager_theme::{Theme, tokens};
 

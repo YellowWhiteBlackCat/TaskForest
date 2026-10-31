@@ -17,7 +17,7 @@ use std::path::Path;
 
 use nvml_wrapper::enums::device::UsedGpuMemory;
 use nvml_wrapper::{Nvml, struct_wrappers::device::ProcessInfo};
-use taskmanager_core::{DeviceState, ProcessIdentity};
+use taskforest_core::{DeviceState, ProcessIdentity};
 
 use super::{ProcessGpuEnrichmentProvider, RawGpuCounter, RawGpuSnapshot};
 use crate::engine::hardware::gpu::normalize_pci_slot;

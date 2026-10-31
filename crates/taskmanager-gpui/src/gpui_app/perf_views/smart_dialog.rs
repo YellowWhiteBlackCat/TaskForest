@@ -2,8 +2,8 @@
 
 use crate::gpui_app::root::prop_row;
 use gpui::{Div, ParentElement, Styled, div, px};
+use taskforest_core::core::metrics::DiskMetrics;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_shell::presentation::smart_availability_i18n_key;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, with_alpha};

@@ -10,7 +10,7 @@ use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 // ── two-series main graphs (disk read/write, NIC rx/tx) ────────────────────
 
 use std::collections::BTreeMap;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceLifecycle, DevicePresence, DiskScalarObservations, NetworkScalarObservations,
     NetworkTelemetryObservation, StorageTelemetryObservation,
 };

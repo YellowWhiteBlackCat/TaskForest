@@ -3,7 +3,7 @@
 //! generation reset, and per-device/per-field isolation.
 
 use super::*;
-use taskmanager_core::core::failure::FailureKind;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_telemetry_store::GpuMetricPoint;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
@@ -348,9 +348,9 @@ fn one_devices_failed_series_never_affects_another_devices_availability() {
 fn chart_metric_utilization_window_matches_the_usage_ring() {
     use std::collections::BTreeMap;
 
-    use taskmanager_core::core::device_state::{DeviceLifecycle, DevicePresence, DeviceState};
-    use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::device_state::{DeviceLifecycle, DevicePresence, DeviceState};
+    use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+    use taskforest_core::core::metrics::{
         GpuMetrics, GpuScalarObservations, GpuTelemetryObservation, ScalarObservation,
     };
     use taskmanager_telemetry_store::CorrelatedTelemetryStamp;

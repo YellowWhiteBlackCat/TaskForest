@@ -117,7 +117,7 @@ uses wgpu/winit safe public APIs and does not call the Windows crate directly.
    binary names `taskmanager-platform-native`; the shell reaches the
    platform exclusively through `taskmanager-application` ports.
 3. **No feature may live in only one frontend.** New behavior is added to
-   `taskmanager-core`/`taskmanager-application`/`taskmanager-shell` first;
+   `taskforest-core`/`taskmanager-application`/`taskmanager-shell` first;
    frontends only render it (the firewall test
    `frontends_execute_no_native_commands_and_read_no_native_paths` guards
    the I/O side).

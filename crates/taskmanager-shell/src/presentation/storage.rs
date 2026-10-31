@@ -1,7 +1,7 @@
 //! Storage presentation labels shared by all frontends.
 
+use taskforest_core::core::storage_health::FilesystemBackingKind;
 use taskmanager_application::i18n;
-use taskmanager_core::core::storage_health::FilesystemBackingKind;
 
 /// Stable localized label for filesystem topology class. The label is only a
 /// presentation spelling; the backing classification itself remains core

@@ -4,14 +4,14 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
 
 use crate::demo_app;
+use taskforest_core::core::device_state::DeviceState;
 use taskmanager_application::MAX_CONTAINER_ROWS;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 

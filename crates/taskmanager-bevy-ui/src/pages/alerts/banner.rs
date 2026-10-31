@@ -30,7 +30,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use std::collections::VecDeque;
-use taskmanager_core::core::alerts::Alert;
+use taskforest_core::core::alerts::Alert;
 use taskmanager_ui_contract::IconId;
 
 /// The angular frequency of the banner spring (rad/s). The spring's natural

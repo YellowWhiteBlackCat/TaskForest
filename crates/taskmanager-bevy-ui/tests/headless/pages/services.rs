@@ -24,20 +24,20 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
 use bevy::ui_widgets::Activate;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedServiceEvent, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
     PlatformHandle, ServiceEvent, SystemFacets,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
-    RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
@@ -845,7 +845,7 @@ fn service_control_buttons_arm_service_actions() {
 #[test]
 fn ordering_cycle_members_paint_the_warning_plate() {
     use bevy::ecs::hierarchy::ChildOf;
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
     };
     use taskmanager_ui_contract::IconId;

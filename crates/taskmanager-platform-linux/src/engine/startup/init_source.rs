@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use taskmanager_core::{FailureKind, ProviderId, SourceStatus};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{FailureKind, ProviderId, SourceStatus};
 
 use super::{
     BlameSnapshot, STARTUP_CONTROL_TIMEOUT, SYSTEMD_PROVIDER_ID, StartupControlPolicy,

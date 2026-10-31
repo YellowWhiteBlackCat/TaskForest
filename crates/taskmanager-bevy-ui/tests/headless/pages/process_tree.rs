@@ -1,14 +1,14 @@
 use super::aggregate::{ProcessTreeCellKind, ProcessTreeTextCell};
 use super::*;
-use taskmanager_application::process_category_projection::category_buckets;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessMetadataObservation, process_category,
 };
+use taskmanager_application::process_category_projection::category_buckets;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ShellApp;
 
@@ -17,7 +17,7 @@ use taskmanager_shell::ShellApp;
 const SNAPSHOT_MS: u64 = 1;
 
 fn tokened(pid: u32, name: &str, parent: Option<u32>) -> ProcessItem {
-    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::metrics::ScalarObservation;
     let mut item = ProcessItem::new(pid, name);
     item.parent_pid = parent;
     item.with_scalar_observations(ProcessScalarObservations {
@@ -33,7 +33,7 @@ fn key_of(kind: fn(ProcessLiveKey) -> ProcessRowId, pid: u32) -> ProcessRowId {
 }
 
 fn application(pid: u32, parent_pid: Option<u32>, name: &str) -> ProcessItem {
-    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::metrics::ScalarObservation;
 
     let identity =
         ProcessApplicationIdentity::new(format!("org.example.{name}"), name.to_owned(), None)

@@ -1,8 +1,8 @@
 //! Toolkit-neutral system-information groups from cached provider facts.
 
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_application::i18n;
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
-use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SystemInformationRow {

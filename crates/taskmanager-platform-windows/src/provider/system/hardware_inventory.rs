@@ -9,17 +9,17 @@
 //! provider never reaches WMI or a command interpreter and never invents
 //! vendor/version strings.
 
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     ComputeTopology, CpuIdentity, DisplayInfo, FailureKind, HardwareInfo, HostIdentity, KernelInfo,
     ProviderId,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::HardwareInventoryProvider;
 
 use super::{HARDWARE_INVENTORY_PROVIDER, available_source, unavailable_source};
-use taskmanager_core::CoreBreakdown;
-use taskmanager_core::CpuType;
+use taskforest_core::CoreBreakdown;
+use taskforest_core::CpuType;
 use taskmanager_platform_portable::EdidFacts;
 use taskmanager_platform_portable::parse_edid;
 use taskmanager_windows_api::WindowsApiError;

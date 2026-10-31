@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::FilesystemBackingKind;
+use taskforest_core::FilesystemBackingKind;
 
 const MOUNTINFO: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),

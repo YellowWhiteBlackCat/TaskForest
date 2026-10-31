@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceStatus, FailureKind, GpuMetricField, GpuScalarObservations, ProviderId,
     ScalarObservation,
 };

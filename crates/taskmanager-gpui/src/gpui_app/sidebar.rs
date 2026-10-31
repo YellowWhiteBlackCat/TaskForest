@@ -9,7 +9,7 @@ use gpui::{
     Styled, Window, div, px,
 };
 use std::rc::Rc;
-use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
+use taskforest_core::core::config::SidebarDeviceOverrideConfig;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_telemetry_store::TelemetryStore;
@@ -27,9 +27,9 @@ use crate::gpui_app::history_samples::{
     storage_activity_samples,
 };
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::scroll_region_with_overlay_rail;
@@ -47,7 +47,7 @@ use captions::{
 pub use network::NetworkVisibility;
 pub(crate) use network::{network_category_label, nic_caption_line2};
 use row::{DeviceRowProps, device_row};
-use taskmanager_core::core::config::sidebar::{ordered_indices, visible_with_override};
+use taskforest_core::core::config::sidebar::{ordered_indices, visible_with_override};
 use taskmanager_theme::WindowCorner;
 
 /// Dedicated right-edge hit gutter for sidebar resizing. It is deliberately

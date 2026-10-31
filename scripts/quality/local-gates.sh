@@ -244,7 +244,7 @@ esac
 # the same set the tier would compile for the crate, and never a hand-copy.
 scope_roots_for() {
     case "$scope" in
-    core) printf '%s\n' taskmanager-core taskmanager-application taskmanager-shell ;;
+    core) printf '%s\n' taskforest-core taskmanager-application taskmanager-shell ;;
     bevy) printf '%s\n' taskmanager-bevy-ui ;;
     gpui) printf '%s\n' taskmanager-gpui taskmanager-ui ;;
     iced) printf '%s\n' taskmanager-iced ;;
@@ -1020,7 +1020,7 @@ if maybe mutants; then
     if scope_skip mutants "workspace-wide measurement" extended; then
         # Decision logic in core/application plus the Linux fixture parsers: all
         # three are the layers whose silent breakage the behavior gates must catch.
-        run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskmanager-core,taskmanager-application,taskmanager-platform-linux --min-score 80
+        run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskforest-core,taskmanager-application,taskmanager-platform-linux --min-score 80
     fi
 fi
 if maybe miri; then

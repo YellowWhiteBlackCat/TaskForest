@@ -7,10 +7,10 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual
 // Startup column headers, action labels, confirm/cancel) that was previously
 // hard-coded English.
 use std::rc::Rc;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
+use taskforest_core::core::services::{ServiceAction, ServiceStatus};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppPage, RefreshRequest};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
-use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
 
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir, matches_service_text};
 use taskmanager_theme::tokens;
@@ -23,7 +23,7 @@ use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
-use taskmanager_core::core::process::ProcessBatchIntent;
+use taskforest_core::core::process::ProcessBatchIntent;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::process_batch_action_label;
 use taskmanager_shell::service_cycle_members;

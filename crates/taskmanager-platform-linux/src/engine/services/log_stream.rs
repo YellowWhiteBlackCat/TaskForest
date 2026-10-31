@@ -22,7 +22,7 @@ use super::{
 use super::{ServiceLogAvailability, ServiceLogFeed, ServiceLogLevelFilter};
 #[cfg(any(test, feature = "test-support"))]
 use super::{ServiceLogStreamEnd, ServiceLogStreamSnapshot};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
 
 #[cfg(target_os = "linux")]
 const STREAM_TIMEOUT: Duration = Duration::from_secs(2);

@@ -6,12 +6,12 @@ use crate::demo_app;
 use crate::ui::test_support::repo_temp_dir;
 use ratatui::crossterm::event::KeyCode;
 use std::time::{Duration, Instant};
-use taskmanager_app_host::NativeAppHost;
-use taskmanager_application::AppAction;
-use taskmanager_core::core::history::{
+use taskforest_core::core::history::{
     ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey, HistoryWindow,
 };
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskmanager_app_host::NativeAppHost;
+use taskmanager_application::AppAction;
 use taskmanager_theme::Theme;
 
 fn press(app: &mut TuiApp, value: char) {

@@ -19,8 +19,8 @@ use super::page_layout::{
 use super::{hierarchy_summary, status_filter_row};
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{ProcessControlAvailability, SortCol};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;

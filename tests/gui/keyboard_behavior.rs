@@ -1,9 +1,9 @@
 //! Production-root keyboard behavior not covered by pure command-router tests.
 
 use gpui::{AppContext, Entity, Keystroke, TestAppContext, WindowHandle};
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::SmartSelfTestKind;
 use taskmanager_application::{ConfirmationKind, SurfaceKind};
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_gpui::gpui_app::dashboard::DashboardPanel;
 use taskmanager_gpui::gpui_app::root::{
     GpuiSurfaceKind, RootView, TopPage, WindowSurfaceDismissReason, WindowSurfaceKind,

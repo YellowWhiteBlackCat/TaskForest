@@ -17,15 +17,15 @@
 use std::fmt;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
+};
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::SystemFacets;
 use taskmanager_application::{
     ConfigClient, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
     PlatformHandle,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
 };
 
 /// Typed failure for the one process-wide runtime start attempt.

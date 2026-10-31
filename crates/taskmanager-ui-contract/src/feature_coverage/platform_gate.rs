@@ -48,7 +48,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
 

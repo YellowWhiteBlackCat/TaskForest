@@ -8,7 +8,7 @@ use ratatui::layout::Rect;
 
 use super::render_details_for_selection;
 use crate::{TuiApp, TuiTheme};
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_shell::ProcessTreeRow;
 
 pub(crate) fn render_process_details(

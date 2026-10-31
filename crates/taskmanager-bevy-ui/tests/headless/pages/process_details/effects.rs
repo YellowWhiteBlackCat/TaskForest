@@ -8,15 +8,15 @@ use bevy::asset::{AssetPlugin, Assets};
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui_widgets::Activate;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::{
     AppAction, AppPage, PlatformClient, PlatformEffect, PlatformEvent, PlatformFacets,
     PlatformHandle, ProcessFacets, ProcessNetworkEscalationRequest, ProcessNetworkRequest,
-};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::{ShellApp, fixture};
 

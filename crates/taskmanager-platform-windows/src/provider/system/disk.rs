@@ -8,23 +8,23 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use taskmanager_core::{DiskMetrics, FailureKind, ScalarObservation, StorageTelemetryObservation};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{DiskMetrics, FailureKind, ScalarObservation, StorageTelemetryObservation};
 use taskmanager_platform_provider::StorageTelemetryProvider;
 
 use super::{STORAGE_TELEMETRY_PROVIDER, available_source, unavailable_source};
-use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
-use taskmanager_core::DeviceId;
-use taskmanager_core::DeviceLifecycleRegistry;
-use taskmanager_core::DeviceRefreshOutcome;
-use taskmanager_core::DeviceState;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::DiskPartition;
-use taskmanager_core::DiskPartitionScalarObservations;
-use taskmanager_core::DiskScalarObservations;
-use taskmanager_core::ProviderId;
-use taskmanager_core::SmartAvailability;
-use taskmanager_core::storage::StorageConnection;
+use taskforest_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskforest_core::DeviceId;
+use taskforest_core::DeviceLifecycleRegistry;
+use taskforest_core::DeviceRefreshOutcome;
+use taskforest_core::DeviceState;
+use taskforest_core::DeviceStatus;
+use taskforest_core::DiskPartition;
+use taskforest_core::DiskPartitionScalarObservations;
+use taskforest_core::DiskScalarObservations;
+use taskforest_core::ProviderId;
+use taskforest_core::SmartAvailability;
+use taskforest_core::storage::StorageConnection;
 use taskmanager_windows_api::WindowsDiskPerformance;
 use taskmanager_windows_api::query_disk_device_info;
 use taskmanager_windows_api::query_disk_performance;
@@ -178,7 +178,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
 
             let (model, disk_type, connection, is_removable) = if let Some(ref dev) = native_device
             {
-                use taskmanager_core::storage::{
+                use taskforest_core::storage::{
                     StorageDeviceKind, StorageInterconnect, StorageProtocol,
                 };
                 use taskmanager_windows_api::{WindowsDiskBusType, WindowsDiskMediaType};

@@ -2,7 +2,7 @@
 use crate::app::Message;
 use crate::ui::device_chart;
 use iced::{Element, widget::column};
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 pub(super) fn performance_tab<'a>(
     app: &'a crate::IcedApp,

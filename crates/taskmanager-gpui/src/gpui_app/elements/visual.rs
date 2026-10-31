@@ -5,7 +5,7 @@ use gpui::{
     Point, StyleRefinement, Styled, StyledText, canvas, div, px,
 };
 use std::rc::Rc;
-use taskmanager_core::core::text::match_ranges_ascii_ci;
+use taskforest_core::core::text::match_ranges_ascii_ci;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::definite_length;
@@ -146,9 +146,9 @@ pub fn status_bar(theme: &Theme, left: &[String], right: &[String]) -> Div {
 /// the theme's highlight token (`Theme::highlight_fg`, currently the accent;
 /// kept as a distinct semantic so search legibility cannot drift from the
 /// accent family) — ASCII case-insensitive, non-overlapping, via the SINGLE
-/// shared match engine `taskmanager_core::core::text::match_ranges_ascii_ci`
+/// shared match engine `taskforest_core::core::text::match_ranges_ascii_ci`
 /// (ADR-020: GPUI, TUI and iced all render these ranges and never recompute
-/// matches themselves; the shared engine in `taskmanager_core::core::text` is
+/// matches themselves; the shared engine in `taskforest_core::core::text` is
 /// the only match owner, so no second implementation survives in a frontend
 /// component).
 /// Falls back to a plain text element when the query is empty.

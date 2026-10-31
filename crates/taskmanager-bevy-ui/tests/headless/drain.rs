@@ -9,15 +9,15 @@
 
 use std::sync::{Arc, Mutex};
 
-use taskmanager_application::{
-    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ShellEvent,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, EventSequence, RequestId,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
+use taskmanager_application::{
+    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ShellEvent,
 };
 
 use taskmanager_shell::ShellApp;

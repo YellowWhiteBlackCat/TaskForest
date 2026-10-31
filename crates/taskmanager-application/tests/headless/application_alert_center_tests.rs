@@ -1,14 +1,14 @@
 use super::*;
 use crate::AlertRuleImportMode;
 use std::time::Duration;
-use taskmanager_core::alerts::{
+use taskforest_core::alerts::{
     AlertEventKind, AlertInstanceId, AlertMetric, AlertRule, AlertRuleId, AlertSeverity,
     AlertTargetIdentity, MAX_ALERT_EVENTS,
 };
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::device_state::{DeviceLifecycle, DevicePresence};
-use taskmanager_core::core::storage::StorageIdentityStability;
-use taskmanager_core::metrics::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::device_state::{DeviceLifecycle, DevicePresence};
+use taskforest_core::core::storage::StorageIdentityStability;
+use taskforest_core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, MemoryMetrics, ScalarObservation,
 };
 
@@ -171,7 +171,7 @@ fn disabled_rule_stays_listed_but_cannot_become_active() {
 
 #[test]
 fn merge_replace_and_missing_stable_target_have_atomic_semantics() {
-    use taskmanager_core::alerts::AlertRuleConflictPolicy;
+    use taskforest_core::alerts::AlertRuleConflictPolicy;
 
     let mut center = AlertCenter::new([cpu_rule(90.0)]);
     let memory = AlertRule::new(

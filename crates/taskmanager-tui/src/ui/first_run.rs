@@ -8,9 +8,9 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::text::Line;
 use ratatui::widgets::{Paragraph, Wrap};
+use taskforest_core::core::setup::SetupScriptAction;
 use taskmanager_application::first_run::FirstRunPhase;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_shell::presentation::first_run::first_run_phase_key;
 use taskmanager_ui_contract::IconId;
 

@@ -19,11 +19,11 @@ use bevy::ui::prelude::{
     percent,
 };
 use bevy::ui::widget::Text;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
+use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_shell::presentation::missing_value;
 
 use super::paint::SystemPaint;

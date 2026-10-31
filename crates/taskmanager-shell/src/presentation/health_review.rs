@@ -1,12 +1,12 @@
 //! Complete health groups over typed cached facts; unavailable values stay explicit.
 use super::smart::smart_self_test_failure_i18n_key;
 use super::{bytes, device_status_i18n_key, fan_rpm, power_w_precise, temperature_c_precise};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
+use taskforest_core::core::storage_health::{FilesystemHealthSnapshot, FilesystemHealthStatus};
+use taskforest_core::core::system_health::SmartSelfTestObservation;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
-use taskmanager_core::core::storage_health::{FilesystemHealthSnapshot, FilesystemHealthStatus};
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum HealthReviewSection {

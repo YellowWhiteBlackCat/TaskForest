@@ -1,14 +1,14 @@
 //! Independent inventory-source failure projections.
 
 use super::super::*;
-use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ServiceEvent};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventSequence, OperationFailure, PartialSourceSnapshot, ProviderFailure,
     RequestId,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ServiceEvent};
 
 #[test]
 fn inventory_failures_project_independently_without_overwriting_sibling_pages() {

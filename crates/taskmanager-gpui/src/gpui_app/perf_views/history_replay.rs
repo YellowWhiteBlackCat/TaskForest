@@ -8,10 +8,10 @@
 //! blank graph.
 
 use std::rc::Rc;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryProjection;
 use taskmanager_application::HistoryReplayError;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::history_replay::row_heading;
 use taskmanager_shell::presentation::local_timestamp;
 use taskmanager_theme::Color;
@@ -25,11 +25,11 @@ use gpui::{
     AnyElement, App, ElementId, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
     ScrollHandle, SharedString, Styled, Window, div, px,
 };
+use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayController,
     HistoryReplayRequest, HistoryReplayRequestId,
 };
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphCacheHandle, GraphOpts, graph_element};

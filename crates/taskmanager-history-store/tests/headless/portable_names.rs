@@ -2,7 +2,7 @@
 //! Ordinary portable files and private external-name ingress over real storage.
 
 use super::*;
-use taskmanager_core::core::history::ApplicationHistoryIdentity;
+use taskforest_core::core::history::ApplicationHistoryIdentity;
 
 #[test]
 fn application_records_create_visible_ordinary_files_and_query_by_the_same_key() {

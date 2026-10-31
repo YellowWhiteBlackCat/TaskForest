@@ -27,23 +27,23 @@
 
 use std::collections::HashSet;
 
-use taskmanager_application::process_sort::compare_processes;
-use taskmanager_application::{InteractionState, ServiceDependenciesLifecycle};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_contract::{CapabilitySnapshot, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
 };
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::startup::StartupEntry;
+use taskmanager_application::process_sort::compare_processes;
+use taskmanager_application::{InteractionState, ServiceDependenciesLifecycle};
 
 use super::process_rows::ProcessRowId;
 use super::sort_axis::sort_axis;
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
 use crate::fixture::DirectTrackSeedFact;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 mod inventory_sort;
 mod process_selection;
@@ -54,18 +54,18 @@ mod session_control;
 
 pub use process_selection::identity_range;
 pub use service_viewing::ServiceViewing;
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
+use taskforest_core::core::history::HistoryRecordSink;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{
     AlertEvaluation, AlertEventSeed, AlertRuleEditResult, ControlRequestId,
     DesktopNotificationRequest, ManagedAlertRuleEdit, NetworkEscalationState,
     PersistentApplicationHistoryRecorder, PlatformEventBatch, ProcessEvent, RequestAttemptId,
     ShellUiActionIntent, ShellUiActionState,
 };
-use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
-use taskmanager_core::core::history::HistoryRecordSink;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::CapabilityId;
 
 /// The Applications-table viewing state for a direct-track window: the active
 /// sort, the status bucket, and the search query — the same authoritative

@@ -5,16 +5,16 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::hardware::CpuType;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservationGroup, SystemSnapshot,
 };
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::fixture::{edit_hardware, edit_snapshot, record_demo_history_frame};
 
 use super::*;
-use taskmanager_core::core::hardware::HardwareInfo;
+use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::{CpuClusterSpec, CpuTopologySpec};
 
@@ -381,11 +381,11 @@ fn demo_core_cells_render_the_three_segment_readout() {
 /// a topology.
 #[test]
 fn an_alternative_topology_seeds_a_self_consistent_grouped_grid() {
-    use taskmanager_application::{AppAction, AppPage};
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         CpuMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
         SystemSnapshot,
     };
+    use taskmanager_application::{AppAction, AppPage};
     use taskmanager_shell::fixture::{edit_hardware, edit_snapshot, record_demo_history_frame};
 
     let topology = CpuTopologySpec {

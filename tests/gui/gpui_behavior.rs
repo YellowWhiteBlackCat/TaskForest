@@ -3,9 +3,9 @@
 //! confirmation, and navigation behavior. Renderer-internal projections and
 //! render-only smoke coverage live in `taskmanager-gpui`'s own test suite.
 
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::{
     ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
 };
 use taskmanager_test_support::ProcessItemFixtureBuilder;

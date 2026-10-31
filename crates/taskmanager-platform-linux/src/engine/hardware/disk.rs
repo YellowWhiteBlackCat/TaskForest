@@ -4,7 +4,7 @@
 //! Resolves a typed `StorageConnection` (protocol, interconnect, device kind)
 //! and collapses partition names to their physical disk key (for example,
 //! `nvme0n1p6` becomes `nvme0n1`).
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
 

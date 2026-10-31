@@ -4,8 +4,8 @@
 //! one for the positional cursor.
 
 use super::*;
+use taskforest_core::core::process::ProcessCategory;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::process::ProcessCategory;
 
 /// Resolve one fixture row identity by visible position.
 fn identity_at(app: &ShellApp, index: usize) -> ProcessLiveKey {
@@ -140,7 +140,7 @@ fn the_grouped_arrow_sequence_reproduces_the_previous_direct_writes() {
 
 #[test]
 fn the_batch_confirmation_authority_gates_by_destructive_and_reach() {
-    use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
+    use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 
     // A destructive verb is gated whatever it targets.
     assert!(ShellApp::process_batch_is_destructive(
@@ -182,7 +182,7 @@ fn the_batch_confirmation_authority_gates_by_destructive_and_reach() {
 
 #[test]
 fn selection_queries_report_the_gate_before_the_intent_is_frozen() {
-    use taskmanager_core::core::process::ProcessBatchAction;
+    use taskforest_core::core::process::ProcessBatchAction;
 
     // Single selected process row: a reversible verb submits directly.
     let mut app = crate::demo_app();
@@ -207,7 +207,7 @@ fn selection_queries_report_the_gate_before_the_intent_is_frozen() {
 
 #[test]
 fn application_tree_end_is_typed_as_a_tree_action() {
-    use taskmanager_core::core::process::ProcessBatchAction;
+    use taskforest_core::core::process::ProcessBatchAction;
 
     let mut app = crate::demo_app();
     app.application.active_page = AppPage::Applications;

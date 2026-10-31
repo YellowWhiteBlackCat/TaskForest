@@ -5,7 +5,7 @@
 //! the command from this projection instead of composing a command of its
 //! own.
 
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskforest_core::core::metrics::DiskMetrics;
 
 /// The copyable remediation for one device whose SMART tool is missing.
 #[derive(Clone, Debug, PartialEq, Eq)]

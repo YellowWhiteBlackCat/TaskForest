@@ -4,7 +4,7 @@
 //! topology, so GPUI, Iced, TUI and Bevy all read the same elastic fields and
 //! none of them hardcodes a shape.
 
-use taskmanager_core::core::hardware::CpuType;
+use taskforest_core::core::hardware::CpuType;
 
 /// One CPU cluster: physical cores of ONE class sharing one SMT shape.
 /// Free composition across any number of clusters is what makes the model

@@ -23,10 +23,10 @@ use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{AlignSelf, FlexDirection, Node, Overflow, UiRect, Val, percent, px, rem};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Button, ScrollArea};
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::category_expansion_key;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
 use taskmanager_shell::{
     ProcessRowId, ProcessTreeRow, SortCol, SortDir, app_tree_expansion_key_for_identity,

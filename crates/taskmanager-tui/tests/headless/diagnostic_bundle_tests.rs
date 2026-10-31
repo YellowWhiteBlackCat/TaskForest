@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::diagnostics::{
+use taskforest_core::core::diagnostics::{
     DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource,
 };
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};

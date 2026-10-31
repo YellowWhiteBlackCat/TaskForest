@@ -6,7 +6,7 @@
 use crate::HistoryRetention;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_core::{
     BatteryInfo, BatteryScalarObservations, CpuMetrics, CpuScalarObservations,
     CpuTelemetryObservation, DeviceGeneration, DeviceState, FailureKind, GpuMetrics,
     GpuScalarObservations, GpuTelemetryObservation, HistoricalSample, HistoryMetric,

@@ -3,13 +3,13 @@
 //! keep both files under the source-line ceiling.
 
 use super::*;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
+use taskforest_core::core::services::ServiceAction;
 use taskmanager_application::AppAction;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
-use taskmanager_core::core::services::ServiceAction;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedDomain;
 use taskmanager_shell::fixture::ProjectionSeedFact;
@@ -190,7 +190,7 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
 
 #[test]
 fn info_header_sort_message_routes_to_the_shared_shell_sort_slot() {
-    use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+    use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 
     use taskmanager_shell::{InfoSortCol, InfoTable};
 

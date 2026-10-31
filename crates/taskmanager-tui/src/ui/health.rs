@@ -15,12 +15,12 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{ProviderRuntimeState, SystemSnapshot};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     SourceLineProjection, SourceStateKind, device_source_line, truncate_text,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{ProviderRuntimeState, SystemSnapshot};
 use taskmanager_ui_contract::IconId;
 
 use super::containers::Modal;
@@ -37,7 +37,7 @@ pub(crate) mod health_support;
 use crate::TuiTheme;
 use crate::ui::alerts::{alert_event_line, managed_rule_line, metric_label, metric_unit};
 use crate::ui::{DeviceHealth, classify_device_state};
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 
 /// Render the health overlay centred over `area`.
 pub(super) fn render_health_overlay_at(

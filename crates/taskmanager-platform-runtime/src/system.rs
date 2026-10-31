@@ -3,6 +3,13 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
+use taskforest_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{
+    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuEngineRowsSnapshot,
+    GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation,
+    MsrReadoutSnapshot, NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot,
+    SmbiosMemorySnapshot, StorageTelemetryObservation,
+};
 use taskmanager_application::{
     ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest,
     GpuEngineRowsEvent, GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryEvent,
@@ -10,13 +17,6 @@ use taskmanager_application::{
     NetworkTelemetryRequest, NpuInventoryRequest, PlatformEvent, RaplPowerRequest,
     SmbiosMemoryRequest, StorageTelemetryRequest, SystemTelemetryDomainEvent,
 };
-use taskmanager_core::{
-    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuEngineRowsSnapshot,
-    GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation,
-    MsrReadoutSnapshot, NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot,
-    SmbiosMemorySnapshot, StorageTelemetryObservation,
-};
-use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::delivery::{recv_or_shutdown_with_idle, spawn_or_register_lane};
 use crate::health::CapabilityHealth;

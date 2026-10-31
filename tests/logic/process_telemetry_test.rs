@@ -1,11 +1,11 @@
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceStatus, ProcessTelemetrySnapshot, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorScale, SensorUnit,
 };
 // The mountinfo/smartctl parsers are Linux-provider helpers (Linux-only
 // dev-dependency); the defaults/serialization tests below are neutral.
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::{FilesystemHealthStatus, SmartSelfTestKind, SmartSelfTestPhase};
+use taskforest_core::core::{FilesystemHealthStatus, SmartSelfTestKind, SmartSelfTestPhase};
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{
     parse_mountinfo, parse_smart_self_test_json, smart_self_test_plan,

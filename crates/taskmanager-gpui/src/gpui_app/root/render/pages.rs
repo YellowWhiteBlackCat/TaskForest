@@ -7,8 +7,8 @@ use super::super::{Hover, PresentationSnapshot, RootView, SelectedDevice, TopPag
 use super::init_search_entity;
 use crate::gpui_app::root::{containers_view, elements, i18n, responsive};
 use gpui::{AppContext, Context, Div, Pixels, Window, px};
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
 use taskmanager_ui::layout::PageScaffold;

@@ -22,8 +22,8 @@ use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
@@ -34,12 +34,12 @@ use super::{PendingEffects, QuitForwarded};
 use crate::app::{AppShellPlugin, ContentSlot, FrontendTrack, Page, Route};
 use crate::pages::history::HistoryProjectionResource;
 use crate::window::WindowPalette;
+use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessBatchAction;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -978,8 +978,8 @@ fn diagnostic_review_owns_keys_until_dismissed() {
 fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
     use crate::first_run_modal::{self, FirstRunCommand, SetupState};
     use crate::window_surface;
+    use taskforest_core::core::setup::SetupScriptAction;
     use taskmanager_application::first_run::FirstRunController;
-    use taskmanager_core::core::setup::SetupScriptAction;
     use taskmanager_shell::fixture::setup::setup_script_info;
     let mut app = input_app(shell_with_selection());
     window_surface::register(&mut app);

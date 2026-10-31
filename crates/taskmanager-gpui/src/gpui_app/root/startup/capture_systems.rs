@@ -2,17 +2,17 @@
 
 use crate::gpui_app::processes_view::rows::expand_all;
 use gpui::Context;
+use taskforest_core::core::DiagnosticBundleError;
+use taskforest_core::core::DiagnosticBundleErrorKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process::ProcessCategory;
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
-use taskmanager_core::core::DiagnosticBundleError;
-use taskmanager_core::core::DiagnosticBundleErrorKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process::ProcessCategory;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::app::alert_rows::AlertRowFamily;

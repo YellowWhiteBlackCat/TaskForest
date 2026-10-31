@@ -1,14 +1,14 @@
 //! Smartctl transport parsing tests (line split).
 
 use super::*;
-use taskmanager_core::StorageDeviceKind;
+use taskforest_core::StorageDeviceKind;
 
 mod tests_inner {
     use std::cell::{Cell, RefCell};
 
-    use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-    use taskmanager_core::core::smart::SmartSelfTestSupport;
-    use taskmanager_core::core::smart::refresh_state;
+    use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+    use taskforest_core::core::smart::SmartSelfTestSupport;
+    use taskforest_core::core::smart::refresh_state;
 
     use super::*;
 
@@ -63,7 +63,7 @@ mod tests_inner {
 
     #[test]
     fn ata_failure_attributes_table_is_typed_and_preserves_signals() {
-        use taskmanager_core::core::smart::AtaSmartAttribute;
+        use taskforest_core::core::smart::AtaSmartAttribute;
 
         let smart = parse_smartctl_json(ATA_FAILURE_ATTRIBUTES_FIXTURE)
             .expect("ATA failure fixture parsed");

@@ -3,7 +3,7 @@
 
 use super::*;
 
-use taskmanager_core::{LimitValue, ResourceGroupCpuLimit, ResourceGroupLimitRequest};
+use taskforest_core::{LimitValue, ResourceGroupCpuLimit, ResourceGroupLimitRequest};
 use taskmanager_windows_api::WindowsJobLimitRequest;
 
 fn cpu_limit(quota: LimitValue, period_micros: u64) -> ResourceGroupLimitRequest {

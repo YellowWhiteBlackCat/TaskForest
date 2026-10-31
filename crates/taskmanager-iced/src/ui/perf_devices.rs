@@ -4,9 +4,9 @@
 use super::*;
 use crate::theme;
 use iced::widget::{column, container};
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
-use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
+use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 
 use taskmanager_shell::presentation::{
     device_action_i18n_key, device_status_i18n_key, missing_value,

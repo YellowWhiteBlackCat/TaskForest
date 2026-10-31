@@ -1,17 +1,17 @@
+use taskforest_contract::{
+    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, EventEnvelope, RequestEnvelope,
+    RequestId,
+};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::{
     PlatformEvent, PlatformHandle, SmartControlRequest, SmartEvent, SmartObservationRequest,
     StorageHealthEvent, StorageHealthRequest,
-};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, EventEnvelope, RequestEnvelope,
-    RequestId,
 };
 
 use super::*;

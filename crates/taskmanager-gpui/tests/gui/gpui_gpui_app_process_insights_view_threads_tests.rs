@@ -2,9 +2,9 @@ use super::*;
 use gpui::{
     AppContext, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window, px,
 };
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
-use taskmanager_core::core::process_telemetry::{ProcessThreads, ThreadState};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskforest_core::core::process_telemetry::{ProcessThreads, ThreadState};
 
 fn labels() -> ProcessInsightsLabels {
     ProcessInsightsLabels::capture_fixture()
@@ -66,7 +66,7 @@ fn format_keeps_missing_cpu_time_honest() {
 
 #[test]
 fn format_thread_renders_runqueue_and_wait_diagnostics() {
-    use taskmanager_core::core::process_telemetry::ThreadWaitKind;
+    use taskforest_core::core::process_telemetry::ThreadWaitKind;
 
     let thread = ProcessThreadInfo {
         tid: 4244,

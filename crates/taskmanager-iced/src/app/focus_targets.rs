@@ -3,16 +3,16 @@
 //! budget. The stable operation IDs (`iced-…`) are the single identity each
 //! focusable widget registers with Iced's focus traversal.
 
+use taskforest_core::core::services::ServiceAction;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{AppPage, ProcessInsightFacet, RefreshRequest};
-use taskmanager_core::core::services::ServiceAction;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_shell::{InfoSortCol, InfoTable, SortCol};
 
 use super::DetailsSection;
 use super::selectors::PerfDevice;
-use taskmanager_core::core::history::HistoryWindow;
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_shell::ProcessStatusFilter;
 
 /// Focus targets that remain local to the Iced adapter.

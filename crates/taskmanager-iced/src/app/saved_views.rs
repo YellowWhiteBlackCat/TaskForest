@@ -1,7 +1,7 @@
 //! Save/restore bridge between the shared view model and immutable config publications.
 
 use super::IcedApp;
-use taskmanager_core::core::config::Config;
+use taskforest_core::core::config::Config;
 use taskmanager_shell::saved_views::{preset_to_config, restore_saved_views};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 

@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use sysinfo::Disks;
-use taskmanager_core::core::device_state::{DeviceRefreshOutcome, DeviceState, DeviceStatus};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceRefreshOutcome, DeviceState, DeviceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{
     StorageIdentityStability, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::source::SourceOutcome;
 
 use super::inventory::{
     collect_storage_inventory, merge_disk_inventory, reconcile_storage_snapshot_identity,
@@ -20,7 +20,7 @@ use super::sysfs::{
     SYSFS_BLOCK_METADATA_PROVIDER, SYSFS_BLOCK_PROVIDER, SysfsBlockInventory,
     read_sysfs_block_inventory, sysfs_partition_parent,
 };
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 

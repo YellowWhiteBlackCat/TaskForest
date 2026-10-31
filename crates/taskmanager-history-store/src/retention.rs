@@ -1,7 +1,7 @@
 //! Retention policy: TTL and quota trimming (roadmap #4 defaults: 7 days /
 //! 500 MB, both tested as pure functions over parsed samples).
 
-use taskmanager_core::HistoricalSample;
+use taskforest_core::HistoricalSample;
 
 /// Bounding policy for the on-disk history. The defaults are the roadmap #4
 /// contract; a stricter policy is always allowed.

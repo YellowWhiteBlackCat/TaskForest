@@ -1,10 +1,10 @@
 //! Bounded groups of correlated domain events drained by a frontend tick.
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::setup::SetupScriptEvent;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventEnvelope, EventSequence, OperationFailure, ProviderFailure, RequestId,
 };
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::setup::SetupScriptEvent;
 
 use super::facets::PlatformEventVisitor;
 use super::{
@@ -15,7 +15,7 @@ use super::{
     SessionEvent, ShellEvent, SmartEvent, SmbiosMemoryEvent, StartupEvent, StartupEvidenceEvent,
     StorageHealthEvent,
 };
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 mod environment;
 mod integration;

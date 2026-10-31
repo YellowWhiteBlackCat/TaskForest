@@ -2,19 +2,19 @@ use super::*;
 use crate::gpui_app::root::RootView;
 use gpui::TestAppContext;
 use std::rc::Rc;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::ProviderId;
+use taskforest_core::core::SourceOutcome;
+use taskforest_core::core::SourceStatus;
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::core::startup::StartupImpactEvidence;
 use taskmanager_application::i18n;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::ProviderId;
-use taskmanager_core::core::SourceOutcome;
-use taskmanager_core::core::SourceStatus;
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::startup::StartupImpactEvidence;
 use taskmanager_shell::{InfoSortCol, InfoTable, SortDir};
 use taskmanager_theme::Theme;
 use taskmanager_ui::data::table::SortState;
 
 fn entry(name: &str, enabled: bool) -> StartupEntry {
-    use taskmanager_core::core::startup::{
+    use taskforest_core::core::startup::{
         StartupControlPolicy, StartupImpact, StartupScope, StartupSource,
     };
 
@@ -132,7 +132,7 @@ fn startup_source_detail_does_not_claim_complete_rows_for_inventory_failure() {
 
 #[test]
 fn startup_impact_text_carries_the_tier_duration_or_typed_unknown() {
-    use taskmanager_core::core::startup::StartupImpactUnknownReason;
+    use taskforest_core::core::startup::StartupImpactUnknownReason;
 
     let measured = entry("measured", true);
     assert_eq!(

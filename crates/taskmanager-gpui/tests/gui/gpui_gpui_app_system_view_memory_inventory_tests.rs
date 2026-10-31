@@ -1,8 +1,8 @@
 use super::*;
 use gpui::AppContext;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::SmbiosMemoryRequestFailure;
 use taskmanager_application::{SmbiosMemorySession, SmbiosMemoryState};
-use taskmanager_core::core::failure::FailureKind;
 use taskmanager_test_support::pin_english;
 use taskmanager_theme::Theme;
 use taskmanager_ui::primitives::selectable_text;
@@ -73,7 +73,7 @@ impl gpui::Render for InventoryLayout {
 #[gpui::test]
 async fn accepted_inventory_wraps_inside_measured_card_bounds(cx: &mut gpui::TestAppContext) {
     use gpui::{VisualTestContext, px, size};
-    use taskmanager_platform_contract::RequestId;
+    use taskforest_contract::RequestId;
     use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
     pin_english();
     cx.update(selectable_text::init);

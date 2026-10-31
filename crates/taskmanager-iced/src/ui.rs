@@ -16,9 +16,9 @@ use iced::widget::{column, container, row, scrollable, text};
 // `crate::i18n::t(language, key)` still backs the iced-owned modal chrome
 // (settings / about / health / containers); this `t` carries the shared-page
 // body strings (Performance / Applications) that were previously hard-coded.
+use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{alert_severity_label, t};
-use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use super::{application_identity_observation, bundle_identity_from_path};
-use taskmanager_core::ProcessMetadataAvailability;
+use taskforest_core::ProcessMetadataAvailability;
 
 #[test]
 fn canonical_bundle_path_yields_the_bundle_name() {

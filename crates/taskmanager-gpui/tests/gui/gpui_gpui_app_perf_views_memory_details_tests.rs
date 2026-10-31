@@ -1,6 +1,6 @@
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{MemoryMetrics, OptionalObservation};
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{MemoryMetrics, OptionalObservation};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{compressed_swap_readout, compression_ratio_readout, virtual_memory_commit_readout};

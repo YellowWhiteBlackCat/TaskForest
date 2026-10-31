@@ -5,14 +5,14 @@
 //! periodic CPU package observation (`diagnostics::observe_cpu_packages_at`)
 //! and the `telemetry.cpu.throttle` lane provider. Raw per-logical-CPU reads
 //! are handed to
-//! [`aggregate_package_throttle_counters`](taskmanager_core::aggregate_package_throttle_counters),
+//! [`aggregate_package_throttle_counters`](taskforest_core::aggregate_package_throttle_counters),
 //! the one aggregation rule, so neither path can grow a second口径 of its own.
 //! A counter no read could observe stays `None`; it is never a fabricated
 //! zero.
 
 use std::path::Path;
 
-use taskmanager_core::{
+use taskforest_core::{
     CpuThrottleCounterSample, CpuThrottleSnapshot, FailureKind, aggregate_package_throttle_counters,
 };
 

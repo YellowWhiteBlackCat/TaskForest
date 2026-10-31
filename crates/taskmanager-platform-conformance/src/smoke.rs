@@ -2,10 +2,10 @@
 
 use std::time::{Duration, Instant};
 
+use taskforest_contract::{EventPortError, OperationFailure, RetryDisposition};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::process::ProcessItem;
 use taskmanager_application::{PlatformClient, PlatformEventBatch, ProcessEvent};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::process::ProcessItem;
-use taskmanager_platform_contract::{EventPortError, OperationFailure, RetryDisposition};
 
 /// Batches and failures collected while waiting for the expected event count.
 #[derive(Default)]

@@ -1,7 +1,7 @@
 //! Shared optional-setup status and typed failure copy.
 
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::first_run::FirstRunPhase;
-use taskmanager_core::core::failure::FailureKind;
 
 #[must_use]
 pub const fn first_run_failure_key(kind: FailureKind) -> &'static str {

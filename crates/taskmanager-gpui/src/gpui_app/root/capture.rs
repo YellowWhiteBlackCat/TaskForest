@@ -10,21 +10,21 @@ use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterStat
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 
-use taskmanager_application::AlertEventSeed;
-use taskmanager_core::core::NpuInventorySnapshot;
-use taskmanager_core::core::PowerSupplySnapshot;
-use taskmanager_core::core::SensorCenterSnapshot;
-use taskmanager_core::core::ServiceId;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
-use taskmanager_core::core::process::{
+use taskforest_core::core::NpuInventorySnapshot;
+use taskforest_core::core::PowerSupplySnapshot;
+use taskforest_core::core::SensorCenterSnapshot;
+use taskforest_core::core::ServiceId;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::group_aggregate::aggregate_apps_typed;
+use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessCategory, ProcessItem, ProcessLiveKey,
     process_category,
 };
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::startup::BootTimeline;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::startup::StartupEntry;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::startup::BootTimeline;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::StartupEntry;
+use taskmanager_application::AlertEventSeed;
 use taskmanager_shell::DirectTrackState;
 use taskmanager_shell::fixture::seed_capture_msr_readout;
 use taskmanager_telemetry_store::live_graph::{LiveGraphHistory, MAX_HISTORY_CAPACITY};

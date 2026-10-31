@@ -1,8 +1,8 @@
 //! Process inventory, control-correlation and insight fold systems.
 
 use super::*;
+use taskforest_contract::CapabilityId;
 use taskmanager_application::{CorrelatedProcessAffinityEvent, CorrelatedProcessEvent};
-use taskmanager_platform_contract::CapabilityId;
 
 pub(super) fn apply_process_events(
     store: &mut SystemProjectionStore,

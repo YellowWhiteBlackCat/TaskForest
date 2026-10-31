@@ -1,7 +1,7 @@
 //! Sensor and power-supply providers.
 
 use super::*;
-use taskmanager_platform_contract::DeviceDiscovery;
+use taskforest_contract::DeviceDiscovery;
 
 impl SensorProvider for FakeProvider {
     fn refresh(

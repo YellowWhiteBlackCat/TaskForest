@@ -18,23 +18,23 @@ use bevy::app::App;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::session::{
+    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::target::SessionId;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedSessionEvent, EnvironmentFacets, HostTelemetryRequest, LatestControlRequest,
     PlatformClient, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
     SessionControlOutcome, SessionControlRequest, SessionEvent, SystemFacets,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::{
-    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::target::SessionId;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
-    RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 use taskmanager_shell::presentation::MISSING_VALUE;

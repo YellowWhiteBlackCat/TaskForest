@@ -6,8 +6,8 @@ use gpui::TestAppContext;
 
 use super::ProcessTooltipIndex;
 use crate::gpui_app::root::RootView;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cmdline: &str) -> ProcessItem {

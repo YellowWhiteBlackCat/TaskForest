@@ -18,7 +18,7 @@
 //! ## Honesty boundary
 //!
 //! - `Requires` names capability identities that already exist in
-//!   `taskmanager-platform-contract`; it never invents a provider claim.
+//!   `taskforest-contract`; it never invents a provider claim.
 //! - `NotInVocabulary` is the explicit M3.1 baseline for a feature whose
 //!   operating-system facts have no capability identity yet. It is visible
 //!   debt (the ledger reports `Unregistered`), never a silent omission, and
@@ -29,7 +29,7 @@
 //!   implemented yet must NOT be legitimized as `NotApplicable`; it is
 //!   `Requires` plus an absent/undeclared platform source.
 
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 /// Product-expected capabilities that no feature owns, declared explicitly
 /// with the reason they are not a feature-ledger item.

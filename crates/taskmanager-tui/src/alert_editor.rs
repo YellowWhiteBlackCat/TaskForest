@@ -1,8 +1,8 @@
 //! TUI-owned selection and toggle behavior for canonical managed alert rules.
 
 use crate::TuiApp;
+use taskforest_core::core::alerts::AlertRuleId;
 use taskmanager_application::ManagedAlertRuleEdit;
-use taskmanager_core::core::alerts::AlertRuleId;
 
 impl TuiApp {
     /// The currently selected rule index in the health overlay. Clamped against

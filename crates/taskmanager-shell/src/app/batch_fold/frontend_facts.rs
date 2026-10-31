@@ -1,10 +1,10 @@
 //! Shared folds for native appearance and health facts consumed by renderers.
 
 use super::*;
+use taskforest_contract::CapabilityId;
 use taskmanager_application::{
     CorrelatedDesktopAppearanceEvent, CorrelatedSmartEvent, CorrelatedStorageHealthEvent,
 };
-use taskmanager_platform_contract::CapabilityId;
 
 pub(super) fn apply_desktop_appearance(
     events: Vec<CorrelatedDesktopAppearanceEvent>,

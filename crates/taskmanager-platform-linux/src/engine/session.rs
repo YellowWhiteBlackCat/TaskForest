@@ -21,12 +21,12 @@
 use std::fs;
 use std::process::Command;
 use std::time::{Duration, Instant};
-use taskmanager_core::core::session::{
+use taskforest_core::core::session::{
     SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
 };
 use tracing::{debug, info};
 
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
 use taskmanager_platform_portable::{BoundedCommandError, BoundedOutput, run_with_timeout};
 
 const SESSION_CONTROL_TIMEOUT: Duration = Duration::from_secs(2);

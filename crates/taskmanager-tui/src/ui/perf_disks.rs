@@ -2,7 +2,7 @@
 //!
 //! Reads the live snapshot's `disks` vector through the typed `Option`-returning
 //! accessors so an unavailable field renders an honest dash instead of a
-//! fabricated zero. Read-only consume of `taskmanager_core::core::metrics::DiskMetrics`;
+//! fabricated zero. Read-only consume of `taskforest_core::core::metrics::DiskMetrics`;
 //! this crate never mutates the shared snapshot shape. The accessor names mirror
 //! `crates/taskmanager-gpui/src/gpui_app/perf_views/disk_stats.rs` so the two frontends agree on what
 //! "unavailable" means for each disk field.
@@ -23,8 +23,8 @@ use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_shell::presentation::smart::smart_section_visible;
 
+use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,

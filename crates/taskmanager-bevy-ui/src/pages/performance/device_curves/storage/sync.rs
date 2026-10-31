@@ -29,7 +29,7 @@ use crate::pages::performance::{DynBlock, Section};
 use crate::scene_attach::{attach_child, insert_into};
 use crate::widgets::chart::{ChartCanvas, ChartContent};
 use crate::window::WindowPalette;
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskforest_core::core::metrics::DiskMetrics;
 
 /// The systems that own the storage surface.
 #[derive(SystemParam)]

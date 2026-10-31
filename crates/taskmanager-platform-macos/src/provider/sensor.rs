@@ -4,13 +4,13 @@
 //! (IOHIDServiceClient) behind its safe API on both Intel and Apple Silicon.
 //! Fan speeds have no safe accessor and stay absent (ADR-019).
 
-use taskmanager_application::SensorRequest;
-use taskmanager_core::DeviceId;
-use taskmanager_core::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::DeviceId;
+use taskforest_core::{
     DeviceGeneration, DeviceState, DeviceStatus, FailureKind, ProviderId, SensorCenterSnapshot,
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
 };
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot, ProviderFailure};
+use taskmanager_application::SensorRequest;
 use taskmanager_platform_provider::SensorProvider;
 use taskmanager_platform_runtime::{ProviderRegistration, SensorExecutors, SensorProviderBindings};
 

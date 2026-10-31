@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 fn fixture_root(name: &str) -> PathBuf {
     crate::test_support::repo_temp_dir().join(format!(

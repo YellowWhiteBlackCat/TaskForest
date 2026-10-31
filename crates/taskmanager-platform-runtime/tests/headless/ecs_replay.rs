@@ -5,7 +5,7 @@
 //! application revisions, or frontend state, so a replay cannot become a
 //! second fact authority.
 
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
 
 use crate::health::CapabilityHealth;
 

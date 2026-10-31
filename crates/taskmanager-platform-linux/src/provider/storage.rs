@@ -1,8 +1,9 @@
 //! Storage-health and SMART provider implementations.
 
-use taskmanager_core::core::smart::{SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::smart::{SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::{
     DeviceState, DeviceStatus, FilesystemHealthSnapshot, SmartSelfTestIntent, SmartSelfTestReport,
     StorageDeviceTarget, StorageInterconnect, StorageProtocol,
 };
@@ -13,7 +14,6 @@ use taskmanager_escalation::polkit::{
 use taskmanager_escalation::{
     EscalationAvailability, EscalationDenialReason, EscalationFeature, PrivilegeGate,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     FilesystemHealthProvider, SmartSelfTestControlProvider, SmartSelfTestObservationProvider,
 };

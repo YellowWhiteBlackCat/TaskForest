@@ -5,6 +5,10 @@ edition = "2024"
 rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Audited SCM_RIGHTS fd-passing boundary crate — the third unsafe trust root for TaskForest (AF_PACKET launcher → unprivileged app)"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-fd-bridge"
 
 # The THIRD crate in the workspace permitted to contain `unsafe` (ADR-022 +
 # ADR-024 + ADR-025). It is the audited OS ABI seam for passing a file

@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::CapabilityRiskLevel;
+use taskforest_core::CapabilityRiskLevel;
 
 #[test]
 fn recognises_container_cgroups_and_ids() {

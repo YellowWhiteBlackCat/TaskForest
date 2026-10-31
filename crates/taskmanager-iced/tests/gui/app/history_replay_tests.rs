@@ -1,11 +1,11 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
+use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionOutcome, HistoryReplayError,
     HistoryReplayErrorKind, HistoryReplayRow,
 };
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 use super::*;
 

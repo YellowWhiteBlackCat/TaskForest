@@ -4,10 +4,10 @@
 //! read boundary. Ratatui code receives owned strings or primitive display
 //! facts and never reaches into `ProcessItem::current_*` observations.
 
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_shell::presentation::{
     MISSING_VALUE, optional_cpu_time_seconds, optional_nice, peak_of, start_clock_local,
 };

@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::{CapabilityId, CapabilityRequest};
+use taskforest_contract::{CapabilityId, CapabilityRequest};
 
 use super::*;
 use crate::{SessionControlRequest, StartupControlRequest};

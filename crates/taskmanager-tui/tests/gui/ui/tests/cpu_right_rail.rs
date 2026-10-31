@@ -5,21 +5,21 @@
 //! frames. Value expectations are the fixture projections the folds are
 //! fed below, asserted row-by-row like a reader would scan the column.
 
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::metrics::{
+    CpuFrequencySource, MsrReadoutSnapshot, MsrThermalStatusReadout, PressureWindow,
+    ResourcePressure, ScalarObservation, ScalarObservationGroup, SystemPressureSnapshot,
+};
 use taskmanager_application::i18n::Language;
 use taskmanager_application::{
     AppAction, AppPage, CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
 };
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::metrics::{
-    CpuFrequencySource, MsrReadoutSnapshot, MsrThermalStatusReadout, PressureWindow,
-    ResourcePressure, ScalarObservation, ScalarObservationGroup, SystemPressureSnapshot,
-};
 
 use super::acceptance_support::frame_in_language;
 use super::frame_text;
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::metrics::CpuPackageMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::CpuPackageMetrics;
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::fixture::{edit_hardware, edit_snapshot};
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 use taskmanager_shell::presentation::msr_thermal_status_segments;

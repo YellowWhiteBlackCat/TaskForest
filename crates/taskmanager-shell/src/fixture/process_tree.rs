@@ -2,9 +2,9 @@
 
 use crate::fixture::{ProjectionSeedFact, seed_projection_fact};
 use crate::{ProcessRowId, ShellApp};
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessLiveKey, ProcessMetadataObservation,
     ProcessScalarObservations,
 };

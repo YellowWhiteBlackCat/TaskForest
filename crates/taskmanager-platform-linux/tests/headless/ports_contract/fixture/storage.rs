@@ -2,7 +2,7 @@
 //! directory-usage scan lane.
 
 use super::*;
-use taskmanager_core::SmartSelfTestPhase;
+use taskforest_core::SmartSelfTestPhase;
 
 impl DirectoryUsageProvider for FakeProvider {
     fn scan_chunk(

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_application::HistoryReplayTransitionError;
 use taskmanager_application::MAX_HISTORY_REPLAY_ERROR_CHARS;
 use taskmanager_application::{
@@ -7,7 +8,6 @@ use taskmanager_application::{
     HistoryReplayController, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
     HistoryReplayState,
 };
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 fn rows(value: f32) -> Arc<[HistoryReplayRow]> {
     Arc::from([HistoryReplayRow {
@@ -133,8 +133,8 @@ fn closed_controller_rejects_refresh_and_window_selection() {
 
 #[test]
 fn performance_projection_filters_application_rows_and_keeps_last_good_request_identity() {
+    use taskforest_core::core::history::ApplicationHistoryIdentity;
     use taskmanager_application::{ApplicationHistoryCapability, ApplicationHistoryStatus};
-    use taskmanager_core::core::history::ApplicationHistoryIdentity;
     let mut replay = HistoryReplayController::default();
     let request = replay.open().expect("open");
     let system = rows(12.0)[0].clone();

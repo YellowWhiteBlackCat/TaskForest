@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use taskmanager_core::{LimitValue, ResourceLastObservation};
+use taskforest_core::{LimitValue, ResourceLastObservation};
 
 use super::*;
 

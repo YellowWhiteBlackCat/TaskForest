@@ -1,10 +1,10 @@
 //! Misc shared-shell tests: typed notification-failure reporting and the
 //! persisted history-capacity pass-through (G-02).
 
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{CapabilityId, SubmissionError, SubmissionErrorKind};
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
-use taskmanager_platform_contract::{CapabilityId, SubmissionError, SubmissionErrorKind};
 use taskmanager_telemetry_store::live_graph::{
     DEFAULT_HISTORY_CAPACITY, MAX_HISTORY_CAPACITY, MIN_HISTORY_CAPACITY, MetricSeries,
 };

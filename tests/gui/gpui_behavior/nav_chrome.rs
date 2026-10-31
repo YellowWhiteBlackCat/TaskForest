@@ -19,10 +19,10 @@
 //! assertion ("control absent") is meaningful.
 
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::setup::SetupScriptInfo;
 use taskmanager_application::first_run::{FirstRunController, FirstRunPhase};
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::setup::SetupScriptInfo;
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage, UnitFamily, WindowSurfaceKind};
 use taskmanager_gpui::gpui_app::sidebar::SelectedDevice;
 use taskmanager_theme::Theme;

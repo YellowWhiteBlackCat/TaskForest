@@ -5,8 +5,8 @@ use std::io;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use taskmanager_core::FailureKind;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::FailureKind;
 
 use super::ServiceManager;
 

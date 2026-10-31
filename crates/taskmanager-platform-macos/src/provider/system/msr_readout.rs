@@ -1,8 +1,8 @@
 //! Registered-pending CPU MSR-readout provider (macOS side of the CpuMsr
 //! request lane).
 
-use taskmanager_core::MsrReadoutSnapshot;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::MsrReadoutSnapshot;
 use taskmanager_platform_provider::MsrReadoutProvider;
 
 /// Registered-pending CPU MSR-readout provider: the lane is backed on Linux

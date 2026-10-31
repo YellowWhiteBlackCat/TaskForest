@@ -2,8 +2,8 @@
 
 use super::*;
 use gpui::{AppContext, TestAppContext};
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
-use taskmanager_core::core::config::{COLOR_SCHEME_DARK, COLOR_SCHEME_SYSTEM};
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::config::{COLOR_SCHEME_DARK, COLOR_SCHEME_SYSTEM};
 use taskmanager_theme::{LightDark, Skin, Theme};
 
 #[gpui::test]

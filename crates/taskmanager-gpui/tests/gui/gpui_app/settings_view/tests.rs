@@ -1,7 +1,7 @@
 //! Settings-page unit tests (line split).
 
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::metrics::GpuMetrics;
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_ui::theme_binding::definite_length;
 mod tests_inner {
     use super::*;
@@ -26,21 +26,21 @@ mod tests_inner {
     use crate::gpui_app::root::RootView;
     use crate::gpui_app::settings_view::init_data_points_slider;
     use crate::gpui_app::settings_view::refresh::init_slider_entity;
-    use taskmanager_application::first_run::FirstRunController;
-    use taskmanager_application::i18n;
-    use taskmanager_core::ProviderId;
+    use taskforest_contract::{
+        CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    };
+    use taskforest_core::ProviderId;
     #[cfg(target_os = "linux")]
-    use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
-    use taskmanager_core::core::config::{
+    use taskforest_core::core::config::WINDOW_DECORATIONS_CUSTOM;
+    use taskforest_core::core::config::{
         STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_GRAYSCALE,
         TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_SYSTEM,
     };
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::setup::SetupScriptInfo;
-    use taskmanager_core::core::units::UnitPreferences;
-    use taskmanager_platform_contract::{
-        CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    };
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::setup::SetupScriptInfo;
+    use taskforest_core::core::units::UnitPreferences;
+    use taskmanager_application::first_run::FirstRunController;
+    use taskmanager_application::i18n;
     use taskmanager_theme::tokens;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::inputs::switch::SwitchState;

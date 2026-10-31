@@ -32,24 +32,24 @@ use bevy::ui::BackgroundColor;
 use bevy::ui::Node;
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, RequestId, RequestPort,
+    SubmissionError,
+};
+use taskforest_core::core::metrics::MemoryTelemetryObservation;
+use taskforest_core::core::metrics::{
+    CpuMetrics, CpuPackageMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics,
+    MemoryMetrics, MemoryScalarObservations, NetworkAdapterType, NetworkMetrics,
+    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
+    ScalarObservation, ScalarObservationGroup,
+};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedSystemTelemetryOutcome, HostTelemetryRequest, PlatformClient, PlatformEvent,
     PlatformEventBatch, PlatformFacets, PlatformHandle, ProjectedSystemTelemetry, SystemFacets,
     SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome, SystemTelemetryDomainState,
     SystemTelemetryRevision,
-};
-use taskmanager_core::core::metrics::MemoryTelemetryObservation;
-use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuPackageMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics,
-    MemoryMetrics, MemoryScalarObservations, NetworkAdapterType, NetworkMetrics,
-    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    ScalarObservation, ScalarObservationGroup,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, RequestId, RequestPort,
-    SubmissionError,
 };
 
 use taskmanager_shell::presentation::{MISSING_VALUE, cpu_thermal_throttle_summary};
@@ -70,17 +70,17 @@ use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::widgets::chart::{ChartCanvas, ChartContent, MAX_CHART_POINTS, line_segments};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
+use taskforest_contract::RequestEnvelope;
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
+};
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::SmartControlRequest;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::smart::{
-    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
-};
-use taskmanager_platform_contract::RequestEnvelope;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_shell::presentation::trend::window;
 

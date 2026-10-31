@@ -17,8 +17,8 @@ use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, percent, px, rem,
 };
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
 
 use super::{SystemFactGroup, SystemFactRow, fact_row_scene, section_card_scene};
 use crate::palette::{UiPalette, space_4};

@@ -1,6 +1,6 @@
 //! Typed GPU scalar points retained by the correlated history.
 
-use taskmanager_core::GpuMetrics;
+use taskforest_core::GpuMetrics;
 
 /// One timestamped GPU scalar point.
 ///

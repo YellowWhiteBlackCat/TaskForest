@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::SmartSelfTestFailure;
-use taskmanager_core::SmartSelfTestKind;
+use taskforest_core::DeviceStatus;
+use taskforest_core::SmartSelfTestFailure;
+use taskforest_core::SmartSelfTestKind;
 
 #[test]
 fn slow_smart_control_does_not_block_status_observation() {

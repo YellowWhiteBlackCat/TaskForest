@@ -1,6 +1,6 @@
 //! Shared muda/tray-icon bridge for the Windows and macOS tray adapters.
 //!
-//! The neutral TrayMenuSpec (from `taskmanager-core`) is rendered to a
+//! The neutral TrayMenuSpec (from `taskforest-core`) is rendered to a
 //! native `tray_icon::menu::Menu` exactly once here, then attached to the
 //! tray icon by whichever OS adapter hosts it. Menu id encoding and radio
 //! exclusivity also live here so the two adapters cannot drift.
@@ -15,11 +15,11 @@
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::collections::HashMap;
 
-use taskmanager_core::tray::TrayActionId;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use taskmanager_core::tray::{TrayMenuItem, TrayMenuSpec};
+use taskforest_contract::TrayFailure;
+use taskforest_core::tray::TrayActionId;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use taskmanager_platform_contract::TrayFailure;
+use taskforest_core::tray::{TrayMenuItem, TrayMenuSpec};
 
 /// Prefix of the native menu ids so inbound `tray_icon::menu::MenuEvent`s
 /// can be attributed to our tray.

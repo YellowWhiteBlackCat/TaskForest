@@ -6,7 +6,7 @@
 //!
 //! # Neutral single source
 //!
-//! Preference-aware quantity formatting lives in `taskmanager-core`
+//! Preference-aware quantity formatting lives in `taskforest-core`
 //! (`core::units`, ADR-020 single-source family). GPUI stores and passes the
 //! core-owned [`UnitPreferences`] directly; this module only owns graph-sample
 //! conversion and unrelated GPUI readout helpers.
@@ -22,9 +22,9 @@
 //! behaviour below 2^53 is identical to the old `as f64 / unit` expressions.
 
 use crate::gpui_app::graph::GraphSettings;
+use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::units::{self, QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::GpuMetrics;
-use taskmanager_core::core::units::{self, QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::gpu_display_identity;
 
 const MIB_BYTES: u64 = 1024 * 1024;

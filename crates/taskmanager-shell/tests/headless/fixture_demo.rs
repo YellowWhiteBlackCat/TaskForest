@@ -4,10 +4,10 @@
 //! useful bounded history window for every frontend that consumes them.
 
 use super::*;
+use taskforest_contract::{CapabilityId, CapabilityStatus};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_application::i18n;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 
 use crate::presentation::{msr_thermal_status_segments, msr_thermal_status_summary};
 

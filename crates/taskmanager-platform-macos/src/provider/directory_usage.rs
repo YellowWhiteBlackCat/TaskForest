@@ -16,8 +16,8 @@
 //! mac host in this environment); the scanner is verified against fixture
 //! trees on Linux CI inside the shared provider crate.
 
-use taskmanager_core::{DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot};
 use taskmanager_platform_portable::DirectoryUsageScanner;
 use taskmanager_platform_provider::DirectoryUsageProvider;
 

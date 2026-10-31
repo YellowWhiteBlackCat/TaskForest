@@ -2,11 +2,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::bounded;
+use taskforest_core::{ProcessItem, SystemSnapshot};
 use taskmanager_application::snapshot_export::{
     SnapshotExportController, SnapshotExportErrorKind, SnapshotExportOutcome,
     SnapshotExportPayload, SnapshotExportState, SnapshotExportTarget,
 };
-use taskmanager_core::{ProcessItem, SystemSnapshot};
 
 use super::*;
 use taskmanager_application::snapshot_export::SnapshotExportDisposition;

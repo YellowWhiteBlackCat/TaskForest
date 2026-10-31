@@ -9,18 +9,18 @@ use super::super::*;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::smart::{
+    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+    SmartSelfTestSupport,
+};
+use taskforest_core::core::system_health::SmartSelfTestObservation;
+use taskforest_core::core::target::StorageDeviceKey;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     AppAction, AppPage, SmartControlRequest, SmartObservationBatch, SmartSelfTestState,
 };
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::smart::{
-    SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
-    SmartSelfTestSupport,
-};
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
-use taskmanager_core::core::target::StorageDeviceKey;
 
 use crate::{TuiApp, TuiTheme, render};
 use taskmanager_application::{PendingConfirmation, PlatformClient};
@@ -412,12 +412,12 @@ fn while_armed_the_gate_owns_the_keyboard() {
 #[test]
 fn confirm_round_trips_through_queue_effect_into_the_smart_control_session() {
     use std::sync::{Arc, Mutex};
-    use taskmanager_application::{
-        PlatformEvent, PlatformFacets, PlatformHandle, SmartControlRequest, StorageFacets,
-    };
-    use taskmanager_platform_contract::{
+    use taskforest_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
         RequestEnvelope, RequestPort, SubmissionError,
+    };
+    use taskmanager_application::{
+        PlatformEvent, PlatformFacets, PlatformHandle, SmartControlRequest, StorageFacets,
     };
 
     #[derive(Default)]

@@ -20,15 +20,13 @@ use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::ScrollArea;
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use std::sync::Arc;
+use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey};
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     ApplicationHistoryCapability, HistoryReplayCompletion, HistoryReplayCompletionOutcome,
     HistoryReplayController, HistoryReplayRow,
 };
-use taskmanager_core::core::history::{
-    ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey,
-};
-use taskmanager_core::core::identity::DeviceId;
 use taskmanager_theme::tokens::UiSize;
 
 #[test]

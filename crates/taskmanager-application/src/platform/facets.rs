@@ -1,10 +1,10 @@
 //! Request and event contracts grouped by independent capability change axis.
 
-use taskmanager_core::core::setup::SetupScriptEvent;
-use taskmanager_platform_contract::RequestScope;
-use taskmanager_platform_contract::RequestTracking;
-use taskmanager_platform_contract::RequestTrackingError;
-use taskmanager_platform_contract::{CapabilityId, EventPort};
+use taskforest_contract::RequestScope;
+use taskforest_contract::RequestTracking;
+use taskforest_contract::RequestTrackingError;
+use taskforest_contract::{CapabilityId, EventPort};
+use taskforest_core::core::setup::SetupScriptEvent;
 
 /// Bind one application request DTO to exactly one platform-neutral
 /// capability. The runtime consumes this association at the typed lane

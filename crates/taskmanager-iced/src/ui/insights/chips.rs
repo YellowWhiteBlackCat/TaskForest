@@ -8,8 +8,8 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::process_telemetry::{CapabilityRiskLevel, ProcessCapabilities};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process_telemetry::{CapabilityRiskLevel, ProcessCapabilities};
 use taskmanager_theme::{Color, Theme, tokens};
 use zhuge_ui_kit_iced::surface::{self, BadgeGeometry};
 

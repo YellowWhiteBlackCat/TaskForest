@@ -17,9 +17,9 @@ use gpui::{
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{self, UiSize};
 

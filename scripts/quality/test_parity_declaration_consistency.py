@@ -149,7 +149,7 @@ def test_unsupported_but_implemented_is_reported(guard) -> None:
         write(declaration, declaration_text)
         write(
             crate / "src" / "diagnostic_report.rs",
-            "use taskmanager_core::DiagnosticBundlePlan;\n"
+            "use taskforest_core::DiagnosticBundlePlan;\n"
             "pub fn export_diagnostic_report() { let _ = DiagnosticBundlePlan::prepare; }\n",
         )
         findings = guard.analyze_frontend("demo", crate, declaration, root)
@@ -346,7 +346,7 @@ def _build_end_to_end_repo(root: Path) -> None:
     )
     write(
         root / "crates/taskmanager-tui/src/diagnostic_report.rs",
-        "use taskmanager_core::DiagnosticBundlePlan;\n",
+        "use taskforest_core::DiagnosticBundlePlan;\n",
     )
 
 

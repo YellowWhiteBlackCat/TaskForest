@@ -1,10 +1,10 @@
 //! Frozen diagnostic plans prepared from observed, cached facts.
 
-use taskmanager_application::DiagnosticBundleEngine;
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::diagnostics::{
+use taskforest_core::core::config::Config;
+use taskforest_core::core::diagnostics::{
     DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan,
 };
+use taskmanager_application::DiagnosticBundleEngine;
 
 use super::SystemProjectionStore;
 

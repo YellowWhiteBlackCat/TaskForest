@@ -6,20 +6,20 @@ use crate::command_palette::TuiSurfaceAction;
 use crate::health_review::HealthReviewMode;
 use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{PerfDevice, TuiApp, TuiSurface};
+use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+    ProcessMetadataObservation, ProcessMetadataObservations,
+};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
-    ProcessMetadataObservation, ProcessMetadataObservations,
-};
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::SearchSlot;
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;

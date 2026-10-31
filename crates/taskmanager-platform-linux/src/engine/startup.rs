@@ -24,12 +24,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use taskmanager_core::core::startup::{
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
-use taskmanager_core::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::PartialSourceSnapshot;
+use taskforest_core::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
 
 pub(super) const STARTUP_CONTROL_TIMEOUT: Duration = Duration::from_secs(2);
 const XDG_PROVIDER_ID: ProviderId = ProviderId::borrowed("linux.startup.xdg");

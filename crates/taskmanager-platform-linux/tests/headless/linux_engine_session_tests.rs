@@ -3,8 +3,8 @@ use super::*;
 use std::os::unix::process::ExitStatusExt;
 #[cfg(unix)]
 use std::sync::atomic::{AtomicUsize, Ordering};
-use taskmanager_core::SessionId;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+use taskforest_core::SessionId;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
 
 const FIXTURE_BOOT_ID: &str = "01234567-89ab-cdef-0123-456789abcdef";
 

@@ -4,8 +4,8 @@
 //! navigation for the active width class, from the frame-local render context.
 
 use gpui::{Context, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use taskforest_contract::CapabilityId;
 use taskmanager_application::i18n;
-use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageFrame;
 use taskmanager_ui::theme_binding::font_size;

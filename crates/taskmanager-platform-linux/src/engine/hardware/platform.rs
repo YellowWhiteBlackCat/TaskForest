@@ -6,7 +6,7 @@
 use std::fs;
 
 #[cfg(target_os = "linux")]
-use taskmanager_core::classify_hypervisor_vendor;
+use taskforest_core::classify_hypervisor_vendor;
 
 use super::num_cpu_dirs;
 use super::read_sysfs_string;

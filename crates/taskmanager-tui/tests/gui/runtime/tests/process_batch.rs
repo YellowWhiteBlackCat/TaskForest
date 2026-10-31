@@ -5,10 +5,10 @@
 use super::super::*;
 
 use crate::ui::process_menu::ProcessMenuAction;
+use taskforest_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
 use taskmanager_application::AppAction;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::fixture_start_token;
 

@@ -1,6 +1,6 @@
 //! Performance options, on-demand capability and replay message reducer.
 
-use taskmanager_core::core::identity::DeviceId;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsAction, present_gpu_engine_rows,
@@ -8,7 +8,7 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 
 use super::super::{IcedApp, Message, PerfDevice};
 use super::dispatch::UpdateDispatch;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 
 impl IcedApp {

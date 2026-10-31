@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessHistorySnapshot, ProcessItem, ProcessLiveKey,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessScalarObservations,
 };
-use taskmanager_core::{FailureKind, ProcessHistoryStore};
+use taskforest_core::{FailureKind, ProcessHistoryStore};
 
 /// Read-only subset of the previous process row needed to retain typed values
 /// across a provider refresh. Histories deliberately stay in

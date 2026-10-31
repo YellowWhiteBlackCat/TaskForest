@@ -2,13 +2,13 @@
 
 use std::collections::{BTreeMap, HashSet};
 
-use taskmanager_core::{
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::{
     CpuTelemetryObservation, DeviceId, DeviceLifecycle, FailureKind, GpuTelemetryObservation,
     HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation, ProviderId,
     SourceOutcome, SourceStatus, StorageTelemetryObservation, SystemObservationState,
     SystemSnapshot, SystemTelemetryDomains,
 };
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::event_batch::CorrelatedSystemTelemetryOutcome;
 use super::facets::SystemTelemetryDomainOutcome;
@@ -17,7 +17,7 @@ use crate::device_lifecycle::{
     DeviceLifecycleApplyResult, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
     DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
 };
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemTelemetryDomain {

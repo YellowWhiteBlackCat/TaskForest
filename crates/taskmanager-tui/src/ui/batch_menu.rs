@@ -13,8 +13,8 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskforest_core::core::process::PriorityTier;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::PriorityTier;
 use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};

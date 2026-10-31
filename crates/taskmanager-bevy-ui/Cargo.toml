@@ -17,11 +17,11 @@ publish = false
 
 [dependencies]
 zhuge-ui-kit-bevy.workspace = true
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
-taskmanager-ipc = { path = "../taskmanager-ipc" }
+taskforest-ipc = { path = "../taskforest-ipc" }
 crossbeam-channel = "0.5"
 serde_json = "1.0"
 taskmanager-shell = { path = "../taskmanager-shell" }

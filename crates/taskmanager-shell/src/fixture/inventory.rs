@@ -1,7 +1,7 @@
 //! Deterministic process, service, startup, and session inventory fixtures.
 
 use super::*;
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
     ProcessScalarObservations,
 };

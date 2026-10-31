@@ -27,8 +27,8 @@ use bevy::ui::{
     percent, px, rem, widget::Text,
 };
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::alerts::{AlertEvent, AlertEventKind, export_alert_events_json};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{AlertEvent, AlertEventKind, export_alert_events_json};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_ui_contract::IconId;
 

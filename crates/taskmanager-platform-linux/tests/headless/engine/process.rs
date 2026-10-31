@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use super::*;
-use taskmanager_core::ProcessScalarObservations;
-use taskmanager_core::ScalarObservation;
+use taskforest_core::ProcessScalarObservations;
+use taskforest_core::ScalarObservation;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]
@@ -301,7 +301,7 @@ fn boot_time_cache_retries_failed_reads_on_the_shorter_interval_and_recovers() {
 #[ignore = "host-dependent: drives the live /proc process collector against the test's own pid"]
 #[test]
 fn fd_source_stays_available_across_decimation_skip_ticks_on_box() {
-    use taskmanager_core::ScalarAvailability;
+    use taskforest_core::ScalarAvailability;
 
     let own_pid = std::process::id();
     let window = FD_COUNT_REFRESH_EVERY_N_TICKS;

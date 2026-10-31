@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     AlertInstanceId, AlertRuleId, AlertTargetIdentity, DeviceGeneration, DeviceId, DiskMetrics,
 };
 

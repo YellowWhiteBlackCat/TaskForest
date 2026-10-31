@@ -2,10 +2,10 @@
 
 use super::frame_text;
 
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::AppPage;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]

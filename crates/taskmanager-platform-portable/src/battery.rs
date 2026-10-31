@@ -5,12 +5,12 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::DeviceGeneration;
-use taskmanager_core::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::DeviceGeneration;
+use taskforest_core::{
     BatteryInfo, BatteryScalarObservations, DeviceId, DeviceState, DeviceStatus, FailureKind,
     PowerSupplyKind, PowerSupplySnapshot, ProviderId, ScalarObservation,
 };
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot, ProviderFailure};
 
 pub fn collect_battery_snapshot(
     identity_namespace: &str,

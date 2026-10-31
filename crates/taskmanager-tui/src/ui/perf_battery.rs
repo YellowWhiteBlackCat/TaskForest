@@ -5,7 +5,7 @@
 //! `current_*` accessors so an unavailable field renders an honest dash instead
 //! of a fabricated zero — mirroring `crates/taskmanager-gpui/src/gpui_app/perf_views/dynamic.rs`
 //! (`render_battery`) and `root/system_health.rs`. Read-only consume of
-//! `taskmanager_core::core::power::BatteryInfo`; this crate never mutates the shared
+//! `taskforest_core::core::power::BatteryInfo`; this crate never mutates the shared
 //! snapshot shape. The accessor names agree with the GPUI frontend so the two
 //! renderers agree on what "unavailable" means for each battery field.
 //!
@@ -22,15 +22,15 @@ use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
+use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::power::BatteryInfo;
-use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_shell::ShellApp;
 
 use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
-use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskforest_core::core::power::PowerSupplySnapshot;
 
 /// Render the per-battery detail section into `area`. A zero-height area (the
 /// small-terminal case where no panel was allocated) renders nothing. A `None`

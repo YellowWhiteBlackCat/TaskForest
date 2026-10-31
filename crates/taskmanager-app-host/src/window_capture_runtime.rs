@@ -10,11 +10,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded, select_biased};
+use taskforest_contract::{WindowCaptureFailure, WindowCaptureReceipt};
 use taskmanager_application::window_capture::{
     WindowCaptureCompletion, WindowCaptureError, WindowCaptureErrorKind, WindowCaptureOutcome,
     WindowCapturePort, WindowCaptureRequest, WindowCaptureTarget,
 };
-use taskmanager_platform_contract::{WindowCaptureFailure, WindowCaptureReceipt};
 
 use crate::worker_fault::catch_worker_panic;
 use taskmanager_platform_native::capture_current_window_png;

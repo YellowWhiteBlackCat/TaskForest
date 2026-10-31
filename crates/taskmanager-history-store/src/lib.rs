@@ -1,12 +1,12 @@
 //! Opt-in persistent telemetry history (roadmap #4, R1).
 //!
 //! This crate is the storage half of the history-persistence seam: it
-//! implements the core [`taskmanager_core::HistoryRecordSink`] port (driven only by
+//! implements the core [`taskforest_core::HistoryRecordSink`] port (driven only by
 //! `CorrelatedSystemTelemetryIngestor`), buffers accepted samples, and
 //! flushes them to one JSONL file per series under an injected directory —
 //! the composition edge picks the platform convention, this crate never
 //! touches a platform API. Reads go through [`HistoryQuery`], which answers
-//! windowed [`taskmanager_core::HistoricalSeries`] / [`taskmanager_core::PeakSummary`]
+//! windowed [`taskforest_core::HistoricalSeries`] / [`taskforest_core::PeakSummary`]
 //! read models for the
 //! performance page's future history mode.
 //!

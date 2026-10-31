@@ -5,7 +5,7 @@
 //! paths directly (no aggregate facade).
 
 use ::gpui::{Font, FontFallbacks, font};
-use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, HighContrast, LightDark, NativeAppearance, ResolvedFonts,
     Skin, Theme,

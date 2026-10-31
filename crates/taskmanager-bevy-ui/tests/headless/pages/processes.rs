@@ -25,11 +25,11 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
@@ -883,10 +883,10 @@ fn wheel_scrolls_map_to_signed_rows_by_unit() {
 }
 
 // ---- multi-select batch tests ----
+use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
 use taskmanager_application::PendingConfirmation;
-use taskmanager_core::core::process::ProcessBatchAction;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_ui_contract::IconId;

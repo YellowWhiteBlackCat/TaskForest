@@ -8,11 +8,11 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::{Sender, TrySendError};
-use taskmanager_application::PlatformEvent;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventEnvelope, EventSequence, OperationFailure, ProviderFailure, RequestId,
 };
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::PlatformEvent;
 
 use super::catalog::{ProviderPanicLedger, RuntimeCapabilityCatalog};
 use super::event_queue::{EventClass, EventFinality, EventQueueState, QueuedEvent};

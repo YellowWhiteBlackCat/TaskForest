@@ -15,7 +15,7 @@
 
 use std::time::SystemTime;
 
-use taskmanager_core::{FailureKind, LocalTimeRules, LocalTimeRulesObservation, unix_millis};
+use taskforest_core::{FailureKind, LocalTimeRules, LocalTimeRulesObservation, unix_millis};
 use taskmanager_windows_api::query_time_zone_rules;
 use taskmanager_windows_api::{WindowsApiError, WindowsTimeZoneRules, WindowsYearZoneRule};
 

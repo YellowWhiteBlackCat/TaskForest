@@ -1,14 +1,14 @@
 use super::*;
+use taskforest_contract::RequestId;
+use taskforest_core::DmiIdentityFacts;
+use taskforest_core::SmbiosMemorySnapshot;
+use taskforest_core::core::CpuInstructionFeature;
+use taskforest_core::core::hardware::DisplayInfo;
+use taskforest_core::core::metrics::GpuScalarObservations;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::units::QuantityFamily;
 use taskmanager_application::SmbiosMemoryState;
-use taskmanager_core::DmiIdentityFacts;
-use taskmanager_core::SmbiosMemorySnapshot;
-use taskmanager_core::core::CpuInstructionFeature;
-use taskmanager_core::core::hardware::DisplayInfo;
-use taskmanager_core::core::metrics::GpuScalarObservations;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::units::QuantityFamily;
-use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
@@ -137,8 +137,8 @@ fn device_section_kernel_facts_stay_conditional() {
 /// Drive the real session through admission so the projection observes the
 /// same Ready state production produces.
 fn ready_state(identity: Option<DmiIdentityFacts>) -> SmbiosMemoryState {
+    use taskforest_contract::RequestId;
     use taskmanager_application::SmbiosMemorySession;
-    use taskmanager_platform_contract::RequestId;
     let mut session = SmbiosMemorySession::default();
     let attempt = session.begin_attempt();
     let request = RequestId::new(41).expect("fixture request id");
@@ -261,7 +261,7 @@ fn device_section_keeps_last_good_identity_while_refreshing() {
 /// non-zero class, and the instruction set becomes chips.
 #[test]
 fn cpu_section_breaks_down_hybrid_topology_and_feature_chips() {
-    use taskmanager_core::core::hardware::CoreBreakdown;
+    use taskforest_core::core::hardware::CoreBreakdown;
     let mut hw = hardware();
     hw.instruction_features = vec![CpuInstructionFeature::AesNi, CpuInstructionFeature::Avx2];
     let homogeneous = cpu_section(&hw, &SystemSnapshot::default(), UnitPreferences::default());
@@ -293,7 +293,7 @@ fn cpu_section_breaks_down_hybrid_topology_and_feature_chips() {
 /// appear only when the CPUID identity was actually probed.
 #[test]
 fn cpu_section_surfaces_cpuid_identity_only_when_probed() {
-    use taskmanager_core::core::hardware::CpuIdentity;
+    use taskforest_core::core::hardware::CpuIdentity;
     let bare = cpu_section(
         &hardware(),
         &SystemSnapshot::default(),
@@ -379,7 +379,7 @@ fn memory_section_uses_static_capacity_and_conditional_rows() {
 /// driver fields change.
 #[test]
 fn graphics_section_omits_live_gpu_facts() {
-    use taskmanager_core::core::metrics::GpuMetrics;
+    use taskforest_core::core::metrics::GpuMetrics;
     let mut gpu = GpuMetrics::new("", "Example Arc");
     let bare = graphics_section(
         &SystemSnapshot {
@@ -411,8 +411,8 @@ fn graphics_section_omits_live_gpu_facts() {
 #[test]
 fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_without_fabricating_gaps()
  {
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::{
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::{
         DeviceId, FailureKind, NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot,
         NpuMemoryReport,
     };
@@ -551,12 +551,12 @@ mod memory_inventory_lane {
         MemoryInventoryInputs, MemoryInventoryModel, memory_inventory_model,
     };
     use super::*;
+    use taskforest_contract::{CapabilityStatus, RequestId};
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
+    use taskforest_core::core::units::UnitPreferences;
     use taskmanager_application::SmbiosMemorySession;
     use taskmanager_application::i18n;
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
-    use taskmanager_core::core::units::UnitPreferences;
-    use taskmanager_platform_contract::{CapabilityStatus, RequestId};
 
     fn inputs<'a>(
         state: &'a SmbiosMemoryState,
@@ -746,7 +746,7 @@ mod memory_inventory_lane {
 
 #[test]
 fn device_section_carries_the_memory_full_stall_deduction_bill() {
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         PressureWindow, ResourcePressure, ScalarObservation, SystemPressureSnapshot,
     };
 

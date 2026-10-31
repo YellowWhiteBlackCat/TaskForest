@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::{rc::Rc, sync::Arc};
 
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 
 use super::RootView;
 

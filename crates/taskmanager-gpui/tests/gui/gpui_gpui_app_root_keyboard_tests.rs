@@ -1,14 +1,14 @@
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_application::PendingConfirmation;
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 
 fn root(cx: &mut TestAppContext) -> WindowHandle<RootView> {

@@ -497,7 +497,7 @@ SCOPE_IN_PATH = [
 ]
 
 SCOPE_OUT_PATH = [
-    "crates/taskmanager-core/src/lib.rs",
+    "crates/taskforest-core/src/lib.rs",
     "crates/taskmanager-gpui/src/gpui_app/root.rs",
     "docs/QUALITY_GATES.md",
     "tests/logic/four_frontend_parity_ledger_test.rs",

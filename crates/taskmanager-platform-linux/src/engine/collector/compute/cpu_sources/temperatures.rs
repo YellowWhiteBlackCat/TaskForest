@@ -5,8 +5,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::CpuTemperatureSource;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::CpuTemperatureSource;
 
 use super::{
     CpuTemperatureObservation, FailureSummary, LogicalCoreTemperature, PACKAGE_TIER_EXACT_CHIP,

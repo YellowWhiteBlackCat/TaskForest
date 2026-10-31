@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState,
     GpuTelemetryObservation,
 };

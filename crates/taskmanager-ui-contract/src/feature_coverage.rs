@@ -118,7 +118,7 @@
 //! capability requirement set, an explicit vocabulary gap, or a
 //! `NotApplicable` delivery that has no operating-system source step.
 //! [`feature_platform_report`] folds that declaration against a supplied
-//! [`PlatformCapabilitySurface`] (owned by `taskmanager-platform-contract`) and
+//! [`PlatformCapabilitySurface`] (owned by `taskforest-contract`) and
 //! one frontend declaration into [`FeaturePlatformLedger`], where `Missing` (no
 //! frontend entry) and `Unsupported`/`Unregistered` (no platform source) come
 //! from different axes and never infer each other. [`feature_platform_gate_findings`]
@@ -126,7 +126,7 @@
 //! typed reasons elsewhere, zero false success, bidirectional capability
 //! binding, and directional ceilings from [`PLATFORM_GATE_BASELINE`]. The
 //! platform identity and registration types are owned by
-//! `taskmanager-platform-contract`; this crate composes them and never
+//! `taskforest-contract`; this crate composes them and never
 //! re-exports them.
 //!
 //! ## Honesty boundary

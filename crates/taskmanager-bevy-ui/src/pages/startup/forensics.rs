@@ -30,8 +30,8 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupFailedUnit};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupFailedUnit};
 use taskmanager_ui_contract::IconId;
 
 use super::inks::{InkRole, StartupInk};

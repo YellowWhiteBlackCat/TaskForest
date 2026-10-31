@@ -106,11 +106,19 @@ pub fn run_cli(binary_name: &'static str) {
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
+use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::FirstRunController;
-use taskmanager_ipc::DaemonMessage;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::config::Config;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessCategory;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskforest_core::core::target::ServiceId;
+use taskforest_core::core::text::contains_ascii_ci;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
@@ -121,14 +129,6 @@ use taskmanager_application::{
     DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
 };
 use taskmanager_cli::{FrontendHandlers, run};
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessCategory;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_core::core::text::contains_ascii_ci;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, SearchSlot, ShellKeyEvent,
     SortCol, matches_process_query,

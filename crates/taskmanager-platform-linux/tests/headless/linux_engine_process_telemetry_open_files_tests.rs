@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 
 #[test]
 fn classify_covers_socket_pipe_anon_and_paths() {

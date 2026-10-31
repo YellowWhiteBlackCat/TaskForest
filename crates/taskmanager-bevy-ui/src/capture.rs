@@ -3,7 +3,7 @@
 use crate::app::Page;
 use crate::pages::performance::PerformanceDeviceTarget;
 use bevy::window::WindowResolution;
-use taskmanager_core::core::sensors::SensorQuantity;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_shell::ShellApp;
 
 pub(crate) fn capture_page_name(page: Page) -> &'static str {

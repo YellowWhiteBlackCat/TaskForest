@@ -7,9 +7,9 @@ use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_shell::memory::memory_segments;
 
 use crate::gpui_app::formatting;
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 
 /// One colorless composition segment with its rendered width share already
 /// folded (bytes / current total).

@@ -1,6 +1,6 @@
 use super::*;
 use std::sync::Mutex;
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, HistoricalSample, HistoryMetric, HistorySeriesKey, ProcessApplicationIdentity,
     ProcessMetadataObservation, ProcessScalarObservations, ScalarObservation,
 };

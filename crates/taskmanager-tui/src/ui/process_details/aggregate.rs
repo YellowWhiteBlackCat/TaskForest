@@ -5,9 +5,9 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Wrap};
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::presentation::{bytes, control_error_detail};
 
 use crate::TuiTheme;

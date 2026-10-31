@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::IsolationKind;
+use taskforest_core::DeviceStatus;
+use taskforest_core::IsolationKind;
 use taskmanager_windows_api::WindowsComputeAccelerator;
 use taskmanager_windows_api::WindowsGpuEngineDetail;
 use taskmanager_windows_api::WindowsGpuEngineSample;

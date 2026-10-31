@@ -26,11 +26,11 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceLogAvailability, ServiceLogEntry, ServiceLogErrorKind, ServiceLogLevelFilter,
     ServiceLogProviderState, ServiceLogTimeFilter,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::app::OpenServiceLog;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
@@ -41,7 +41,7 @@ use crate::pages::services::{log_follow, log_text};
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
-use taskmanager_core::core::services::ServiceLogLevel;
+use taskforest_core::core::services::ServiceLogLevel;
 
 /// The log list's viewport height, in rem: the visible budget of the log
 /// entries before the list starts scrolling. The bound rides the rem axis

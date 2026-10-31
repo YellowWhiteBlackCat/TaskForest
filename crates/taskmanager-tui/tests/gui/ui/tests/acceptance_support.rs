@@ -10,10 +10,10 @@ use std::sync::OnceLock;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::session::SessionIncarnation;
 use taskmanager_application::i18n::{self, Language};
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::session::SessionIncarnation;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 use crate::TuiApp;

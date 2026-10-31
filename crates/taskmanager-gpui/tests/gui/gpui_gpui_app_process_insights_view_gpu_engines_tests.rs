@@ -1,9 +1,9 @@
 use super::*;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
-use taskmanager_core::core::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::process_telemetry::ProcessGpuSnapshot;
+use taskforest_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskforest_core::core::{
     DeviceStatus, FailureKind, ProcessGpuEngineUsage, ProcessGpuEngines, ScalarObservation,
 };
 

@@ -83,7 +83,7 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 
 ## 实现边界
 
-平台细节进入以下 crate，而不进入 `taskmanager-core` 或 renderer：
+平台细节进入以下 crate，而不进入 `taskforest-core` 或 renderer：
 
 - `taskmanager-platform-linux`：Linux provider、`/proc`/`/sys`、init、SMART、GPU 和控制；
 - `taskmanager-platform-macos`：macOS provider SPI、safe command 和 fallback；

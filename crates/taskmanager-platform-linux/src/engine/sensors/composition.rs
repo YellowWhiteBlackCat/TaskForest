@@ -5,7 +5,7 @@
 //! diagnostics, while a partial child scan can never confirm device absence.
 
 use super::*;
-use taskmanager_platform_contract::DeviceDiscovery;
+use taskforest_contract::DeviceDiscovery;
 
 pub(super) fn collect_sensor_center_source_from_roots(
     hwmon_root: &Path,

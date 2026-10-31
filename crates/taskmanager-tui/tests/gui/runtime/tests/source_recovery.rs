@@ -2,10 +2,10 @@
 
 use super::super::*;
 
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::{AppPage, RefreshRequest};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 

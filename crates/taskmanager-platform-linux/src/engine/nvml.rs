@@ -5,7 +5,7 @@
 //! capability vocabulary before producing shared domain facts.
 
 use nvml_wrapper::error::NvmlError;
-use taskmanager_core::{DeviceStatus, FailureKind};
+use taskforest_core::{DeviceStatus, FailureKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NvmlFailureKind {

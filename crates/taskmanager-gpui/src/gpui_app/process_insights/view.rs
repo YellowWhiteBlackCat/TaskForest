@@ -4,11 +4,11 @@ use super::{ProcessInsightsErrorKind, ProcessInsightsRenderState};
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_application::process_details_vm::render_environment_value;
-use taskmanager_application::{NetworkEscalationState, ProcessInsightFacet};
-use taskmanager_core::core::{
+use taskforest_core::core::{
     ProcessEnvironment, ProcessGpuSnapshot, ProcessIsolation, ProcessNetworkSnapshot,
 };
+use taskmanager_application::process_details_vm::render_environment_value;
+use taskmanager_application::{NetworkEscalationState, ProcessInsightFacet};
 use taskmanager_shell::presentation::capabilities_summary;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
@@ -20,10 +20,10 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::process_telemetry::LimitValue;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProjectedProcessResources;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::process_telemetry::LimitValue;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 
@@ -260,7 +260,7 @@ fn escalation_row(
     net_escalation: NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
 ) -> Div {
-    use taskmanager_core::core::FailureKind;
+    use taskforest_core::core::FailureKind;
     let escalatable = network.traffic_failure == Some(FailureKind::RequiresEscalation);
     if !escalatable {
         return div();

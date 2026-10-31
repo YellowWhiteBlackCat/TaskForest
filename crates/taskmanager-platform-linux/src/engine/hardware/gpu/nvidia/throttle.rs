@@ -1,6 +1,6 @@
 //! Provider-neutral mapping for NVML's instantaneous clock-throttle mask.
 
-use taskmanager_core::GpuThrottleReason;
+use taskforest_core::GpuThrottleReason;
 
 use crate::engine::nvml::{NvmlFailureKind, classify_error};
 

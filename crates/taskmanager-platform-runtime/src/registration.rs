@@ -2,8 +2,8 @@
 
 use std::marker::PhantomData;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{CapabilityRequest, CapabilityStatus};
+use taskforest_contract::{CapabilityRequest, CapabilityStatus};
+use taskforest_core::core::identity::ProviderId;
 
 /// Provider attribution tied to the application request type it serves.
 ///

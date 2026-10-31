@@ -5,6 +5,10 @@ edition = "2024"
 rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "OS-neutral bounded capability runtime for TaskForest native adapters"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-platform-runtime"
 
 [dependencies]
 bevy_app = { version = "=0.20.1", default-features = false, features = ["std"] }
@@ -14,9 +18,9 @@ bevy_app = { version = "=0.20.1", default-features = false, features = ["std"] }
 # and keep concurrency in the typed provider lanes below.
 bevy_ecs = { version = "=0.20.1", default-features = false, features = ["std"] }
 crossbeam-channel = "0.5"
-taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 
 [lib]
 name = "taskmanager_platform_runtime"

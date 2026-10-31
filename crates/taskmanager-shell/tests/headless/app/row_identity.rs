@@ -3,8 +3,8 @@
 use super::*;
 
 use crate::ProcessRowAnchor;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessScalarObservations};
 
 fn selected_identity(app: &ShellApp) -> ProcessLiveKey {
     app.selected_row

@@ -1,6 +1,6 @@
 //! Static CPU facts whose public APIs are safe and bounded.
 
-use taskmanager_core::CpuInstructionFeature;
+use taskforest_core::CpuInstructionFeature;
 #[cfg(all(
     windows,
     any(target_arch = "x86", target_arch = "x86_64"),

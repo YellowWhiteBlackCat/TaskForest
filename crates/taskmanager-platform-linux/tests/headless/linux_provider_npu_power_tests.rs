@@ -8,7 +8,7 @@
 
 use super::*;
 use std::sync::atomic::{AtomicU64, Ordering};
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 static SCRATCH: AtomicU64 = AtomicU64::new(0);
 

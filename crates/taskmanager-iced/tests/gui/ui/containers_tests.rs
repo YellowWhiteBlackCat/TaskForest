@@ -1,7 +1,7 @@
 use super::*;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_application::MAX_CONTAINER_ROWS;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 
 fn healthy_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);

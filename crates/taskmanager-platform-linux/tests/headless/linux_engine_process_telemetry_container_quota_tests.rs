@@ -8,7 +8,7 @@
 
 use super::*;
 use crate::engine::process::telemetry::safe_cgroup_path;
-use taskmanager_core::ContainerCpuQuota;
+use taskforest_core::ContainerCpuQuota;
 
 fn quota_fixture_tree(label: &str) -> PathBuf {
     let base = std::env::var_os("TMPDIR")

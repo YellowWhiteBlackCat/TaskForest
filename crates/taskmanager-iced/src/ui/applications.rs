@@ -12,7 +12,7 @@ use iced::Length;
 use iced::alignment::Horizontal;
 use iced::widget::{Space, Stack, button, container, mouse_area, row, text};
 use std::rc::Rc;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;

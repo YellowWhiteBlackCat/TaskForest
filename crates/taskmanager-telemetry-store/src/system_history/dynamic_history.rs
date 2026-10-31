@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::DeviceId;
+use taskforest_core::DeviceId;
 
 use super::{
     CorrelatedSystemTelemetryHistoryInner, DeviceMetricHistory, DynamicHistoryDomain,

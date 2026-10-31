@@ -11,9 +11,9 @@ use ratatui::{
     text::{Line, Span},
     widgets::Paragraph,
 };
+use taskforest_core::core::alerts::Alert;
 use taskmanager_application::i18n::t;
 use taskmanager_application::truncate_text;
-use taskmanager_core::core::alerts::Alert;
 use taskmanager_shell::presentation::health_review::{
     HealthReviewGroup, HealthReviewRow, sensor_groups, storage_groups,
 };

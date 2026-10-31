@@ -11,7 +11,7 @@ publish = false
 # application port and the app-host seam for the UI-neutral CLI modes and
 # accepts shape capabilities as plain values (ADR-051) — never features.
 [dependencies]
-taskmanager-core = { path = "../taskmanager-core" }
+taskforest-core = { path = "../taskforest-core" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-assets = { path = "../taskmanager-assets" }

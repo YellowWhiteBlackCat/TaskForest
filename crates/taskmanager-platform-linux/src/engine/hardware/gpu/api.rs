@@ -6,7 +6,7 @@
 
 #![cfg_attr(any(test, feature = "test-support"), allow(dead_code))]
 
-use taskmanager_core::GpuGraphicsApi;
+use taskforest_core::GpuGraphicsApi;
 
 #[cfg(not(any(test, feature = "test-support")))]
 use std::process::Command;

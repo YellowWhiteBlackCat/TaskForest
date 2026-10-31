@@ -29,8 +29,8 @@ crates/*/docs/*.md       crate 专题章程：单个 crate 的深层细节，由
 
 | 任务 | 必读 | 相关 ADR |
 |---|---|---|
-| 新增/修改领域事实、标量或可选语义 | [SCALAR_AVAILABILITY](SCALAR_AVAILABILITY.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[WIRE_DOMAIN_BOUNDARIES](WIRE_DOMAIN_BOUNDARIES.md)、[core README](../crates/taskmanager-core/README.md) | 015 016 011 |
-| 改平台采集 / 新增数据源 | [CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 对应能力行、[platform-contract](../crates/taskmanager-platform-contract/README.md)、对应平台 adapter README | 006 007 009 010 011 013 043 044 |
+| 新增/修改领域事实、标量或可选语义 | [SCALAR_AVAILABILITY](SCALAR_AVAILABILITY.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[WIRE_DOMAIN_BOUNDARIES](WIRE_DOMAIN_BOUNDARIES.md)、[core README](../crates/taskforest-core/README.md) | 015 016 011 |
+| 改平台采集 / 新增数据源 | [CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md) 对应能力行、[platform-contract](../crates/taskforest-contract/README.md)、对应平台 adapter README | 006 007 009 010 011 013 043 044 |
 | 改调度 / 并发 / 事件投递 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[platform-runtime README](../crates/taskmanager-platform-runtime/README.md) | 008 033 |
 | 改历史 / 图表数据 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[telemetry-store](../crates/taskmanager-telemetry-store/README.md)、[history-store](../crates/taskmanager-history-store/README.md) | 014 036 055 |
 | 改前端交互 / UI 组件 | [ARCH](ARCH.md) §8、[UI_COMPONENT_ARCHITECTURE](UI_COMPONENT_ARCHITECTURE.md)、[SHARED_UI_PACKAGES](SHARED_UI_PACKAGES.md)、shell / ui / ui-contract / 对应前端 README | 017 020 026 027 028 038 039 042 046 051 |

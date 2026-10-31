@@ -28,15 +28,15 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Button, ScrollArea};
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t, project_process_resources,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -320,8 +320,8 @@ use effects::{
     on_network_escalate_activated, on_refresh_activated, queue_selected_process_insights,
 };
 pub(crate) use formatting::*;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProjectedProcessInsights;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::command_identity_summary;
 
 // ---- observer bridge ----------------------------------------------------

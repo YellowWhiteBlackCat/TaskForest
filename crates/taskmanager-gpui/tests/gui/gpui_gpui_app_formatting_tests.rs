@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::core::units::format_quantity;
-use taskmanager_core::core::units::format_quantity_f64;
-use taskmanager_core::core::units::format_quantity_pair;
+use taskforest_core::core::units::format_quantity;
+use taskforest_core::core::units::format_quantity_f64;
+use taskforest_core::core::units::format_quantity_pair;
 
 const TWO_POW_53: u64 = 1 << 53;
 const GIB_IN_BYTES: u64 = 1024 * 1024 * 1024;
@@ -88,7 +88,7 @@ fn unit_formatter_fails_closed_for_non_finite_graph_samples() {
 
 /// Parity with the neutral core single source: for a fixed input ×
 /// preference matrix, the Drive and Network families must be byte-identical
-/// to calling `taskmanager-core` directly. This is the acceptance test
+/// to calling `taskforest-core` directly. This is the acceptance test
 /// that the same data + same preference renders the same string in every
 /// frontend.
 #[test]

@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use taskmanager_core::{ProcessMetadataAvailability, ProcessScalarObservations, ScalarObservation};
+use taskforest_core::{ProcessMetadataAvailability, ProcessScalarObservations, ScalarObservation};
 
 use super::super::ProcessManager;
 use super::*;
 use std::fs;
-use taskmanager_core::ApplicationIconFormat;
+use taskforest_core::ApplicationIconFormat;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn identity(id: &str, name: &str, icon: Option<&str>) -> ProcessApplicationIdentity {

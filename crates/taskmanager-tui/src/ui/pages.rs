@@ -5,8 +5,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row, Wrap};
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::{SourceNotice, i18n::t, source_notice};
-use taskmanager_core::core::source::SourceStatus;
 use taskmanager_shell::presentation::MISSING_VALUE;
 
 use super::containers::{
@@ -14,10 +14,10 @@ use super::containers::{
 };
 use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{InfoSortCol, SortDir};
 

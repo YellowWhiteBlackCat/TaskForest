@@ -10,23 +10,23 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::ProcessInsightFacet;
-use taskmanager_ipc::DaemonMessage;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_ui_contract::navigation::NavOrientation;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
+use taskforest_contract::InstanceEvent;
+use taskforest_contract::InstanceGuard;
+use taskforest_contract::TrayController;
+use taskforest_core::core::config::MOTION_NORMAL;
+use taskforest_core::core::time::LocalTimeRules;
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::tray::TrayEvent;
 #[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
 use taskmanager_application::AlertSuggestionWindow;
-use taskmanager_core::core::config::MOTION_NORMAL;
-use taskmanager_core::core::time::LocalTimeRules;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::tray::TrayEvent;
-use taskmanager_platform_contract::InstanceEvent;
-use taskmanager_platform_contract::InstanceGuard;
-use taskmanager_platform_contract::TrayController;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -48,8 +48,8 @@ use taskmanager_ui::inputs::slider::SliderState;
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::primitives::button::ButtonState;
 
-use taskmanager_core::core::process::{ProcessBatchHistory, ProcessLiveKey};
-use taskmanager_core::core::startup::StartupEntryId;
+use taskforest_core::core::process::{ProcessBatchHistory, ProcessLiveKey};
+use taskforest_core::core::startup::StartupEntryId;
 
 use crate::gpui_app::containers_view;
 use crate::gpui_app::cpu_view::{self, CpuHistoryCache};
@@ -65,18 +65,18 @@ use crate::gpui_app::startup_view;
 use crate::gpui_app::system_health_view::{self, SystemHealthCallbacks};
 use crate::gpui_app::system_view;
 use crate::gpui_app::users_view;
+use taskforest_contract::OperationFailure;
+use taskforest_core::core::StableDeviceSelection;
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::session::SessionIdentity;
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     CommandRouter, ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
     default_router,
 };
-use taskmanager_core::core::StableDeviceSelection;
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::session::SessionIdentity;
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
 

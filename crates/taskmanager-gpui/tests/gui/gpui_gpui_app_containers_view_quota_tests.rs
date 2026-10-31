@@ -14,13 +14,13 @@
 use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_theme::Theme;
 
 const GIB: u64 = 1024 * 1024 * 1024;

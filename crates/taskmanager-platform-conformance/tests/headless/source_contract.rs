@@ -1,5 +1,5 @@
-use taskmanager_core::{DeviceId, FailureKind, ProviderId};
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::{DeviceId, FailureKind, ProviderId};
 
 use super::assert_device_discovery_consistent;
 

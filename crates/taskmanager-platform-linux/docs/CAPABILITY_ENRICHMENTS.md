@@ -13,7 +13,7 @@ uses the installed Spectacle active-window provider through fixed argv,
 validates the returned PNG header and dimensions, and reports a typed
 provider absence or fault when Spectacle is unavailable. The cross-target
 backend roster and future-slot vocabulary are owned by
-[`taskmanager-platform-contract`](../../taskmanager-platform-contract/docs/SURFACE_AND_DISCOVERY.md).
+[`taskforest-contract`](../../taskforest-contract/docs/SURFACE_AND_DISCOVERY.md).
 
 This Linux crate does not define the macOS or Windows implementation of these
 facts. Those adapters must fill the same neutral contracts from their native

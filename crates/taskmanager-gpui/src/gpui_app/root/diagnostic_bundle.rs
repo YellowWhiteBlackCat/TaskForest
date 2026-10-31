@@ -17,8 +17,8 @@ use taskmanager_ui::theme_binding::length;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::theme::mono_font_with_fallback;
+use taskforest_core::core::diagnostics::DiagnosticPreview;
 use taskmanager_application::i18n;
-use taskmanager_core::core::diagnostics::DiagnosticPreview;
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_redaction_summary,
 };

@@ -1,9 +1,9 @@
 //! Production localization resolver for the isolated system-health surface.
 
-use taskmanager_application::i18n;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceStatus, FilesystemHealthStatus, SmartSelfTestKind, SmartSelfTestPhase,
 };
+use taskmanager_application::i18n;
 use taskmanager_shell::presentation::smart::smart_self_test_failure_i18n_key;
 
 use super::{SensorGroup, SystemHealthText};

@@ -6,14 +6,14 @@
 //! accessibility cannot infer different active dialogs from parallel booleans.
 
 use crate::gpui_app::dashboard::DashboardPanel;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessLiveKey};
+use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionReduction, PendingConfirmation, PlatformEffect,
     ServiceControlTarget, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessLiveKey};
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::ServiceId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowSurfaceKind {

@@ -1,9 +1,9 @@
 use super::*;
-use taskmanager_core::DirectoryScanBounds;
-use taskmanager_core::DirectoryScanId;
-use taskmanager_core::DirectoryScanStatus;
-use taskmanager_core::SmartSelfTestKind;
-use taskmanager_core::{DeviceGeneration, DeviceId, StorageDeviceKey};
+use taskforest_core::DirectoryScanBounds;
+use taskforest_core::DirectoryScanId;
+use taskforest_core::DirectoryScanStatus;
+use taskforest_core::SmartSelfTestKind;
+use taskforest_core::{DeviceGeneration, DeviceId, StorageDeviceKey};
 
 fn target() -> StorageDeviceTarget {
     StorageDeviceTarget {
