@@ -95,10 +95,10 @@ export TMPDIR="$scratch_root/local-gates-$$-$(date +%s)/tmp"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
 
-# Keep local Cargo invocations on the same pinned 1.99.0 toolchain and warning
+# Keep local Cargo invocations on the same pinned 1.99.1 toolchain and warning
 # policy as CI. The repository's rust-version remains a compatibility floor;
 # it is not the toolchain selected for the current gate run.
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.1}"
 export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
 rustflags="${RUSTFLAGS:-}"

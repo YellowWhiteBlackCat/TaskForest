@@ -2,7 +2,7 @@
 name = "taskmanager-ipc"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "High-performance compact binary IPC protocol and cross-platform transport for TaskForest Daemon"
 readme = "README.md"

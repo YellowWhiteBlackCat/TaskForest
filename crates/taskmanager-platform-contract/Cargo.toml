@@ -2,7 +2,7 @@
 name = "taskmanager-platform-contract"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Platform-neutral capability, request, event, and port contracts for TaskForest"
 readme = "README.md"

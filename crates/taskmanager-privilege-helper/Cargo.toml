@@ -2,7 +2,7 @@
 name = "taskmanager-privilege-helper"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 authors = ["TaskForest"]
 license = "Apache-2.0"
 description = "Fixed-operation privileged helper binaries for TaskForest (TaskForest permission-model Boundary 2, ADR-023)."

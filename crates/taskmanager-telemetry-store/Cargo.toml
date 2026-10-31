@@ -2,7 +2,7 @@
 name = "taskmanager-telemetry-store"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Platform-neutral bounded telemetry history read model for TaskForest"
 

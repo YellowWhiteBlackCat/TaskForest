@@ -1,6 +1,6 @@
 [toolchain]
-# Developer, local-gate, and package manifests all pin the repository's 1.99.0
+# Developer, local-gate, and package manifests all pin the repository's 1.99.1
 # toolchain; `Cargo.toml::rust-version` mirrors the same floor.
-channel = "1.99.0"
+channel = "1.99.1"
 profile = "minimal"
 components = ["clippy", "rustfmt"]

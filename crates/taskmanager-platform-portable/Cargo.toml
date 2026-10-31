@@ -2,7 +2,7 @@
 name = "taskmanager-platform-portable"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Portable safe-I/O provider implementations shared by TaskForest native adapters"
 publish = false

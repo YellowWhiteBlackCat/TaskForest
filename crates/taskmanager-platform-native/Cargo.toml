@@ -4,7 +4,7 @@ version = "0.5.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Compile-time native OS adapter selection for TaskForest frontends"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 
 [features]
 default = ["hardware-all"]

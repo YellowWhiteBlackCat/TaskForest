@@ -135,7 +135,7 @@ CI 构建后通过 WiX 反编译实际 MSI、提取载荷，校验版本、安�
 每次发布必须固定并记录下列事实，缺一不得发布：
 
 1. workspace `Cargo.lock`（依赖版本与补丁解析结果）；
-2. `rust-toolchain.toml` 声明的 1.99.0 工具链；
+2. `rust-toolchain.toml` 声明的 1.99.1 工具链；
 3. 根 `Cargo.toml` 的 `rust-version` 下限；
 4. `[patch.crates-io]` 中的 GPUI Kit（`gpui-kit` 0.8.1）、`bevy_clipboard` 0.20.0 与
    `cryoglyph` 0.1.0 补丁版本；

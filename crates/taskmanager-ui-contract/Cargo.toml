@@ -2,7 +2,7 @@
 name = "taskmanager-ui-contract"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Toolkit-neutral semantic UI contracts for TaskForest frontends"
 
