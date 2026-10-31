@@ -6,7 +6,11 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row, Wrap};
 use taskforest_core::core::source::SourceStatus;
-use taskmanager_application::{SourceNotice, i18n::t, source_notice};
+use taskmanager_application::{
+    SourceNotice,
+    i18n::{session_family_label, t},
+    source_notice,
+};
 use taskmanager_shell::presentation::MISSING_VALUE;
 
 use super::containers::{
@@ -479,7 +483,7 @@ pub(super) fn render_users(
                     t("common.user"),
                     t("users.seat"),
                     t("users.tty"),
-                    t("common.type"),
+                    t("users.family"),
                     t("users.since"),
                 ],
                 theme,
@@ -503,7 +507,7 @@ pub(super) fn render_users(
                 Constraint::Percentage(22),
                 Constraint::Length(10),
                 Constraint::Length(10),
-                Constraint::Length(9),
+                Constraint::Length(14),
                 Constraint::Min(16),
             ],
             column_spacing: 2,
@@ -517,11 +521,7 @@ pub(super) fn render_users(
                 Cell::from(session.user.as_str()),
                 Cell::from(session.seat.as_deref().unwrap_or(MISSING_VALUE)),
                 Cell::from(session.tty.as_deref().unwrap_or(MISSING_VALUE)),
-                Cell::from(if session.remote {
-                    t("users.remote")
-                } else {
-                    t("users.local")
-                }),
+                Cell::from(session_family_label(session.family)),
                 Cell::from(session.timestamp.as_deref().unwrap_or(MISSING_VALUE)),
             ])
         },

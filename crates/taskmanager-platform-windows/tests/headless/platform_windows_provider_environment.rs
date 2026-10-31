@@ -1,6 +1,7 @@
 use super::*;
 #[cfg(windows)]
 use taskforest_core::StartupImpactUnknownReason;
+use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
 use taskforest_core::{
     DeviceState, DeviceStatus, SessionControlAction, SessionId, SessionIdentity,
     SessionIncarnation, StartupEvidenceFailure,
@@ -147,6 +148,11 @@ fn missing_wts_logon_token_keeps_inventory_row_but_removes_control_identity() {
     assert_eq!(snapshot.items[0].user, "fixture-user");
     assert_eq!(snapshot.items[0].incarnation, None);
     assert_eq!(snapshot.items[0].identity(), None);
+    assert_eq!(
+        snapshot.items[0].family,
+        SessionFamilyFact::Observed(SessionFamily::Remote),
+        "the WTS session's explicit RDP name is an observed remote family"
+    );
     assert_eq!(
         snapshot.sources[0].outcome,
         SourceOutcome::Partial(FailureKind::Unsupported)

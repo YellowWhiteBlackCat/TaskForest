@@ -8,7 +8,9 @@ use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
     ProcessMetadataObservation, ProcessScalarObservations,
 };
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::{
     CpuScalarObservations, FailureKind, ScalarAvailability, ScalarObservation,
 };
@@ -415,8 +417,8 @@ async fn session_confirmation_publishes_its_frozen_target_to_assistive_technolog
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     };
     root.update(cx, |view, _| {
         view.mark_telemetry_frame_ready();

@@ -1,7 +1,9 @@
 //! Deterministic, non-destructive Users confirmation capture.
 
 use super::{CaptureEvidence, CaptureScenario};
-use taskforest_core::core::session::{SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionFamily, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 
 impl CaptureEvidence {
     pub(crate) fn session_control_confirmation_requested(&self) -> bool {
@@ -30,7 +32,7 @@ pub(crate) fn session_control_fixture() -> SessionItem {
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: Some("2026-10-12 09:30".into()),
+        family: SessionFamilyFact::Observed(SessionFamily::Console),
     }
 }

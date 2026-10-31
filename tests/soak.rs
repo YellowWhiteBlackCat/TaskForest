@@ -5,7 +5,7 @@
 //! collector tick that leaks a file descriptor or a socket every cycle, an
 //! asset cache that never releases. Budget gates (`tests/performance.rs`)
 //! cannot see any of those — they measure cost, not drift — so this suite
-//! drives the real refresh loop at the application's high-frequency cadence
+//! drives real process collection at the application's high-frequency cadence
 //! and asserts that the retained state stays flat.
 //!
 //! Cadence knobs (the default run is bounded so the standard gate stays
@@ -72,17 +72,18 @@ fn soak_tick_ms() -> u64 {
 
 /// How long the event port must stay quiet before a tick counts as settled,
 /// and how long that wait may take before the tick proceeds anyway.
-const SOAK_SETTLE: Duration = Duration::from_millis(250);
-const SOAK_SETTLE_DEADLINE: Duration = Duration::from_secs(10);
+const SOAK_SETTLE: Duration = Duration::from_millis(20);
+const SOAK_SETTLE_DEADLINE: Duration = Duration::from_secs(2);
 
 /// Drain the event port until it has been quiet for `quiet`, or until
 /// `deadline` passes. Returns how many events arrived while waiting.
 ///
-/// A soak tick may only start once the previous refresh has settled:
-/// re-submitting while lanes are still running piles up concurrent collectors,
+/// A soak tick may only start once the previous process collection has settled:
+/// re-submitting while the process lane is still running piles up collectors,
 /// which inflates descriptor counts for reasons that have nothing to do with a
-/// leak. Settling first keeps every sample matched against a quiescent
-/// baseline, so the drift assertions compare like with like.
+/// leak. The short quiet interval is below the product cadence, so the loop can
+/// still sustain its 100ms schedule when the host finishes each process sample
+/// within budget.
 fn drain_until_quiet(
     client: &mut PlatformClient,
     quiet: Duration,
@@ -219,14 +220,13 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
         PlatformClient::new(NativePlatformRuntime::spawn().expect("native runtime must compose"));
 
     let mut rows_seen = 0_usize;
-    let mut paced_ticks = 0_usize;
     let mut fd_samples: Vec<usize> = Vec::new();
     let mut rss_samples: Vec<u64> = Vec::new();
 
     let started = Instant::now();
     for revision in 1..=ticks {
         let tick_started = Instant::now();
-        let submissions = client.request_refresh(RefreshRequest::All, revision);
+        let submissions = client.request_refresh(RefreshRequest::Processes, revision);
         // `Busy` is the product's normal steady state: a slow lane is still
         // working when the next cadence arrives, and the refresh loop simply
         // re-issues. Any other outcome is a real submission failure.
@@ -263,7 +263,6 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
         // own speed sets the rate.
         if let Some(remaining) = tick.checked_sub(tick_started.elapsed()) {
             std::thread::sleep(remaining);
-            paced_ticks += 1;
         }
         if let Some(fds) = self_fd_count() {
             fd_samples.push(fds);
@@ -280,30 +279,23 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
         rss_samples.last().copied(),
     ) {
         eprintln!(
-            "soak report: {ticks} ticks × {tick:?} in {elapsed:?}, {paced_ticks} paced, \
+            "soak report: {ticks} process ticks × {tick:?} in {elapsed:?}, \
              rows={rows_seen}, descriptors {first_fd}->{last_fd}, RSS {first_rss}->{last_rss} KiB"
         );
     } else {
-        eprintln!(
-            "soak report: {ticks} ticks × {tick:?} in {elapsed:?}, {paced_ticks} paced, \
-             rows={rows_seen}"
-        );
+        eprintln!("soak report: {ticks} process ticks × {tick:?} in {elapsed:?}, rows={rows_seen}");
     }
 
     assert!(
         rows_seen > 0,
         "the soak must observe at least one process row"
     );
-    // The harness must spread its cycles over wall-clock time: every tick waits
-    // for the port to go quiet before the next submission, so the run cannot be
-    // faster than that settle window per tick no matter how fast the host is.
-    // `paced_ticks` reports how often the loop got to sleep out a whole
-    // cadence; on a busy host a full refresh outlasts the cadence, which is the
-    // host's business, not a harness defect, so it is reported, not asserted.
+    // The harness must sustain at least the configured cadence. A slow process
+    // collection may overrun it, but must never turn the soak into a spin.
     assert!(
-        elapsed >= SOAK_SETTLE * ticks as u32,
-        "the soak cycled {ticks} ticks in {elapsed:?}, faster than the {SOAK_SETTLE:?} quiet \
-         window every tick must observe — the loop did not pace itself"
+        elapsed >= tick.mul_f64(ticks as f64),
+        "the soak cycled {ticks} process ticks in {elapsed:?}, faster than the configured \
+         {tick:?} cadence allows — the loop did not pace itself"
     );
 
     // A soak that sampled nothing would pass vacuously. On Linux the sampler

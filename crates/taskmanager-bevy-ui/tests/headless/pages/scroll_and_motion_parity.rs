@@ -41,7 +41,9 @@ use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
 };
 use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerRollup, ContainerSummary};
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
@@ -833,8 +835,8 @@ fn session_rows(count: usize) -> Vec<SessionItem> {
             user: format!("user-{index}"),
             seat: Some(format!("seat{index}")),
             tty: Some(format!("tty{index}")),
-            remote: false,
             timestamp: Some("2026-10-12 09:30".to_owned()),
+            family: SessionFamilyFact::default(),
         })
         .collect()
 }

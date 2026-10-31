@@ -3,6 +3,7 @@ use crate::gpui_app::root::RootView;
 use gpui::AppContext;
 use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
 use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::SessionFamilyFact;
 use taskforest_core::core::session::SessionItem;
 use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
@@ -188,8 +189,8 @@ fn page_switch_dispatches_refresh_and_snapshot_populates_page_rows(cx: &mut gpui
             user: "zhugenanbei".into(),
             seat: Some("seat0".into()),
             tty: Some("pts/0".into()),
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         };
         let batch = PlatformEventBatch {
             session_events: vec![CorrelatedSessionEvent {

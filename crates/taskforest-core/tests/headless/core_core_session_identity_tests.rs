@@ -1,4 +1,6 @@
-use taskforest_core::core::session::{SessionIdentity, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionFamilyFact, SessionIdentity, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::target::SessionId;
 
 fn item(incarnation: Option<SessionIncarnation>) -> SessionItem {
@@ -9,8 +11,8 @@ fn item(incarnation: Option<SessionIncarnation>) -> SessionItem {
         user: "alice".into(),
         seat: Some("seat0".into()),
         tty: None,
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

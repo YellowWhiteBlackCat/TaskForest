@@ -3,7 +3,9 @@
 
 use super::super::*;
 
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskmanager_application::AppAction;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::queue_effect;
@@ -260,8 +262,8 @@ fn menu_targets_the_sorted_session_row() {
                 user: "zeta".into(),
                 seat: None,
                 tty: None,
-                remote: false,
                 timestamp: None,
+                family: SessionFamilyFact::default(),
             },
             SessionItem {
                 id: "3".into(),
@@ -273,8 +275,8 @@ fn menu_targets_the_sorted_session_row() {
                 user: "alpha".into(),
                 seat: None,
                 tty: None,
-                remote: false,
                 timestamp: None,
+                family: SessionFamilyFact::default(),
             },
         ])),
     );

@@ -4,6 +4,7 @@ use super::super::*;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::ProcessScalarObservations;
 use taskforest_core::core::services::ServiceStatus;
+use taskforest_core::core::session::SessionFamilyFact;
 use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
@@ -183,8 +184,8 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
             user: "root".into(),
             seat: None,
             tty: None,
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         },
         SessionItem {
             id: "9".into(),
@@ -193,8 +194,8 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
             user: "alice".into(),
             seat: Some("seat1".into()),
             tty: None,
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         },
     ]);
 

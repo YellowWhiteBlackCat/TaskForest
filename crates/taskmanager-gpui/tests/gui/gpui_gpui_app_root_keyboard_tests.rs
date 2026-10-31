@@ -2,7 +2,9 @@ use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandl
 use taskforest_core::core::ScalarObservation;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process::ProcessScalarObservations;
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskmanager_application::PendingConfirmation;
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
@@ -149,8 +151,8 @@ async fn session_confirmation_enter_and_escape_use_the_shared_gate(cx: &mut Test
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     };
     win.update(cx, |view, _window, cx| {
         seed_direct_track_fact(

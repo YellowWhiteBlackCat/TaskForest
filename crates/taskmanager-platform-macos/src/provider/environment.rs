@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 
 use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::session::SessionFamilyFact;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskforest_core::{
     DeviceState, FailureKind, ProviderId, SessionControlAction, SessionIdentity, SessionItem,
@@ -244,6 +245,9 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
                 };
                 id_output.trim().parse::<u32>().unwrap_or(0)
             });
+            // `who` reports the tty and the remote-host marker, so the family
+            // is observed; the classification rule itself lives in the contract.
+            let family = SessionFamilyFact::classify(None, Some(tty.as_str()), remote);
             items.push(SessionItem {
                 id: format!("macos:session:{tty}").into(),
                 incarnation: None,
@@ -251,7 +255,7 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
                 user,
                 seat: None,
                 tty: Some(tty),
-                remote,
+                family,
                 timestamp,
             });
         }

@@ -50,7 +50,9 @@ use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamily, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::smart::SmartSelfTestKind;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::demo_app;
@@ -266,8 +268,8 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 user: "capture-user".into(),
                 seat: Some("seat0".into()),
                 tty: Some("tty7".into()),
-                remote: false,
                 timestamp: Some("2026-10-12 09:30".into()),
+                family: SessionFamilyFact::Observed(SessionFamily::Console),
             };
             seed_projection_fact(
                 shell,

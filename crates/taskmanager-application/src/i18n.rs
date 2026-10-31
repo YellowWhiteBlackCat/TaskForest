@@ -29,6 +29,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 use taskforest_core::alerts::AlertSeverity;
+use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
 
 /// The two locales this app ships. Add a variant + a matching `locales/<code>.json`
 /// (and a wire value below) to extend.
@@ -240,6 +241,21 @@ pub fn alert_severity_label(severity: AlertSeverity) -> &'static str {
         AlertSeverity::Info => t("alert.info"),
         AlertSeverity::Warning => t("alert.warning"),
         AlertSeverity::Critical => t("alert.critical"),
+    }
+}
+
+/// Shared localized label for the session-family fact, including its
+/// availability. All four frontends call this so "observed unknown",
+/// "unobserved", and "unavailable" keep the same meaning and wording.
+#[must_use]
+pub fn session_family_label(family: SessionFamilyFact) -> &'static str {
+    match family {
+        SessionFamilyFact::Observed(SessionFamily::Graphical) => t("users.family_graphical"),
+        SessionFamilyFact::Observed(SessionFamily::Console) => t("users.family_console"),
+        SessionFamilyFact::Observed(SessionFamily::Remote) => t("users.family_remote"),
+        SessionFamilyFact::Observed(SessionFamily::Unknown) => t("users.family_unknown"),
+        SessionFamilyFact::Unobserved => t("users.family_unobserved"),
+        SessionFamilyFact::Unavailable => t("users.family_unavailable"),
     }
 }
 

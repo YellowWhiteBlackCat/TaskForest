@@ -10,7 +10,9 @@ use taskforest_contract::{
     RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskforest_core::core::services::ServiceAction;
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::source::SourceStatus;
 use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
@@ -115,8 +117,8 @@ fn trusted_session(id: &str, created_monotonic_usec: u64) -> SessionItem {
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

@@ -5,10 +5,11 @@ use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Element, Rectangle, Size};
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskmanager_application::AppPage;
-use taskmanager_application::i18n::Language;
-use taskmanager_application::i18n::set_language;
+use taskmanager_application::i18n::{Language, session_family_label, set_language};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
@@ -16,11 +17,9 @@ use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_ui_contract::{SemanticNodeId, SemanticRole};
 
 #[test]
-fn user_projection_preserves_session_identity_and_remote_facts() {
-    // `remote_text` now resolves Yes/No through the shared catalog, which
-    // auto-detects the host locale on first use; pin English so the
-    // assertion is deterministic and independent of the host language.
-    use taskmanager_application::i18n::{Language, set_language};
+fn user_projection_preserves_session_identity_and_family_facts() {
+    // Family labels use the shared catalog; pin English so assertions are
+    // deterministic and independent of the host language.
     set_language(Language::En);
 
     let shell = demo_app();
@@ -33,8 +32,8 @@ fn user_projection_preserves_session_identity_and_remote_facts() {
     assert_eq!(rows[0].user, "devuser");
     assert_eq!(rows[0].seat.as_deref(), Some("seat0"));
     assert_eq!(rows[0].tty.as_deref(), Some("tty2"));
-    assert_eq!(remote_text(rows[0].remote), "No");
-    assert_eq!(remote_text(rows[1].remote), "Yes");
+    assert_eq!(session_family_label(rows[0].family), "Console");
+    assert_eq!(session_family_label(rows[1].family), "Remote");
     assert_eq!(rows[1].timestamp.as_deref(), Some("2026-07-29 11:20"));
 }
 
@@ -64,8 +63,8 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
             user: "unknown".into(),
             seat: Some(String::new()),
             tty: None,
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         }])),
     );
     let rows = user_rows(&shell);
@@ -73,6 +72,7 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
     assert_eq!(optional_text(rows[0].seat.as_deref()), "—");
     assert_eq!(optional_text(rows[0].tty.as_deref()), "—");
     assert_eq!(optional_text(rows[0].timestamp.as_deref()), "—");
+    assert_eq!(session_family_label(rows[0].family), "Not observed");
 }
 
 /// The Users page owns no filter of its own: a Processes-page query never

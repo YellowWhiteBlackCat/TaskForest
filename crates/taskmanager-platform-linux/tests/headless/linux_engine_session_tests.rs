@@ -4,7 +4,9 @@ use std::os::unix::process::ExitStatusExt;
 #[cfg(unix)]
 use std::sync::atomic::{AtomicUsize, Ordering};
 use taskforest_core::SessionId;
-use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamily, SessionFamilyFact, SessionIdentity, SessionIncarnation,
+};
 
 const FIXTURE_BOOT_ID: &str = "01234567-89ab-cdef-0123-456789abcdef";
 
@@ -474,7 +476,10 @@ fn parse_classic_layout_local_session() {
     assert_eq!(s[0].user, "alice");
     assert_eq!(s[0].seat.as_deref(), Some("seat0"));
     assert_eq!(s[0].tty.as_deref(), Some("tty2"));
-    assert!(!s[0].remote);
+    assert_eq!(
+        s[0].family,
+        SessionFamilyFact::Observed(SessionFamily::Console)
+    );
     // Weekday/time tokens are kept; bare "+0800" (no `:`/`-`) is dropped.
     assert!(s[0].timestamp.as_deref().unwrap().contains("2026-07-28"));
     assert!(s[0].timestamp.as_deref().unwrap().contains("10:00:00"));
@@ -500,7 +505,11 @@ fn parse_classic_layout_remote_ssh_session() {
     assert_eq!(s.len(), 1);
     assert_eq!(s[0].seat, None);
     assert_eq!(s[0].tty.as_deref(), Some("pts/0"));
-    assert!(s[0].remote, "explicit `yes` flag ⇒ remote");
+    assert_eq!(
+        s[0].family,
+        SessionFamilyFact::Observed(SessionFamily::Remote),
+        "explicit `yes` flag ⇒ remote"
+    );
 }
 
 // ── systemd 256+ layout (LEADER / CLASS / IDLE / SINCE; no timestamp) ─────
@@ -520,20 +529,25 @@ fn parse_systemd256_layout_local() {
         Some("tty2"),
         "must not pick up LEADER pid `1156` as the TTY"
     );
-    assert!(!s[0].remote, "`no` IDLE flag must read as not-remote");
+    assert_eq!(
+        s[0].family,
+        SessionFamilyFact::Observed(SessionFamily::Console),
+        "`no` IDLE flag must read as local console"
+    );
     assert_eq!(s[0].timestamp, None, "no date/time token in this layout");
 }
 
 #[test]
 fn parse_systemd256_layout_manager_session() {
-    // A manager/session with no seat and no tty → inferred remote.
+    // A manager/session with no seat and no tty and an explicit `no` idle
+    // value remains family-unobserved; the parser must not infer a family.
     let out = "3 1000 devuser - 1162 manager - no -";
     let s = parse_loginctl_sessions(out);
     assert_eq!(s.len(), 1);
     assert_eq!(s[0].seat, None);
     assert_eq!(s[0].tty, None);
     // No explicit yes/no BEFORE inference? `no` is present (IDLE) → used.
-    assert!(!s[0].remote);
+    assert_eq!(s[0].family, SessionFamilyFact::Unobserved);
 }
 
 // ── tolerance: blanks, short rows, header, uid garbage ────────────────────
@@ -555,7 +569,11 @@ fn parse_skips_blank_header_and_short_rows() {
     assert_eq!(s[0].id, SessionId::new("2"));
     assert_eq!(s[1].id, SessionId::new("8"));
     assert_eq!(s[1].seat, None);
-    assert!(s[1].remote, "no seat ⇒ inferred remote");
+    assert_eq!(
+        s[1].family,
+        SessionFamilyFact::Observed(SessionFamily::Remote),
+        "no seat and no TTY ⇒ the parser's inferred remote fact is classified"
+    );
     assert_eq!(s[1].tty, None);
 }
 
@@ -586,8 +604,14 @@ fn parse_multiple_sessions_preserve_order() {
     assert_eq!(s[0].id, SessionId::new("2"));
     assert_eq!(s[1].id, SessionId::new("3"));
     assert_eq!(s[2].id, SessionId::new("4"));
-    assert!(s[1].remote);
-    assert!(!s[0].remote);
+    assert_eq!(
+        s[1].family,
+        SessionFamilyFact::Observed(SessionFamily::Remote)
+    );
+    assert_eq!(
+        s[0].family,
+        SessionFamilyFact::Observed(SessionFamily::Console)
+    );
 }
 
 #[test]

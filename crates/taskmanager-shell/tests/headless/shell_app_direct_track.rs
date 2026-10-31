@@ -5,7 +5,9 @@ use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process::ProcessScalarObservations;
 use taskforest_core::core::services::ServiceAction;
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::target::ServiceId;
 use taskmanager_application::LatestControlRequest;
 use taskmanager_application::ServiceControlOutcome;
@@ -373,8 +375,8 @@ fn session_item(id: &str, created_monotonic_usec: u64) -> SessionItem {
         user: "test-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

@@ -9,11 +9,11 @@ use iced::{Element, Length};
 use std::rc::Rc;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
-// Shared locale catalog for the Users-page body chrome (column headers, action
-// buttons, Yes/No) that was previously hard-coded English.
-use taskforest_core::core::session::SessionControlAction;
+// Shared locale catalog for the Users-page body chrome (column headers,
+// family availability labels, action buttons) that was previously hard-coded.
+use taskforest_core::core::session::{SessionControlAction, SessionFamily, SessionFamilyFact};
 use taskmanager_application::RefreshRequest;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{session_family_label, t};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
@@ -50,7 +50,7 @@ pub(super) struct UsersColumns {
     pub(super) name: TableColumn,
     pub(super) seat: TableColumn,
     pub(super) tty: TableColumn,
-    pub(super) remote: TableColumn,
+    pub(super) family: TableColumn,
     pub(super) logon: TableColumn,
 }
 
@@ -64,7 +64,7 @@ pub(super) fn users_columns() -> UsersColumns {
         name: TableColumn::text("Name", InfoSortCol::Name.label(), ColumnWidth::Fixed(170.0)),
         seat: TableColumn::text("Seat", InfoSortCol::Seat.label(), ColumnWidth::Fixed(100.0)),
         tty: TableColumn::text("Tty", "users.tty", ColumnWidth::Fixed(100.0)),
-        remote: TableColumn::text("Remote", "users.remote", ColumnWidth::Fixed(90.0)),
+        family: TableColumn::text("Family", "users.family", ColumnWidth::Fixed(120.0)),
         logon: TableColumn::text("Logon", "users.logon", ColumnWidth::Fill),
     }
 }
@@ -150,7 +150,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                         columns.seat.length(),
                     ),
                     plain_header_cell(&columns.tty),
-                    plain_header_cell(&columns.remote),
+                    plain_header_cell(&columns.family),
                     plain_header_cell(&columns.logon),
                 ]
                 .spacing(8)
@@ -286,9 +286,10 @@ fn user_rows_in_window(
             let index = window.start + offset;
             let is_selected = index == selected;
             let zebra = crate::theme::zebra_index(index);
-            let remote_cell: Element<'static, Message, iced::Theme, iced::Renderer> = {
-                let mut cell = text(remote_text(session.remote)).width(columns.remote.length());
-                if session.remote {
+            let family_cell: Element<'static, Message, iced::Theme, iced::Renderer> = {
+                let mut cell =
+                    text(session_family_label(session.family)).width(columns.family.length());
+                if session.family.family() == Some(SessionFamily::Remote) {
                     cell = cell.color(crate::theme_binding::color(table_theme.palette().accent));
                 }
                 cell.into()
@@ -298,7 +299,7 @@ fn user_rows_in_window(
                 text(session.user.clone()).width(columns.name.length()),
                 text(optional_text(session.seat.as_deref())).width(columns.seat.length()),
                 text(optional_text(session.tty.as_deref())).width(columns.tty.length()),
-                remote_cell,
+                family_cell,
                 text(optional_text(session.timestamp.as_deref())).width(columns.logon.length()),
             ]
             .spacing(8)
@@ -425,11 +426,7 @@ fn session_action_bar<'a>(
         || t("hint.select_session").to_string(),
         |session| {
             let tty_str = session.tty.as_deref().unwrap_or("—");
-            let remote_str = if session.remote {
-                t("users.remote")
-            } else {
-                t("common.none")
-            };
+            let family_str = session_family_label(session.family);
             format!(
                 "{} {} · {} (UID {}) · TTY {} · {}",
                 t("hint.selected_session"),
@@ -437,7 +434,7 @@ fn session_action_bar<'a>(
                 session.user,
                 session.uid,
                 tty_str,
-                remote_str
+                family_str
             )
         },
     );
@@ -535,7 +532,7 @@ pub(crate) struct UserRow {
     user: String,
     seat: Option<String>,
     tty: Option<String>,
-    remote: bool,
+    family: SessionFamilyFact,
     timestamp: Option<String>,
 }
 
@@ -563,7 +560,7 @@ pub(crate) fn user_rows(shell: &ShellApp) -> Vec<UserRow> {
                 user: session.user.clone(),
                 seat: session.seat.clone(),
                 tty: session.tty.clone(),
-                remote: session.remote,
+                family: session.family,
                 timestamp: session.timestamp.clone(),
             })
         })
@@ -590,14 +587,6 @@ fn optional_text(value: Option<&str>) -> String {
     value
         .filter(|value| !value.is_empty())
         .map_or_else(missing_value, str::to_owned)
-}
-
-fn remote_text(remote: bool) -> &'static str {
-    if remote {
-        t("common.yes")
-    } else {
-        t("common.no")
-    }
 }
 
 #[cfg(test)]

@@ -6,6 +6,8 @@ use taskforest_core::core::process::{
     ProcessScalarObservations,
 };
 
+use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
+
 pub(super) fn services() -> Vec<ServiceItem> {
     [
         (
@@ -89,8 +91,8 @@ pub(super) fn sessions() -> Vec<SessionItem> {
             user: "devuser".into(),
             seat: Some("seat0".into()),
             tty: Some("tty2".into()),
-            remote: false,
             timestamp: Some("2026-07-29 08:41".into()),
+            family: SessionFamilyFact::Observed(SessionFamily::Console),
         },
         SessionItem {
             id: "9".into(),
@@ -99,8 +101,8 @@ pub(super) fn sessions() -> Vec<SessionItem> {
             user: "devuser".into(),
             seat: None,
             tty: Some("pts/4".into()),
-            remote: true,
             timestamp: Some("2026-07-29 11:20".into()),
+            family: SessionFamilyFact::Observed(SessionFamily::Remote),
         },
     ]
 }

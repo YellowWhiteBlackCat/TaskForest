@@ -56,7 +56,7 @@ src/core.rs                     owner-module index for every fact below
 ├── cpu_codename.rs  cpu_features.rs                    CPU identity facts
 ├── appearance.rs  text.rs  units.rs  tray.rs           presentation helpers
 ├── device_state.rs  system_health.rs  kernel_log.rs    system-level facts
-├── session.rs  setup.rs  source.rs  target.rs          session/setup/source identity
+├── session.rs  setup.rs  source.rs  target.rs          session identity, family availability and setup/source facts
 └── identity.rs  hardware.rs  failure.rs                core identity and failure types
 ```
 

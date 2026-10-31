@@ -68,6 +68,106 @@ impl SessionIdentity {
     }
 }
 
+/// The terminal family that owns a login session, in the one vocabulary every
+/// frontend wears: a display server, a console terminal, a session reached over
+/// the network, or one that nothing identified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionFamily {
+    /// A display server (Wayland or X11) owns the seat.
+    Graphical,
+    /// A console terminal (virtual or physical) owns the session.
+    Console,
+    /// The session was reached from another host; the transport is the
+    /// stronger fact whatever terminal carries it.
+    Remote,
+    /// The identifying facts were observed, but they name no family.
+    Unknown,
+}
+
+/// The session-family fact together with its availability.
+///
+/// Keeping availability inside the fact is what stops a renderer from
+/// borrowing a neighbouring plate: "nothing observed" and "this provider
+/// cannot observe families" are typed outcomes, never a default that reads as
+/// a real family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionFamilyFact {
+    /// The provider observed the identifying facts and classified them.
+    Observed(SessionFamily),
+    /// The provider reported the session but nothing identified its family.
+    #[default]
+    Unobserved,
+    /// The provider cannot observe the identifying facts at all.
+    Unavailable,
+}
+
+impl SessionFamilyFact {
+    /// The one rule that turns observed session facts into a family.
+    ///
+    /// Providers call this rather than re-deriving a family of their own, so
+    /// every platform answers the same question the same way: the transport
+    /// wins over the terminal, a display tty is a display-server session, and
+    /// a terminal tty is a console session. Facts that identify nothing stay
+    /// unobserved instead of being guessed.
+    #[must_use]
+    pub fn classify(seat: Option<&str>, tty: Option<&str>, remote: bool) -> Self {
+        if remote {
+            return Self::Observed(SessionFamily::Remote);
+        }
+        if let Some(tty) = tty.map(str::trim) {
+            if is_display_tty(tty) {
+                return Self::Observed(SessionFamily::Graphical);
+            }
+            if is_terminal_tty(tty) {
+                return Self::Observed(SessionFamily::Console);
+            }
+        }
+        if tty.is_some_and(|tty| !tty.trim().is_empty()) {
+            // Something was observed, but it names no family: that is an
+            // observed unknown, not an absence of observation.
+            return Self::Observed(SessionFamily::Unknown);
+        }
+        if seat.is_some_and(|seat| !seat.trim().is_empty()) {
+            // A seat without a terminal belongs to a display session.
+            return Self::Observed(SessionFamily::Graphical);
+        }
+        Self::Unobserved
+    }
+
+    /// The identified family, or `None` when the fact carries no family.
+    #[must_use]
+    pub const fn family(self) -> Option<SessionFamily> {
+        match self {
+            Self::Observed(family) => Some(family),
+            Self::Unobserved | Self::Unavailable => None,
+        }
+    }
+
+    /// Whether the identifying facts were observed at all.
+    #[must_use]
+    pub const fn is_observed(self) -> bool {
+        matches!(self, Self::Observed(_))
+    }
+}
+
+/// A compositor-owned terminal: an X11 display (`:0`) or a Wayland seat
+/// (`wayland-0`).
+fn is_display_tty(tty: &str) -> bool {
+    tty.starts_with(':') || tty.contains("wayland")
+}
+
+/// A terminal-owned line: a pseudo terminal (`pts/3`, `/dev/pts/3`) or a
+/// physical console (`tty1`, `/dev/tty1`).
+fn is_terminal_tty(tty: &str) -> bool {
+    tty.eq_ignore_ascii_case("console")
+        || tty.starts_with("pts")
+        || tty.contains("/dev/pts/")
+        || tty.starts_with("tty")
+        || tty.contains("/dev/tty")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct SessionItem {
     pub id: SessionId,
@@ -80,7 +180,14 @@ pub struct SessionItem {
     pub user: String,
     pub seat: Option<String>,
     pub tty: Option<String>,
-    pub remote: bool,
+    /// The terminal family this session belongs to, with its availability.
+    ///
+    /// Providers classify through [`SessionFamilyFact::classify`] so the rule
+    /// has one authority; a provider that cannot observe the identifying facts
+    /// at all states [`SessionFamilyFact::Unavailable`] instead of guessing.
+    /// An old payload without this key means the family was never observed.
+    #[serde(default)]
+    pub family: SessionFamilyFact,
     pub timestamp: Option<String>,
 }
 

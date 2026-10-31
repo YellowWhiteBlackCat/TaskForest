@@ -1,7 +1,9 @@
 use super::*;
 use crate::gpui_app::root::TopPage;
 use std::time::{Duration, Instant};
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 
 #[gpui::test]
@@ -47,8 +49,8 @@ async fn users_session_confirmation_keeps_both_choices_inside_compact_bounds(
         user: "capture-user-with-a-long-display-name-that-wraps-within-the-dialog".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     };
     win.update(cx, |view, _window, cx| {
         view.mark_telemetry_frame_ready();

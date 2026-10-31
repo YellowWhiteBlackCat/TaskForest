@@ -1,11 +1,12 @@
-//! Session-kind classification: the terminal family that owns a login session.
+//! The session-family plate: which mark one login session wears.
 //!
-//! The provider reports three observable facts per session — the `seat` it
-//! belongs to, the `tty` that carries it, and the `remote` flag. The product
-//! needs ONE visual family per row so the user can tell a graphical display
-//! session from a console terminal and from a session reached over the
-//! network. The classifier reads only those observed fields: an unobserved
-//! family is `Unknown`, never a guess.
+//! The classification itself is a contract fact: the provider observes the
+//! session's identifying facts and reports a typed
+//! [`SessionFamilyFact`](taskforest_core::core::session::SessionFamilyFact)
+//! through the one rule core owns. This module only decides which mark a
+//! reported family wears, so no frontend re-derives a family from raw fields
+//! and none can borrow a neighbouring plate: an unobserved or unavailable
+//! family wears the neutral plate, never a real family's glyph.
 //!
 //! Glyph authority: every mark comes from the shared semantic icon registry
 //! through the crate's icon layer (`crate::icons`), so a session kind can
@@ -15,7 +16,7 @@
 //! a remote session the globe (`IconId::Remote`).
 
 use bevy::ecs::component::Component;
-use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
 use taskmanager_ui_contract::IconId;
 
 /// The terminal family a login session belongs to.
@@ -54,42 +55,15 @@ impl SessionKind {
             SessionKind::Unknown => IconId::System,
         }
     }
-}
 
-/// Classify one observed session into its terminal family.
-pub(crate) fn classify(session: &SessionItem) -> SessionKind {
-    if session.remote {
-        // A remote session is reached over the network whatever terminal
-        // carries it — the transport is the stronger fact.
-        return SessionKind::Remote;
-    }
-    if let Some(tty) = session.tty.as_deref() {
-        let tty = tty.trim();
-        if is_display_tty(tty) {
-            return SessionKind::Graphical;
-        }
-        if is_terminal_tty(tty) {
-            return SessionKind::Console;
+    /// The mark for one reported session family. The contract decides whether a
+    /// family was observed at all; this frontend only picks the glyph.
+    pub(crate) fn from_fact(fact: SessionFamilyFact) -> Self {
+        match fact.family() {
+            Some(SessionFamily::Graphical) => Self::Graphical,
+            Some(SessionFamily::Console) => Self::Console,
+            Some(SessionFamily::Remote) => Self::Remote,
+            Some(SessionFamily::Unknown) | None => Self::Unknown,
         }
     }
-    if session.seat.is_some() {
-        // A seat without a terminal belongs to a display session.
-        return SessionKind::Graphical;
-    }
-    SessionKind::Unknown
-}
-
-/// A compositor-owned terminal: an X11 display (`:0`) or a Wayland seat
-/// (`wayland-0`).
-fn is_display_tty(tty: &str) -> bool {
-    tty.starts_with(':') || tty.contains("wayland")
-}
-
-/// A terminal-owned line: a pseudo terminal (`pts/3`, `/dev/pts/3`) or a
-/// physical console (`tty1`, `/dev/tty1`).
-fn is_terminal_tty(tty: &str) -> bool {
-    tty.starts_with("pts")
-        || tty.contains("/dev/pts/")
-        || tty.starts_with("tty")
-        || tty.contains("/dev/tty")
 }

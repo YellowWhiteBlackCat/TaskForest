@@ -9,7 +9,9 @@
 
 use bevy::input::keyboard::KeyCode;
 use taskforest_core::core::services::{ServiceAction, ServiceStatus};
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::startup::{
     StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
@@ -67,8 +69,8 @@ fn session_item(id: &str, user: &str) -> SessionItem {
         user: user.to_owned(),
         seat: Some("seat0".to_owned()),
         tty: Some("tty2".to_owned()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

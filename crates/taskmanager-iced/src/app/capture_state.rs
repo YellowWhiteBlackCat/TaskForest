@@ -21,7 +21,9 @@ use taskforest_core::core::metrics::DiskMetrics;
 use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessLiveKey,
 };
-use taskforest_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamily, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
 use taskforest_core::core::target::SessionId;
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
@@ -364,8 +366,8 @@ fn apply_capture_user_and_process_targets(app: &mut IcedApp, target: &str) -> bo
                 user: "capture-user".into(),
                 seat: Some("seat0".into()),
                 tty: Some("tty7".into()),
-                remote: false,
                 timestamp: Some("2026-10-12 09:30".into()),
+                family: SessionFamilyFact::Observed(SessionFamily::Console),
             };
             seed_projection_fact(
                 &mut app.shell,

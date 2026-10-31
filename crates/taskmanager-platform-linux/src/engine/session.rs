@@ -22,7 +22,7 @@ use std::fs;
 use std::process::Command;
 use std::time::{Duration, Instant};
 use taskforest_core::core::session::{
-    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
+    SessionControlAction, SessionFamilyFact, SessionIdentity, SessionIncarnation, SessionItem,
 };
 use tracing::{debug, info};
 
@@ -106,6 +106,9 @@ pub fn parse_loginctl_sessions(output: &str) -> Vec<SessionItem> {
         } else {
             Some(ts.join(" "))
         };
+        // loginctl hands back the identifying facts, so the family is observed;
+        // the classifier that turns them into a family lives in the contract.
+        let family = SessionFamilyFact::classify(seat.as_deref(), tty.as_deref(), remote);
 
         out.push(SessionItem {
             id: id.into(),
@@ -114,7 +117,7 @@ pub fn parse_loginctl_sessions(output: &str) -> Vec<SessionItem> {
             user,
             seat,
             tty,
-            remote,
+            family,
             timestamp,
         });
     }

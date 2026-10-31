@@ -115,9 +115,10 @@ Detail behind the README module map:
   `log_follow.rs` (the follow lock, whose single authority is the shell's
   `feed.follow`), `deps_tree.rs` (the dependency relation tree), `unit_filter.rs`
   (the sliding unit-type filter), `action_glyph.rs` (the lifecycle marks).
-- `src/pages/sessions/` — `kind.rs` (the terminal family classified from the
-  observed `tty`/`seat`/`remote` only, and the family's own semantic plate: a
-  display-server session the monitor, a console session the terminal) and
+- `src/pages/sessions/` — `kind.rs` (maps the core-owned, typed family fact to
+  the family's own semantic plate: a display-server session the monitor, a
+  console session the terminal; the frontend never reclassifies `tty`/`seat`/
+  `remote`) and
   `bubble.rs` (the logout confirmation bubble: a projection of the shared
   confirmation gate, never a second gate).
 - `src/pages/containers/` — the containers page: `quota.rs` (the DECLARED
