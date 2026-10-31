@@ -1,12 +1,12 @@
 use super::project_timeline;
 use std::sync::Arc;
+use taskforest_core::core::{
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, FailureKind, ScalarObservation,
+};
 use taskmanager_application::MIN_TELEMETRY_INTERVAL;
 use taskmanager_application::system_timeline::{
     MAX_GRAPH_POINTS, SystemHistoryWindow, TimelineMetric, TimelineSelection, TimelineState,
     TimelineStatistic,
-};
-use taskmanager_core::core::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, FailureKind, ScalarObservation,
 };
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::{

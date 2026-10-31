@@ -8,8 +8,8 @@
 //! is announced as unavailable (never as zero), and arming the confirmation
 //! gate surfaces a modal an AT user can read, understand, and dismiss.
 
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -17,10 +17,10 @@ use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 use super::build_snapshot;
 use crate::confirmation::PendingConfirmationView;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_accessibility_linux::snapshot_to_tree_update;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::AccessibilityActionRejection;

@@ -10,8 +10,8 @@ use super::{IcedApp, Message, PlatformEffect};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ProcessAffinityReady, ProcessAffinityState};
 
-use taskmanager_core::core::hardware::CpuType;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 impl IcedApp {

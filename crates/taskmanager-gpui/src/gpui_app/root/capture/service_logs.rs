@@ -1,9 +1,9 @@
 //! Read-only service capture data uses the actual correlated details state.
 use crate::gpui_app::root::RootView;
+use taskforest_contract::RequestId;
+use taskforest_core::core::services::{ServiceLogSnapshot, ServiceLogState};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::ServiceUpdate;
-use taskmanager_core::core::services::{ServiceLogSnapshot, ServiceLogState};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
 
 pub(crate) fn seed(view: &mut RootView, target: &ServiceId) {
     if view

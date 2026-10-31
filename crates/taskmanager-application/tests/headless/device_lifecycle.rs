@@ -3,9 +3,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::*;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::npu::{NpuDevice, NpuInventorySnapshot};
 
 fn lifecycle(
     presence: DevicePresence,

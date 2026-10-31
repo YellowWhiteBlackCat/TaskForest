@@ -95,7 +95,7 @@ pub struct SmbiosMemorySuccess {
 /// The system/board identity facts parsed from a SUCCESS object's `identity`
 /// section. Every field is `None` when the helper reported `null` — never a
 /// fabricated zero or empty string. The lane's core-facing twin
-/// (`taskmanager-core::DmiIdentityFacts`) is mapped from this field-by-field
+/// (`taskforest-core::DmiIdentityFacts`) is mapped from this field-by-field
 /// at the provider crossing.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DmiIdentityFacts {

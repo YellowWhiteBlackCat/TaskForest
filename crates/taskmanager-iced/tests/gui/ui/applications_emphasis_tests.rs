@@ -5,7 +5,7 @@
 
 use super::*;
 use iced::widget::button;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::fixture::{ProjectionSeedFact, demo_app, seed_projection_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_theme::Theme;

@@ -6,12 +6,12 @@ use std::time::{Duration, Instant};
 
 use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
 use sysinfo::{ProcessRefreshKind, ProcessStatus, System};
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
-use taskmanager_core::{
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::{
     FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessMetadataFailure, ProviderId,
     SourceOutcome, SourceStatus,
 };
-use taskmanager_platform_contract::PartialSourceSnapshot;
 
 mod application;
 pub mod batch;
@@ -50,8 +50,8 @@ use observation::{observe_clock_ticks, observe_process_scalars};
 use previous::{PreviousItems, PreviousProcessView};
 pub(crate) use procfs::validate_exact_start_token;
 use rates::ProcessRateState;
-use taskmanager_core::ScalarObservation;
-use taskmanager_core::core::time::unix_millis;
+use taskforest_core::ScalarObservation;
+use taskforest_core::core::time::unix_millis;
 use tree::{io_failure, read_boot_time_secs};
 
 /// Owner-label map from `/etc/passwd`, cached across ticks.

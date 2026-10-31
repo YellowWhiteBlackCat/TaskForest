@@ -16,12 +16,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     CumulativeCounter, FailureKind, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
     NetworkTelemetryObservation, NetworkWirelessObservations, OptionalObservation,
     ScalarObservation,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::NetworkTelemetryProvider;
 
 use taskmanager_platform_portable::run_with_timeout;

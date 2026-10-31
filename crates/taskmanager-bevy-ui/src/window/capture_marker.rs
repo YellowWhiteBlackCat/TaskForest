@@ -32,9 +32,9 @@ use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
 use bevy::text::TextColor;
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
+use taskforest_core::core::metrics::ScalarAvailability;
 use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_ui_contract::navigation::NavOrientation;
 

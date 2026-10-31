@@ -5,9 +5,9 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_core::core::alerts::AlertMetric;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskforest_core::core::alerts::AlertMetric;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;

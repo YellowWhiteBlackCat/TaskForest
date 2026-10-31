@@ -189,7 +189,7 @@ pub(super) fn session_row_scene(
     let user = row.user.clone();
     let seat = row.seat.clone();
     let tty = row.tty.clone();
-    let remote = row.remote.to_owned();
+    let family = row.family.to_owned();
     let since = row.since.clone();
     let fill = if selected {
         palette.nav_active_bg
@@ -201,7 +201,7 @@ pub(super) fn session_row_scene(
     let user_width = widths[1].width_px;
     let seat_width = widths[2].width_px;
     let tty_width = widths[3].width_px;
-    let remote_width = widths[4].width_px;
+    let family_width = widths[4].width_px;
     let since_width = widths[5].width_px;
     Box::new(bsn! {
         Node {
@@ -222,7 +222,7 @@ pub(super) fn session_row_scene(
              @text_cell_scene(user, user_width, Role::Body) --
              @text_cell_scene(seat, seat_width, Role::Body) --
              @terminal_cell_scene(tty, tty_width, row.kind, palette) --
-             @text_cell_scene(remote, remote_width, Role::Body) --
+             @text_cell_scene(family, family_width, Role::Body) --
              @text_cell_scene(since, since_width, Role::Body)
         ]
     })

@@ -23,7 +23,7 @@ use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{AlignItems, FlexDirection, Node, UiRect, Val, percent, px, rem};
 use bevy::ui::widget::Text;
 
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessCollateralMember, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
     ProcessLiveKey,
 };

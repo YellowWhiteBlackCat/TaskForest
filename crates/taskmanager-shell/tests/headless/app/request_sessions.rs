@@ -1,6 +1,18 @@
 //! Cross-boundary terminal filtering for the three remaining request sessions.
 
 use super::super::*;
+use taskforest_contract::OperationFailure;
+use taskforest_contract::{CapabilityId, EventSequence, ProviderFailure, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::GpuEngineRowsSnapshot;
+use taskforest_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
+    ProcessBatchTargetResult, ProcessGroupScope,
+};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::target::StorageDeviceKey;
 use taskmanager_application::{
     CorrelatedEvent, GpuEngineRowsEvent, PlatformEventContext, ProcessAffinityEvent, ProcessEvent,
     ShellEvent, ShellUiActionIntent, SmartEvent, SmartObservationBatch, SmartStateRevision,
@@ -9,18 +21,6 @@ use taskmanager_application::{
 use taskmanager_application::{
     GpuEngineRowsState, NetworkEscalationState, ProcessAffinityState, ShellUiActionState,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
-    ProcessBatchTargetResult, ProcessGroupScope,
-};
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::StorageDeviceKey;
-use taskmanager_platform_contract::OperationFailure;
-use taskmanager_platform_contract::{CapabilityId, EventSequence, ProviderFailure, RequestId};
 
 fn request(value: u64) -> RequestId {
     RequestId::new(value).expect("fixture request id is non-zero")

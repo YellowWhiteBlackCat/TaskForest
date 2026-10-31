@@ -11,9 +11,9 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 
 use taskmanager_theme::tokens;
 

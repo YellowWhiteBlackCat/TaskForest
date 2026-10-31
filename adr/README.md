@@ -64,6 +64,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [057](057-resolver-v3-msrv-aware-resolution.md) | Resolver v3, MSRV-aware dependency resolution | Resolver v3 makes dependency resolution honor the `rust-version` floor; feature unification semantics are unchanged. | Build |
 | [058](058-cargo-build-warnings-gate.md) | Warning threshold moves to Cargo build.warnings | The warning threshold is `build.warnings = "deny"`; CI keeps the mold-carrying `RUSTFLAGS`, so both hosts stay equally strict. | Build |
 | [059](059-blueprint-disposition-ledger.md) | Blueprint disposition ledger | `FeatureId` is the typed delivery registry; a separate public 225-slot census records every blueprint slot as adopted by a typed feature or explicitly unsupported, so no roadmap item is hidden without a 225-variant enum. | Feature coverage, Product scope |
+| [060](060-taskforest-publish-namespace-and-semver-baseline.md) | Publisher namespace cutover and the semver baseline | Published library crates take the reserved `taskforest-*` namespace in one atomic cutover, and the API-compatibility gate keeps a git-revision baseline until each crate's first release becomes its baseline. | Build, Release, Layering |
 
 ## Decision chains
 
@@ -111,7 +112,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | Audited unsafe boundaries | 022, 024, 025, 031, 056 |
 | Frontend & UI | 017, 020, 026, 027, 028, 029, 032, 037, 038, 039, 040, 041, 042, 046, 050, 051, 052 |
 | Accessibility & semantic output | 054 |
-| Build & dependency policy | 056, 057, 058 |
+| Build & dependency policy | 056, 057, 058, 060 |
 | Runtime scheduling | 008, 033 |
 | Storage & persistence | 010, 036 |
 | Release & packaging | 006, 028, 029, 044, 045, 051 |

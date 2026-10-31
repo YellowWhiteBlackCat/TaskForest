@@ -1,10 +1,10 @@
 //! Transport-aware smartctl command planning and protocol-neutral JSON parsing.
 
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     SmartAvailability, StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_core::core::smart::AtaSmartAttribute;
-use taskmanager_core::core::smart::{
+use taskforest_core::core::smart::AtaSmartAttribute;
+use taskforest_core::core::smart::{
     SmartProviderFailureKind, SmartSelfTestCapabilities, SmartSelfTestSupport,
 };
 

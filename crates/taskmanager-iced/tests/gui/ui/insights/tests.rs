@@ -11,18 +11,18 @@ use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Element, Rectangle, Size};
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ConnectionState;
+use taskforest_core::core::process_telemetry::OpenFileKind;
+use taskforest_core::core::process_telemetry::ThreadState;
 use taskmanager_application::i18n::{Language, with_language};
 use taskmanager_application::{
     ProcessInsightFacet, ProcessInsightFacetState, ProcessInsightUnavailable,
 };
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ConnectionState;
-use taskmanager_core::core::process_telemetry::OpenFileKind;
-use taskmanager_core::core::process_telemetry::ThreadState;
-use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
@@ -156,7 +156,7 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
 
 #[test]
 fn thread_rows_vm_renders_runqueue_and_wait_diagnostics() {
-    use taskmanager_core::core::process_telemetry;
+    use taskforest_core::core::process_telemetry;
 
     let thread = ProcessThreadInfo {
         tid: 4244,
@@ -338,7 +338,7 @@ fn facet_unavailable_text_maps_typed_reasons() {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::process_telemetry::{
         ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, ProcessConnection,
     };
 
@@ -521,14 +521,14 @@ fn insights_current_resource_facet_renders_beside_pending_and_typed_unavailable_
 
 #[test]
 fn open_files_section_renders_fd_limit_saturation() {
-    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::{
         OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations,
         ResourceObservation,
     };
-    use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+    use taskforest_core::{LimitValue, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind};
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
 
     let theme = Theme::dark();
     let target =
@@ -569,10 +569,10 @@ fn open_files_section_renders_fd_limit_saturation() {
 
 #[test]
 fn isolation_section_renders_sandbox_detection() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
 
     let theme = Theme::default();
     let target =
@@ -594,10 +594,10 @@ fn isolation_section_renders_sandbox_detection() {
 
 #[test]
 fn isolation_section_renders_posix_capabilities() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::{ProcessCapabilities, ProcessIsolation};
 
     let theme = Theme::default();
     let target =
@@ -624,13 +624,13 @@ fn isolation_section_renders_posix_capabilities() {
 
 #[test]
 fn isolation_section_renders_namespace_audit() {
-    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::{
         LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry, NamespaceAuditStatus,
         ProcessIsolation,
     };
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
 
     let theme = Theme::default();
     let target =
@@ -660,10 +660,10 @@ fn isolation_section_renders_namespace_audit() {
 
 #[test]
 fn isolation_section_renders_seccomp_filter() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::ProcessIsolation;
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::ProcessIsolation;
 
     let theme = Theme::default();
     let target =
@@ -683,10 +683,10 @@ fn isolation_section_renders_seccomp_filter() {
 
 #[test]
 fn network_section_renders_observed_throughput() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::ProcessNetworkSnapshot;
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::ProcessNetworkSnapshot;
 
     let theme = Theme::default();
     let target =
@@ -710,10 +710,10 @@ fn network_section_renders_observed_throughput() {
 
 #[test]
 fn environment_section_renders_observed_entries() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process::FrozenProcessIdentity;
+    use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
     use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process::FrozenProcessIdentity;
-    use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 
     let theme = Theme::default();
     let target =

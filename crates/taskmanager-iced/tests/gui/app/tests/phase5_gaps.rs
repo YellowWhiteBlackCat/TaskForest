@@ -3,12 +3,12 @@
 use crate::IcedApp;
 use crate::app::Message;
 use std::collections::HashSet;
+use taskforest_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_shell::matches_process_query;

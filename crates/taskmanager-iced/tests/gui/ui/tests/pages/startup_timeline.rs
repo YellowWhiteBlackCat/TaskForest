@@ -1,8 +1,8 @@
 use super::*;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::StartupCriticalChainNode;
+use taskforest_core::core::startup::StartupEvidenceFailure;
 use taskmanager_application::KeyCode;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::startup::StartupCriticalChainNode;
-use taskmanager_core::core::startup::StartupEvidenceFailure;
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_theme::Theme;
 
@@ -10,8 +10,8 @@ use taskmanager_theme::Theme;
 
 /// A measured critical chain: two timed units plus one untimed node.
 fn timeline_evidence() -> StartupBootEvidenceSnapshot {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::startup::StartupCriticalChainNode;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::startup::StartupCriticalChainNode;
 
     let healthy = DeviceState::healthy(1_785_292_800_000);
     StartupBootEvidenceSnapshot {
@@ -98,8 +98,8 @@ fn startup_timeline_stays_silent_without_evidence_or_on_typed_failure() {
 /// A chain beyond the segment cap collapses the tail into a bounded +N row.
 #[test]
 fn startup_timeline_collapses_overflow_into_a_bounded_row() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::startup::StartupCriticalChainNode;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::startup::StartupCriticalChainNode;
 
     let healthy = DeviceState::healthy(1);
     let chain: Vec<StartupCriticalChainNode> = (0..25)

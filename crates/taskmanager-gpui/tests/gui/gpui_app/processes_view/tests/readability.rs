@@ -7,11 +7,11 @@
 //! still exposes useful data rather than only chrome.
 
 use gpui::{VisualTestContext, px, size};
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::identity::ProviderId;
 use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use crate::gpui_app::root::TopPage;

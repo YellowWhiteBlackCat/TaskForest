@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, FailureKind, GpuMetricField, GpuMetrics, GpuScalarObservations, GpuThrottleReason,
     ProviderId, ScalarObservation,
 };

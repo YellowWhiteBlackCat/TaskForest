@@ -1,25 +1,23 @@
 //! Deterministic fixtures and English-only copy for capture/headless wiring.
 
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
-use taskmanager_core::core::smart::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
+use taskforest_core::core::smart::{
     SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
     SmartSelfTestSupport,
 };
-use taskmanager_core::core::storage_health::FilesystemBackingKind;
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
-use taskmanager_core::core::{
+use taskforest_core::core::storage_health::FilesystemBackingKind;
+use taskforest_core::core::system_health::SmartSelfTestObservation;
+use taskforest_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorDescriptor,
     SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
 };
 
+use taskforest_contract::{CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId};
 use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, SmartEvent, SmartObservationBatch,
     StorageHealthEvent,
-};
-use taskmanager_platform_contract::{
-    CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId,
 };
 
 #[derive(Clone, Debug)]

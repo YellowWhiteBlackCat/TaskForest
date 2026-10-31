@@ -31,8 +31,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 #[cfg(target_os = "macos")]
-use taskmanager_platform_contract::InstanceGuard;
-use taskmanager_platform_contract::{InstanceEvent, InstanceFailure, InstanceRole};
+use taskforest_contract::InstanceGuard;
+use taskforest_contract::{InstanceEvent, InstanceFailure, InstanceRole};
 
 /// Wire payload a secondary writes to the primary's socket.
 #[cfg(target_os = "macos")]

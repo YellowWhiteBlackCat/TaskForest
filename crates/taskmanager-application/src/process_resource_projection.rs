@@ -1,6 +1,6 @@
 //! Canonical current-value fold for process resource-limit observations.
 
-use taskmanager_core::{LimitValue, ProcessResourceSnapshot, ResourceLimitKind};
+use taskforest_core::{LimitValue, ProcessResourceSnapshot, ResourceLimitKind};
 
 /// Borrowed renderer input for one process's resource limits.
 ///

@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
-    CapabilityId, RequestId, RequestScope, RequestTracking, SidebandPolicy,
-};
+use taskforest_contract::{CapabilityId, RequestId, RequestScope, RequestTracking, SidebandPolicy};
+use taskforest_core::core::identity::ProviderId;
 
 use crate::config::{
     CapabilityRoute, DEFAULT_ACTIVE_TARGET_LIMIT_PER_CAPABILITY, DeliveryClass, RuntimeDomain,
@@ -14,7 +12,7 @@ use super::{
     CompletionOwner, CompletionVerdict, DEFAULT_IN_FLIGHT_LEASE_MS, EcsAdmissionError,
     RuntimeEcsScheduler, StalledSubject,
 };
-use taskmanager_platform_contract::MAX_RECENT_SCHEDULING_STALLS;
+use taskforest_contract::MAX_RECENT_SCHEDULING_STALLS;
 
 #[derive(Clone)]
 struct ModelJob {

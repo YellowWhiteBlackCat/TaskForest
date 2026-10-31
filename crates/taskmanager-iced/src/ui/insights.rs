@@ -11,8 +11,8 @@
 //!
 //! Extracted from [`super::overlays`] so the overlays module stays under the
 //! repository's source-size budget.
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ProcessConnection;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ProcessConnection;
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;
@@ -23,13 +23,13 @@ mod pills;
 
 use iced::Element;
 use iced::widget::{column, text};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process_telemetry::{IsolationKind, LimitValue};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     ProcessInsightFacet, ProcessInsightFacetState, ProcessInsightUnavailable,
     ProjectedProcessInsights, project_process_resources,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process_telemetry::{IsolationKind, LimitValue};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{

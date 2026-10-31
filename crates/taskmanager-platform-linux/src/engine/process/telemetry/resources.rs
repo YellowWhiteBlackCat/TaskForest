@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use taskmanager_core::ProcessIdentity;
-use taskmanager_core::{
+use taskforest_core::ProcessIdentity;
+use taskforest_core::{
     LimitValue, ProviderId, ResourceGroupMembership, ResourceLimit, ResourceLimitKind,
 };
 

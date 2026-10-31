@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use taskmanager_shell::SortCol;
 
 use gpui::{App, FocusHandle, Pixels};
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::{processes_view, services_view, startup_view};
 

@@ -18,14 +18,14 @@
 
 use bevy::app::App;
 use bevy::input::keyboard::KeyCode;
-use taskmanager_application::PlatformEffect;
-use taskmanager_core::core::services::ServiceLogLevel;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::ServiceLogLevel;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogLevelFilter,
     ServiceLogProviderState, ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState,
     ServiceLogTimeFilter,
 };
+use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::app::OpenServiceLog;
 use taskmanager_theme::tokens::UiSize;
@@ -35,8 +35,8 @@ use super::log_panel::{
     log_status_caption,
 };
 use super::tests::{headless_services_app, push_services, route_to_services};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_theme::Theme;
 

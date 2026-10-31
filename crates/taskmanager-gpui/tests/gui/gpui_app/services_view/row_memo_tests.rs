@@ -4,7 +4,7 @@ use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{TestAppContext, VisualTestContext, px, size};
 use std::rc::Rc;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 
 use taskmanager_shell::{InfoSortCol, InfoTable, SortDir};

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::{DeviceStatus, ProviderId};
+use taskforest_core::{DeviceStatus, ProviderId};
 
 use super::super::{GpuProviderSample, probe_amdgpu_device, scan_drm_cards};
 use super::drm::verify_directory;

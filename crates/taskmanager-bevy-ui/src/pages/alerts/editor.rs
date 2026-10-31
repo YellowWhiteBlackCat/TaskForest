@@ -27,12 +27,12 @@ use bevy::ui_widgets::{
     SliderStep, SliderThumb, SliderValue, TrackClick, ValueChange,
 };
 use std::time::Duration;
-use taskmanager_application::i18n::t;
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
     AlertSeverity, export_alert_rules_json, import_alert_rules_json,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]

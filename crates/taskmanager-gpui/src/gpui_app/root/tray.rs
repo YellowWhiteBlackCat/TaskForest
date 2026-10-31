@@ -15,12 +15,12 @@ use std::sync::mpsc::channel;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 
 use gpui::{AnyWindowHandle, App, Entity};
-use taskmanager_app_host::spawn_tray;
-use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
-use taskmanager_core::core::tray::{
+use taskforest_core::core::tray::{
     TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
     TraySpecError,
 };
+use taskmanager_app_host::spawn_tray;
+use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
 use tracing::warn;
 
 use crate::gpui_app::root::RootView;

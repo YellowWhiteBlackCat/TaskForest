@@ -2,15 +2,15 @@
 name = "taskmanager-tui"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Ratatui terminal frontend product (taskmanager-tui) for the TaskForest native system monitor"
 publish = false
 
 [dependencies]
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "layout-cache", "macros", "underline-color", "unstable-rendered-line-info"] }
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 # The neutral theme crate, taken with DEFAULT features — toolkit-free — so
 # this frontend proves the neutral build (ADR-026).
 taskmanager-theme = { path = "../taskmanager-theme" }
@@ -19,7 +19,7 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 taskmanager-assets = { path = "../taskmanager-assets" }
-taskmanager-ipc = { path = "../taskmanager-ipc" }
+taskforest-ipc = { path = "../taskforest-ipc" }
 crossbeam-channel = "0.5"
 serde_json = "1.0"
 # Shared CLI composition harness (ADR-051): the product bin hands this

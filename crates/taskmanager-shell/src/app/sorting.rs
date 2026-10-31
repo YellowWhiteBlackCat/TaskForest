@@ -11,11 +11,11 @@
 //! single source every frontend's tree/group projection consumes, so the
 //! frontends cannot drift.
 use super::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::StartupEntry;
 use taskmanager_application::process_sort::compare_axis;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::StartupEntry;
 
 /// Process-table column the list is sorted by. This models the ordering that
 /// was previously hard-coded inside [`ShellApp::visible_processes`] so the render

@@ -10370,6 +10370,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskforest-contract"
+version = "0.5.1"
+dependencies = [
+ "taskforest-core",
+]
+
+[[package]]
+name = "taskforest-core"
+version = "0.5.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "taskmanager-test-support",
+]
+
+[[package]]
+name = "taskforest-daemon"
+version = "0.5.1"
+dependencies = [
+ "crossbeam-channel",
+ "ctrlc",
+ "pico-args",
+ "serde",
+ "serde_json",
+ "sysinfo 0.39.6",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
+ "taskmanager-history-store",
+ "taskmanager-platform-native",
+ "taskmanager-platform-runtime",
+ "taskmanager-test-support",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "taskforest-ipc"
+version = "0.5.1"
+dependencies = [
+ "crc32fast",
+ "serde",
+ "serde_json",
+ "taskforest-core",
+ "taskmanager-test-support",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "taskmanager-accessibility-linux"
 version = "0.5.1"
 dependencies = [
@@ -10392,11 +10443,11 @@ version = "0.5.1"
 dependencies = [
  "crossbeam-channel",
  "ctrlc",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-application",
- "taskmanager-core",
  "taskmanager-history-store",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
  "taskmanager-platform-native",
  "taskmanager-platform-runtime",
  "taskmanager-test-support",
@@ -10411,8 +10462,8 @@ dependencies = [
  "crossbeam-channel",
  "serde",
  "serde_json",
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-test-support",
 ]
 
@@ -10432,15 +10483,15 @@ dependencies = [
  "bevy",
  "crossbeam-channel",
  "serde_json",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
  "taskmanager-cli",
- "taskmanager-core",
  "taskmanager-icons",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-test-support",
  "taskmanager-theme",
@@ -10453,46 +10504,15 @@ name = "taskmanager-cli"
 version = "0.5.1"
 dependencies = [
  "serde_json",
+ "taskforest-core",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
- "taskmanager-core",
  "taskmanager-escalation",
  "taskmanager-platform-native",
  "taskmanager-test-support",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "taskmanager-core"
-version = "0.5.1"
-dependencies = [
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "taskmanager-test-support",
-]
-
-[[package]]
-name = "taskmanager-daemon"
-version = "0.5.1"
-dependencies = [
- "crossbeam-channel",
- "ctrlc",
- "pico-args",
- "serde",
- "serde_json",
- "sysinfo 0.39.6",
- "taskmanager-core",
- "taskmanager-history-store",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
- "taskmanager-platform-native",
- "taskmanager-platform-runtime",
- "taskmanager-test-support",
- "tempfile",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -10522,11 +10542,12 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.119",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
- "taskmanager-core",
  "taskmanager-escalation",
  "taskmanager-platform-conformance",
  "taskmanager-platform-linux",
@@ -10551,15 +10572,15 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
  "taskmanager-cli",
- "taskmanager-core",
  "taskmanager-icons",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
@@ -10577,7 +10598,7 @@ version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
- "taskmanager-core",
+ "taskforest-core",
 ]
 
 [[package]]
@@ -10593,16 +10614,16 @@ dependencies = [
  "naga 27.0.3",
  "serde",
  "serde_json",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
  "taskmanager-cli",
- "taskmanager-core",
  "taskmanager-icons",
- "taskmanager-ipc",
  "taskmanager-platform-conformance",
- "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
@@ -10622,19 +10643,6 @@ version = "0.5.1"
 dependencies = [
  "taskmanager-assets",
  "taskmanager-ui-contract",
-]
-
-[[package]]
-name = "taskmanager-ipc"
-version = "0.5.1"
-dependencies = [
- "crc32fast",
- "serde",
- "serde_json",
- "taskmanager-core",
- "taskmanager-test-support",
- "tempfile",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -10664,8 +10672,8 @@ dependencies = [
 name = "taskmanager-platform-android"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
  "taskmanager-application",
- "taskmanager-platform-contract",
  "taskmanager-platform-runtime",
 ]
 
@@ -10673,16 +10681,9 @@ dependencies = [
 name = "taskmanager-platform-conformance"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
-]
-
-[[package]]
-name = "taskmanager-platform-contract"
-version = "0.5.1"
-dependencies = [
- "taskmanager-core",
 ]
 
 [[package]]
@@ -10700,13 +10701,13 @@ dependencies = [
  "serde",
  "serde_json",
  "sysinfo 0.39.6",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-afpacket",
  "taskmanager-application",
- "taskmanager-core",
  "taskmanager-escalation",
  "taskmanager-perf-ioctl",
  "taskmanager-platform-conformance",
- "taskmanager-platform-contract",
  "taskmanager-platform-portable",
  "taskmanager-platform-provider",
  "taskmanager-platform-runtime",
@@ -10728,10 +10729,10 @@ dependencies = [
  "plist",
  "serde_json",
  "sysinfo 0.39.6",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
  "taskmanager-platform-conformance",
- "taskmanager-platform-contract",
  "taskmanager-platform-portable",
  "taskmanager-platform-provider",
  "taskmanager-platform-runtime",
@@ -10743,9 +10744,9 @@ dependencies = [
 name = "taskmanager-platform-native"
 version = "0.5.1"
 dependencies = [
- "taskmanager-core",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-platform-linux",
  "taskmanager-platform-macos",
  "taskmanager-platform-windows",
@@ -10755,8 +10756,8 @@ dependencies = [
 name = "taskmanager-platform-ohos"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
  "taskmanager-application",
- "taskmanager-platform-contract",
  "taskmanager-platform-runtime",
 ]
 
@@ -10766,9 +10767,9 @@ version = "0.5.1"
 dependencies = [
  "nix 0.31.3",
  "starship-battery",
- "taskmanager-core",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-platform-conformance",
- "taskmanager-platform-contract",
  "taskmanager-platform-provider",
 ]
 
@@ -10776,8 +10777,8 @@ dependencies = [
 name = "taskmanager-platform-provider"
 version = "0.5.1"
 dependencies = [
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-contract",
+ "taskforest-core",
 ]
 
 [[package]]
@@ -10787,9 +10788,9 @@ dependencies = [
  "bevy_app",
  "bevy_ecs",
  "crossbeam-channel",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
 ]
 
 [[package]]
@@ -10802,11 +10803,11 @@ dependencies = [
  "raw-cpuid",
  "smbios-lib",
  "sysinfo 0.39.6",
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
  "taskmanager-escalation",
  "taskmanager-platform-conformance",
- "taskmanager-platform-contract",
  "taskmanager-platform-portable",
  "taskmanager-platform-provider",
  "taskmanager-platform-runtime",
@@ -10824,7 +10825,7 @@ version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
- "taskmanager-core",
+ "taskforest-core",
  "taskmanager-perf-ioctl",
  "taskmanager-platform-portable",
 ]
@@ -10857,9 +10858,9 @@ version = "0.5.1"
 name = "taskmanager-shell"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
  "taskmanager-ui-contract",
@@ -10883,7 +10884,7 @@ name = "taskmanager-telemetry-store"
 version = "0.5.1"
 dependencies = [
  "ringbuf",
- "taskmanager-core",
+ "taskforest-core",
  "taskmanager-test-support",
 ]
 
@@ -10891,9 +10892,9 @@ dependencies = [
 name = "taskmanager-test-support"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
 ]
 
 [[package]]
@@ -10904,8 +10905,8 @@ version = "0.5.1"
 name = "taskmanager-tray-muda"
 version = "0.5.1"
 dependencies = [
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-contract",
+ "taskforest-core",
  "tray-icon",
 ]
 
@@ -10916,13 +10917,13 @@ dependencies = [
  "crossbeam-channel",
  "ratatui",
  "serde_json",
+ "taskforest-contract",
+ "taskforest-core",
+ "taskforest-ipc",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
  "taskmanager-cli",
- "taskmanager-core",
- "taskmanager-ipc",
- "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
@@ -10945,9 +10946,9 @@ dependencies = [
 name = "taskmanager-ui-contract"
 version = "0.5.1"
 dependencies = [
+ "taskforest-contract",
+ "taskforest-core",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
 ]
 
 [[package]]

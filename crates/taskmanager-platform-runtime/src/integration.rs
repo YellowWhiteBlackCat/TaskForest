@@ -4,15 +4,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
+use taskforest_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::setup::{SetupScriptAction, SetupScriptEvent};
 use taskmanager_application::{
     CommandLaunchRequest, DesktopAppearanceEvent, DesktopAppearanceRequest,
     DesktopNotificationRequest, PlatformEvent, ResourceRevealRequest, SetupScriptRequest,
     ShellEvent, UrlOpenRequest,
 };
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
-use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_lane,

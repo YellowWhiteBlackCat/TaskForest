@@ -12,9 +12,9 @@
 //! request is a unit `Refresh` payload mirroring
 //! [`super::system::HardwareInventoryRequest`].
 
-use taskmanager_core::SmbiosMemorySnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::SmbiosMemorySnapshot;
 
 /// One SMBIOS memory-inventory read for the host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

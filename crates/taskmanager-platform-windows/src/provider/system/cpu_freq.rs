@@ -5,16 +5,16 @@
 //! unavailable until a bounded, trustworthy Windows source is selected; no
 //! command interpreter is used.
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     CpuMetrics, CpuTelemetryObservation, CpuTemperatureSource, FailureKind, ScalarObservation,
     ScalarObservationGroup, ScalarObservationSlot,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::CpuTelemetryProvider;
 
 use super::{CPU_TELEMETRY_PROVIDER, available_source, unavailable_source};
-use taskmanager_core::CpuPerformancePolicy;
-use taskmanager_core::CpuScalarObservations;
+use taskforest_core::CpuPerformancePolicy;
+use taskforest_core::CpuScalarObservations;
 use taskmanager_windows_api::WindowsProcessorTopology;
 use taskmanager_windows_api::active_power_scheme_name;
 use taskmanager_windows_api::effective_power_overlay_name;

@@ -6,10 +6,10 @@ use std::fs;
 use nix::errno::Errno;
 #[cfg(target_os = "linux")]
 use nix::unistd::{SysconfVar, sysconf};
-use taskmanager_core::{FailureKind, FrozenProcessIdentity};
+use taskforest_core::{FailureKind, FrozenProcessIdentity};
 
 use super::tree::io_failure;
-use taskmanager_core::ProcessSchedulingPolicy;
+use taskforest_core::ProcessSchedulingPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcStatFields {

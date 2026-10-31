@@ -5,7 +5,7 @@
 //! idle fan.
 
 use super::*;
-use taskmanager_core::core::sensors::{SensorQuantity, SensorReading};
+use taskforest_core::core::sensors::{SensorQuantity, SensorReading};
 
 /// The fan channels the sensor center reports (`FanSpeed` readings).
 pub(crate) fn fans(shell: &ShellApp) -> Option<Vec<&SensorReading>> {

@@ -1,15 +1,15 @@
 use super::*;
 use std::path::PathBuf;
-use taskmanager_core::DeviceState;
-use taskmanager_core::ProcessSchedulingPolicy;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::DeviceState;
+use taskforest_core::ProcessSchedulingPolicy;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     ContainerMetadata, ContainerRuntime, ProcessAncestorNode, ProcessItem,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
     ProcessScalarObservations,
 };
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::units::UnitPreferences;
 
 fn process_details_rows(item: &ProcessItem, units: &UnitPreferences) -> Vec<ProcessDetailsRowVm> {
     super::process_details_rows_with_local_time(

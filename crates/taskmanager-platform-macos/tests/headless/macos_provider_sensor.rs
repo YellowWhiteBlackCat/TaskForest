@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::SourceOutcome;
+use taskforest_core::SourceOutcome;
 use taskmanager_platform_conformance::assert_device_discovery_consistent;
 
 #[test]

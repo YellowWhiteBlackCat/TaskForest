@@ -2,11 +2,11 @@
 
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, WindowHandle, px, size};
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,
 };
-use taskmanager_core::core::{
+use taskforest_core::core::{
     FailureKind, ProviderId, SourceOutcome, SourceStatus, StartupBootEvidenceSnapshot,
     StartupCriticalChainNode,
 };

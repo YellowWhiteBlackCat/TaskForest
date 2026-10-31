@@ -3,11 +3,11 @@
 
 use super::super::*;
 
-use taskmanager_application::AppAction;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_application::AppAction;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 #[test]
@@ -212,8 +212,8 @@ fn boot_timeline_present_arrows_keep_moving_the_table_selection() {
 /// intact: the block is silent but the table contract is unchanged.
 #[test]
 fn boot_timeline_typed_failure_leaves_the_page_keyboard_contract_intact() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::startup::StartupEvidenceFailure;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::startup::StartupEvidenceFailure;
     let mut app = crate::demo_app();
     let healthy = DeviceState::healthy(1);
     let mut evidence = app

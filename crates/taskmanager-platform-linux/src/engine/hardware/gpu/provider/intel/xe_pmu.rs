@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Instant;
 
-use taskmanager_core::{DeviceId, FailureKind};
+use taskforest_core::{DeviceId, FailureKind};
 use taskmanager_perf_ioctl::GpuEngineCounter;
 
 use super::super::super::intel::discover_xe_pmu_layout;

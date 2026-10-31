@@ -1,11 +1,11 @@
 //! test-intent: behavior
 use super::*;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use taskmanager_application::AlertEventSeed;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
 };
+use taskmanager_application::AlertEventSeed;
 #[test]
 fn event_modal_filters_authoritative_history_exports_complete_json_and_clears_it() {
     let mut app = crate::demo_app();

@@ -1,6 +1,6 @@
 use super::*;
 use crate::engine::services::target::systemd_service_id;
-use taskmanager_core::ServiceId;
+use taskforest_core::ServiceId;
 
 fn service_id() -> ServiceId {
     systemd_service_id("demo.service")

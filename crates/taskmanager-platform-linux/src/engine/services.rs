@@ -40,7 +40,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 #[cfg(feature = "test-support")]
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceLogAvailability, ServiceLogEntry,
     ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter,
     ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
@@ -48,19 +48,19 @@ use taskmanager_core::core::services::{
     ServiceStatus,
 };
 #[cfg(not(feature = "test-support"))]
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceLogEntry, ServiceLogErrorKind,
     ServiceLogFailure, ServiceLogLevel, ServiceLogQuery, ServiceLogState, ServiceLogStreamState,
     ServiceLogTimeFilter, ServiceRelationKind, ServiceStatus,
 };
 #[cfg(all(test, not(feature = "test-support")))]
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceLogAvailability, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogSnapshot,
     ServiceLogStreamEnd, ServiceLogStreamSnapshot,
 };
 
-use taskmanager_core::ServiceId;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::ServiceId;
 #[cfg(target_os = "linux")]
 use taskmanager_platform_portable::BoundedCommandError;
 #[cfg(unix)]

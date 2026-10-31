@@ -2,13 +2,17 @@
 name = "taskmanager-platform-provider"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Platform-neutral native provider SPI for TaskForest capability adapters"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-platform-provider"
 
 [dependencies]
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 
 [lib]
 name = "taskmanager_platform_provider"

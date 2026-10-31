@@ -19,6 +19,11 @@ use std::fmt;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
+use taskforest_core::config::Config;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::process_telemetry::ContainerSummary;
+use taskforest_core::{ProcessItem, SystemSnapshot};
 use taskmanager_application::collect_diagnostic_bundle_from_client;
 use taskmanager_application::export_diagnostic_bundle;
 use taskmanager_application::{
@@ -26,11 +31,6 @@ use taskmanager_application::{
     PlatformClient, ProcessEvent, RefreshRequest,
 };
 use taskmanager_assets::product;
-use taskmanager_core::config::Config;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::process_telemetry::ContainerSummary;
-use taskmanager_core::{ProcessItem, SystemSnapshot};
 
 /// Pause between non-blocking event drains while waiting for the runtime to
 /// report a complete snapshot. The provider lanes run on their own OS threads;

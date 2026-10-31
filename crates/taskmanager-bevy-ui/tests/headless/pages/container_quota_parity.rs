@@ -34,13 +34,13 @@ use bevy::ui::widget::Text;
 use bevy::ui::{IsDefaultUiCamera, UiPlugin};
 use bevy::ui_widgets::UiWidgetsPlugins;
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture;

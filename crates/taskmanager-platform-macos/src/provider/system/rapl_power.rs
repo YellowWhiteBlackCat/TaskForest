@@ -1,8 +1,8 @@
 //! Registered-pending CPU package-power provider (macOS side of the
 //! PackagePowerRapl request lane).
 
-use taskmanager_core::RaplPowerSnapshot;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::RaplPowerSnapshot;
 use taskmanager_platform_provider::RaplPowerProvider;
 
 /// Registered-pending CPU package-power provider: the lane is backed on Linux

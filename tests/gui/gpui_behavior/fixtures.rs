@@ -1,6 +1,6 @@
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::GpuEngine;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::GpuEngine;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, DiskScalarObservations, GpuEngineKind,
     GpuMetrics, GpuScalarObservations, GpuThrottleReason, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryModuleObservations,

@@ -1,6 +1,6 @@
 //! Deterministic active alerts produced by the normal shared evaluator.
 
-use taskmanager_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::ScalarObservation;
 
 use crate::ShellApp;
 use crate::fixture::{ProjectionSeedFact, seed_projection_fact};

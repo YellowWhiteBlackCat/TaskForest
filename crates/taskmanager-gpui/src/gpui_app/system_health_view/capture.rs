@@ -1,6 +1,6 @@
 //! English copy for capture wiring; deterministic data belongs to shell.
 use super::{SensorGroup, SystemHealthText};
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DeviceStatus, FilesystemHealthStatus, SmartSelfTestFailure, SmartSelfTestKind,
     SmartSelfTestPhase,
 };

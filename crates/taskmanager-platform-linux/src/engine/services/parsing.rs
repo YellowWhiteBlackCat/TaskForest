@@ -6,7 +6,7 @@ mod proptests;
 
 use std::fs;
 
-use taskmanager_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
+use taskforest_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
 
 use super::target::{
     openrc_service_id, systemd_unit_id, valid_openrc_service_name, valid_systemd_unit_name,
@@ -35,8 +35,8 @@ use super::{ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceRelationKind, S
 ///            After=network.target\n";
 /// let d = parse_systemctl_show_deps(out);
 /// let requires = d
-///     .relation_targets(&taskmanager_core::ServiceRelationKind::Requires)
-///     .map(taskmanager_core::ServiceId::as_str)
+///     .relation_targets(&taskforest_core::ServiceRelationKind::Requires)
+///     .map(taskforest_core::ServiceId::as_str)
 ///     .collect::<Vec<_>>();
 /// assert_eq!(
 ///     requires,

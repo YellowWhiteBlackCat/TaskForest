@@ -1,13 +1,13 @@
 # 跨平台信息采集与数据源全景清单 (Telemetry Manifest)
 
 > **定位**：全仓唯一权威的跨平台底层数据源清单（Single Source of Truth）。
-> **约束**：业务层保持 `#![forbid(unsafe_code)]`；原生 ABI 仅允许存在于受 ADR 独立审计的边界 crate 中；坚持 100% 诚实遥测，能力级降级以 `platform-contract::CapabilityStatus` 的真实变体名承载（不支持即 `Unsupported`，暂不可用即 `TemporarilyUnavailable`），失败原因级以 `taskmanager-core::FailureKind` 承载，严禁伪造零值或推断虚假状态。
+> **约束**：业务层保持 `#![forbid(unsafe_code)]`；原生 ABI 仅允许存在于受 ADR 独立审计的边界 crate 中；坚持 100% 诚实遥测，能力级降级以 `platform-contract::CapabilityStatus` 的真实变体名承载（不支持即 `Unsupported`，暂不可用即 `TemporarilyUnavailable`），失败原因级以 `taskforest-core::FailureKind` 承载，严禁伪造零值或推断虚假状态。
 
 ---
 
 ## 1. 核心设计与数据采集原则
 
-1. **三平台对等契约 (Uniform Contract)**：所有平台适配器均实现统一的 `taskmanager-platform-contract` 与 `taskmanager-platform-provider` 特征集，产出 toolkit-neutral 的 Core DTO 模型。
+1. **三平台对等契约 (Uniform Contract)**：所有平台适配器均实现统一的 `taskforest-contract` 与 `taskmanager-platform-provider` 特征集，产出 toolkit-neutral 的 Core DTO 模型。
 2. **安全分级路径 (Safety Hierarchy)**：
    - 首选 **(A) 社区成熟且已审计的 Safe Rust 库**（如 `sysinfo`、`raw-cpuid`、`starship-battery`、`smbioslib`、`notify-rust`、`windows-registry`、`windows-service`）；
    - 必备极小原生 ABI 走 **(B) 独立最小审计边界 crate**（Linux 的 `perf-ioctl`、`afpacket`、`fd-bridge`；Windows 的 `taskmanager-windows-api`；严格做到 `#![deny(unsafe_op_in_unsafe_fn)]` 与 `// SAFETY:` 逐块注释，零 handle/pointer 穿透）；

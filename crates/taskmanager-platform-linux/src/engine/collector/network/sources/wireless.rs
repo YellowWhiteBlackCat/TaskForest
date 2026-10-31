@@ -5,8 +5,8 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::source::SourceOutcome;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 use super::{SourceObservation, command_spawn_failure, io_failure, select_failure};

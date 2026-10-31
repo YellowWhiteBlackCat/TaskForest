@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
-use taskmanager_core::core::diagnostics::DiagnosticSource;
-use taskmanager_core::core::services::{ServiceLogEntry, ServiceLogLevel};
+use taskforest_core::core::diagnostics::DiagnosticSource;
+use taskforest_core::core::services::{ServiceLogEntry, ServiceLogLevel};
 
 use super::*;
 

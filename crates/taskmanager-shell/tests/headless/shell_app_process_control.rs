@@ -1,9 +1,9 @@
 use super::*;
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::{
     ProcessCategory, ProcessItem, ProcessLiveKey, ProcessScalarObservations,
 };
-use taskmanager_platform_contract::CapabilityStatus;
 
 fn live_process(pid: u32, parent_pid: Option<u32>, token: u64) -> ProcessItem {
     let mut process = ProcessItem::new(pid, format!("process-{pid}"));

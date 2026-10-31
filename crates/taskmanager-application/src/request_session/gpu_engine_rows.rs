@@ -1,10 +1,10 @@
 //! Request-correlated per-engine GPU acquisition lifecycle.
 
 use crate::{RequestAttemptId, RequestCorrelation};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{GpuEngineRowsFailure, GpuEngineRowsSnapshot};
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::{GpuEngineRowsFailure, GpuEngineRowsSnapshot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GpuEngineRowsRequestFailure {

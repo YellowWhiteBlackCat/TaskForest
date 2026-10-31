@@ -27,7 +27,7 @@ mod services;
 mod storage;
 
 pub(super) use registry::fake_registry;
-use taskmanager_core::ProcessSignal;
+use taskforest_core::ProcessSignal;
 
 #[derive(Clone, Default)]
 pub(super) struct FakeProvider {

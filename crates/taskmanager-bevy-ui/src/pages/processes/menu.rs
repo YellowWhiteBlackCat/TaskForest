@@ -11,10 +11,10 @@
 //! request is the neutral `ProcessBatchAction::SetPriority`, so this surface
 //! never invents a nice number or a platform-specific priority word.
 
+use taskforest_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
 use taskmanager_application::AppAction;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
 use taskmanager_shell::presentation::process_batch_action_label;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId, ShellApp,
@@ -22,10 +22,10 @@ use taskmanager_shell::{
 
 use crate::menu_modal::{ActionMenuContext, MenuModal};
 use crate::widgets::menu::{MenuItem, MenuSpec};
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::ProcessAffinityRequest;
 use taskmanager_application::ResourceRevealRequest;
 use taskmanager_application::UrlOpenRequest;
-use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::presentation::priority_tier_label;
 use taskmanager_shell::presentation::search_url_for;
 

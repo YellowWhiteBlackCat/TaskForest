@@ -17,8 +17,8 @@ platform or runtime types to this layer.
 Removed device-owner authority is retained as a bounded newest tombstone tail,
 preserving recent cross-partition conflict protection without an ever-growing
 identity map.
-Domain facts and platform contracts are imported directly from `taskmanager-core` and
-`taskmanager-platform-contract` at their actual owner modules; this crate maintains no
+Domain facts and platform contracts are imported directly from `taskforest-core` and
+`taskforest-contract` at their actual owner modules; this crate maintains no
 model-forwarding facade.
 
 ## Contract and verification

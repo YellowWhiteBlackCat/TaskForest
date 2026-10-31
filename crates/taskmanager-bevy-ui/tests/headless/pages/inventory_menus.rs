@@ -8,20 +8,27 @@
 //! shared gate, typed confirm, honest cancel — with each page's own verbs.
 
 use bevy::input::keyboard::KeyCode;
-use taskmanager_application::i18n::t;
-use taskmanager_application::{AppAction, AppPage, PlatformEffect};
-use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::startup::{
+use taskforest_core::core::services::{ServiceAction, ServiceStatus};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::startup::{
     StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_application::{AppAction, AppPage, PlatformEffect};
 
 use taskmanager_shell::ShellApp;
 
 use crate::menu_modal::ActionMenuContext;
 use crate::pages::sessions::menu::SessionMenuModal;
 use crate::pages::startup::menu::StartupMenuModal;
+use taskforest_contract::CapabilityId;
+use taskforest_contract::EventSequence;
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_contract::RequestId;
+use taskforest_core::core::startup::StartupControlPolicy;
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::CorrelatedSessionEvent;
 use taskmanager_application::CorrelatedStartupEvent;
@@ -31,11 +38,6 @@ use taskmanager_application::SessionControlOutcome;
 use taskmanager_application::SessionEvent;
 use taskmanager_application::StartupControlOutcome;
 use taskmanager_application::StartupEvent;
-use taskmanager_core::core::startup::StartupControlPolicy;
-use taskmanager_platform_contract::CapabilityId;
-use taskmanager_platform_contract::EventSequence;
-use taskmanager_platform_contract::PartialSourceSnapshot;
-use taskmanager_platform_contract::RequestId;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -67,8 +69,8 @@ fn session_item(id: &str, user: &str) -> SessionItem {
         user: user.to_owned(),
         seat: Some("seat0".to_owned()),
         tty: Some("tty2".to_owned()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

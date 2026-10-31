@@ -13,10 +13,10 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::DiskPartition;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::DiskPartition;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_theme::Theme;
 use taskmanager_ui::primitives::card_surface::CardSurface;

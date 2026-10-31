@@ -1,6 +1,6 @@
 //! Shared in-process telemetry history state.
 //!
-//! Snapshot models remain in `taskmanager-core`. This crate owns only the
+//! Snapshot models remain in `taskforest-core`. This crate owns only the
 //! concurrency and bounded-history mechanism populated after application
 //! correlation and observed by frontends.
 

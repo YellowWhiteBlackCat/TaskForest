@@ -1,14 +1,14 @@
 //! Application-owned merge policy for independently scheduled process insights.
 
-use taskmanager_core::{
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::{
     FailureKind, ProcessEnvironment, ProcessGpuSnapshot, ProcessIdentity, ProcessIsolation,
     ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessTelemetrySnapshot,
     ProcessThreads,
 };
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessInsightFacetEvent, ProcessInsightObservation};
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process::FrozenProcessIdentity;
 
 use crate::ProcessInsightsRevision;
 

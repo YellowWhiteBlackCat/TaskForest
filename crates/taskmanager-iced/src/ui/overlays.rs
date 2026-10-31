@@ -8,10 +8,10 @@
 use crate::ui::smart_self_test_confirmation::confirmation;
 use iced::widget::{column, container, opaque, row, text};
 use iced::{Element, Length};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
@@ -21,9 +21,9 @@ use crate::app::Message;
 use crate::focus;
 use crate::theme;
 use crate::ui::components::{key_value_rows, styled_scrollable};
-use taskmanager_core::core::SmartSelfTestKind;
-use taskmanager_core::core::SmartSelfTestPhase;
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskforest_core::core::SmartSelfTestKind;
+use taskforest_core::core::SmartSelfTestPhase;
+use taskforest_core::core::metrics::DiskMetrics;
 
 pub(crate) mod alerts;
 pub(crate) use alerts::*;

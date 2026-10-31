@@ -5,16 +5,16 @@ use std::time::Duration;
 
 use bevy::MinimalPlugins;
 use bevy::app::{App, PreUpdate};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
+use taskforest_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 use taskmanager_application::{
     AlertRuleImportMode, DesktopNotificationRequest, IntegrationFacets, ManagedAlertRule,
     ManagedAlertRuleEdit, PlatformClient, PlatformEffect, PlatformEvent, PlatformEventBatch,
     PlatformFacets, PlatformHandle,
-};
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
-use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::{ShellApp, fixture};
 

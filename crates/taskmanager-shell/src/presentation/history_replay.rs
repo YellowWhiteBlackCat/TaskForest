@@ -1,6 +1,6 @@
 //! Common persisted-series headings; identity stays owned by the core key.
 
-use taskmanager_core::core::history::HistorySeriesKey;
+use taskforest_core::core::history::HistorySeriesKey;
 
 #[must_use]
 pub fn row_heading(key: &HistorySeriesKey) -> String {

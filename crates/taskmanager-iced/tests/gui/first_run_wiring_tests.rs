@@ -1,13 +1,13 @@
 //! test-intent: behavior
 
 use super::*;
+use taskforest_contract::{CapabilityId, EventSequence};
+use taskforest_core::core::setup::{SetupScriptAction, SetupScriptEvent};
 use taskmanager_application::first_run::FirstRunPhase;
 use taskmanager_application::{
     CorrelatedSetupScriptEvent, PlatformEventBatch, PlatformEventContext,
 };
 use taskmanager_assets::product::REPOSITORY_URL;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
-use taskmanager_platform_contract::{CapabilityId, EventSequence};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_test_support::setup_script::{SetupScriptRecorder, platform};
 
@@ -85,8 +85,8 @@ fn explicit_native_actions_stay_pending_once_and_docs_use_the_url_port() {
 
 #[test]
 fn request_action_without_a_platform_folds_the_typed_failure_and_stays_shown() {
+    use taskforest_core::core::failure::FailureKind;
     use taskmanager_application::first_run::FirstRunController;
-    use taskmanager_core::core::failure::FailureKind;
     let mut app = IcedApp::new(None);
     app.first_run = FirstRunController::from_observation(Some(setup_script_info()));
     let _ = app.update(Message::FirstRun(FirstRunMessage::Open));

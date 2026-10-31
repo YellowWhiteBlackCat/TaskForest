@@ -7,13 +7,13 @@ use std::time::Duration;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::i18n::current_language;
 use taskmanager_application::{
     AppPage, KeyCode, Modifiers, PlatformClient, PlatformEffect, RefreshRequest,
 };
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_ipc::SubscriptionMask;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
@@ -31,7 +31,7 @@ mod seam;
 mod semantic;
 
 pub(crate) use keys::handle_key;
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::{ShellKeyEvent, queue_effect};
 
 /// Test-only re-export of the terminal event seam: the overlay HitMap

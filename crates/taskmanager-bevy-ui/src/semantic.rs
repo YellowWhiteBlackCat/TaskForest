@@ -39,9 +39,9 @@ use taskmanager_ui_contract::{
 
 use crate::app::FrontendTrack;
 use crate::confirmation::PendingConfirmationView;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::process_sort::ProcessSortAxis;
 use taskmanager_application::process_sort::compare_processes;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::GraphSummary;

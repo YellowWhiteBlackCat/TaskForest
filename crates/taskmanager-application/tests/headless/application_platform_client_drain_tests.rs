@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     EventSequence, OperationFailure, ProviderFailure, RequestEnvelope, RequestPort,
     SubmissionError,
@@ -12,13 +12,13 @@ use crate::platform::{
     ProcessGpuRequest, ProcessInsightFacetEvent, ProcessInsightFacetState,
     ProcessInsightObservation, ProcessInsightUnavailable, ProcessNetworkRequest,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::{
     ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot, ProcessNetworkSnapshot,
 };
-use taskmanager_platform_contract::RequestId;
 
 #[derive(Default)]
 struct EmptyCapabilities;

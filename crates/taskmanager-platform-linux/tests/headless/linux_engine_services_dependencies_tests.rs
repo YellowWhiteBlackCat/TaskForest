@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use super::*;
-use taskmanager_core::ServiceRelationKind;
+use taskforest_core::ServiceRelationKind;
 
 struct FakeRunner {
     outcomes: VecDeque<DependencyCommandResult>,

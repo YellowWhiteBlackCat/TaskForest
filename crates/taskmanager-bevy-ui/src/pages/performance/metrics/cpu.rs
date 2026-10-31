@@ -1,7 +1,7 @@
 //! CPU detail-field projection over the cached shell snapshot.
 
 use super::*;
-use taskmanager_core::core::hardware::CpuType;
+use taskforest_core::core::hardware::CpuType;
 use taskmanager_shell::presentation::cpu_idle_state_summary;
 use taskmanager_shell::presentation::cpu_interrupt_summary;
 use taskmanager_shell::presentation::cpu_power_limits_summary;

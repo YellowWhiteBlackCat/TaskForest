@@ -20,10 +20,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::control_error_detail;
 

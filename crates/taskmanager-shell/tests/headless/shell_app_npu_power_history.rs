@@ -9,9 +9,9 @@
 
 use crate::ShellApp;
 use crate::fixture::{ProjectionSeedFact, seed_projection_fact};
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::npu::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::npu::{
     NpuDevice, NpuInventorySnapshot, NpuPowerObservation, NpuPowerReport,
 };
 

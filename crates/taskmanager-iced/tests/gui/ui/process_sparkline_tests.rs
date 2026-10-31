@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 const SIZE: Size = Size::new(48.0, 16.0);
 

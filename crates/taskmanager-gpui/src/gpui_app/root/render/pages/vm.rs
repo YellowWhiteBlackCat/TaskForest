@@ -1,7 +1,7 @@
 //! Pure page-level telemetry projection for root render composition.
 
 use crate::gpui_app::formatting;
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::metrics::SystemSnapshot;
 
 pub(super) struct ProcessPageMetrics {
     pub swap_auto_hidden: bool,

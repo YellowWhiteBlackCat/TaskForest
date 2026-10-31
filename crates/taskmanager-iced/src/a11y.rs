@@ -12,6 +12,8 @@
 use std::cmp::Ordering;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::session::SessionControlAction;
 #[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
 use taskmanager_application::AppAction;
@@ -19,8 +21,6 @@ use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
 #[cfg(not(target_os = "linux"))]
 use taskmanager_ui_contract::DetachedAccessibilityBridge;

@@ -34,7 +34,7 @@ System observation, refresh policy, and history projection have separate owners.
    Windows, or macOS provider operation.
 3. `taskmanager-telemetry-store` is a bounded read-model adapter with a separately
    constructed correlated-ingestion capability. It may depend inward on
-   `taskmanager-core` observation types, but never on application, provider,
+   `taskforest-core` observation types, but never on application, provider,
    runtime, native-adapter, or frontend crates. A read store cannot derive a writer.
 4. History ingestion happens only after `PlatformClient` has accepted correlation
    for a system-domain event. Raw provider completion cannot write history.

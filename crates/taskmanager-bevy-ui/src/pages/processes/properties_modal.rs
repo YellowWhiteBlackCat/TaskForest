@@ -23,8 +23,8 @@ use bevy::prelude::Visibility;
 use bevy::scene::{CommandsSceneExt, Ready};
 use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
 use bevy::ui_widgets::{Activate, SelectedTab, TabList, ValueChange};
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::{PlatformEffect, ProcessInsightFacet, i18n::t};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ShellApp;
 use view::ProcessPropertiesCurve;
 

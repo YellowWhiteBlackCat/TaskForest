@@ -2,10 +2,14 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::core::device_state::{DeviceLifecycle, DevicePresence, DeviceState};
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventSequence,
+    RequestId,
+};
+use taskforest_core::core::device_state::{DeviceLifecycle, DevicePresence, DeviceState};
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
+use taskforest_core::core::metrics::{
     CpuIdleState, CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, CpuPerformancePolicy,
     CpuScalarObservations, CpuTelemetryObservation, DiskMetrics, DiskScalarObservations,
     GpuGraphicsApi, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation,
@@ -16,22 +20,18 @@ use taskmanager_core::core::metrics::{
     ScalarObservation, ScalarObservationGroup, StorageTelemetryObservation, SystemLoadAverage,
     SystemSnapshot,
 };
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::power::PowerSupplySnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::startup::{
+use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::power::PowerSupplySnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventSequence,
-    RequestId,
-};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp, live_graph::LiveGraphHistory,
 };
@@ -53,15 +53,15 @@ pub use cpu_topology::{CpuClusterSpec, CpuTopologySpec, demo_cpu_topology};
 use cpu_topology::{
     core_usage_seed, cpu_types_seed, per_core_frequency_seed, per_core_temperature_seed,
 };
+use taskforest_core::core::directory_usage::DirectoryUsageSnapshot;
+use taskforest_core::core::process::ProcessBatchIntent;
+use taskforest_core::core::process_telemetry::ContainerRollup;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
     ProcessAffinityReady, ProjectedProcessInsights, RequestAttemptId,
 };
-use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
-use taskmanager_core::core::process::ProcessBatchIntent;
-use taskmanager_core::core::process_telemetry::ContainerRollup;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 

@@ -22,9 +22,9 @@ use bevy::ui::prelude::{
     UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
 
 use super::phases::{boot_phase_slices, phase_rows_scene, phase_total_ms};
 use crate::palette::{UiPalette, space_2, space_4, space_8};

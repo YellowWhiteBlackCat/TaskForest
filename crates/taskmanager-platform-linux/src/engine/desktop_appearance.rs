@@ -5,11 +5,11 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::{
+use taskforest_contract::CompositeSourceSnapshot;
+use taskforest_core::{
     DesktopAppearance, DesktopFamily, FailureKind, PreferredColorScheme, ProviderId, SourceOutcome,
     SourceStatus,
 };
-use taskmanager_platform_contract::CompositeSourceSnapshot;
 
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 

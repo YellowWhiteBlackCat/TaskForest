@@ -1,6 +1,6 @@
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::*;
 

@@ -13,10 +13,10 @@ use crate::gpui_app::process_insights::view::ProcessInsightsViewProps;
 use gpui::{
     Context, Div, Entity, InteractiveElement, MouseButton, ParentElement, Rgba, Styled, div, px,
 };
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::NetworkEscalationState;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::command_identity_summary;
 use taskmanager_theme::Length;
 use taskmanager_ui::theme_binding::absolute;
@@ -36,14 +36,14 @@ use crate::gpui_app::process_insights::{
     ProcessInsightsLabels, ProcessInsightsRenderState, render_process_insights,
 };
 use crate::gpui_app::sidebar::{SelectedDevice, network_category_label};
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
 use taskmanager_assets::product;
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowControls, WindowCorner};
 use taskmanager_ui::brand_logo_image;

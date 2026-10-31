@@ -14,16 +14,16 @@ use crate::gpui_app::elements;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, PendingConfirmation, ServiceControlTarget, SessionControlConfirmation,
     StartupControlRequest, SurfaceDismissReason, SurfaceKind,
 };
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;

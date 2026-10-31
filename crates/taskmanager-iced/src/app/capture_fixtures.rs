@@ -1,36 +1,36 @@
 //! Fixtures and helpers for Iced capture scenes.
 
 use crate::keys::IcedKey;
-use taskmanager_application::AppPage;
-use taskmanager_application::{AlertEventSeed, KeyCode, Modifiers};
-use taskmanager_core::SystemSnapshot;
-use taskmanager_core::core::alerts::{
+use taskforest_core::SystemSnapshot;
+use taskforest_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
 };
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::{
     DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind, ScalarObservation,
     ScalarObservationGroup, SmartAvailability,
 };
-use taskmanager_core::core::npu::{
+use taskforest_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
-use taskmanager_core::core::process::{
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations,
 };
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
+use taskmanager_application::AppPage;
+use taskmanager_application::{AlertEventSeed, KeyCode, Modifiers};
 use taskmanager_shell::fixture::process_insights::process_insights_projection;
 use taskmanager_shell::fixture::process_insights::seed_process_properties_history;
 use taskmanager_shell::fixture::{

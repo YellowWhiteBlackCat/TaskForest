@@ -7,11 +7,11 @@ use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Wrap};
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField};
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::units::UnitPreferences;
 
 use super::highlight;
 use super::{kv, panel};
@@ -28,10 +28,10 @@ use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 mod aggregate;
 mod insights;
 pub(crate) use insights::{insights_lines, modal_insights_lines, network_requires_escalation};
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::process_details_vm::{
     ProcessDetailsRowVm, process_details_rows_with_local_time,
 };
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::ProcessTreeRow;
 use taskmanager_shell::presentation::command_identity_summary;
 

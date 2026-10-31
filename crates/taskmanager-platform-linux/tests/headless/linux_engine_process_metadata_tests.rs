@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use taskmanager_core::ProcessMetadataAvailability;
+use taskforest_core::ProcessMetadataAvailability;
 
 use super::*;
-use taskmanager_core::FailureKind;
-use taskmanager_core::ProcessItem;
-use taskmanager_core::ProcessScalarObservations;
-use taskmanager_core::ScalarObservation;
+use taskforest_core::FailureKind;
+use taskforest_core::ProcessItem;
+use taskforest_core::ProcessScalarObservations;
+use taskforest_core::ScalarObservation;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn owner(uid: u32, label: Option<&str>, observed_at_ms: u64) -> ProcessOwner {

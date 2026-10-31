@@ -93,8 +93,8 @@ fn the_wash_is_translucent_over_the_row_surface() {
 #[test]
 fn the_projection_carries_its_sort_axis() {
     use std::collections::HashSet;
-    use taskmanager_core::core::process::ProcessItem;
-    use taskmanager_core::core::time::LocalTimeRulesObservation;
+    use taskforest_core::core::process::ProcessItem;
+    use taskforest_core::core::time::LocalTimeRulesObservation;
 
     let process = ProcessItem::new(42, "worker");
     let flat = vec![&process];

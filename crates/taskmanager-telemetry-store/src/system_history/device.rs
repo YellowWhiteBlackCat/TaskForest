@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceLifecycle, DevicePresence, HistoricalSample, HistoryMetric, HistoryRecordSink,
     HistorySeriesKey, SystemObservationState,
 };

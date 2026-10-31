@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use taskmanager_platform_contract::{WindowCaptureBackend, WindowCaptureFailureKind};
+use taskforest_contract::{WindowCaptureBackend, WindowCaptureFailureKind};
 
 use super::*;
 

@@ -1,11 +1,9 @@
 //! Optional setup discovery and correlated, explicit native actions (ADR-040).
 
 use crate::{CorrelatedSetupScriptEvent, PlatformClient, PlatformEventBatch, SetupScriptRequest};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
-use taskmanager_platform_contract::{
-    CapabilityId, OperationFailure, RequestId, SubmissionErrorKind,
-};
+use taskforest_contract::{CapabilityId, OperationFailure, RequestId, SubmissionErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum FirstRunPhase {

@@ -3,14 +3,14 @@
 use crate::gpui_app::dashboard::DashboardState;
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
-use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::FilesystemHealthSnapshot;
-use taskmanager_core::core::SensorCenterSnapshot;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::{
+use taskforest_core::core::FilesystemHealthSnapshot;
+use taskforest_core::core::SensorCenterSnapshot;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::{
     DeviceGeneration, FilesystemHealthStatus, SensorQuantity, SmartSelfTestKind,
     SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
 };
+use taskmanager_application::system_timeline::SystemPageSection;
 
 use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome};
 use taskmanager_shell::fixture::health::health_fixture;

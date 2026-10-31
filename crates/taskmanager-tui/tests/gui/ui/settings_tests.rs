@@ -1,6 +1,6 @@
 use super::*;
+use taskforest_core::core::config::Config;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::config::Config;
 
 #[test]
 fn permission_controls_and_cancel_remain_inside_the_smallest_modal() {

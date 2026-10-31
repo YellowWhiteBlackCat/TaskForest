@@ -2,11 +2,11 @@
 
 use std::collections::BTreeSet;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilitySnapshot, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface,
     PlatformSource,
 };
+use taskforest_core::core::identity::ProviderId;
 
 /// A freshly spawned runtime must expose the complete product-expected
 /// capability surface (M3.2 semantics): the registration face it DECLARES,

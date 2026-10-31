@@ -1,9 +1,9 @@
 //! Frozen target, live facts, complete facet tails and normal keyboard controls.
 use super::*;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{PlatformEffect, ProcessInsightFacet, ProcessInsightFacetState};
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::process_insights::{
     process_insights_projection, seed_process_properties_history,

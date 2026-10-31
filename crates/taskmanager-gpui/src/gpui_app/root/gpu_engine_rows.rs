@@ -5,11 +5,11 @@
 //! refresh cadence and invalidates scheduled work when that device is no
 //! longer visible.
 
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_application::{
     GpuEngineRowsRequest, GpuEngineRowsState, request_submission_failure,
 };
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use crate::gpui_app::root::RootView;
 

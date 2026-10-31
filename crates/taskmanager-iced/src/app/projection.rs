@@ -9,11 +9,11 @@ use taskmanager_shell::{InfoSortCol, SortDir};
 use crate::ui::process_projection::{ProcessProjection, ProcessProjectionFingerprint};
 
 use super::{IcedApp, PerfDevice};
+use taskforest_core::core::history::HistoryWindow;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_application::ApplicationHistoryRow;
 use taskmanager_application::ApplicationHistoryStatus;
 use taskmanager_application::HistoryReplayRequestId;
-use taskmanager_core::core::history::HistoryWindow;
-use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_shell::presentation::trend::TrendSeries;
 
 /// The inputs that can change the owned facts/order of one inventory table.

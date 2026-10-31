@@ -20,10 +20,10 @@ Linux*) ;;
     ;;
 esac
 
-# Direct invocations should retain the same pinned 1.99.0 toolchain and warning
+# Direct invocations should retain the same pinned 1.99.1 toolchain and warning
 # policy as the local gate and Linux CI caller. Caller-provided linker flags
 # (including CI's mold flag) are preserved.
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.1}"
 export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
 rustflags="${RUSTFLAGS:-}"

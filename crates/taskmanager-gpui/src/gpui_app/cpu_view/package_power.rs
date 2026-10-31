@@ -15,11 +15,11 @@
 //! can never prompt.
 
 use gpui::{Context, Div, InteractiveElement, ParentElement, Styled, div};
+use taskforest_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::RaplPowerSnapshot;
 use taskmanager_application::RaplPowerRequestFailure;
 use taskmanager_application::{RaplPowerRequest, RaplPowerState, i18n, request_submission_failure};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::RaplPowerSnapshot;
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;

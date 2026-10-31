@@ -29,10 +29,10 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table_body, virtual_table_row};
 use iced::widget::canvas::{self, Cache, Geometry};
 use iced::widget::{column, container, row, text};
 use iced::{Color, Element, Length};
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::power::PowerSupplySnapshot;
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity, SensorReading};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::power::PowerSupplySnapshot;
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity, SensorReading};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::{Theme, tokens};

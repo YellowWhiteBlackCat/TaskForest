@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Observer, Producer};
-use taskmanager_core::{DeviceId, GpuEngineMetricPoint, SystemObservationState};
+use taskforest_core::{DeviceId, GpuEngineMetricPoint, SystemObservationState};
 
 mod device;
 mod dynamic_history;

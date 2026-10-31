@@ -4,16 +4,16 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, LimitValue, ProcessIdentity, ProcessResourceObservations, ProcessResourceSnapshot,
     ProviderId, ResourceGroupMembership, ResourceObservation, SourceOutcome, SourceStatus,
 };
 
 use super::{parse_limit_value, parse_proc_cgroup, parse_proc_limits};
 use crate::engine::process::telemetry::{parse_start_time_ticks, safe_cgroup_path};
-use taskmanager_core::DeviceState;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::ResourceLimit;
+use taskforest_core::DeviceState;
+use taskforest_core::DeviceStatus;
+use taskforest_core::ResourceLimit;
 
 const LIMITS_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.limits");
 const MEMBERSHIP_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.cgroup.membership");

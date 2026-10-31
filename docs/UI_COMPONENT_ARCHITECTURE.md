@@ -26,7 +26,7 @@ Bevy/Iced 基础组件与纯文本、窗口算法和中立 surface 值统一归�
 - Inputs：switch、slider、checkbox、text input、search input、select；
 - Overlays：layer stack、dialog、popup、context menu、dropdown、toast；
 - Layout：page viewport/frame/scaffold、list-page scaffold、scroll region；
-- Data：table、row selection、data row、key/value row、status cell、empty/loading/error/recovery state；搜索高亮的匹配几何由合同层单一引擎（`taskmanager_core::core::text::match_ranges_ascii_ci`，ADR-020）提供，共享 UI 层不再持有第二套匹配实现。
+- Data：table、row selection、data row、key/value row、status cell、empty/loading/error/recovery state；搜索高亮的匹配几何由合同层单一引擎（`taskforest_core::core::text::match_ranges_ascii_ci`，ADR-020）提供，共享 UI 层不再持有第二套匹配实现。
 
 每个组件必须有键盘路径、焦点可见态、语义名称/角色/状态、窄窗口行为和失败/禁用表达。
 危险操作只提交 typed intent；确认框关闭、取消和 Escape 不产生副作用。

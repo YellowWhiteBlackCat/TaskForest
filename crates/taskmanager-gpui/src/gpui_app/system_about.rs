@@ -17,8 +17,8 @@ use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
+use taskforest_core::core::{DesktopAppearance, HardwareInfo};
 use taskmanager_application::i18n;
-use taskmanager_core::core::{DesktopAppearance, HardwareInfo};
 use taskmanager_shell::presentation::system_information::{
     SystemInformationRow, copy_all_text, groups,
 };

@@ -4,13 +4,13 @@
 //! CPU width-6 alignment, and its drop-on-missing row policy.
 use super::*;
 use std::path::PathBuf;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
-use taskmanager_core::core::process::process_ancestor_lineage;
-use taskmanager_core::core::time::LocalTimeRules;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
+use taskforest_core::core::process::process_ancestor_lineage;
+use taskforest_core::core::time::LocalTimeRules;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {
@@ -60,7 +60,7 @@ fn vm_value(field: ProcessDetailsField) -> String {
 
 #[test]
 fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
-    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::metrics::ScalarObservation;
 
     // The parity fixture leaves both counter families unobserved, so the rows
     // pinned the shared dash. Observe them explicitly: the renderer's row must

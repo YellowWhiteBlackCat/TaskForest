@@ -14,14 +14,14 @@ use bevy::app::App;
 use bevy::asset::Assets;
 use bevy::ecs::entity::Entity;
 use bevy::text::Font;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
+};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigStore, HostTelemetryRequest,
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, SystemFacets, TelemetryInterval,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
 };
 use taskmanager_theme::{LightDark, Skin, Theme};
 
@@ -34,7 +34,7 @@ use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
-use taskmanager_platform_contract::RequestEnvelope;
+use taskforest_contract::RequestEnvelope;
 
 struct FixedCapabilities(CapabilitySnapshot);
 

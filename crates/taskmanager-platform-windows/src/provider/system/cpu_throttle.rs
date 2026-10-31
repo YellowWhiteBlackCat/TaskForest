@@ -1,8 +1,8 @@
 //! Registered-pending CPU thermal-throttle counter provider (Windows side of
 //! the CpuThrottle request lane).
 
-use taskmanager_core::CpuThrottleSnapshot;
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::CpuThrottleSnapshot;
 use taskmanager_platform_provider::CpuThrottleProvider;
 
 /// Registered-pending CPU thermal-throttle counter provider: the cumulative

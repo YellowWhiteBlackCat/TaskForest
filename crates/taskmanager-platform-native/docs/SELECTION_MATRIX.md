@@ -14,10 +14,10 @@ boundary and native capture selection.
 The selector never substitutes UTC for an unavailable local zone, and capture
 never falls back to a display-wide or fabricated image. Every target must
 expose the same typed platform surface with honest fallbacks; shared contract
-types remain owned by `taskmanager-platform-contract` and are not forwarded
+types remain owned by `taskforest-contract` and are not forwarded
 through this selector. At runtime the app-host worker invokes the registered
 in-process renderer hook first, then the adapter selected here; the capture
-receipt vocabulary is owned by `taskmanager-platform-contract`.
+receipt vocabulary is owned by `taskforest-contract`.
 
 OS-specific process liveness and native path knowledge remain in the selected
 adapter; the application host receives only safe probes and owned paths.

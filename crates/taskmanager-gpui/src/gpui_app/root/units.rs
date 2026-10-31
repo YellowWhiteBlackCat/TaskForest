@@ -3,7 +3,7 @@
 use gpui::Context;
 
 use super::{MagnitudeBase, QuantityNotation, RootView, UnitFamily};
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 
 impl RootView {
     /// Snapshot the six current unit choices at render entry. Providers only

@@ -13,13 +13,13 @@
 use std::collections::HashSet;
 
 use super::SystemProjectionStore;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_contract::{CapabilityId, CapabilityStatus, OperationFailure, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem, ProcessLiveKey,
     ProcessSignal, descendant_live_keys,
 };
-use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, OperationFailure, RequestId};
+use taskforest_core::core::process_telemetry::ResourceGroupLimitRequest;
 
 use super::process_rows::ProcessRowId;
 use taskmanager_application::RefreshRequest;

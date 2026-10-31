@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-use taskmanager_core::{HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey};
+use taskforest_core::{HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey};
 use taskmanager_history_store::{
     FlushReport, MAX_DIRECTORY_ENTRIES_PER_SCAN, PersistentHistoryStore, RetentionPolicy,
     STALE_TEMPORARY_AGE_MS,

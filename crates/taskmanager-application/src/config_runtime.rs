@@ -11,7 +11,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, TrySendError, bounded, select, tick};
-use taskmanager_core::config::Config;
+use taskforest_core::config::Config;
 
 use crate::{ConfigLoadSource, ConfigStore};
 

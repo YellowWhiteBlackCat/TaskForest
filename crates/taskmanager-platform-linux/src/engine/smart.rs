@@ -31,16 +31,16 @@
 //! collector owns periodic invocation and caching.
 
 #[cfg(not(target_os = "linux"))]
-use taskmanager_core::core::device_state::DeviceStatus;
+use taskforest_core::core::device_state::DeviceStatus;
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::SmartAvailability;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::SmartAvailability;
 #[cfg(feature = "test-support")]
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_core::core::smart::DiskSmart;
-use taskmanager_core::core::smart::SmartProviderFailureKind;
+use taskforest_core::core::smart::DiskSmart;
+use taskforest_core::core::smart::SmartProviderFailureKind;
 
 #[cfg(target_os = "linux")]
 use std::time::Duration;

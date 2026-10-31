@@ -3,7 +3,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use taskmanager_core::BootTimeline;
+use taskforest_core::BootTimeline;
 
 const MAX_BOOT_BASELINE_ERROR_CHARS: usize = 512;
 

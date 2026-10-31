@@ -10,11 +10,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded, select_biased};
+use taskforest_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 use taskmanager_application::{
     DiagnosticBundleCompletion, DiagnosticBundlePort, DiagnosticBundleRequest,
     DiagnosticBundleTarget,
 };
-use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 
 use crate::worker_fault::catch_worker_panic;
 

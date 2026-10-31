@@ -2,9 +2,13 @@
 name = "taskmanager-perf-ioctl"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Audited perf_event_open boundary crate — one of four unsafe trust roots for TaskForest"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-perf-ioctl"
 
 # One of four audited crates in the workspace permitted to contain `unsafe`. It is the
 # audited OS/driver ABI seam (ADR-022): every unsafe block carries a SAFETY

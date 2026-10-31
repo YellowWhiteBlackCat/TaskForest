@@ -6,14 +6,14 @@
 //! through exhaustive events, so two local modals or two row menus cannot be
 //! represented at the same time.
 
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::SurfaceKind;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::presentation::system_information::SystemInformationGroup;
 
 /// Stable identity of every Iced-owned primary surface.

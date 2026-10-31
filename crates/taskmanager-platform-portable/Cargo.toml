@@ -2,7 +2,7 @@
 name = "taskmanager-platform-portable"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Portable safe-I/O provider implementations shared by TaskForest native adapters"
 publish = false
@@ -13,8 +13,8 @@ publish = false
 # and can never move; the fork's Linux path uses no nix at all and its
 # *BSD targets ride the patched nix ~0.31 line instead.
 starship-battery = "0.11"
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
 
 [target.'cfg(unix)'.dependencies]

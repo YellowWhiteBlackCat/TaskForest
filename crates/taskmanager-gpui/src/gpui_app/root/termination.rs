@@ -10,11 +10,11 @@ use crate::gpui_app::elements;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, PendingConfirmation, SurfaceDismissReason, SurfaceKind,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::definite_length;

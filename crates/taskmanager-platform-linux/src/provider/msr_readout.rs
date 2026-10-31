@@ -18,14 +18,14 @@
 //! `IA32_THERM_STATUS` (0x19C) thermal-status / PROCHOT bits. No fabricated
 //! register values exist on any path.
 
-use taskmanager_core::FailureKind;
-use taskmanager_core::{MsrPackageReadout, MsrReadoutSnapshot, MsrThermalStatusReadout};
+use taskforest_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_core::FailureKind;
+use taskforest_core::{MsrPackageReadout, MsrReadoutSnapshot, MsrThermalStatusReadout};
 use taskmanager_escalation::polkit::PolkitGate;
 use taskmanager_escalation::polkit::{MsrHelperErrorKind, MsrHelperOutcome, invoke_msr_helper};
 use taskmanager_escalation::{
     EscalationAvailability, EscalationDenialReason, EscalationFeature, PrivilegeGate,
 };
-use taskmanager_platform_contract::{CapabilityStatus, ProviderFailure};
 use taskmanager_platform_provider::MsrReadoutProvider;
 
 pub(super) struct NativeMsrReadoutProvider {

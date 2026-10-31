@@ -4,7 +4,7 @@
 
 use super::*;
 use gpui::WindowDecorations;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
 };
 

@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::GpuScalarObservations;
+use taskforest_core::GpuScalarObservations;
 #[cfg(windows)]
 use taskmanager_windows_api::WindowsGpuAdapterMemorySample;
 use taskmanager_windows_api::WindowsPciAddress;

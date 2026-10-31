@@ -10,10 +10,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(target_family = "unix")]
 use nix::fcntl::OFlag;
-use taskmanager_core::core::startup::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupScope, StartupSource,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use tracing::{info, warn};
 
 use super::{

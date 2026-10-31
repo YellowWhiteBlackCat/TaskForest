@@ -1,9 +1,9 @@
 //! Session-control confirmation for the shell-owned direct track.
 
+use taskforest_core::core::session::{SessionIdentity, SessionItem};
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, PendingConfirmation, PlatformEffect, SurfaceDismissReason,
 };
-use taskmanager_core::core::session::{SessionIdentity, SessionItem};
 
 use super::DirectTrackState;
 

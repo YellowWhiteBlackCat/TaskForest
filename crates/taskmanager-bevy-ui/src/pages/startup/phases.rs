@@ -3,7 +3,7 @@
 //!
 //! The three boot phases the overview compares — firmware, kernel and user
 //! space — are read from the shared contract's MEASURED phase split
-//! ([`taskmanager_core::core::startup::StartupTimelineSnapshot`]). A phase
+//! ([`taskforest_core::core::startup::StartupTimelineSnapshot`]). A phase
 //! the contract did not measure stays absent: its row says so explicitly
 //! instead of drawing a zero-width bar, which would claim the phase took no
 //! time at all.
@@ -22,10 +22,10 @@ use bevy::ui::prelude::{
     UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupPhaseKind, StartupTimelineSnapshot,
 };
+use taskmanager_application::i18n::t;
 
 use super::inks::{InkRole, StartupInk};
 use crate::palette::{UiPalette, space_2, space_8};

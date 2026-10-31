@@ -9,12 +9,12 @@ use tracing::warn;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
-use taskmanager_application::i18n;
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertRuleTransferError,
     export_alert_rules_json, import_alert_rules_json,
 };
+use taskmanager_application::i18n;
+use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

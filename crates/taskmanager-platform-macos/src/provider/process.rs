@@ -29,15 +29,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     CumulativeCounter, FailureKind, FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult,
     ProcessBatchTargetResult, ProcessInsightSnapshot, ProcessItem, ProcessMetadataFailure,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
     ProcessResourceSnapshot, ProcessScalarObservations, ProcessSignal, ProviderId,
     ScalarObservation,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ProcessControlProvider, ProcessListProvider, ProcessResourcesProvider,
 };

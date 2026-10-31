@@ -6,7 +6,7 @@
 //! missing measurement stays a gap instead of becoming a synthetic instant.
 
 use crate::HistoryRetention;
-use taskmanager_core::{
+use taskforest_core::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, FailureKind, MetricSample,
     ScalarObservation,
 };

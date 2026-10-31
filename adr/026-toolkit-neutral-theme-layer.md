@@ -7,7 +7,7 @@ Status: accepted (the feature-gated gpui/iced bindings clause is superseded by A
 The application must be able to run as several frontends from one codebase:
 the GPUI desktop shell (`crates/taskmanager-gpui/src/gpui_app`), the TUI (`crates/taskmanager-tui`,
 ratatui), and a future iced frontend. The non-UI spine already supports this:
-`taskmanager-core` → `taskmanager-application` → `taskmanager-ui-contract`
+`taskforest-core` → `taskmanager-application` → `taskmanager-ui-contract`
 are toolkit-free, and the TUI proves a second frontend can be composed on the
 same application layer.
 

@@ -3,18 +3,18 @@
 //! interaction state. No renderer projection fixture is mutated here.
 
 use gpui::TestAppContext;
-use taskmanager_application::{InteractionEvent, PendingConfirmation};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent,
 };
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::{DeviceGeneration, DeviceId, ServiceId, SmartSelfTestKind};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::{DeviceGeneration, DeviceId, ServiceId, SmartSelfTestKind};
+use taskmanager_application::{InteractionEvent, PendingConfirmation};
 use taskmanager_gpui::gpui_app::root::RootView;
 use taskmanager_gpui::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use taskmanager_theme::Theme;
 
 use super::proc;
-use taskmanager_core::core::process::{ProcessBatchResult, ProcessBatchTargetResult};
+use taskforest_core::core::process::{ProcessBatchResult, ProcessBatchTargetResult};
 
 fn end_task_target() -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_process(&proc(4242, "important-worker"))

@@ -6,25 +6,25 @@
 //! values. Render and input code consume immutable `RootView` accessors.
 
 use std::{rc::Rc, sync::Arc};
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_shell::fixture::DirectTrackSeedFact;
 use taskmanager_shell::fixture::seed_direct_track_fact;
 
+use taskforest_core::core::Alert;
+use taskforest_core::core::directory_usage::DirectoryUsageSnapshot;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::power::PowerSupplySnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process_telemetry::ContainerRollup;
+use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 use taskmanager_application::StartupEvidenceUnavailable;
-use taskmanager_core::core::Alert;
-use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
-use taskmanager_core::core::power::PowerSupplySnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process_telemetry::ContainerRollup;
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 
 mod demo;
 

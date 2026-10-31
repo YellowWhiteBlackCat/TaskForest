@@ -2,9 +2,13 @@
 name = "taskmanager-afpacket"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Audited AF_PACKET boundary crate — the second unsafe trust root for TaskForest (per-process network accounting)"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-afpacket"
 
 # The SECOND crate in the workspace permitted to contain `unsafe` (ADR-022 +
 # ADR-024). It is the audited OS ABI seam for AF_PACKET raw sockets: every

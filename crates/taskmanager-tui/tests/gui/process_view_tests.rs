@@ -1,10 +1,10 @@
 use super::*;
 use std::collections::HashSet;
 
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessScalarObservations;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::{SortCol, SortDir, project_process_tree_rows};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
@@ -31,7 +31,7 @@ fn proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
 }
 
 fn app_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
-    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
     let identity = ProcessApplicationIdentity::new("org.example.App", name, None)
         .expect("identity fixture needs real values");
     let mut item = proc(pid, name, cpu, mem_mb);
@@ -40,7 +40,7 @@ fn app_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
 }
 
 fn background_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
-    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
     let mut item = proc(pid, name, cpu, mem_mb);
     item.apply_application_identity(
         ProcessMetadataObservation::<ProcessApplicationIdentity>::absent(10),

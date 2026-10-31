@@ -3,19 +3,19 @@
 //! Owns the renderer-neutral service-log lifecycle: opening/closing the one
 //! active stream, throttled follow polling, follow/pause toggles, level/time
 //! filter cycles, and folding one-shot/stream log snapshots into the shared
-//! feed. The feed itself lives in `taskmanager-core`; this module is the shell
+//! feed. The feed itself lives in `taskforest-core`; this module is the shell
 //! adapter that every frontend drives, so the TUI/Iced/gpui log panels never
 //! drift apart.
 use super::{ShellApp, submission_time_ms};
-use taskmanager_application::{PlatformEffect, ServiceLogStreamLifecycle, ServiceLogStreamRequest};
-use taskmanager_core::core::services::ServiceLogLevel;
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::services::ServiceLogLevel;
+use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogProviderState,
     ServiceLogQuery, ServiceLogState, ServiceLogStreamSnapshot, ServiceLogStreamState,
     ServiceLogTimeFilter,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::{PlatformEffect, ServiceLogStreamLifecycle, ServiceLogStreamRequest};
 
 /// Minimum wall-clock gap between two incremental service-log follow requests.
 /// Mirrors the gpui details panel's 1 Hz throttle; the shell owns the cadence
@@ -48,7 +48,7 @@ pub const fn next_log_time(time: ServiceLogTimeFilter) -> ServiceLogTimeFilter {
 /// One open service-log stream: the frozen service identity plus the
 /// core-owned [`ServiceLogFeed`] state machine (bounded entries, follow/pause,
 /// level/time filters, cursor-deduped merges). The feed lives in
-/// `taskmanager-core` and is the same single source the gpui details panel
+/// `taskforest-core` and is the same single source the gpui details panel
 /// drives, so the TUI/Iced log panels can never drift from it.
 #[derive(Clone, Debug)]
 pub struct OpenServiceLog {

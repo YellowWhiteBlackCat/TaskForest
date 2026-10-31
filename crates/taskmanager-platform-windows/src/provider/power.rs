@@ -1,8 +1,8 @@
 //! Windows power provider backed by the shared safe battery assembler.
 
+use taskforest_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::{PowerSupplySnapshot, ProviderId};
 use taskmanager_application::PowerSupplyRequest;
-use taskmanager_core::{PowerSupplySnapshot, ProviderId};
-use taskmanager_platform_contract::{DeviceSourceSnapshot, ProviderFailure};
 use taskmanager_platform_portable::collect_battery_snapshot;
 use taskmanager_platform_provider::PowerSupplyProvider;
 use taskmanager_platform_runtime::{PowerExecutors, PowerProviderBindings, ProviderRegistration};

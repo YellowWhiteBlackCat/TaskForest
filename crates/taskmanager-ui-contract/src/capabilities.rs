@@ -773,7 +773,7 @@ pub struct FrontendCapabilityDeclaration {
 /// it reports whether a frontend declared a capability explicitly
 /// (`Declared`), or silently omitted/duplicated/over-declared it. It is
 /// deliberately NOT named `CapabilityStatus`, which is owned by
-/// `taskmanager-platform-contract` and describes runtime availability. The
+/// `taskforest-contract` and describes runtime availability. The
 /// self-describing name also keeps it distinct from the sibling coverage axes
 /// ([`crate::BindingCoverageStatus`] for command bindings and
 /// [`crate::FeatureCoverageStatus`] for product features).

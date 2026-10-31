@@ -1,5 +1,5 @@
+use taskforest_contract::ProviderFailure;
 use taskmanager_escalation::polkit::SetupScriptFailure;
-use taskmanager_platform_contract::ProviderFailure;
 
 use super::{
     NativeSetupScriptProvider, SETUP_HELPER_PATH, SETUP_SCRIPT_PATH, classify_setup_failure,

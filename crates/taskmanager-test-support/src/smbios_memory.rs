@@ -2,15 +2,15 @@
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use taskmanager_application::{
-    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, SmbiosMemoryEvent,
-    SmbiosMemoryRequest, SystemFacets,
-};
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, EventEnvelope,
     EventPort, EventPortError, EventSequence, RequestEnvelope, RequestPort, SubmissionError,
     SubmissionErrorKind,
+};
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
+use taskmanager_application::{
+    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, SmbiosMemoryEvent,
+    SmbiosMemoryRequest, SystemFacets,
 };
 
 #[derive(Clone, Default)]

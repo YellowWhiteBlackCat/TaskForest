@@ -12,9 +12,9 @@ fn accel_device_targets_qualify_for_the_fdinfo_walk() {
 
 #[test]
 fn hardware_and_npu_flow_into_the_envelope_verbatim() {
-    use taskmanager_core::core::hardware::{ComputeTopology, HardwareInfo};
-    use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
-    use taskmanager_core::{CpuInstructionFeature, DeviceId};
+    use taskforest_core::core::hardware::{ComputeTopology, HardwareInfo};
+    use taskforest_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+    use taskforest_core::{CpuInstructionFeature, DeviceId};
 
     let hardware = HardwareInfo::from_fragments(
         Default::default(),
@@ -51,7 +51,7 @@ fn hardware_and_npu_flow_into_the_envelope_verbatim() {
 
 use super::*;
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 
 /// Build a synthetic per-process GPU breakdown exactly as the bulk reader
 /// produces on a host with one GPU process holding one render engine:

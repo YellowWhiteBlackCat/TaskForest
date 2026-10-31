@@ -7,10 +7,10 @@ use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Pixels, Size,
     StatefulInteractiveElement, Styled, div, px, size,
 };
+use taskforest_core::core::config::SidebarDeviceOverrideConfig;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
-use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::absolute;

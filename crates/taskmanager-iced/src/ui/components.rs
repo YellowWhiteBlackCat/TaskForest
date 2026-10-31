@@ -8,9 +8,9 @@
 use iced::advanced::text::IntoFragment;
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{RefreshRequest, SourceNotice, SourceStateKind, merge_source_lines};
-use taskmanager_core::core::source::SourceStatus;
 
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_theme::{Theme, tokens};

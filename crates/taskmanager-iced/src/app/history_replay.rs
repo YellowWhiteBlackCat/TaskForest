@@ -2,13 +2,14 @@
 
 use std::rc::Rc;
 
+use taskforest_core::core::history::{HistorySeriesKey, HistoryWindow};
 use taskmanager_application::{
     HistoryReplayCompletionDisposition, HistoryReplayController, HistoryReplayRequest,
     HistoryReplayRequestId,
 };
-use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 use super::IcedApp;
+use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_app_host::HistoryFrontendConnectRequestId;
 use taskmanager_app_host::HistoryFrontendConnector;
 use taskmanager_app_host::HistoryFrontendConnectorStartError;
@@ -20,7 +21,6 @@ use taskmanager_application::ApplicationHistoryProjection;
 use taskmanager_application::ApplicationHistoryUnavailableReason;
 use taskmanager_application::HistoryReplayCompletion;
 use taskmanager_application::HistoryReplayError;
-use taskmanager_core::core::history::HistoryRecordSink;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct HistoryReplayRow {

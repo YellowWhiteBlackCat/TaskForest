@@ -10,7 +10,7 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceStatus, MAX_ENVIRONMENT_BYTES, MAX_ENVIRONMENT_ENTRIES, ProcessEnvironment,
     ProcessEnvironmentEntry,
 };

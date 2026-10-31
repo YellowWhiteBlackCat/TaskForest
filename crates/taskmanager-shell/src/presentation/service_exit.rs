@@ -1,7 +1,7 @@
 //! Localized explanations for the canonical service exit-status vocabulary.
 
+use taskforest_core::core::services::service_exit_status_label;
 use taskmanager_application::i18n;
-use taskmanager_core::core::services::service_exit_status_label;
 
 pub(super) fn exit_status_text(status: i32) -> String {
     let key = match status {

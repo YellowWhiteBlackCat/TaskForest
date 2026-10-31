@@ -29,13 +29,13 @@ use bevy::ui_widgets::popover::Popover;
 use bevy::ui_widgets::{
     Checkbox, MenuPopup, RadioButton, RadioGroup, ScrollArea, Scrollbar, Slider, TextInput,
 };
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SystemFacets,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::{

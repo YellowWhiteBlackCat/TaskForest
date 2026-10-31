@@ -5,7 +5,7 @@ use crate::{
     HistoryReplayRequestId, HistoryReplayRow,
 };
 use std::sync::Arc;
-use taskmanager_core::core::history::HistoryWindow;
+use taskforest_core::core::history::HistoryWindow;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PerformanceHistoryProjection {

@@ -1,9 +1,9 @@
 //! Pure stat-row projection for dynamic battery and sensor devices.
 
-use taskmanager_application::i18n;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     BatteryInfo, SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
+use taskmanager_application::i18n;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::viewmodel::StatRow;
 

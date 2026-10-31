@@ -6,20 +6,20 @@
 //! disappearing. Rendered at the reference and the minimum size, in both
 //! locales' frame pipeline, with the raw-key oracle riding along.
 
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 use taskmanager_application::i18n::Language;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 
 use super::acceptance_support::{
     REFERENCE_HEIGHT, REFERENCE_WIDTH, assert_frame_has_no_raw_catalog_keys, body_text,
     frame_in_language, visible_row_count, with_frame_in_language,
 };
 use crate::TuiApp;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::fixture::{ProjectionSeedFact, edit_processes, seed_projection_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

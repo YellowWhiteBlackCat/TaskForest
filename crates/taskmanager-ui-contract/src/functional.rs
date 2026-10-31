@@ -62,7 +62,7 @@
 //!     resizing, and multi-family GPU inspection panels.
 
 use crate::keybindings::FrontendShape;
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 /// A stable user intent in the shared product contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

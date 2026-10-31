@@ -6,12 +6,12 @@
 
 use std::collections::HashMap;
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     CounterDelta, CumulativeCounter, DeviceState, FailureKind, FrozenProcessIdentity,
     ProcessEnvironment, ProcessInsightSnapshot, ProcessOpenFiles, ProcessThreadInfo,
     ProcessThreads, ThreadState,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ProcessEnvironmentProvider, ProcessOpenFilesProvider, ProcessThreadsProvider,
 };
@@ -204,7 +204,7 @@ pub(crate) fn open_files_value_from_boundary(
     raw_entries: Vec<WindowsOpenHandleEntry>,
     observed_at_ms: u64,
 ) -> ProcessOpenFiles {
-    use taskmanager_core::{OpenFileEntry, OpenFileKind};
+    use taskforest_core::{OpenFileEntry, OpenFileKind};
 
     let mut unreadable_count = 0_u32;
     let mut entries = Vec::with_capacity(raw_entries.len());
@@ -293,7 +293,7 @@ pub(crate) fn environment_value_from_boundary(
 ) -> ProcessEnvironment {
     use std::path::PathBuf;
 
-    use taskmanager_core::ProcessEnvironmentEntry;
+    use taskforest_core::ProcessEnvironmentEntry;
 
     ProcessEnvironment {
         state: DeviceState::healthy(observed_at_ms),

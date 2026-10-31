@@ -12,17 +12,17 @@ use taskmanager_application::ServiceAttemptId;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 
-use taskmanager_application::{
-    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceUpdate, i18n,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
     ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_core::core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskforest_core::core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
+use taskmanager_application::{
+    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceUpdate, i18n,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ServiceLogCopyFeedback {

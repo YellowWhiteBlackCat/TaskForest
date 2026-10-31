@@ -12,14 +12,14 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use taskmanager_application::{
-    ConfigClient, ConfigCoordinator, ConfigRuntimeStartError, PlatformClient,
-};
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     InProcessCaptureFn, InstanceEvent, InstanceFailure, InstanceRole, PlatformCapabilitySurface,
     TrayController, TrayFailure,
+};
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
+use taskmanager_application::{
+    ConfigClient, ConfigCoordinator, ConfigRuntimeStartError, PlatformClient,
 };
 use taskmanager_platform_native::{
     NativePlatformRuntime, history_lock_holder_is_gone, native_config_path, native_history_dir,
@@ -68,8 +68,8 @@ pub use presentation::{
 pub use process_termination::{ProcessTermination, ProcessTerminationInstallError};
 use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};
-use taskmanager_core::core::tray::TrayEvent;
-use taskmanager_core::core::tray::TraySpec;
+use taskforest_core::core::tray::TrayEvent;
+use taskforest_core::core::tray::TraySpec;
 use taskmanager_platform_native::capability_surface;
 use window_capture_runtime::WindowCaptureCoordinator;
 pub use window_capture_runtime::{WindowCaptureClient, WindowCaptureRuntimeStartError};

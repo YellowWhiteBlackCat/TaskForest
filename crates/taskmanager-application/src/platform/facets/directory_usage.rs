@@ -6,11 +6,11 @@
 //! publications on this capability's own lane; the UI lane never blocks on a
 //! scan.
 
-use taskmanager_core::{DirectoryScanId, DirectoryScanSpec, DirectoryUsageSnapshot};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, RequestPort, RequestScope, RequestTracking,
     RequestTrackingError, SidebandPolicy,
 };
+use taskforest_core::{DirectoryScanId, DirectoryScanSpec, DirectoryUsageSnapshot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DirectoryUsageRequest {

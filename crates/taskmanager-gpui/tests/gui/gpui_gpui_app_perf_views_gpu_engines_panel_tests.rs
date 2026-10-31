@@ -1,10 +1,10 @@
-use taskmanager_application::GpuEngineRowsSession;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{CapabilityStatus, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::{
     GpuEngine, GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot, GpuMetrics,
 };
-use taskmanager_platform_contract::{CapabilityStatus, RequestId};
+use taskmanager_application::GpuEngineRowsSession;
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsPresentation, present_gpu_engine_rows,
 };

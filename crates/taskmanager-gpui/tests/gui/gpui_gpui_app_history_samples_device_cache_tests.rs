@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_core::core::DeviceLifecycle;
-use taskmanager_core::core::DeviceState;
-use taskmanager_core::core::{GpuScalarObservations, GpuTelemetryObservation, ScalarObservation};
+use taskforest_core::core::DeviceLifecycle;
+use taskforest_core::core::DeviceState;
+use taskforest_core::core::{GpuScalarObservations, GpuTelemetryObservation, ScalarObservation};
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::{CorrelatedTelemetryStamp, TelemetryStore};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
@@ -69,7 +69,7 @@ fn device_sample_cache_reuses_until_the_ring_advances() {
 // ── split-direction throughput families (read/write, rx/tx) ────────────────
 
 use std::collections::BTreeMap;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     DevicePresence, DiskScalarObservations, NetworkScalarObservations, NetworkTelemetryObservation,
     StorageTelemetryObservation,
 };

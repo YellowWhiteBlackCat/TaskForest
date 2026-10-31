@@ -2,22 +2,24 @@ use super::{apply_accessibility_action, build_snapshot};
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
 // Linux-only dependency: these snapshots exist only on Linux.
+use taskforest_core::core::metrics::CpuMetrics;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::{
+    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
+    ProcessMetadataObservation, ProcessScalarObservations,
+};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::{
+    CpuScalarObservations, FailureKind, ScalarAvailability, ScalarObservation,
+};
 #[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::snapshot_to_tree_update;
 #[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::stable_node_id;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::{
-    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
-    ProcessMetadataObservation, ProcessScalarObservations,
-};
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::{
-    CpuScalarObservations, FailureKind, ScalarAvailability, ScalarObservation,
-};
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
@@ -415,8 +417,8 @@ async fn session_confirmation_publishes_its_frozen_target_to_assistive_technolog
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     };
     root.update(cx, |view, _| {
         view.mark_telemetry_frame_ready();

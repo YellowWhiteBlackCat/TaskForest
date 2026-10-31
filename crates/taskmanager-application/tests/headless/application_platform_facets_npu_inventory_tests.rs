@@ -1,8 +1,8 @@
-use taskmanager_core::DeviceId;
-use taskmanager_platform_contract::CapabilityRequest;
+use taskforest_contract::CapabilityRequest;
+use taskforest_core::DeviceId;
 
 use super::*;
-use taskmanager_core::NpuDevice;
+use taskforest_core::NpuDevice;
 
 #[test]
 fn npu_inventory_request_owns_the_accelerator_npu_capability() {

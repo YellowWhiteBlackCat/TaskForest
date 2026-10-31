@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 use super::{GpuFieldRead, gpu_io_failure, preferred_gpu_failure};
 

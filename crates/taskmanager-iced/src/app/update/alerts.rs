@@ -1,7 +1,7 @@
 //! Frontend Alerts route and shared event-history message reducer.
 
+use taskforest_core::core::alerts::export_alert_events_json;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::export_alert_events_json;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::super::{IcedApp, Message};

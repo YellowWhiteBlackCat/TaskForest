@@ -1,9 +1,9 @@
 //! Shared Linux policy for revalidating a frozen process target before use.
 
-use taskmanager_core::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::FailureKind;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use crate::engine::process::ProcessManager;
 

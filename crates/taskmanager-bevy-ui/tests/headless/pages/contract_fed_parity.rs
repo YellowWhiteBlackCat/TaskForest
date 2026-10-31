@@ -33,19 +33,19 @@ use bevy::transform::TransformPlugin;
 use bevy::ui::widget::Text;
 use bevy::ui::{Node, UiPlugin};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MetricSample, ScalarObservation, SystemSnapshot,
 };
-use taskmanager_core::core::npu::{
+use taskforest_core::core::npu::{
     NpuDevice, NpuInventorySnapshot, NpuPowerObservation, NpuPowerReport,
 };
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchIntent, ProcessItem, ProcessLiveKey, ProcessScalarObservations,
 };
-use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupTimelineSnapshot};
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupTimelineSnapshot};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, edit_processes, record_demo_history_frame, seed_projection_fact,
@@ -105,13 +105,13 @@ fn live_key(process: &ProcessItem) -> ProcessLiveKey {
 
 /// A quiet platform client: the headless composition never talks to a host.
 fn quiet_runtime() -> &'static SharedRuntime {
+    use taskforest_contract::{
+        CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+        RequestEnvelope, RequestPort, SubmissionError,
+    };
     use taskmanager_application::{
         HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
         SystemFacets,
-    };
-    use taskmanager_platform_contract::{
-        CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-        RequestEnvelope, RequestPort, SubmissionError,
     };
 
     struct Quiet;

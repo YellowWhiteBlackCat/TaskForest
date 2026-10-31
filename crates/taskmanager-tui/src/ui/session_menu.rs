@@ -16,8 +16,9 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskforest_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_application::i18n::session_family_label;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};
@@ -63,11 +64,7 @@ pub(super) fn render_session_menu_at(
             format!(
                 "  session {}  {}",
                 menu.session.id.as_str(),
-                if menu.session.remote {
-                    t("users.remote")
-                } else {
-                    t("users.local")
-                }
+                session_family_label(menu.session.family)
             ),
             Style::new().fg(theme.dim),
         ),

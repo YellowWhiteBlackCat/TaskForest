@@ -7,9 +7,9 @@ use crate::ui::responsive::{
     PerformanceChartInventory, PerformancePageBudget, PerformanceVerticalRunway,
 };
 use iced::Size;
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 #[must_use]
 pub(crate) fn device_marker_line(device: PerfDevice) -> String {

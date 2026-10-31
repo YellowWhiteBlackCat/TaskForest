@@ -26,7 +26,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use taskmanager_core::HistorySeriesKey;
+use taskforest_core::HistorySeriesKey;
 
 pub use self::lock::{HistoryWriterClaimStatus, probe_root_lock};
 use self::lock::{RootLockOwnership, acquire_root_lock};

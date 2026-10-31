@@ -21,8 +21,8 @@ use bevy::ecs::system::{Query, Res};
 use bevy::scene::{Scene, bsn};
 use bevy::time::Time;
 use bevy::ui::prelude::{BackgroundColor, Node, Overflow, percent, px};
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
 use super::{SystemFactGroup, SystemFactRow, fact_row_scene, section_card_scene};

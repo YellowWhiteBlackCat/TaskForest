@@ -8,11 +8,11 @@
 
 use std::sync::Arc;
 
+use taskforest_contract::CapabilityRequest;
 use taskmanager_application::{
     CpuThrottleRequest, GpuEngineRowsRequest, MsrReadoutRequest, NpuInventoryRequest,
     RaplPowerRequest, SmbiosMemoryRequest, SystemFacets,
 };
-use taskmanager_platform_contract::CapabilityRequest;
 
 use super::port::ChannelRequestPort;
 

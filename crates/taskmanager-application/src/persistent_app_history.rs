@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::core::process::group_aggregate::{
+use taskforest_core::core::process::group_aggregate::{
     ProcessGroupAggregate, aggregate_apps_typed,
 };
-use taskmanager_core::{
+use taskforest_core::{
     ApplicationHistoryIdentity, HistoricalSample, HistoryMetric, HistoryRecordSink,
     HistorySeriesKey, ProcessItem,
 };

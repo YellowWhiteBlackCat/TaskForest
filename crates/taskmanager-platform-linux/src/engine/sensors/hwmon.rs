@@ -1,8 +1,6 @@
 //! Linux hwmon ABI channel classification and fixed-point parsing.
 
-use taskmanager_core::{
-    SensorDescriptor, SensorMagnitude, SensorQuantity, SensorScale, SensorUnit,
-};
+use taskforest_core::{SensorDescriptor, SensorMagnitude, SensorQuantity, SensorScale, SensorUnit};
 
 const HWMON_PWM_MAXIMUM: u32 = 255;
 

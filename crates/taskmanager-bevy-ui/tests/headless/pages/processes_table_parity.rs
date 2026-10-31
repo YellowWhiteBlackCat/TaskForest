@@ -26,11 +26,11 @@ use bevy::scene::ScenePlugin;
 use bevy::text::{Font, FontFeatureTag, FontFeatures, TextFont};
 use bevy::ui::prelude::{BackgroundColor, Node, TextBackgroundColor, Val};
 use bevy::ui::widget::Text;
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation, ProcessScalarObservations,
 };
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::LightDark;
 use taskmanager_theme::Theme;

@@ -18,10 +18,10 @@ use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
-use taskmanager_application::i18n;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
 };
+use taskmanager_application::i18n;
 use taskmanager_theme::skins::tokens_for;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{LightDark, Theme};

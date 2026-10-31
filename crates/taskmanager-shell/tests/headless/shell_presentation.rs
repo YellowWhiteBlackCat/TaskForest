@@ -1,19 +1,19 @@
 use super::*;
 use crate::presentation::smart::{self_test_intent, smart_section_visible};
-use taskmanager_application::AppAction;
-use taskmanager_application::MsrReadoutSession;
-use taskmanager_core::SystemHealthScore;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::RequestId;
+use taskforest_core::SystemHealthScore;
+use taskforest_core::core::metrics::{
     CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, MsrReadoutSnapshot,
     MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics,
 };
-use taskmanager_core::core::services::ServiceDiagnostics;
-use taskmanager_core::core::smart::{
+use taskforest_core::core::services::ServiceDiagnostics;
+use taskforest_core::core::smart::{
     SmartSelfTestCapabilities, SmartSelfTestKind, SmartSelfTestSupport,
 };
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
-use taskmanager_core::{DeviceGeneration, SystemLoadAverage};
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::{DeviceGeneration, SystemLoadAverage};
+use taskmanager_application::AppAction;
+use taskmanager_application::MsrReadoutSession;
 
 #[test]
 fn health_summary_names_the_red_yellow_green_saturation_grade() {
@@ -311,7 +311,7 @@ fn priority_tier_labels_resolve_non_empty_and_distinct_for_every_tier() {
 
 #[test]
 fn process_batch_action_labels_are_complete_and_action_specific() {
-    use taskmanager_core::core::process::ProcessBatchAction;
+    use taskforest_core::core::process::ProcessBatchAction;
 
     i18n::set_language(i18n::Language::En);
     let actions = [
@@ -909,7 +909,7 @@ fn network_interface_group_properties() {
 
 #[test]
 fn service_cycle_members_are_folded_from_typed_inventory_graphs() {
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind, ServiceStatus,
     };
 

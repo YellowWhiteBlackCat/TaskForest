@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::Message;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 #[test]
 fn typed_route_transitions_are_idempotent_and_shared_page_selection_closes_alerts() {

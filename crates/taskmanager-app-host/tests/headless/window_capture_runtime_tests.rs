@@ -3,12 +3,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
+use taskforest_contract::{
+    WindowCaptureBackend, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,
+};
 use taskmanager_application::window_capture::{
     WindowCaptureController, WindowCaptureDisposition, WindowCaptureErrorKind,
     WindowCaptureOutcome, WindowCaptureState, WindowCaptureTarget,
-};
-use taskmanager_platform_contract::{
-    WindowCaptureBackend, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,
 };
 
 use super::*;

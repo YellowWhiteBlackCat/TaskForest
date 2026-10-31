@@ -21,9 +21,9 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::metrics::CpuMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::CpuType;
-use taskmanager_core::core::metrics::CpuMetrics;
 
 use super::sparkline::{recent_window_with, sparkline_in};
 use crate::{TuiApp, TuiGlyphMode, TuiTheme};

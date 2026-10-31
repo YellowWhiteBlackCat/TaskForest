@@ -16,7 +16,7 @@ unsupported outcome instead of claiming Linux data sources or fabricating
 telemetry. CPU and memory telemetry are explicitly deferred per ADR-043
 (details in [`docs/TELEMETRY_STATUS.md`](docs/TELEMETRY_STATUS.md)).
 
-The shared `taskmanager-core`, application contracts, and runtime remain the
+The shared `taskforest-core`, application contracts, and runtime remain the
 only reusable lower layers. An OHOS provider may be added here only after its
 native source, permission behavior, identity rules, and failure mapping are
 verified on the target device.

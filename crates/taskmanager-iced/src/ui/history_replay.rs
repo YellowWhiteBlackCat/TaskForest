@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use iced::widget::{canvas, column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::history::{HistoryMetric, HistoryWindow};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::history::{HistoryMetric, HistoryWindow};
 use taskmanager_shell::presentation::history_replay::row_heading;
 
 use taskmanager_theme::tokens;
@@ -21,7 +21,7 @@ use crate::app::{FocusTarget, Message, history_replay::IcedHistoryReplay};
 use crate::focus;
 use crate::theme;
 use crate::ui::device_chart;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::local_timestamp;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::Theme;

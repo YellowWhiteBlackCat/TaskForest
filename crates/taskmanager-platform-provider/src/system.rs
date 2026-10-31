@@ -4,13 +4,13 @@
 //! inventory, SMBIOS memory, CPU package power, CPU MSR readouts, CPU
 //! thermal-throttle counters).
 
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, DeviceId, GpuEngineRowsSnapshot,
     GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation,
     MsrReadoutSnapshot, NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot,
     SmbiosMemorySnapshot, StorageTelemetryObservation,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 
 pub trait HostTelemetryProvider: Send + 'static {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<HostRuntimeObservation, ProviderFailure>;

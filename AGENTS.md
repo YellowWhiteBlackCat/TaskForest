@@ -28,7 +28,7 @@ the lower document layers.
   adapters.
 - One fact has one authority. A lower layer may expand an upper layer, never redefine it.
 - Cross-crate forwarding facades and type re-exports are forbidden. Consumers import the
-  actual owner module (`taskmanager-core` or `taskmanager-platform-contract`); composition
+  actual owner module (`taskforest-core` or `taskforest-contract`); composition
   crates select adapters and expose behavior, not a second public address for shared types.
 - Core evolution is a hard cutover: once a new typed contract is current, delete the old
   API, alias, wrapper, fallback, renderer state, fixture, demo/capture path, and caller in

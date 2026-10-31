@@ -2,13 +2,13 @@
 
 use super::*;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_application::project_process_resources;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process_telemetry::{
     LimitValue, ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
     ResourceObservation,
 };
+use taskmanager_application::project_process_resources;
 use taskmanager_ui::init;
 
 fn labels() -> ProcessInsightsLabels {

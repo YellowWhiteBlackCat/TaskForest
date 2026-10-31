@@ -1,11 +1,11 @@
 //! Windows WTS session inventory and session-control providers.
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::session::{
-    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIdentity, SessionIncarnation, SessionItem,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_provider::{SessionControlProvider, SessionInventoryProvider};
 use taskmanager_windows_api::{
     WindowsApiError, WindowsSession, WindowsSessionIdentity, WindowsSessionIncarnation,
@@ -42,14 +42,17 @@ pub(super) fn project_windows_session_snapshot(
                     None
                 }
             };
+            let seat = None;
+            let tty = (!session_name.is_empty()).then_some(session_name);
+            let family = SessionFamilyFact::classify(seat.as_deref(), tty.as_deref(), remote);
             SessionItem {
                 id: format!("windows:session:{}", session.session_id).into(),
                 incarnation,
                 uid: 0,
                 user: session.user_name.unwrap_or_default(),
-                seat: None,
-                tty: (!session_name.is_empty()).then_some(session_name),
-                remote,
+                seat,
+                tty,
+                family,
                 timestamp: None,
             }
         })

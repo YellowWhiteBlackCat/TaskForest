@@ -177,7 +177,7 @@ def self_test() -> int:
     """Prove the guard goes red on a new inline owner path and stays green on
     the import form, a comment and a lowered census."""
     cases: list[tuple[str, str, int]] = [
-        ("import form is clean", "use taskmanager_core::core::Alerts;\n", EXIT_OK),
+        ("import form is clean", "use taskforest_core::core::Alerts;\n", EXIT_OK),
         (
             "public re-export is clean",
             "pub use taskmanager_platform_linux::NativePlatformRuntime;\n",
@@ -185,13 +185,13 @@ def self_test() -> int:
         ),
         (
             "scoped re-export is clean",
-            "pub(crate) use taskmanager_core::core::Alerts;\n",
+            "pub(crate) use taskforest_core::core::Alerts;\n",
             EXIT_OK,
         ),
-        ("comment is not a path use", "// see taskmanager_core::core::Alerts\n", EXIT_OK),
+        ("comment is not a path use", "// see taskforest_core::core::Alerts\n", EXIT_OK),
         (
             "string literal is not a path use",
-            'let m = "taskmanager_core::core::Alerts";\n',
+            'let m = "taskforest_core::core::Alerts";\n',
             EXIT_OK,
         ),
         (

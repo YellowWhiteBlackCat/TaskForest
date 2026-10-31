@@ -42,7 +42,7 @@ license = "Apache-2.0"
 repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
 homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 publish = false
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 # The `tests/gui.rs` suite's product target is declared by
 # `taskmanager-gpui` (ADR-051); this host registers only its own suites.
 autotests = false
@@ -60,6 +60,10 @@ path = "tests/logic.rs"
 name = "performance"
 path = "tests/performance.rs"
 
+[[test]]
+name = "soak"
+path = "tests/soak.rs"
+
 [dev-dependencies]
 # The gate suites compile against real owner types; every workspace fact they
 # touch is imported from its owner crate. Product-scoped tests live in the
@@ -73,7 +77,7 @@ chrono = "0.4"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full", "visit"] }
-taskmanager-core = { path = "crates/taskmanager-core" }
+taskforest-core = { path = "crates/taskforest-core" }
 taskmanager-application = { path = "crates/taskmanager-application" }
 taskmanager-app-host = { path = "crates/taskmanager-app-host" }
 taskmanager-escalation = { path = "crates/taskmanager-escalation" }
@@ -92,6 +96,8 @@ taskmanager-assets = { path = "crates/taskmanager-assets" }
 taskmanager-platform-native = { path = "crates/taskmanager-platform-native" }
 taskmanager-platform-conformance = { path = "crates/taskmanager-platform-conformance" }
 taskmanager-test-support = { path = "crates/taskmanager-test-support" }
+# Owner contract for the typed submission outcomes the soak gate inspects.
+taskforest-contract = { path = "crates/taskforest-contract" }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 taskmanager-platform-linux = { path = "crates/taskmanager-platform-linux", default-features = false, features = ["test-support"] }

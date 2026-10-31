@@ -56,7 +56,7 @@ driver 加一次性随机命名回传文件），并已通过 `x86_64-pc-windows
 
 - **能力级 gate**（`CapabilityStatus`）：`PermissionRequired` = 需要权限决策、但本能力无提权
   offer；`RequiresEscalation` = 需要权限且存在可触达的原生提权路径。两者都不是失败原因。
-- **失败原因级**（`taskmanager_core::FailureKind` / `ProviderFailure`）：`PermissionDenied` =
+- **失败原因级**（`taskforest_core::FailureKind` / `ProviderFailure`）：`PermissionDenied` =
   硬拒绝或当前无可行授权；`RequiresEscalation` = 可经原生授权重试。二者作为 `Degraded`/
   `Unavailable` 等的嵌套 `failure` 载荷。
 

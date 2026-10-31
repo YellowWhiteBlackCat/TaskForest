@@ -48,9 +48,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{ScrollArea, ValueChange};
+use taskforest_core::config::Config;
 use taskmanager_application::i18n::{Language, current_language, set_language, t};
 use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInterval};
-use taskmanager_core::config::Config;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskmanager_theme::tokens::UiSize;
@@ -60,11 +60,11 @@ use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
 use crate::palette::{UiPalette, space_8, ui_palette};
 use crate::window::{Role, TextRole, WindowPalette};
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::appearance::PreferredColorScheme;
 use taskmanager_application::ConfigSubmissionStatus;
 use taskmanager_application::ConfigSubmitError;
 use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::appearance::PreferredColorScheme;
 
 mod choices;
 use choices::{

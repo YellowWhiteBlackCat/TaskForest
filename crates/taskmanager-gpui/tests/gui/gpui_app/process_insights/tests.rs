@@ -1,6 +1,22 @@
 use super::view::ProcessInsightsViewProps;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window, px, size};
 use gpui::{ParentElement, Styled, div};
+use taskforest_contract::CapabilityCatalog;
+use taskforest_contract::CapabilityId;
+use taskforest_contract::CapabilitySnapshot;
+use taskforest_contract::EventEnvelope;
+use taskforest_contract::EventPort;
+use taskforest_contract::EventPortError;
+use taskforest_contract::EventSequence;
+use taskforest_contract::OperationFailure;
+use taskforest_contract::RequestEnvelope;
+use taskforest_contract::RequestId;
+use taskforest_contract::RequestPort;
+use taskforest_contract::RetryDisposition;
+use taskforest_contract::SubmissionError;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::CorrelatedEvent;
 use taskmanager_application::NetworkEscalationReady;
 use taskmanager_application::PlatformEvent;
@@ -10,31 +26,15 @@ use taskmanager_application::ProcessEvent;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::ProcessNetworkEscalationRequest;
 use taskmanager_application::TelemetryRefreshPolicy;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_platform_contract::CapabilityCatalog;
-use taskmanager_platform_contract::CapabilityId;
-use taskmanager_platform_contract::CapabilitySnapshot;
-use taskmanager_platform_contract::EventEnvelope;
-use taskmanager_platform_contract::EventPort;
-use taskmanager_platform_contract::EventPortError;
-use taskmanager_platform_contract::EventSequence;
-use taskmanager_platform_contract::OperationFailure;
-use taskmanager_platform_contract::RequestEnvelope;
-use taskmanager_platform_contract::RequestId;
-use taskmanager_platform_contract::RequestPort;
-use taskmanager_platform_contract::RetryDisposition;
-use taskmanager_platform_contract::SubmissionError;
 use taskmanager_shell::fixture::process_insights::process_insights_snapshot;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_telemetry_store::TelemetryStore;
 
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_application::NetworkEscalationState;
 use taskmanager_application::ProjectedProcessInsights;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 use taskmanager_shell::fixture::process_insights::process_insights_projection_from_snapshot;
 use taskmanager_theme::Theme;
 
@@ -139,7 +139,7 @@ async fn capture_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestApp
 async fn escalation_pill_renders_for_requires_escalation_and_submits_on_click(
     cx: &mut TestAppContext,
 ) {
-    use taskmanager_core::core::{DeviceStatus, FailureKind};
+    use taskforest_core::core::{DeviceStatus, FailureKind};
 
     let mut snapshot = process_insights_snapshot();
     snapshot.network.traffic_failure = Some(FailureKind::RequiresEscalation);
@@ -285,8 +285,8 @@ fn escalated_batch(request_id: RequestId) -> PlatformEventBatch {
 /// event clears everything back to normal.
 #[gpui::test]
 async fn declined_prompt_transitions_the_pill_and_retry_resubmits(cx: &mut gpui::TestAppContext) {
+    use taskforest_contract::RequestId;
     use taskmanager_application::{NetworkEscalationFailed, RequestCorrelation};
-    use taskmanager_platform_contract::RequestId;
 
     let (view, submitted) = root_with_escalation_platform(cx);
 
@@ -407,9 +407,9 @@ async fn helper_missing_and_timeout_lane_failures_carry_typed_kinds(cx: &mut gpu
 /// affordance in the laid-out view, not just exist as unreachable state.
 #[gpui::test]
 async fn failed_escalation_state_renders_the_clickable_retry_pill(cx: &mut gpui::TestAppContext) {
+    use taskforest_contract::RequestId;
+    use taskforest_core::core::{DeviceStatus, FailureKind};
     use taskmanager_application::{NetworkEscalationFailed, RequestCorrelation};
-    use taskmanager_core::core::{DeviceStatus, FailureKind};
-    use taskmanager_platform_contract::RequestId;
 
     let mut snapshot = process_insights_snapshot();
     snapshot.network.traffic_failure = Some(FailureKind::RequiresEscalation);

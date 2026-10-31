@@ -4,17 +4,15 @@
 //! expiry, supersession, or identity change, and folds per-target issues into
 //! a single batch health verdict.
 
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::smart::{SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport};
+use taskforest_core::core::storage::StorageDeviceTarget;
 use taskmanager_application::{
     PlatformEvent, SmartControlRequest, SmartEvent, SmartObservationBatch, SmartObservationIssue,
     SmartObservationRequest, SmartTrackingEnd, SmartTrackingEndReason,
 };
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::smart::{
-    SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport,
-};
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_platform_contract::ProviderFailure;
 
 use super::smart_state::{SharedSmartRuntimeState, SmartCommitStatus, SmartJobSnapshot};
 use super::{SmartControlExecutor, SmartObservationExecutor};

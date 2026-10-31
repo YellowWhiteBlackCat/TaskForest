@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
-use taskmanager_core::core::sensors::{SensorQuantity, SensorScale, refresh_sensor_center_state};
+use taskforest_core::ScalarAvailability;
+use taskforest_core::core::sensors::{SensorQuantity, SensorScale, refresh_sensor_center_state};
 use taskmanager_platform_conformance::assert_device_discovery_consistent;
 
 fn read_fixture(name: &str, result: std::io::Result<String>, now_ms: u64) -> SensorReading {

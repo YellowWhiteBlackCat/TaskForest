@@ -17,8 +17,8 @@ use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::formatting;
+use taskforest_core::core::SystemSnapshot;
 use taskmanager_application::i18n;
-use taskmanager_core::core::SystemSnapshot;
 use taskmanager_theme::{Color, Theme};
 
 use super::readouts::cpu_summary_readout;

@@ -3,10 +3,10 @@
 use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use taskforest_core::core::SmartSelfTestObservation;
+use taskforest_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
+use taskforest_core::core::startup::BootTimeline;
 use taskmanager_application::AlertEventSeed;
-use taskmanager_core::core::SmartSelfTestObservation;
-use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
-use taskmanager_core::core::startup::BootTimeline;
 
 #[derive(Debug, PartialEq)]
 pub enum CaptureProcessAction {

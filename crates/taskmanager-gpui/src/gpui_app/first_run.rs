@@ -17,10 +17,10 @@ use taskmanager_ui::theme_binding::hsla;
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{RootView, platform_submission_time_ms};
 use crate::gpui_app::root::{WindowSurfaceDismissReason, WindowSurfaceKind};
+use taskforest_contract::OperationFailure;
+use taskforest_core::core::setup::SetupScriptAction;
 use taskmanager_application::CorrelatedSetupScriptEvent;
 use taskmanager_application::i18n;
-use taskmanager_core::core::setup::SetupScriptAction;
-use taskmanager_platform_contract::OperationFailure;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

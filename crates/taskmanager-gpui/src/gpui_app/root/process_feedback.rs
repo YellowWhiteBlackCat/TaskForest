@@ -1,8 +1,8 @@
 //! Typed process-control user feedback.
 
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{PriorityTier, ProcessSignal};
 use taskmanager_application::i18n;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{PriorityTier, ProcessSignal};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProcessControlAction {

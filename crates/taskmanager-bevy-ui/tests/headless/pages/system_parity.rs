@@ -28,15 +28,15 @@ use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::Activate;
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{DmiIdentityFacts, SmbiosMemorySnapshot, SmbiosModuleRow};
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorReading};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, SmbiosMemoryEvent,
 };
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{DmiIdentityFacts, SmbiosMemorySnapshot, SmbiosModuleRow};
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorReading};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_test_support::{pin_english, smbios_memory};
@@ -130,7 +130,7 @@ fn seed_memory_inventory(shell: &mut ShellApp, snapshot: SmbiosMemorySnapshot) {
 
 /// One temperature reading of the sensor center.
 fn zone_reading(label: &str, temperature_c: f64) -> SensorReading {
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorScale,
     };
 
@@ -515,7 +515,7 @@ fn gpu_die_temperatures_get_their_own_group_card() {
 
 #[test]
 fn a_failed_diagnostic_export_shows_a_centred_troubleshooting_surface() {
-    use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+    use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
     pin_english();
     let mut app = crate::window::tests::scripted_frontend_app();

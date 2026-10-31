@@ -48,13 +48,13 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
-use taskmanager_application::i18n::t;
-use taskmanager_application::{SourceNotice, source_notice};
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupEntry, StartupEntryId, StartupImpactEvidence, StartupScope,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_application::{SourceNotice, source_notice};
 
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};

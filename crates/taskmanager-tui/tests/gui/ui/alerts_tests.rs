@@ -1,10 +1,10 @@
 use super::alerts_support::render_suggestions_overlay;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
+use taskmanager_application::{AppAction, AppPage};
 
 use crate::demo_app;
 use taskmanager_application::i18n::{Language, set_language};

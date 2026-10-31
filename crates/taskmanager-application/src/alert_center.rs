@@ -20,11 +20,11 @@
 //! [`AlertCenter::managed_rules`] but never enter the evaluator. Notification
 //! policy changes go through [`AlertCenter::set_policy`].
 
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     Alert, AlertEngine, AlertEvent, AlertEventId, AlertEventKind, AlertInstanceId, AlertRule,
     AlertRuleId, AlertRuleTransferError, NotificationPolicy, default_rules,
 };
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::metrics::SystemSnapshot;
 
 use crate::platform::DesktopNotificationRequest;
 
@@ -32,7 +32,7 @@ use super::AlertDispatcher;
 use crate::managed_alert_rules::reduce_managed_alert_rules;
 use crate::{ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome};
 use std::collections::HashSet;
-use taskmanager_core::core::alerts::MAX_ALERT_EVENTS;
+use taskforest_core::core::alerts::MAX_ALERT_EVENTS;
 
 /// One evaluation pass: the current active alerts plus the requests the
 /// frontend should submit to the desktop notification service.

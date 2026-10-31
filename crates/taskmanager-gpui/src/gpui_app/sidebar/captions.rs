@@ -2,12 +2,12 @@
 
 use crate::gpui_app::formatting;
 use crate::gpui_app::perf_views::gpu_percentage_readout;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
+use taskforest_core::core::units::bytes_percent;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::{BatteryInfo, SensorReading};
 use taskmanager_application::i18n;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
-use taskmanager_core::core::units::bytes_percent;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
-use taskmanager_core::core::{BatteryInfo, SensorReading};
 use taskmanager_shell::presentation::device_status_i18n_key;
 
 pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {

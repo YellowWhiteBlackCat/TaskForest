@@ -44,7 +44,7 @@ fn nth_fields_extracts_only_the_wanted_positions() {
 }
 
 use super::*;
-use taskmanager_core::ProcessSchedulingPolicy;
+use taskforest_core::ProcessSchedulingPolicy;
 
 fn proc_stat(threads: u32, start_ticks: u64, user: u64, system: u64, nice: i32) -> String {
     let mut fields = vec!["0".to_owned(); 20];

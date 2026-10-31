@@ -1,7 +1,7 @@
 //! Pure formatting for optional, platform-neutral memory detail rows.
 
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 
 pub(super) fn virtual_memory_commit_readout(
     memory: &MemoryMetrics,

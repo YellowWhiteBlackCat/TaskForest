@@ -7,7 +7,7 @@
 //!
 //! The product has one row hierarchy: category headers, application totals and
 //! recursive process nodes. Historical presentation tokens are normalized by
-//! `taskmanager-core::Config` and never enter this renderer.
+//! `taskforest-core::Config` and never enter this renderer.
 //!
 //! The shell's [`taskmanager_shell::ProcessTreeRow`] projection owns the O(N)
 //! category/tree walk and its cacheable, borrowed-free row structure.
@@ -18,7 +18,7 @@
 //! The test-side `build_process_rows` helper materializes the shared rows and
 //! remains the fresh-rebuild reference for cache-invalidation tests.
 
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 use taskmanager_shell::{ProcessRowAggregate, ProcessRowId, ProcessTreeRow};
 
 #[cfg(test)]

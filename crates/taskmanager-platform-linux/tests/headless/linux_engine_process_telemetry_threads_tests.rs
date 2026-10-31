@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 
 fn stat_line(comm: &str, state: &str, utime: u64, stime: u64) -> String {
     // Fields after `)`: state(3) ppid(4) pgrp(5) session(6) tty_nr(7)

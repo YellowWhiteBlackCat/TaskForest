@@ -2,15 +2,15 @@
 //! resource-digit selector.
 
 use super::super::*;
-use taskmanager_application::GpuEngineRowsState;
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
+use taskmanager_application::GpuEngineRowsState;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 

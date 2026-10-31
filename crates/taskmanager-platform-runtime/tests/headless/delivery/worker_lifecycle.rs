@@ -3,12 +3,12 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::bounded;
-use taskmanager_application::HardwareInventoryRequest;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityScheduler, MAX_PROVIDER_PANIC_NOTES, ProviderFailure, RequestId,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::HardwareInventoryRequest;
 
 use super::fixture;
 use crate::Queued;
@@ -16,7 +16,7 @@ use crate::delivery::RuntimeCapabilityCatalog;
 use crate::delivery::worker::{
     LaneStartRegistry, PROCESS_WORKER_LIMIT, WorkerQuota, WorkerRuntime, WorkerSpawnError,
 };
-use taskmanager_platform_contract::RequestTracking;
+use taskforest_contract::RequestTracking;
 
 struct WorkerExitSignal(crossbeam_channel::Sender<()>);
 

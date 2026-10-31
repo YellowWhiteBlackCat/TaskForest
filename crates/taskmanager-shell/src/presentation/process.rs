@@ -1,11 +1,11 @@
 //! Process-list presentation summaries shared by all frontends.
 
 use crate::presentation::{MISSING_VALUE, bytes};
+use taskforest_core::LimitValue;
+use taskforest_core::ProcessItem;
+use taskforest_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
+use taskforest_core::core::process_telemetry::ProcessResourceSnapshot;
 use taskmanager_application::{ProcessInsightFacet, i18n, i18n::t, project_process_resources};
-use taskmanager_core::LimitValue;
-use taskmanager_core::ProcessItem;
-use taskmanager_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
-use taskmanager_core::core::process_telemetry::ProcessResourceSnapshot;
 
 /// Retrieve and format the ancestor lineage for a target PID from a process inventory.
 #[must_use]

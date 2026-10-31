@@ -6,12 +6,12 @@ use std::io::ErrorKind;
 use std::ops::Deref;
 use std::path::Path;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::{
     ScalarObservation, StorageConnection, StorageIdentityStability,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::provenance::{
     SourceFailures, first_optional_text, io_failure_kind, observe_required_sector_bytes,

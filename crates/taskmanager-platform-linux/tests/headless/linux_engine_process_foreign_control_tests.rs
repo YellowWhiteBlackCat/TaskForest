@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::PriorityTier;
+use taskforest_core::PriorityTier;
 use taskmanager_escalation::polkit::ForeignProcessSignal;
 
 fn target() -> FrozenProcessIdentity {

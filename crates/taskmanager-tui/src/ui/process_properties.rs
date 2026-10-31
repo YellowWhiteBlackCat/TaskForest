@@ -4,7 +4,7 @@
 //!
 //! Tabs — Overview / Performance / Command / Insights — consume the SAME shared
 //! projections the inline `process_details` panel already reads, with domain
-//! facts imported directly from `taskmanager-core`. The modal
+//! facts imported directly from `taskforest-core`. The modal
 //! freezes the selected [`ProcessItem`] at open time so a list refresh cannot
 //! redirect the view; the Insights tab additionally reads the live
 //! `process_insights` projection matched to the frozen process incarnation,
@@ -22,10 +22,10 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
 use taskmanager_application::{ProcessInsightFacet, i18n::t};
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::process_insight_facet_label;
 use taskmanager_shell::presentation::value_with_peak;
 
@@ -38,8 +38,8 @@ use crate::TuiApp;
 #[path = "../../tests/headless/ui/process_properties_support.rs"]
 pub(crate) mod process_properties_support;
 use crate::TuiTheme;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::command_identity_summary;
 
 /// The active Properties section. Mirrors GPUI's `ProcessDetailsSection`

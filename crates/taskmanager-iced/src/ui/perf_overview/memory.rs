@@ -3,8 +3,8 @@
 use iced::Element;
 use iced::Length;
 use iced::widget::{column, container, row, text};
+use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;

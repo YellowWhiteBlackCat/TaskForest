@@ -12,11 +12,11 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::prelude::{Display, Node};
 use bevy::ui::widget::Text;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::SystemSnapshot;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::SystemSnapshot;
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::edit_snapshot;
 use taskmanager_theme::Theme;
@@ -44,7 +44,7 @@ fn headless_scene_app() -> App {
 
 #[test]
 fn disk_caption_renders_observed_iops_latency_and_queue_depth() {
-    use taskmanager_core::core::metrics::DiskScalarObservations;
+    use taskforest_core::core::metrics::DiskScalarObservations;
 
     // Every throughput-depth fact comes from its own typed observation: the
     // painted caption must carry the observed values, never a placeholder.
@@ -76,7 +76,7 @@ fn disk_caption_renders_observed_iops_latency_and_queue_depth() {
 
 #[test]
 fn disk_caption_renders_observed_smart_evidence_rows() {
-    use taskmanager_core::core::metrics::SmartAvailability;
+    use taskforest_core::core::metrics::SmartAvailability;
 
     // The SMART family (temperature, per-sensor readings, endurance, spare,
     // power-on hours, unsafe shutdowns) all reach the painted caption from the
@@ -174,7 +174,7 @@ fn disk_caption_renders_observed_smart_evidence_rows() {
 
 #[test]
 fn gpu_section_enumerates_every_projected_adapter() {
-    use taskmanager_core::core::metrics::{
+    use taskforest_core::core::metrics::{
         GpuEngine, GpuEngineKind, GpuMetrics, GpuScalarObservations, SystemSnapshot,
     };
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
@@ -280,8 +280,8 @@ fn gpu_section_enumerates_every_projected_adapter() {
 
 #[test]
 fn battery_block_renders_voltage_health_and_cycles() {
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::power::{
         BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot,
     };
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
@@ -399,7 +399,7 @@ fn performance_history_mount_starts_live_without_inventing_replay_availability()
 fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
     use super::tests::{GIB, memory_metrics};
     use crate::pages::performance::scene::blocks::segment_bar_layout;
-    use taskmanager_core::core::metrics::MemoryMetrics;
+    use taskforest_core::core::metrics::MemoryMetrics;
     use taskmanager_shell::memory::memory_segments;
 
     let memory = memory_metrics(1, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));

@@ -6,14 +6,14 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use taskmanager_core::core::alerts::{AlertInstanceId, AlertSeverity};
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::setup::SetupScriptAction;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, CompositeSourceSnapshot, RequestPort, RequestScope,
     RequestTracking, RequestTrackingError,
 };
+use taskforest_core::core::alerts::{AlertInstanceId, AlertSeverity};
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::setup::SetupScriptAction;
 
 #[derive(Clone, Debug)]
 pub enum ShellEvent {
@@ -60,7 +60,7 @@ pub struct UrlOpenRequest {
 /// Desktop notification for a fired alert (extension capability
 /// `alerts.notify`). `instance_id` is the alert
 /// de-duplication key; upstream gating (policy/cooldown/quiet hours) is done
-/// by the pure [`taskmanager_core::alerts::NotificationGate`] before this request is emitted.
+/// by the pure [`taskforest_core::alerts::NotificationGate`] before this request is emitted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DesktopNotificationRequest {
     pub instance_id: AlertInstanceId,

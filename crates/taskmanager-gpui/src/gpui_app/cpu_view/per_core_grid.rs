@@ -16,7 +16,7 @@ use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
 
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphCacheHandle, GraphSettings, compute_column_count};
-use taskmanager_core::core::hardware::{CpuType, HardwareInfo};
+use taskforest_core::core::hardware::{CpuType, HardwareInfo};
 use taskmanager_theme::Theme;
 
 use super::per_core::PerCoreSeries;

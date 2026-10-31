@@ -1,26 +1,24 @@
 use std::sync::{Arc, Mutex};
 
-use taskmanager_application::{
-    PlatformEvent, ProcessAffinityEvent, ProcessAffinityRequest, ProcessControlRequest,
-    ProcessEnvironmentRequest, ProcessEvent, ProcessInsightFacetEvent, ProcessInsightsRevision,
-    ProcessListRequest, ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessThreadsRequest,
-};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CapabilityId, PartialSourceSnapshot, RequestEnvelope, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DeviceState, FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
     ProcessBatchTargetResult, ProcessEnvironment, ProcessGpuSnapshot, ProcessIdentity,
     ProcessInsightSnapshot, ProcessIsolation, ProcessItem, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads, ResourceGroupLimitRequest,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, PartialSourceSnapshot, RequestEnvelope, RequestId,
+use taskmanager_application::{
+    PlatformEvent, ProcessAffinityEvent, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessEnvironmentRequest, ProcessEvent, ProcessInsightFacetEvent, ProcessInsightsRevision,
+    ProcessListRequest, ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessThreadsRequest,
 };
 
 use super::*;
 use crate::{ProcessProviderBindings, ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
+use taskforest_contract::EventEnvelope;
 use taskmanager_application::PlatformHandle;
-use taskmanager_platform_contract::EventEnvelope;
 
 const CLOCK_MS: u64 = 4_242;
 

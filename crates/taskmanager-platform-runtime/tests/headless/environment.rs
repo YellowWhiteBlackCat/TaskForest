@@ -1,16 +1,16 @@
+use taskforest_contract::{
+    CapabilityId, EventEnvelope, PartialSourceSnapshot, RequestEnvelope, RequestId,
+};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::target::SessionId;
 use taskmanager_application::{
     LatestSessionControlRequest, PlatformEvent, PlatformHandle, SessionControlRequest,
     SessionEvent, StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest,
     StartupInventoryRequest,
-};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionIncarnation};
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::target::SessionId;
-use taskmanager_platform_contract::{
-    CapabilityId, EventEnvelope, PartialSourceSnapshot, RequestEnvelope, RequestId,
 };
 
 use super::*;

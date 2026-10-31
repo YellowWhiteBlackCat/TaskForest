@@ -19,13 +19,13 @@ use crate::demo_app;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::style::Style;
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 const GIB: u64 = 1024 * 1024 * 1024;

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use taskmanager_core::{GpuMetricField, GpuMetricProvenance, GpuMetrics, ProviderId};
+use taskforest_core::{GpuMetricField, GpuMetricProvenance, GpuMetrics, ProviderId};
 
 use super::super::{GpuProviderSample, apply_gpu_metric_field};
 

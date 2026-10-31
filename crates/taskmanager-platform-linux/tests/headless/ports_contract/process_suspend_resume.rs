@@ -3,7 +3,7 @@
 //! and completion rides the existing signal event.
 
 use super::*;
-use taskmanager_core::ProcessSignal;
+use taskforest_core::ProcessSignal;
 
 #[test]
 fn suspend_and_resume_map_to_stop_and_continue_signal_completions() {

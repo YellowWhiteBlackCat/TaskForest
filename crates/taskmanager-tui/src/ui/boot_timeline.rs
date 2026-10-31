@@ -13,9 +13,9 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
+use taskforest_core::core::startup::{BootTimeline, StartupBootEvidenceSnapshot};
 use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::{BootTimeline, StartupBootEvidenceSnapshot};
 
 use crate::TuiTheme;
 

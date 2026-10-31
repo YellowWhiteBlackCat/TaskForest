@@ -13,11 +13,11 @@ fn history_settings_enable_real_review_commands_and_release_the_writer_on_disabl
     use crate::widgets::history_controls::HistoryControl;
     use bevy::app::PreUpdate;
     use bevy::ui_widgets::Activate;
-    use taskmanager_app_host::NativeAppHost;
-    use taskmanager_core::core::history::{
+    use taskforest_core::core::history::{
         ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey, HistoryWindow,
     };
-    use taskmanager_core::core::time::LocalTimeRulesObservation;
+    use taskforest_core::core::time::LocalTimeRulesObservation;
+    use taskmanager_app_host::NativeAppHost;
 
     let path = test_path("history-review");
     let root = path.parent().expect("isolated root");

@@ -1,14 +1,14 @@
 use super::*;
 
 use crate::fixture::{ProjectionSeedDomain, ProjectionSeedFact, seed_projection_fact};
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::session::SessionIncarnation;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::session::SessionIncarnation;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
-use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskforest_core::core::target::{ServiceId, SessionId};
 
 fn service(id: &str, name: &str) -> ServiceItem {
     ServiceItem::from_inventory(id, name, ServiceStatus::Active, "", "", "", "")

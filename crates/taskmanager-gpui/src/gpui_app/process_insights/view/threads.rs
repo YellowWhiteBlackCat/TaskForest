@@ -18,14 +18,14 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_core::core::process_telemetry::ThreadWaitKind;
-use taskmanager_core::core::process_telemetry::{ProcessThreadInfo, ProcessThreads};
+use taskforest_core::core::process_telemetry::ThreadWaitKind;
+use taskforest_core::core::process_telemetry::{ProcessThreadInfo, ProcessThreads};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
-use taskmanager_core::core::device_state::DeviceStatus;
+use taskforest_core::core::device_state::DeviceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

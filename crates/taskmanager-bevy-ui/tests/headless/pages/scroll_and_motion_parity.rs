@@ -33,18 +33,18 @@ use bevy::transform::TransformPlugin;
 use bevy::ui::{BackgroundColor, ComputedNode, Display, Node, UiGlobalTransform};
 use bevy::ui_widgets::{ScrollArea, Scrollbar, ScrollbarThumb};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
-use taskmanager_core::core::process::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
 };
-use taskmanager_core::core::process_telemetry::{
-    ContainerQuota, ContainerRollup, ContainerSummary,
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerRollup, ContainerSummary};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
@@ -835,8 +835,8 @@ fn session_rows(count: usize) -> Vec<SessionItem> {
             user: format!("user-{index}"),
             seat: Some(format!("seat{index}")),
             tty: Some(format!("tty{index}")),
-            remote: false,
             timestamp: Some("2026-10-12 09:30".to_owned()),
+            family: SessionFamilyFact::default(),
         })
         .collect()
 }

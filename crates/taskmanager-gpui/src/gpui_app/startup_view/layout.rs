@@ -1,12 +1,12 @@
 //! Startup-page allocation projected from the shared viewport budget.
 
 use gpui::{AnyElement, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
-use taskmanager_core::core::BootTimeline;
+use taskforest_core::core::BootTimeline;
 use taskmanager_ui::theme_binding::definite_length;
 
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget, VerticalSpace};
-use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_theme::Theme;
 
 use super::boot_evidence::boot_timeline_block;

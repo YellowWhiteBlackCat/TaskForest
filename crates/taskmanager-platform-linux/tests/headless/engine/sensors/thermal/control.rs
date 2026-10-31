@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::{ScalarAvailability, ThermalCoolingActivity, ThermalTripKind};
+use taskforest_core::{ScalarAvailability, ThermalCoolingActivity, ThermalTripKind};
 
 fn fixture(name: &str) -> PathBuf {
     crate::test_support::repo_temp_dir().join(format!(

@@ -14,19 +14,20 @@
 
 use std::path::{Path, PathBuf};
 
-use taskmanager_application::{
-    SessionControlRequest, SessionInventoryRequest, StartupControlRequest, StartupEvidenceRequest,
-    StartupInventoryRequest,
-};
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::session::SessionFamilyFact;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     DeviceState, FailureKind, ProviderId, SessionControlAction, SessionIdentity, SessionItem,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupEntry, StartupEntryId,
     StartupEntryLocator, StartupEvidenceFailure, StartupImpact, StartupImpactEvidence,
     StartupScope, StartupSource,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskmanager_application::{
+    SessionControlRequest, SessionInventoryRequest, StartupControlRequest, StartupEvidenceRequest,
+    StartupInventoryRequest,
+};
 use taskmanager_platform_provider::{
     SessionControlProvider, SessionInventoryProvider, StartupControlProvider,
     StartupEvidenceProvider, StartupInventoryProvider,
@@ -39,7 +40,7 @@ const STARTUP_INVENTORY_PROVIDER: ProviderId =
     ProviderId::borrowed("macos.startup.inventory.plist");
 const SESSION_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("macos.session.inventory.who");
 
-use taskmanager_core::StartupImpactUnknownReason;
+use taskforest_core::StartupImpactUnknownReason;
 use taskmanager_platform_portable::run_with_timeout;
 
 /// LaunchAgents (user scope) and LaunchDaemons (system scope) directories.
@@ -244,6 +245,9 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
                 };
                 id_output.trim().parse::<u32>().unwrap_or(0)
             });
+            // `who` reports the tty and the remote-host marker, so the family
+            // is observed; the classification rule itself lives in the contract.
+            let family = SessionFamilyFact::classify(None, Some(tty.as_str()), remote);
             items.push(SessionItem {
                 id: format!("macos:session:{tty}").into(),
                 incarnation: None,
@@ -251,7 +255,7 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
                 user,
                 seat: None,
                 tty: Some(tty),
-                remote,
+                family,
                 timestamp,
             });
         }

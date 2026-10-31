@@ -19,8 +19,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetricField, GpuMetrics};
-use taskmanager_core::{DeviceId, FailureKind};
+use taskforest_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetricField, GpuMetrics};
+use taskforest_core::{DeviceId, FailureKind};
 use taskmanager_perf_ioctl::GpuEngineCounter;
 
 use super::super::super::intel::discover_intel_pmu_layout_with_receipt;

@@ -7,10 +7,10 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::sync::Arc;
 
-use taskmanager_core::core::device_state::stable_network_id;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::device_state::stable_network_id;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::source::SourceOutcome;
 
 mod wireless;
 pub(super) use wireless::{IwLinkResult, read_iw_links, read_proc_wireless};

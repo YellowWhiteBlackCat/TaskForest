@@ -5,8 +5,8 @@ use crate::ui::system_dashboard::SystemDashboardMessage;
 use crate::{IcedApp, focus};
 use iced::widget::{column, row};
 use iced::{Element, Length};
+use taskforest_core::core::smart::SmartSelfTestKind;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_shell::presentation::health_review::{
     HealthReviewSection, sensor_groups, storage_groups,
 };

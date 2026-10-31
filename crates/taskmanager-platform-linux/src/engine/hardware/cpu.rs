@@ -76,7 +76,7 @@ pub fn detect_cpu_cache() -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>
 /// of materializing billions of ids. Downstream `i < ncpu` bounds checks keep
 /// their semantics — real topologies never reach the cap.
 pub fn parse_cpulist(s: &str) -> Vec<u32> {
-    use taskmanager_core::MAX_TRACKED_LOGICAL_CPUS;
+    use taskforest_core::MAX_TRACKED_LOGICAL_CPUS;
 
     let mut out = Vec::new();
     for part in s.trim().split(',') {

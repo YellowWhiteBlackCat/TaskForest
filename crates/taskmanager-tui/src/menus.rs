@@ -10,18 +10,18 @@ use crate::{
     ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
     SessionMenuTarget, TuiApp, TuiSurface, TuiSurfaceKind,
 };
+use taskforest_core::core::process::{FrozenProcessIdentity, PriorityTier};
+use taskforest_core::core::process::{ProcessBatchAction, ProcessLiveKey};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::smart::self_test::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
     ProcessAffinityReady, ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, PriorityTier};
-use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 

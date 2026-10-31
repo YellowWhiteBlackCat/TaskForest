@@ -2,12 +2,12 @@
 //! isolation), affinity, and control.
 
 use super::*;
-use taskmanager_core::ProcessBatchIntent;
-use taskmanager_core::ProcessBatchResult;
-use taskmanager_core::ProcessBatchTargetResult;
-use taskmanager_core::ProcessResourceObservations;
-use taskmanager_core::ProcessSignal;
-use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+use taskforest_core::ProcessBatchIntent;
+use taskforest_core::ProcessBatchResult;
+use taskforest_core::ProcessBatchTargetResult;
+use taskforest_core::ProcessResourceObservations;
+use taskforest_core::ProcessSignal;
+use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_platform_provider::ProcessEnvironmentProvider;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

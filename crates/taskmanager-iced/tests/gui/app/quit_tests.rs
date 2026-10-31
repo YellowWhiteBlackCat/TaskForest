@@ -1,10 +1,10 @@
 //! Quit-path regression tests for the Iced application update loop.
 
 use super::*;
+use taskforest_contract::TrayController;
+use taskforest_contract::TrayFailure;
+use taskforest_core::core::tray::TrayActionId;
 use taskmanager_application::Modifiers;
-use taskmanager_core::core::tray::TrayActionId;
-use taskmanager_platform_contract::TrayController;
-use taskmanager_platform_contract::TrayFailure;
 use taskmanager_shell::QuitReason;
 
 struct TestTray;

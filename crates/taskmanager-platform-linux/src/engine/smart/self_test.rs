@@ -5,16 +5,16 @@ use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::time::Duration;
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::smart::self_test::SmartSelfTestSupport;
-use taskmanager_core::core::smart::self_test::{
+use taskforest_core::core::smart::self_test::SmartSelfTestSupport;
+use taskforest_core::core::smart::self_test::{
     SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
 };
-use taskmanager_core::{StorageConnection, StorageInterconnect};
+use taskforest_core::{StorageConnection, StorageInterconnect};
 #[cfg(feature = "test-support")]
-use taskmanager_core::{StorageDeviceKind, StorageProtocol};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_core::{StorageDeviceKind, StorageProtocol};
 
 use super::transport::{
     SmartctlDeviceType, command_output_is_permission_denied, command_output_requests_device_type,

@@ -23,8 +23,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
 #[cfg(windows)]
-use taskmanager_platform_contract::InstanceGuard;
-use taskmanager_platform_contract::{InstanceEvent, InstanceFailure, InstanceRole};
+use taskforest_contract::InstanceGuard;
+use taskforest_contract::{InstanceEvent, InstanceFailure, InstanceRole};
 #[cfg(windows)]
 use taskmanager_windows_api::{InstanceMutex, signal_named_event};
 

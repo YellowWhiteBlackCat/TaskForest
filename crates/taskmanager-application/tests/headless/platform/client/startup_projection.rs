@@ -1,19 +1,19 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::{DeviceState, FailureKind, StartupBootEvidenceSnapshot, StartupFailedUnit};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     EventSequence, OperationFailure, ProviderFailure, RequestEnvelope, RequestPort,
     SubmissionError,
 };
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::{DeviceState, FailureKind, StartupBootEvidenceSnapshot, StartupFailedUnit};
 
 use crate::platform::{
     EnvironmentFacets, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     StartupEvidenceEvent, StartupEvidenceRequest, StartupEvidenceUnavailable,
 };
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
 
 #[derive(Default)]
 struct EmptyCapabilities;

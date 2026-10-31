@@ -3,17 +3,17 @@
 //! admission. Split out of `device_render.rs` to respect the test source line
 //! budget.
 
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
 use taskmanager_shell::presentation::missing_value;
 
 use super::frame_text;
-use taskmanager_core::core::failure::FailureKind;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 

@@ -11,10 +11,10 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::alerts::AlertRuleConflictPolicy;
+use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::AlertRuleConflictPolicy;
-use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::alerts::{active_alert_lines, empty_state_text, rule_rows, rule_summary};

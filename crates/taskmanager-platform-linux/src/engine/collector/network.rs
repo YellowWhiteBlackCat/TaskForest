@@ -10,15 +10,15 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use sysinfo::Networks;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
 };
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceState, OptionalObservation, ProviderId, ScalarObservation, SourceOutcome,
     SourceStatus,
 };
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 use crate::engine::hardware::is_virtual_interface;
 

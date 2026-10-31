@@ -1,5 +1,5 @@
 use std::path::Path;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_platform_linux::{
     InitSystem, ServiceManager, parse_openrc_description, parse_unit_description,
 };

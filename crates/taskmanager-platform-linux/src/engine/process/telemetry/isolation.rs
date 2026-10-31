@@ -2,9 +2,9 @@
 
 use std::path::Path;
 
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::{FailureKind, IsolationKind, ProcessCapabilities, ProcessIsolation};
-use taskmanager_core::{
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::{FailureKind, IsolationKind, ProcessCapabilities, ProcessIsolation};
+use taskforest_core::{
     LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry, NamespaceAuditStatus,
     parse_namespace_inode,
 };

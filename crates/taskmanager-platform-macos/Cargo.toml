@@ -2,9 +2,13 @@
 name = "taskmanager-platform-macos"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "macOS application-port adapter composition for TaskForest"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-platform-macos"
 
 # Safety policy (2026-08-02, ADR-019): every provider is implemented ONLY
 # through safe, published wrapper crates (sysinfo / open / plist)
@@ -24,14 +28,14 @@ hardware-all = []
 test-support = []
 
 [dependencies]
-taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
-taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
-taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
-taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
+taskmanager-platform-portable = { path = "../taskmanager-platform-portable", version = "0.5.1" }
+taskmanager-platform-provider = { path = "../taskmanager-platform-provider", version = "0.5.1" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime", version = "0.5.1" }
 # Shared spec -> muda menu bridge (also used by the Windows adapter).
-taskmanager-tray-muda = { path = "../taskmanager-tray-muda" }
+taskmanager-tray-muda = { path = "../taskmanager-tray-muda", version = "0.5.1" }
 
 # Safe cross-platform telemetry (CPU/memory/process/network/disk/components
 # behind safe APIs). Reused version with platform-linux/platform-windows.

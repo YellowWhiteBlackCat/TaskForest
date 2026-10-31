@@ -4,18 +4,18 @@
 //! Extracted as a small topic file so `device_render.rs` stays inside its
 //! line budget; each test asserts rendered text/state, never source text.
 
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
 
 use super::frame_text;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::BatteryScalarObservations;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };

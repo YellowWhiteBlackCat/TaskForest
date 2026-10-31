@@ -8,8 +8,8 @@
 
 use super::navigation::StableDeviceKind;
 use crate::gpui_app::sidebar::SelectedDevice;
-use taskmanager_core::core::SensorQuantity;
-use taskmanager_core::core::SensorReading;
+use taskforest_core::core::SensorQuantity;
+use taskforest_core::core::SensorReading;
 
 use super::RootView;
 

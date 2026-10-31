@@ -12,10 +12,10 @@ use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 use crate::gpui_app::elements::Pill;
 use crate::gpui_app::root::{Hover, RootView};
-use taskmanager_application::i18n;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
 };
+use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

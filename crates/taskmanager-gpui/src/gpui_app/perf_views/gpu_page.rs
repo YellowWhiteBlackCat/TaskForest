@@ -3,8 +3,8 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_platform_contract::CapabilityStatus;
+use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::identity::DeviceId;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -30,9 +30,9 @@ use crate::gpui_app::perf_views::layout::{
 };
 use crate::gpui_app::perf_views::smart_status::status_footer;
 use crate::gpui_app::root::responsive::PerformanceChartInventory;
+use taskforest_core::core::metrics::{GpuMetrics, SystemSnapshot};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, gpu_chart_metric_history,
 };

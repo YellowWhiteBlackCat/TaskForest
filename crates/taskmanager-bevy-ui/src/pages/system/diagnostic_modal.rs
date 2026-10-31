@@ -18,11 +18,11 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition};
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_preview_text,
 };

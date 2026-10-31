@@ -21,16 +21,16 @@
 
 mod health;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppPage, ProcessInsightFacet};
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::InputDispatch;
 
 use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurfaceKind};
 
 use super::handle_settings_key;
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
 
 fn handle_diagnostic_key(app: &mut TuiApp, key: KeyEvent) {

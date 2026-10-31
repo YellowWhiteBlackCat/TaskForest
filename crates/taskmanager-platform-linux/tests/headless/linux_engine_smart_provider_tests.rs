@@ -1,7 +1,7 @@
 use super::*;
 use crate::engine::hardware::classify_storage_connection;
 use crate::engine::smart::transport::{SmartctlDeviceType, smartctl_strategy_for_connection};
-use taskmanager_core::StorageDeviceKind;
+use taskforest_core::StorageDeviceKind;
 
 #[test]
 fn standard_registry_routes_by_protocol_without_vendor_selection() {

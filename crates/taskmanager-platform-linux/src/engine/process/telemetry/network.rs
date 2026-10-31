@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::{FailureKind, NetworkConnectionCounters, ProviderId};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::{FailureKind, NetworkConnectionCounters, ProviderId};
 
 use super::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,

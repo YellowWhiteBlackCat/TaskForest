@@ -2,10 +2,10 @@
 
 use super::*;
 use sysinfo::{Pid, ProcessesToUpdate, System};
-use taskmanager_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceState;
 #[cfg(windows)]
-use taskmanager_core::{DeviceStatus, IsolationKind};
-use taskmanager_core::{ProcessIsolation, ProcessNetworkSnapshot};
+use taskforest_core::{DeviceStatus, IsolationKind};
+use taskforest_core::{ProcessIsolation, ProcessNetworkSnapshot};
 use taskmanager_windows_api::{WindowsApiError, process_affinity};
 #[cfg(windows)]
 use taskmanager_windows_api::{WindowsIntegrityLevel, process_isolation};
@@ -230,8 +230,8 @@ impl ProcessNetworkProvider for WinProcessNetworkProvider {
         #[cfg(windows)]
         {
             use std::net::SocketAddr;
-            use taskmanager_core::core::device_state::DeviceState;
-            use taskmanager_core::core::process_telemetry::{
+            use taskforest_core::core::device_state::DeviceState;
+            use taskforest_core::core::process_telemetry::{
                 ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
                 ProcessConnection, ProcessNetworkSnapshot,
             };

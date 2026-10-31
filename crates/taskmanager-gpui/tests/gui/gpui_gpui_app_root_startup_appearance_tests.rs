@@ -1,5 +1,5 @@
 use super::fallback;
-use taskmanager_core::core::appearance::DesktopFamily;
+use taskforest_core::core::appearance::DesktopFamily;
 
 #[test]
 fn timeout_fallback_keeps_target_platform_identity() {

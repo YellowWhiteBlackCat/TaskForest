@@ -6,7 +6,7 @@ use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::sidebar::SelectedDevice;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     BatteryInfo, DeviceGeneration, DeviceId, DeviceState, PowerSupplySnapshot,
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorScale,
 };

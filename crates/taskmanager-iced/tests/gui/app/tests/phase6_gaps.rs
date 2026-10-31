@@ -5,22 +5,22 @@
 //! 4. Visual table navigation with Home and End keys
 //! 5. Shell level Home / End / PageUp / PageDown handling
 
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
 use taskmanager_application::{AppPage, KeyCode, Modifiers};
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
 
 use taskmanager_shell::{ShellApp, ShellKeyEvent};
 
 use crate::app::{IcedApp, IcedKey, Message};
 use crate::ui::overlays::process_details::{filtered_environment_rows, working_directory_value};
 use crate::ui::perf_devices::network::{network_summary_lines, network_title};
+use taskforest_core::core::metrics::NetworkScalarObservations;
+use taskforest_core::core::metrics::NetworkWirelessObservations;
+use taskforest_core::core::metrics::OptionalObservation;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ProcessEnvironmentEntry;
 use taskmanager_application::AppAction;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::NetworkScalarObservations;
-use taskmanager_core::core::metrics::NetworkWirelessObservations;
-use taskmanager_core::core::metrics::OptionalObservation;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
@@ -159,8 +159,8 @@ fn test_system_spec_export_formatting() {
 
 #[test]
 fn test_system_spec_export_includes_smbios_slots_when_present() {
+    use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
     set_language(Language::En);
     let smbios = SmbiosMemorySnapshot {
         slots_total: 2,

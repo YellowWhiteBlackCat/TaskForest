@@ -1,13 +1,13 @@
 //! Telemetry-frame lifecycle and the typed side outputs of one platform fold.
 
+use taskforest_contract::{OperationFailure, RequestId};
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchResult};
+use taskforest_core::core::storage::StorageDeviceTarget;
 use taskmanager_application::{
     CorrelatedDesktopAppearanceEvent, CorrelatedPowerSupplyEvent, CorrelatedProcessEvent,
     CorrelatedSensorEvent, CorrelatedSetupScriptEvent, CorrelatedShellEvent,
     CorrelatedSystemTelemetryOutcome, ServiceUpdate, SessionControlOutcome, StartupControlOutcome,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchResult};
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_platform_contract::{OperationFailure, RequestId};
 
 use super::ProcessControlFeedback;
 use taskmanager_application::ServiceControlOutcome;

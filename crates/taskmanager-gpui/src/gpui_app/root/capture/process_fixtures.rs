@@ -1,14 +1,14 @@
 //! Deterministic process and startup fixtures used only by capture evidence.
 
-use taskmanager_core::core::DeviceState;
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_core::core::DeviceState;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity, ProcessItem,
     ProcessLiveKey, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
     ProcessOwnerIdentity, ProcessScalarObservations,
 };
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupEntry,
     StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,

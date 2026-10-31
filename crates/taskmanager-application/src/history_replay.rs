@@ -4,7 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::{ApplicationHistoryCapability, ApplicationHistoryStatus, PerformanceHistoryProjection};
-use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
+use taskforest_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 /// Cross-toolkit replay curve ceiling. The storage query may observe a much
 /// longer window; the background owner publishes only this bounded envelope.

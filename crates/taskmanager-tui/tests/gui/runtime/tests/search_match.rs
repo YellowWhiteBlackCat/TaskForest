@@ -7,9 +7,9 @@
 
 use super::super::*;
 use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::SearchSlot;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};

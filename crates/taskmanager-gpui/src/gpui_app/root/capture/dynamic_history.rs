@@ -1,6 +1,6 @@
 //! Controlled battery samples enter the normal correlated history ingestor.
 use super::fixtures::dynamic_power_fixture;
-use taskmanager_core::core::{BatteryScalarObservations, DeviceId, DeviceState, ScalarObservation};
+use taskforest_core::core::{BatteryScalarObservations, DeviceId, DeviceState, ScalarObservation};
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp,
 };

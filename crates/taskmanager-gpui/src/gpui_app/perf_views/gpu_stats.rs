@@ -5,10 +5,10 @@
 //! do not exist on this GPU family (power draw, temperature, VRAM pairs,
 //! throttle reason) omit their rows entirely.
 
+use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::GpuMetrics;
 
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::device_status_i18n_key;

@@ -1,7 +1,7 @@
 //! Behavior tests for the SMART-tool remediation projection (CORE-54).
 
 use crate::presentation::smart_tool;
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability, SmartToolRemediation};
+use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability, SmartToolRemediation};
 
 fn disk_with_smart(availability: SmartAvailability) -> DiskMetrics {
     let mut disk = DiskMetrics::new("nvme0n1");

@@ -20,9 +20,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformEffect, ProcessAffinityState};
-use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::ShellApp;
 
 use crate::app::FrontendTrack;

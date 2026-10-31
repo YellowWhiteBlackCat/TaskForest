@@ -25,13 +25,13 @@ use std::time::{Duration, Instant};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
-use taskmanager_application::process_category_projection::category_expansion_key;
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
-use taskmanager_core::core::process::{
+use taskforest_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessLiveKey, ProcessMetadataObservation,
 };
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{SortCol, SortDir};
 

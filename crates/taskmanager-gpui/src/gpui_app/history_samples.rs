@@ -10,7 +10,7 @@ use taskmanager_telemetry_store::{
 
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
-use taskmanager_core::core::{DeviceGeneration, DeviceId, GpuEngineMetricPoint, GpuMetrics};
+use taskforest_core::core::{DeviceGeneration, DeviceId, GpuEngineMetricPoint, GpuMetrics};
 
 use crate::gpui_app::graph::GraphCacheHandle;
 

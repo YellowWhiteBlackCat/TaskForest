@@ -1,7 +1,7 @@
 # 标量可用性总纲
 
 所有可失败的数值都必须携带值、可用性和最近成功时间。`0` 只表示真实测得的零，不能
-代替未知、不支持、权限不足、暂时失败、过期或设备消失。契约归 `taskmanager-core`，
+代替未知、不支持、权限不足、暂时失败、过期或设备消失。契约归 `taskforest-core`，
 provider 与前端只实现或消费它，不定义第二套语义。
 
 ## 共享契约
@@ -9,7 +9,7 @@ provider 与前端只实现或消费它，不定义第二套语义。
 `ScalarObservation<T>` 区分 `Unknown`、`Available`、`Partial`、`Stale` 和 `Unavailable`；
 `FailureKind` 至少区分 `Unsupported`、`PermissionDenied`、`RequiresEscalation`、
 `MissingDependency`、`TimedOut`、`IdentityChanged`、`TemporarilyUnavailable`、`Rejected` 与
-`ProviderFault`（均为 `taskmanager-core::FailureKind` 的真实变体名；`PermissionDenied` 是失败
+`ProviderFault`（均为 `taskforest-core::FailureKind` 的真实变体名；`PermissionDenied` 是失败
 原因轴词，与能力级 `CapabilityStatus::PermissionRequired` 分属两轴）。可选事实使用
 `OptionalObservation<T>` 的 `Unknown`、`Present`、`Absent`、`NotApplicable` 轴，禁止用
 `ScalarObservation<Option<T>>` 混淆语义。
@@ -82,5 +82,5 @@ Battery、UPS 和外围电源拥有独立 kind 与 generation；capacity、volta
 
 ## 下一层
 
-实现细节在 `crates/taskmanager-core/README.md`、平台 provider README 和测试；本文件只
+实现细节在 `crates/taskforest-core/README.md`、平台 provider README 和测试；本文件只
 定义跨 crate 的语义，不记录迁移批次、测试总数或历史回执。

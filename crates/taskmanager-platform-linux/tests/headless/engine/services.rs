@@ -3,11 +3,11 @@
 use super::*;
 use std::thread;
 use std::time::Instant;
-use taskmanager_core::FailureKind;
-use taskmanager_core::ServiceFailureCause;
-use taskmanager_core::ServiceId;
-use taskmanager_core::ServiceRelationKind;
-use taskmanager_core::core::services::{ServiceOomCause, ServiceRelationEdge};
+use taskforest_core::FailureKind;
+use taskforest_core::ServiceFailureCause;
+use taskforest_core::ServiceId;
+use taskforest_core::ServiceRelationKind;
+use taskforest_core::core::services::{ServiceOomCause, ServiceRelationEdge};
 
 #[test]
 fn openrc_status_maps_started_stopped_crashed() {

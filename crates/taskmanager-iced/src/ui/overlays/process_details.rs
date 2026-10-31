@@ -2,15 +2,15 @@
 
 use iced::widget::{column, container, row, text, text_input};
 use iced::{Element, Length};
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
 use taskmanager_application::{ProcessInsightFacet, ProcessInsightFacetState};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::process_insight_facet_label;
 
 use taskmanager_shell::ShellApp;

@@ -5,12 +5,12 @@ use super::target_observation::{
     WinProcessAffinityProvider, WinProcessIsolationProvider, WinProcessNetworkProvider,
 };
 use super::*;
+use taskforest_core::DeviceStatus;
+use taskforest_core::MAX_ENVIRONMENT_BYTES;
+use taskforest_core::MAX_ENVIRONMENT_ENTRIES;
+use taskforest_core::OpenFileEntry;
+use taskforest_core::ResourceGroupLimitRequest;
 use taskmanager_application::ProcessControlRequest;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::MAX_ENVIRONMENT_BYTES;
-use taskmanager_core::MAX_ENVIRONMENT_ENTRIES;
-use taskmanager_core::OpenFileEntry;
-use taskmanager_core::ResourceGroupLimitRequest;
 use taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_BYTES;
 use taskmanager_windows_api::MAX_PROCESS_ENVIRONMENT_ENTRIES;
 use taskmanager_windows_api::WindowsProcessEnvironmentBlock;
@@ -88,7 +88,7 @@ fn windows_resource_assembly_keeps_memory_current_and_other_facts_typed_unsuppor
 
 #[test]
 fn open_files_projection_maps_kinds_keeps_unreadable_and_sorts_by_fd() {
-    use taskmanager_core::OpenFileKind;
+    use taskforest_core::OpenFileKind;
     use taskmanager_windows_api::{WindowsOpenHandleEntry, WindowsOpenHandleKind};
 
     let raw = vec![

@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
-use taskmanager_core::HistoryMetric;
-use taskmanager_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
+use taskforest_core::HistoryMetric;
+use taskforest_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
 
 /// Persistence probe that stops revision 1 after its fixed CPU rings were
 /// written but before per-core fan-out and the public commit marker. That

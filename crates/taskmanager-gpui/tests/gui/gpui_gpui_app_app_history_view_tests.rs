@@ -3,11 +3,11 @@ use std::sync::Arc;
 use taskmanager_theme::Theme;
 
 use gpui::AppContext;
+use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 use taskmanager_application::{
     ApplicationHistoryMetricSeries, ApplicationHistoryProjection, ApplicationHistoryRow,
     ApplicationHistoryStatus,
 };
-use taskmanager_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 
 use super::*;
 

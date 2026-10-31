@@ -2,17 +2,21 @@
 name = "taskmanager-application"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Toolkit-neutral commands, reducers, and ports for TaskForest"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-application"
 
 [dependencies]
 atomicwrites = "0.4.4"
 crossbeam-channel = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }

@@ -1,32 +1,32 @@
 use std::thread;
 use std::time::Duration;
-use taskmanager_core::core::process_telemetry::ContainerQuota;
+use taskforest_core::core::process_telemetry::ContainerQuota;
 
+use taskforest_contract::{CapabilityId, RequestEnvelope, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::{
+    ContainerRollup, ContainerSummary, FailureKind, IsolationKind, ScalarObservation,
+};
 use taskmanager_application::{
     ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleEvent,
     CpuThrottleRequest, MemoryTelemetryRequest, MsrReadoutEvent, MsrReadoutRequest, PlatformEvent,
     RaplPowerEvent, RaplPowerRequest, SmbiosMemoryEvent, SmbiosMemoryRequest,
     StorageTelemetryRequest, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::{
-    ContainerRollup, ContainerSummary, FailureKind, IsolationKind, ScalarObservation,
-};
-use taskmanager_platform_contract::{CapabilityId, RequestEnvelope, RequestId};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
-use taskmanager_core::CpuTelemetryObservation;
-use taskmanager_core::CpuThrottlePackageCounters;
-use taskmanager_core::CpuThrottleSnapshot;
-use taskmanager_core::MemoryTelemetryObservation;
-use taskmanager_core::MsrPackageReadout;
-use taskmanager_core::MsrReadoutSnapshot;
-use taskmanager_core::RaplPackageRow;
-use taskmanager_core::RaplPowerSnapshot;
-use taskmanager_core::SmbiosMemorySnapshot;
-use taskmanager_core::SmbiosModuleRow;
-use taskmanager_core::StorageTelemetryObservation;
+use taskforest_core::CpuTelemetryObservation;
+use taskforest_core::CpuThrottlePackageCounters;
+use taskforest_core::CpuThrottleSnapshot;
+use taskforest_core::MemoryTelemetryObservation;
+use taskforest_core::MsrPackageReadout;
+use taskforest_core::MsrReadoutSnapshot;
+use taskforest_core::RaplPackageRow;
+use taskforest_core::RaplPowerSnapshot;
+use taskforest_core::SmbiosMemorySnapshot;
+use taskforest_core::SmbiosModuleRow;
+use taskforest_core::StorageTelemetryObservation;
 
 fn fixed_clock() -> u64 {
     17

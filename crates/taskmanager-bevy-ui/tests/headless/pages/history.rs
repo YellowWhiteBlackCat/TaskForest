@@ -9,11 +9,11 @@ use std::sync::Arc;
 use taskmanager_theme::tokens::UiSize;
 
 use super::*;
+use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey};
 use taskmanager_application::{
     ApplicationHistoryRow, HistoryReplayCompletion, HistoryReplayCompletionDisposition,
     HistoryReplayCompletionOutcome, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
 };
-use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey};
 
 fn identity(value: &str, verified: bool) -> ApplicationHistoryIdentity {
     if verified {

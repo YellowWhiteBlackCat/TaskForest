@@ -13,17 +13,17 @@ use std::time::Duration;
 use atomicwrites::{AllowOverwrite, AtomicFile};
 use serde::{Deserialize, Serialize};
 
-use taskmanager_core::config::Config;
-use taskmanager_core::core::export::snapshot_to_json;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::{
+use taskforest_contract::CapabilityCatalog;
+use taskforest_core::config::Config;
+use taskforest_core::core::export::snapshot_to_json;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::{
     DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource,
 };
-use taskmanager_platform_contract::CapabilityCatalog;
 
 use crate::PlatformClient;
 use crate::RefreshRequest;

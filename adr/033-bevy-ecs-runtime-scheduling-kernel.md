@@ -24,7 +24,7 @@
    `CapabilityScheduler` port 消费它，并映射到现有 request method。
 3. 入队前由 ECS 以 `RequestId` 占用 route；入队失败回滚占用。ECS 不读 OS、
    不构造事实、不修改 application revision，也不把 ECS API 暴露给 frontend。
-4. `taskmanager-core` 继续拥有事实和纯规则，`taskmanager-application` 继续
+4. `taskforest-core` 继续拥有事实和纯规则，`taskmanager-application` 继续
    拥有 command/reducer/port/revision，平台 crate 继续拥有 OS I/O。进程行、
    历史 ring 和 UI projection 不实体化。
 5. runtime 构造先验证 route、global/per-capability/per-domain target、scope

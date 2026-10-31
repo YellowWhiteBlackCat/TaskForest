@@ -1,11 +1,11 @@
 use std::time::Duration;
-use taskmanager_core::core::alerts::AlertRuleConflictPolicy;
+use taskforest_core::core::alerts::AlertRuleConflictPolicy;
 
+use taskforest_core::core::alerts::{export_alert_rules_json, import_alert_rules_json};
+use taskforest_core::core::{AlertMetric, AlertRule, AlertSeverity};
 use taskmanager_application::{
     AlertCenter, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
 };
-use taskmanager_core::core::alerts::{export_alert_rules_json, import_alert_rules_json};
-use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
 
 use super::{managed_rules, transfer_entries};
 

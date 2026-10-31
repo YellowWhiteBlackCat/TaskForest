@@ -1,7 +1,7 @@
 use std::time::Duration;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
-use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
+use taskforest_core::core::{AlertMetric, AlertRule, AlertSeverity};
 
 use super::{
     RuleAdjustment, apply_adjustment, maximum_threshold, next_custom_rule_id, target_options,

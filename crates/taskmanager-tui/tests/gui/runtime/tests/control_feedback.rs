@@ -13,25 +13,25 @@ use std::sync::{Arc, Mutex};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::KeyModifiers;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
+    OperationFailure, ProviderFailure, RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
+    ProcessBatchTargetResult,
+};
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     AppPage, CorrelatedEvent, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
     ProcessControlRequest, ProcessFacets, ProcessListRequest,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
-    ProcessBatchTargetResult,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
-    OperationFailure, ProviderFailure, RequestEnvelope, RequestId, RequestPort, SubmissionError,
-};
 
 use crate::render;
 use crate::{TuiApp, TuiTheme};
+use taskforest_contract::{CapabilityId, CapabilityRequest};
 use taskmanager_application::{PlatformClient, ProcessEvent};
-use taskmanager_platform_contract::{CapabilityId, CapabilityRequest};
 use taskmanager_shell::fixture::seed_process_batch_loading;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, queue_effect};
 use taskmanager_test_support::pin_english;

@@ -22,13 +22,13 @@ use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use bevy::text::{RemSize, TextColor, TextFont};
 use bevy::ui::widget::Text;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SystemFacets,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
 use taskmanager_theme::{LightDark, Skin, Theme};

@@ -11,7 +11,7 @@ use crate::widgets::chart::{
     ChartCanvas, ChartContent, ChartHoverLabel, ChartPaintState, ChartPointer, ChartStyle,
     ChartSurface,
 };
-use taskmanager_core::core::alerts::AlertMetric;
+use taskforest_core::core::alerts::AlertMetric;
 use taskmanager_shell::presentation::bytes;
 
 /// The calibration line's thickness in px — a hairline is a real chart

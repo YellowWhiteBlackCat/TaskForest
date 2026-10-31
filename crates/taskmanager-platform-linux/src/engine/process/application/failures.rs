@@ -1,6 +1,6 @@
 //! Typed failure ordering for the desktop application catalog.
 
-use taskmanager_core::{FailureKind, ProcessMetadataFailure};
+use taskforest_core::{FailureKind, ProcessMetadataFailure};
 
 pub(super) fn classify_io(error: &std::io::Error) -> ProcessMetadataFailure {
     match error.kind() {

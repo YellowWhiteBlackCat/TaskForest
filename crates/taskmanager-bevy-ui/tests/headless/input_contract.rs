@@ -101,8 +101,8 @@ fn focus_traversal_and_process_shortcuts_honor_scope_and_text_input() {
 
 #[test]
 fn semantic_addresses_are_stable_across_rebuilds() {
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
     use taskmanager_shell::ShellApp;
     use taskmanager_shell::fixture;
     use taskmanager_shell::process_semantic_key;

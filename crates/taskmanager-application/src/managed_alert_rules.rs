@@ -1,6 +1,6 @@
 //! Canonical managed-alert-rule state and edit reducer.
 
-use taskmanager_core::alerts::{
+use taskforest_core::alerts::{
     AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
     AlertRuleTransferError, merge_alert_rule_entries,
 };

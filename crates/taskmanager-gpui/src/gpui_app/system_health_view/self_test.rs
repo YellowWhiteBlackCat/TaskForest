@@ -5,8 +5,8 @@
 use gpui::{
     AnyElement, Div, InteractiveElement, IntoElement, ParentElement, Stateful, Styled, div,
 };
-use taskmanager_core::core::metrics::DiskMetrics;
-use taskmanager_core::core::{
+use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::{
     DeviceId, DeviceStatus, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
 };
 use taskmanager_shell::presentation::smart::self_test_supported;

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::HistoryRetention;
-use taskmanager_core::MAX_TRACKED_LOGICAL_CPUS;
+use taskforest_core::MAX_TRACKED_LOGICAL_CPUS;
 
 #[test]
 fn correlated_history_is_bounded_oldest_first_and_not_prefilled() {

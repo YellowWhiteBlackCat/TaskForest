@@ -24,10 +24,10 @@ use bevy::ui::prelude::{
     px, rem,
 };
 use bevy::ui::widget::Text;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
@@ -54,11 +54,11 @@ use bevy::ui::ComputedNode;
 use bevy::ui_widgets::{ScrollArea, TextInput};
 use dashboard::{SystemDashboardState, SystemDashboardToolbar};
 use privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
+use taskforest_core::core::metrics::SmbiosMemorySnapshot;
+use taskforest_core::core::npu::NpuEngineKind;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_core::core::metrics::SmbiosMemorySnapshot;
-use taskmanager_core::core::npu::NpuEngineKind;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::health_score_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;

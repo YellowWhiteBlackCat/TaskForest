@@ -2,8 +2,8 @@
 
 use std::collections::HashSet;
 
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::ProcessInsightFacet;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::SortCol;
 
 use super::DetailsSection;

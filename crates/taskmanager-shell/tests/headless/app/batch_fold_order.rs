@@ -1,11 +1,9 @@
-use taskmanager_application::{
-    CorrelatedEvent, DirectoryUsageEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent,
-};
-use taskmanager_core::core::directory_usage::{
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::directory_usage::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
+use taskmanager_application::{
+    CorrelatedEvent, DirectoryUsageEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent,
 };
 
 use super::*;

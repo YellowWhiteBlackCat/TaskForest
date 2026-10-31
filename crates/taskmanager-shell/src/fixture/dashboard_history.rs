@@ -2,13 +2,13 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use taskmanager_core::core::CpuTelemetryObservation;
-use taskmanager_core::core::MemoryTelemetryObservation;
-use taskmanager_core::core::NetworkTelemetryObservation;
-use taskmanager_core::core::StorageTelemetryObservation;
-use taskmanager_core::core::metrics::MemoryScalarObservations;
+use taskforest_core::core::CpuTelemetryObservation;
+use taskforest_core::core::MemoryTelemetryObservation;
+use taskforest_core::core::NetworkTelemetryObservation;
+use taskforest_core::core::StorageTelemetryObservation;
+use taskforest_core::core::metrics::MemoryScalarObservations;
 
-use taskmanager_core::core::{
+use taskforest_core::core::{
     CpuMetrics, CpuScalarObservations, DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence,
     DeviceState, DiskMetrics, DiskScalarObservations, MemoryMetrics, NetworkAdapterType,
     NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations, ScalarObservation,

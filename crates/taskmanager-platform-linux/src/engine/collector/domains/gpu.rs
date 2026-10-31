@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceLifecycleRegistry, DeviceRefreshOutcome,
     DeviceStatus, GpuMetrics, GpuTelemetryObservation,
 };
@@ -13,8 +13,8 @@ use taskmanager_core::{
 use super::{LinuxSystemDomainCollector, SourceQuality, device_quality, lifecycle_snapshot};
 use crate::engine::collector::lifecycle::reconcile_devices;
 use crate::engine::hardware::GpuProviderRegistry;
-use taskmanager_core::FailureKind;
-use taskmanager_core::SourceOutcome;
+use taskforest_core::FailureKind;
+use taskforest_core::SourceOutcome;
 
 /// GPU-only collector owning the runtime-selected all-hardware provider
 /// registry and GPU lifecycle state.

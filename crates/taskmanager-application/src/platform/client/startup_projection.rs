@@ -1,6 +1,6 @@
 //! Correlation and fail-closed publication for startup evidence.
 
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
 
 use crate::platform::{
     PlatformEventBatch, StartupEvidenceEvent, StartupEvidenceProjectionApplyResult,
@@ -8,7 +8,7 @@ use crate::platform::{
 };
 
 use super::PlatformClient;
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 pub(super) struct StartupEvidenceDrainOutcome {
     pub(super) projection: Option<StartupEvidenceProjectionApplyResult>,

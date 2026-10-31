@@ -4,8 +4,8 @@
 //! before it can drift.
 
 use super::*;
-use taskmanager_core::core::CpuTelemetryObservation;
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::CpuTelemetryObservation;
+use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;

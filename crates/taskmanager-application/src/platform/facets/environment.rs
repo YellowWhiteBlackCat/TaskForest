@@ -5,12 +5,12 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestScope,
     RequestTracking, RequestTrackingError,
 };
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 
 use crate::{
     SessionControlOutcome, SessionControlRequest, StartupControlOutcome, StartupControlRequest,

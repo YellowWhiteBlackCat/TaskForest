@@ -1,4 +1,5 @@
 use super::*;
+use taskforest_core::core::config::Config;
 use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::ConfigBootstrap;
 use taskmanager_application::ConfigCoordinator;
@@ -6,13 +7,12 @@ use taskmanager_application::ConfigPublicationOutcome;
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::Language;
-use taskmanager_core::core::config::Config;
 use taskmanager_theme::Theme;
 
 use crate::gpui_app::root::TopPage;
 use gpui::{AppContext, TestAppContext};
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
 use taskmanager_shell::SortCol;
@@ -173,7 +173,7 @@ fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
     cx: &mut TestAppContext,
 ) {
     use crate::gpui_app::chrome::WindowDecorationsPreference;
-    use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
+    use taskforest_core::core::config::WINDOW_DECORATIONS_CUSTOM;
 
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, cx| {

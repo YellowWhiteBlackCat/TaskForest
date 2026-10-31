@@ -35,8 +35,8 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
 use std::marker::PhantomData;
+use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
 
 /// The modal surface's maximum width, in rem: the widest a shell surface

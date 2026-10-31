@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use atomicwrites::{AllowOverwrite, AtomicFile};
-use taskmanager_core::config::Config;
+use taskforest_core::config::Config;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigStoreErrorKind {

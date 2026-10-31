@@ -27,14 +27,14 @@ use bevy::ecs::world::World;
 use bevy::text::Font;
 use bevy::ui::Checked;
 use bevy::ui::widget::Text;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
+};
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{
     HostTelemetryRequest, PlatformClient, PlatformEffect, PlatformEvent, PlatformFacets,
     PlatformHandle, SystemFacets, TelemetryInterval,
-};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
 };
 
 use taskmanager_shell::ShellApp;
@@ -60,7 +60,7 @@ use bevy::transform::TransformPlugin;
 use bevy::ui::UiPlugin;
 use bevy::ui::{ComputedNode, UiGlobalTransform};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-use taskmanager_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::appearance::DesktopAppearance;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 
 #[test]
@@ -185,9 +185,9 @@ fn permission_center_button_freezes_the_lane_and_rejects_a_stale_offer() {
         "a stale rendered button cannot request a removed capability"
     );
 }
-use taskmanager_core::core::appearance::DesktopFamily;
-use taskmanager_core::core::appearance::PreferredColorScheme;
-use taskmanager_platform_contract::RequestEnvelope;
+use taskforest_contract::RequestEnvelope;
+use taskforest_core::core::appearance::DesktopFamily;
+use taskforest_core::core::appearance::PreferredColorScheme;
 
 // ---- scripted platform client (the headless shell-app composition) ----
 

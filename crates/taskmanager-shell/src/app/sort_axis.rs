@@ -23,8 +23,8 @@
 //! data for some columns.
 
 use super::sorting::SortCol;
+use taskforest_core::core::process::ProcessSortKey;
 use taskmanager_application::process_sort::ProcessSortAxis;
-use taskmanager_core::core::process::ProcessSortKey;
 
 /// Map a process-table column onto the neutral comparator axis. The single
 /// exhaustive translation — consumers are shell `SortCol::ascending`, the

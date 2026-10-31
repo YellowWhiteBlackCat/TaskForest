@@ -4,9 +4,9 @@
 
 use crate::app::direct_track::ProcessSelection;
 use crate::app::process_rows::ProcessRowId;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessCategory;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessCategory;
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 
 fn live_process(pid: u32, start_token: u64) -> ProcessItem {
     ProcessItem::new(pid, "worker").with_scalar_observations(ProcessScalarObservations {

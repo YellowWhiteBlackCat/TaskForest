@@ -1,4 +1,4 @@
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, GpuMetrics, GpuScalarObservations,
     MemoryCompositionObservations, MemoryMetrics, MemoryModuleObservations,
     MemoryOptionalObservations, MemoryScalarObservations, OptionalObservation, ScalarObservation,
@@ -14,8 +14,8 @@ use std::fs;
 use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::time::SystemTime;
+use taskforest_core::core::metrics::ScalarObservationGroup;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::ScalarObservationGroup;
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{detect_gpu_metrics_from_paths, is_virtual_interface};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
@@ -416,7 +416,7 @@ fn schema_v1_storage_tokens_hydrate_typed_connection_and_round_trip() {
 
 #[test]
 fn test_legacy_disk_transport_derives_new_connection_axes() {
-    use taskmanager_core::core::metrics::{StorageInterconnect, StorageProtocol};
+    use taskforest_core::core::metrics::{StorageInterconnect, StorageProtocol};
 
     let disk: DiskMetrics = serde_json::from_value(serde_json::json!({
         "name": "legacy-usb",
@@ -480,7 +480,7 @@ fn test_smart_availability_ui_keys_are_exhaustive_and_distinct() {
 
 #[test]
 fn test_smart_status_alone_counts_as_reported_ui_data() {
-    use taskmanager_core::core::device_state::DeviceStatus;
+    use taskforest_core::core::device_state::DeviceStatus;
     use taskmanager_shell::presentation::{effective_smart_status, has_smart_fields};
 
     let status_only = DiskMetricsFixtureBuilder::new()

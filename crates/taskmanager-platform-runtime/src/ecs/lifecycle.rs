@@ -1,6 +1,6 @@
 //! Capability-level admission, completion, retry, and recovery transitions.
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, RequestId, RequestTracking,
     RetryDisposition,
 };

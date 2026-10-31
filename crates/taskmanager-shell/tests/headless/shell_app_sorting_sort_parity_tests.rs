@@ -1,7 +1,7 @@
 use super::{ShellApp, SortCol, SortDir};
 use crate::sort_axis;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
-use taskmanager_core::core::process::ProcessItem;
 use taskmanager_test_support::{SortFixtureMetrics, sort_fixture_row, sort_parity_fixture};
 
 fn neutral_pids(items: &[ProcessItem], axis: ProcessSortAxis, ascending: bool) -> Vec<u32> {

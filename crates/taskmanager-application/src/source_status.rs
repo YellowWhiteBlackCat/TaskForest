@@ -9,10 +9,10 @@
 
 use std::iter::once;
 
-use taskmanager_core::{
+use taskforest_contract::{OperationFailure, ProviderFailure, RetryDisposition};
+use taskforest_core::{
     DeviceState, DeviceStatus, FailureKind, ProviderId, SourceOutcome, SourceStatus,
 };
-use taskmanager_platform_contract::{OperationFailure, ProviderFailure, RetryDisposition};
 
 /// The headline failure represented by one or more source statuses.
 ///

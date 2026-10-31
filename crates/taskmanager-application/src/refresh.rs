@@ -1,9 +1,9 @@
 //! Typed refresh requests and data delivered back to a frontend.
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{ServiceDeps, ServiceLogSnapshot, ServiceLogStreamSnapshot};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{ServiceDeps, ServiceLogSnapshot, ServiceLogStreamSnapshot};
+use taskforest_core::core::target::ServiceId;
 
 use crate::ServiceControlOutcome;
 

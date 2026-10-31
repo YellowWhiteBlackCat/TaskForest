@@ -6,6 +6,13 @@
 //! uncorrelated outcome changes nothing (fail-closed).
 use super::super::*;
 use std::sync::{Arc, Mutex};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilitySnapshot, EventEnvelope,
+    EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
+    RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessSignal};
 use taskmanager_application::{
     AppPage, CorrelatedEvent, KeyCode, Modifiers, PlatformClient, PlatformEvent,
     PlatformEventBatch, PlatformEventContext, PlatformFacets, PlatformHandle,
@@ -14,13 +21,6 @@ use taskmanager_application::{
 use taskmanager_application::{
     ProcessAffinityControlRequest, ProcessAffinityEvent, ProcessAffinityRequest,
     ProcessAffinityState, RefreshRequest,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessSignal};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilitySnapshot, EventEnvelope,
-    EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
-    RequestId, RequestPort, SubmissionError,
 };
 use taskmanager_test_support::pin_english;
 

@@ -1,11 +1,11 @@
-use taskmanager_core::DirectoryScanBounds;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityRequest, MAX_REQUEST_SCOPE_BYTES, RequestTracking, RequestTrackingError,
 };
+use taskforest_core::DirectoryScanBounds;
 
 use super::*;
-use taskmanager_core::DirectoryScanStatus;
-use taskmanager_core::DirectoryScanTotals;
+use taskforest_core::DirectoryScanStatus;
+use taskforest_core::DirectoryScanTotals;
 
 #[test]
 fn directory_usage_request_owns_the_filesystem_directory_usage_capability() {

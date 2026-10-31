@@ -1,17 +1,17 @@
 use gpui::AppContext;
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessMetadataObservations;
+use taskforest_core::core::process::ProcessOwner;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process_telemetry::ContainerQuota;
+use taskforest_core::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::{
     ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessMetadataObservations;
-use taskmanager_core::core::process::ProcessOwner;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process_telemetry::ContainerQuota;
-use taskmanager_core::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 use super::RootView;

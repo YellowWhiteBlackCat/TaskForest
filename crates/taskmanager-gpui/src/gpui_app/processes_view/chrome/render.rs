@@ -33,8 +33,8 @@ use taskmanager_shell::SortCol;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
-use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{ProcessRowId, ProcessStatusFilter};
 
 /// All straight-through processes-page render inputs (design-debt #1 props

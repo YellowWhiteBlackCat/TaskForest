@@ -3,12 +3,12 @@
 use std::collections::HashSet;
 
 use crate::gpui_app::processes_view::rows::category_tree_rows;
-use taskmanager_application::i18n::{self, Language};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation, ProcessScalarObservations,
 };
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_core::core::{FailureKind, ScalarObservation};
+use taskforest_core::core::units::UnitPreferences;
+use taskforest_core::core::{FailureKind, ScalarObservation};
+use taskmanager_application::i18n::{self, Language};
 use taskmanager_shell::SortCol;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

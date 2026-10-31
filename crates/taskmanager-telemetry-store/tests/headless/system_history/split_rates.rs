@@ -10,7 +10,7 @@
 use crate::HistoryRetention;
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceGeneration, DeviceId, DeviceState, DiskMetrics, FailureKind, HistoricalSample,
     HistoryMetric, HistoryRecordSink, HistorySeriesKey, NetworkScalarObservations,
     NetworkTelemetryObservation, ScalarObservation, StorageTelemetryObservation,
@@ -18,8 +18,8 @@ use taskmanager_core::{
 
 use super::*;
 use crate::TelemetryStore;
-use taskmanager_core::DevicePresence;
-use taskmanager_core::DiskScalarObservations;
+use taskforest_core::DevicePresence;
+use taskforest_core::DiskScalarObservations;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 

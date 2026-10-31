@@ -11,8 +11,8 @@ use taskmanager_ui::inputs::select::{SelectOption, select};
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 use crate::gpui_app::root::RootView;
+use taskforest_core::core::alerts::QuietBound;
 use taskmanager_application::i18n;
-use taskmanager_core::core::alerts::QuietBound;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

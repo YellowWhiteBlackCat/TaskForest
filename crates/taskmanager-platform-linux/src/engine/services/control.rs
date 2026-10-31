@@ -4,8 +4,8 @@ use std::io;
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::{FailureKind, ServiceAction, ServiceId};
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{FailureKind, ServiceAction, ServiceId};
 
 use super::log_fetch::permission_denied;
 use super::target::{ResolvedServiceTarget, resolve_service_target};

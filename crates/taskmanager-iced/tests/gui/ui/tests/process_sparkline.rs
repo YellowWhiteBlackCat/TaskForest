@@ -5,8 +5,8 @@ use super::super::process_sparkline::{ProcessCpuSparkline, process_sparkline_poi
 use iced::Size;
 use std::collections::HashSet;
 use std::rc::Rc;
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 

@@ -7,14 +7,14 @@ use crate::gpui_app::system_health_view::{
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::{DeviceGeneration, SmartSelfTestReport};
 use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, PendingConfirmation, SmartControlRequest, SmartObservationProjection,
     SurfaceDismissReason, SurfaceKind,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::{DeviceGeneration, SmartSelfTestReport};
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;

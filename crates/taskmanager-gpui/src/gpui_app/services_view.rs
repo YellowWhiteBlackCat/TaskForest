@@ -31,12 +31,12 @@ use gpui::{
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

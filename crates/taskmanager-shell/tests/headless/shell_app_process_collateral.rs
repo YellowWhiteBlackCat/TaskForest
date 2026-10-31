@@ -6,8 +6,8 @@
 //! — the frozen-gate contract.
 
 use super::*;
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::ProcessScalarObservations;
 
 fn live_process(pid: u32, parent_pid: Option<u32>, token: u64) -> ProcessItem {
     let mut process = ProcessItem::new(pid, format!("process-{pid}"));

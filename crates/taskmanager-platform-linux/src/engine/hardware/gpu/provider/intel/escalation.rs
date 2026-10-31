@@ -16,7 +16,7 @@
 
 use std::io;
 
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 use taskmanager_escalation::{
     EscalationAvailability, EscalationFeature, PrivilegeGate, UnprivilegedGate,
 };

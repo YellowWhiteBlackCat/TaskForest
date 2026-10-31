@@ -1,8 +1,8 @@
 //! Behavior tests for GPU engines breakdown panel and SMART self-test control in Iced.
 
 use crate::app::Message;
+use taskforest_core::core::SmartSelfTestKind;
 use taskmanager_application::ConfirmationKind;
-use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_shell::fixture::health::seed_smart_self_test_capabilities;
 use taskmanager_shell::presentation::smart::self_test_intent;
 
@@ -86,7 +86,7 @@ fn smart_self_test_control_request_and_confirm_flow() {
 
 #[test]
 fn a_painted_smart_control_cannot_retarget_a_replaced_disk() {
-    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::identity::DeviceGeneration;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     let mut app = crate::IcedApp::demo();
     seed_smart_self_test_capabilities(&mut app.shell);

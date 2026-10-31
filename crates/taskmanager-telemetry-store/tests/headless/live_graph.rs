@@ -4,7 +4,7 @@ use crate::HistoryRetention;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use taskmanager_core::{
+use taskforest_core::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DeviceGeneration, DeviceId,
     DeviceLifecycle, DevicePresence, DeviceState, DiskMetrics, GpuMetrics, GpuScalarObservations,
     GpuTelemetryObservation, NetworkMetrics, NetworkScalarObservations,
@@ -16,8 +16,8 @@ use super::{
     ChartSeriesError, ChartSeriesQuery, DeviceDomain, LiveGraphHistory, MetricSeries, SeriesScope,
 };
 use crate::{CorrelatedTelemetryStamp, TelemetryStore};
-use taskmanager_core::DiskScalarObservations;
-use taskmanager_core::GpuEngine;
+use taskforest_core::DiskScalarObservations;
+use taskforest_core::GpuEngine;
 
 fn stamp_at(revision: u64, completed_at_ms: u64) -> CorrelatedTelemetryStamp {
     CorrelatedTelemetryStamp::from_accepted_event(revision, completed_at_ms)

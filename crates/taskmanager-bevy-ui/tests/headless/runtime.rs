@@ -11,10 +11,10 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use taskmanager_application::{PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
 };
+use taskmanager_application::{PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle};
 
 use super::{RuntimeCache, RuntimeStartFailure};
 

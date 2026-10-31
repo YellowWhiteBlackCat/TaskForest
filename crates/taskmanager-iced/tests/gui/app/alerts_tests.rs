@@ -1,11 +1,11 @@
 use super::*;
 use crate::app::Message;
+use taskforest_core::core::alerts::AlertMetric;
+use taskforest_core::core::alerts::import_alert_rules_json;
 use taskmanager_application::AppPage;
 use taskmanager_application::ManagedAlertRuleEditOutcome;
 use taskmanager_application::i18n::Language;
 use taskmanager_application::i18n::set_language;
-use taskmanager_core::core::alerts::AlertMetric;
-use taskmanager_core::core::alerts::import_alert_rules_json;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
 
@@ -295,10 +295,10 @@ fn export_alert_rules_returns_valid_json_matching_canonical_rules() {
 
 #[test]
 fn import_alert_rules_replaces_rules_correctly() {
-    use taskmanager_application::AlertRuleImportMode;
-    use taskmanager_core::core::alerts::{
+    use taskforest_core::core::alerts::{
         AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
     };
+    use taskmanager_application::AlertRuleImportMode;
 
     let mut app = crate::IcedApp::demo();
     let new_rule = AlertRule::new(
@@ -326,11 +326,11 @@ fn import_alert_rules_replaces_rules_correctly() {
 
 #[test]
 fn import_alert_rules_merges_with_replace_existing_policy() {
-    use taskmanager_application::AlertRuleImportMode;
-    use taskmanager_core::core::alerts::{
+    use taskforest_core::core::alerts::{
         AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertSeverity,
         export_alert_rules_json,
     };
+    use taskmanager_application::AlertRuleImportMode;
 
     let mut app = crate::IcedApp::demo();
     let initial_count = app.alerts_rules().len();
@@ -383,8 +383,8 @@ fn import_alert_rules_merges_with_replace_existing_policy() {
 
 #[test]
 fn import_alert_rules_rejects_invalid_json() {
+    use taskforest_core::core::alerts::AlertRuleTransferError;
     use taskmanager_application::AlertRuleImportMode;
-    use taskmanager_core::core::alerts::AlertRuleTransferError;
 
     let mut app = crate::IcedApp::demo();
     let before = app.alerts_rules().to_vec();
@@ -413,10 +413,10 @@ fn export_rules_message_reports_clipboard_notice() {
 #[test]
 fn import_rules_message_applies_and_reports_notice() {
     set_language(Language::En);
-    use taskmanager_application::AlertRuleImportMode;
-    use taskmanager_core::core::alerts::{
+    use taskforest_core::core::alerts::{
         AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
     };
+    use taskmanager_application::AlertRuleImportMode;
 
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
@@ -454,7 +454,7 @@ fn import_rules_message_applies_and_reports_notice() {
 
 #[test]
 fn add_alert_rule_appends_new_rule_and_enables_it() {
-    use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+    use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut app = crate::IcedApp::demo();
     let initial_count = app.alerts_rules().len();
@@ -484,7 +484,7 @@ fn add_alert_rule_appends_new_rule_and_enables_it() {
 
 #[test]
 fn update_alert_rule_modifies_existing_rule_and_preserves_enabled_state() {
-    use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+    use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
@@ -569,7 +569,7 @@ fn remove_alert_rule_deletes_rule_by_id() {
 #[test]
 fn add_rule_message_applies_and_reports_notice() {
     set_language(Language::En);
-    use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+    use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));

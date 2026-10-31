@@ -20,8 +20,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::widgets::{Paragraph, Wrap};
 
+use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{MISSING_VALUE, device_status_i18n_key};
 use taskmanager_ui_contract::IconId;

@@ -1,6 +1,6 @@
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{overview_stats, summary_tiles, swap_bar_stats};

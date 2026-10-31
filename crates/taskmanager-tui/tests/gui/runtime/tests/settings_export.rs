@@ -3,21 +3,21 @@
 
 use super::super::*;
 use crate::demo_app;
+use taskforest_contract::{
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+};
+use taskforest_core::core::config::Config;
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
+};
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigStore;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::{AppAction, i18n::t};
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
-use taskmanager_core::core::sensors::{
-    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
-    SensorReading, SensorScale,
-};
-use taskmanager_platform_contract::{
-    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-};
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,

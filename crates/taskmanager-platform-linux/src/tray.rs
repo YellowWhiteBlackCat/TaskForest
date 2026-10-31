@@ -16,10 +16,10 @@ use std::sync::mpsc::Sender;
 
 use ksni::menu::{CheckmarkItem, RadioGroup, RadioItem, StandardItem, SubMenu};
 use ksni::{Error, Icon, MenuItem, Status, ToolTip};
-use taskmanager_core::tray::{
+use taskforest_contract::{TrayController, TrayFailure};
+use taskforest_core::tray::{
     TrayActionId, TrayEvent, TrayIconData, TrayMenuItem, TrayMenuSpec, TraySpec,
 };
-use taskmanager_platform_contract::{TrayController, TrayFailure};
 
 /// Stable StatusNotifierItem id; consistent across sessions.
 const TRAY_ID: &str = "TaskForest";

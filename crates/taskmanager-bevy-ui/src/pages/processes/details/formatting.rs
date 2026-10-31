@@ -1,14 +1,14 @@
 //! Formatter helpers for Bevy Process Insights cards.
 
-use taskmanager_application::process_details_vm::render_environment_variable;
-use taskmanager_application::{ProjectedProcessResources, i18n::t};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process_telemetry::ThreadWaitKind;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process_telemetry::ThreadWaitKind;
+use taskforest_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, IsolationKind,
     ProcessEnvironment, ProcessGpuSnapshot, ProcessIsolation, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreadInfo, ProcessThreads,
 };
+use taskmanager_application::process_details_vm::render_environment_variable;
+use taskmanager_application::{ProjectedProcessResources, i18n::t};
 use taskmanager_shell::presentation::namespaces_summary;
 use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;

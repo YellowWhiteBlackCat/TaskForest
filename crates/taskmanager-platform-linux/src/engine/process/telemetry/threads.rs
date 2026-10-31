@@ -8,8 +8,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::{
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::{
     FailureKind, ProcessIdentity, ProcessThreadInfo, ProcessThreads, ThreadState, ThreadWaitKind,
 };
 

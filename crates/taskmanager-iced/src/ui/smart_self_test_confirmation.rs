@@ -3,9 +3,9 @@
 use iced::Element;
 use iced::Length;
 use iced::widget::{column, row, text};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message};

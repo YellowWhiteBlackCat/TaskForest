@@ -4,8 +4,8 @@
 
 use iced::Length;
 use iced::widget::{column, row, text};
+use taskforest_core::core::setup::{SetupScriptAction, SetupScriptInfo};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptInfo};
 use taskmanager_shell::presentation::first_run::first_run_failure_key;
 
 use crate::app::Message;

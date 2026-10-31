@@ -2,7 +2,7 @@
 //! Mission Centre model — driven by the platform session ports. Not a per-user
 //! rollup.
 //!
-//! Columns: Session(120) / User(140) / Seat(80) / TTY(80) / Remote(70) /
+//! Columns: Session(120) / User(140) / Seat(80) / TTY(80) / Family(100) /
 //! Logon(140). An action bar offers Disconnect (`terminate-session`) and Lock
 //! (`lock-session`) through the shared visible confirmation surface; transient feedback
 //! (success/failure) lands in a status line, reusing the shared
@@ -37,10 +37,10 @@ use gpui::{
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::source::SourceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -88,7 +88,7 @@ pub struct UsersDelegate {
 
 impl UsersDelegate {
     /// Build a delegate with an empty row set, the fixed 6-column header
-    /// (Session / User / Seat / TTY / Remote / Logon), and the given theme +
+    /// (Session / User / Seat / TTY / Family / Logon), and the given theme +
     /// RootView handle. Row data is filled in per-render via
     /// [`UsersDelegate::set_data`].
     fn new(theme: Theme, root: Entity<RootView>) -> Self {
@@ -97,7 +97,7 @@ impl UsersDelegate {
             vms: Rc::new(Vec::new()),
             query: String::new(),
             // 6 columns per spec: Session 120 / User 140 / Seat 80 / TTY 80 /
-            // Remote 70 / Logon 140. Fixed widths match services/startup (the
+            // Family 100 / Logon 140. Fixed widths match services/startup (the
             // Table has no native flex column). Session / User / Seat carry
             // the shared inventory sort (header click routes through the
             // shell-owned `InventorySorts` slot).
@@ -112,7 +112,7 @@ impl UsersDelegate {
                     .width(px(80.0))
                     .sortable(),
                 TableColumn::new("tty", i18n::t("users.tty")).width(px(80.0)),
-                TableColumn::new("remote", i18n::t("users.remote")).width(px(70.0)),
+                TableColumn::new("family", i18n::t("users.family")).width(px(100.0)),
                 TableColumn::new("logon", i18n::t("users.logon")).width(px(140.0)),
             ],
             theme,
@@ -122,7 +122,7 @@ impl UsersDelegate {
 
     /// Map a table column index onto the shared inventory-sort vocabulary.
     /// `None` for columns that do not carry the interactive sort (TTY /
-    /// Remote / Logon).
+    /// Family / Logon).
     pub(crate) fn info_sort_column(&self, col_ix: usize) -> Option<InfoSortCol> {
         match col_ix {
             0 => Some(InfoSortCol::Session),
@@ -257,12 +257,12 @@ impl TableDelegate for UsersDelegate {
     /// Render one cell from the pre-folded `UserRowVm` strings (built once
     /// per data swap) — this method only styles and paints:
     /// - 0 Session (theme.fg), 1 User (theme.fg + search highlight), 2 Seat
-    ///   (theme.fg_dim), 3 TTY (theme.fg_dim), 4 Remote (theme.cpu when remote
+    ///   (theme.fg_dim), 3 TTY (theme.fg_dim), 4 Family (theme.cpu for Remote
     ///   else theme.fg_dim), 5 Logon (theme.fg_dim).
     ///
     /// The dash placeholders for missing Seat / TTY / Logon and the localized
-    /// yes/no are folded into the VM; the remote COLOR is keyed on the source
-    /// row's `remote` bool here (color is render-layer). text_size 12 matches
+    /// family labels are folded into the VM; the accent is keyed on the typed
+    /// family fact (color is render-layer). text_size 12 matches
     /// the other list rows.
     fn render_td(
         &mut self,
@@ -280,7 +280,7 @@ impl TableDelegate for UsersDelegate {
         let Some(vm) = self.vms.get(row_ix) else {
             return div();
         };
-        let remote = self.rows.get(row_ix).is_some_and(|s| s.remote);
+        let family_is_remote = vm.family_is_remote;
         match col_ix {
             0 => div()
                 .flex()
@@ -312,13 +312,17 @@ impl TableDelegate for UsersDelegate {
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.fg_dim))
                 .child(vm.tty.clone()),
-            // Remote: accent CPU token when remote (so it stands out), else dim.
+            // Remote: accent the network family so it stands out, else dim.
             4 => {
-                let color = if remote { theme.cpu } else { theme.fg_dim };
+                let color = if family_is_remote {
+                    theme.cpu
+                } else {
+                    theme.fg_dim
+                };
                 div()
                     .text_size(font_size(tokens::FONT_12))
                     .text_color(hsla(color))
-                    .child(vm.remote_label)
+                    .child(vm.family_label)
             }
             _ => div()
                 .flex()

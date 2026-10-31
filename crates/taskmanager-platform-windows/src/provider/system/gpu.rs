@@ -7,20 +7,20 @@
 //! integrated/discrete GPUs to report authentic VRAM, shared memory, and driver
 //! device facts without fabricating unsupported metrics.
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceGeneration, GpuMetricField, GpuMetricProvenance, GpuMetrics, GpuScalarObservations,
     GpuTelemetryObservation, GpuThrottleReason,
 };
 
 use super::*;
-use taskmanager_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
-use taskmanager_core::DeviceId;
-use taskmanager_core::DeviceLifecycleRegistry;
-use taskmanager_core::DeviceRefreshOutcome;
-use taskmanager_core::DeviceState;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::GpuEngine;
-use taskmanager_core::GpuEngineKind;
+use taskforest_core::DEFAULT_DEVICE_ABSENCE_RETENTION_MS;
+use taskforest_core::DeviceId;
+use taskforest_core::DeviceLifecycleRegistry;
+use taskforest_core::DeviceRefreshOutcome;
+use taskforest_core::DeviceState;
+use taskforest_core::DeviceStatus;
+use taskforest_core::GpuEngine;
+use taskforest_core::GpuEngineKind;
 use taskmanager_windows_api::WindowsApiError;
 use taskmanager_windows_api::WindowsGpuAdapterMemorySample;
 use taskmanager_windows_api::WindowsPciAddress;

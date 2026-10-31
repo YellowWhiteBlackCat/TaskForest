@@ -2,9 +2,9 @@
 
 use super::*;
 use gpui::AppContext;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::setup::SetupScriptEvent;
-use taskmanager_platform_contract::{CapabilityId, EventSequence};
+use taskforest_contract::{CapabilityId, EventSequence};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::setup::SetupScriptEvent;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_test_support::pin_english;
 use taskmanager_test_support::setup_script::platform;

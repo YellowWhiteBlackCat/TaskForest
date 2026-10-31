@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use taskmanager_core::core::metrics::{SmartAvailability, SmartToolRemediation};
+use taskforest_core::core::metrics::{SmartAvailability, SmartToolRemediation};
 
 /// The package managers this platform adapter knows how to install
 /// `smartmontools` with, in detection order. Each entry pairs the manager's

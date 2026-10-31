@@ -1,12 +1,12 @@
 use super::*;
-use taskmanager_application::i18n::{Language, set_language, t};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorScale,
 };
+use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::missing_value;

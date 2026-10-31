@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use taskmanager_core::{DeviceId, FailureKind};
+use taskforest_core::{DeviceId, FailureKind};
 
 use super::super::super::{GpuFieldRead, preferred_gpu_failure};
 

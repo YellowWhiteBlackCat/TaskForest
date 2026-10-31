@@ -5,6 +5,20 @@
 //! (`tests/service_control.rs`).
 use super::super::*;
 use std::sync::{Arc, Mutex};
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityRequest, CapabilitySnapshot, EventEnvelope, EventPort,
+    EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
+};
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskforest_core::core::setup::SetupScriptAction;
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::ProcessInsightUnavailable;
 use taskmanager_application::{
     AppPage, CommandLaunchRequest, DirectoryUsageRequest, GpuEngineRowsRequest, IntegrationFacets,
@@ -17,20 +31,6 @@ use taskmanager_application::{
 use taskmanager_application::{
     GpuEngineRowsState, MsrReadoutState, NetworkEscalationState, ProcessAffinityState,
     RaplPowerState, RequestCorrelation, ShellUiActionIntent, ShellUiActionState, SmbiosMemoryState,
-};
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
-};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
-use taskmanager_core::core::setup::SetupScriptAction;
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::SubmissionErrorKind;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityRequest, CapabilitySnapshot, EventEnvelope, EventPort,
-    EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
 #[derive(Default)]

@@ -13,8 +13,8 @@ use crate::palette::space_2;
 use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::layout::PERFORMANCE_CHART_SLOT_HEIGHT_REM;
 use bevy::text::{LineBreak, TextLayout};
-use taskmanager_core::core::power::BatteryInfo;
-use taskmanager_core::core::sensors::SensorReading;
+use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::sensors::SensorReading;
 use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricChoiceState;
 

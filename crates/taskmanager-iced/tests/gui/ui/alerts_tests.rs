@@ -1,11 +1,11 @@
 use super::*;
 use crate::app::Message;
+use taskforest_core::core::alerts::{AlertMetric, AlertRule};
 use taskmanager_application::AlertRuleImportMode;
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule};
 
 fn pin_english() {
     set_language(Language::En);

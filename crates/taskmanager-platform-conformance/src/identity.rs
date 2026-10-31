@@ -1,6 +1,6 @@
 //! Shared process-identity rejection contract.
 
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
 
 /// Verify that a stale or mismatched process identity is rejected before the
 /// native operator performs a side effect.

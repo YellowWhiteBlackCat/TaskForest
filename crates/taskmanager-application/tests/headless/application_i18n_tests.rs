@@ -13,6 +13,22 @@ fn t_resolves_and_falls_back() {
     assert_eq!(t("settings.skin"), "Skin");
     assert_eq!(t("chrome.close"), "Close");
     assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Graphical)),
+        "Graphical"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Unknown)),
+        "Unknown"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Unobserved),
+        "Not observed"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Unavailable),
+        "Unavailable"
+    );
+    assert_eq!(
         t("feedback.session_request_accepted"),
         "{action} request accepted for {target}"
     );
@@ -22,6 +38,30 @@ fn t_resolves_and_falls_back() {
     assert_eq!(t("tab.performance"), "性能");
     assert_eq!(t("settings.skin"), "皮肤");
     assert_eq!(t("chrome.close"), "关闭");
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Graphical)),
+        "图形"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Console)),
+        "控制台"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Remote)),
+        "远程"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Observed(SessionFamily::Unknown)),
+        "未知"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Unobserved),
+        "未观测"
+    );
+    assert_eq!(
+        session_family_label(SessionFamilyFact::Unavailable),
+        "不可用"
+    );
     assert_eq!(
         t("feedback.session_request_accepted"),
         "已接受对 {target} 的“{action}”请求"

@@ -13,10 +13,10 @@ use crate::ui::perf_layout::{DetailBody, DetailExtent, DetailHeader, main_with_s
 use crate::ui::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use iced::widget::column;
 use iced::{Color, Element, Renderer};
+use taskforest_contract::CapabilityId;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::{GpuEngine, GpuMetrics};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{GpuEngine, GpuMetrics};
-use taskmanager_platform_contract::CapabilityId;
 
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, GpuChartMetricUnit,

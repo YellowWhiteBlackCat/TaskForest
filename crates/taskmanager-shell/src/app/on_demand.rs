@@ -10,15 +10,15 @@
 //! checks (frozen identity authority) stay on the client, exactly like the
 //! existing lanes.
 use super::ShellApp;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{
     DirectoryUsageRequest, GpuEngineRowsRequest, MsrReadoutRequest, NpuInventoryRequest,
     PlatformEffect, ProcessAffinityControlRequest, ProcessAffinityRequest, RaplPowerRequest,
     ServiceDependenciesRequest, ServiceLogSnapshotRequest, SmartControlRequest,
     SmbiosMemoryRequest,
 };
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::target::ServiceId;
 
 impl ShellApp {
     /// Queue a directory-usage scan lifecycle request (start / resume /

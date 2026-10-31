@@ -1,4 +1,4 @@
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchTargetResult,
 };
 

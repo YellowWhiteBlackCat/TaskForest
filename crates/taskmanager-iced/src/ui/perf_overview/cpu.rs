@@ -2,14 +2,14 @@
 
 use iced::widget::{column, progress_bar, row, text};
 use iced::{Element, Length};
+use taskforest_contract::{CapabilityId, CapabilityStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::metrics::{CpuMetrics, CpuTemperatureSource};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     MsrReadoutRequestFailure, MsrReadoutState, RaplPowerRequestFailure, RaplPowerState,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::metrics::{CpuMetrics, CpuTemperatureSource};
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::presentation::{graph_summary, pressure_summary};

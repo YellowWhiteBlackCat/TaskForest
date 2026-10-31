@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::metrics::ScalarObservationGroup;
+use taskforest_core::core::metrics::ScalarObservationGroup;
 
 fn stat_value<'a>(stats: &'a [StatRow], key: &'static str) -> Option<&'a str> {
     stats

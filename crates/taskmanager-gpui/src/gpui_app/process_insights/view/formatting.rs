@@ -1,11 +1,11 @@
 //! Small pure folds used by the GPUI process-insights cards.
 
-use taskmanager_application::i18n;
-use taskmanager_core::core::process_telemetry::IsolationKind;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::IsolationKind;
+use taskforest_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionTransport, LimitValue, ProcessConnection,
 };
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_application::i18n;
 
 pub(crate) fn format_connection(connection: &ProcessConnection) -> String {
     let transport = match (&connection.transport, &connection.family) {
@@ -65,7 +65,7 @@ pub(super) fn format_pair(
 }
 
 pub(super) fn isolation_label(kind: &IsolationKind) -> &'static str {
-    use taskmanager_core::core::process_telemetry::IsolationKind;
+    use taskforest_core::core::process_telemetry::IsolationKind;
     match kind {
         IsolationKind::Docker => "Docker",
         IsolationKind::Podman => "Podman",

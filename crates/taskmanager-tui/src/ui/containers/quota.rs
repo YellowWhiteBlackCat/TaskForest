@@ -24,8 +24,8 @@
 //!   may fully use). A `cpu.max` that names no budget ("max") declares no
 //!   ceiling at all, so it can never produce an over-limit state.
 
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// The typed state of one container's declared quota.

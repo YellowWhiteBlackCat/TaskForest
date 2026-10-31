@@ -6,8 +6,8 @@
 //! Split out of `performance.rs` so the line-budget gate keeps both files
 //! under the test hard limit.
 
-use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
 };
 use taskmanager_shell::fixture;

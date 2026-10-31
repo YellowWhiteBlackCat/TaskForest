@@ -1,9 +1,9 @@
 use super::*;
 use crate::keys::IcedKey;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::{KeyCode, Modifiers};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;

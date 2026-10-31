@@ -6,9 +6,9 @@
 //! dispatch ArrowLeft/ArrowRight, and assert the `RootView` sort state moved.
 //! No pixels, no filesystem, no process signals.
 
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::ProcessBatchAction;
-use taskmanager_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::ProcessBatchAction;
+use taskforest_core::core::process::ProcessScalarObservations;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::SortDir;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
@@ -38,10 +38,10 @@ use gpui::{
     Window, WindowHandle, div, point, px, size,
 };
 use std::rc::Rc;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::root::{RootView, TopPage};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity,
     ProcessMetadataObservation,
 };

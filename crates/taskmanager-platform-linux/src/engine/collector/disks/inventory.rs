@@ -4,15 +4,15 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use sysinfo::Disks;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus, stable_disk_id};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus, stable_disk_id};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,
     ScalarObservation, StorageInterconnect,
 };
-use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::core::source::SourceOutcome;
 
 use super::identity::reconcile_storage_identity;
 use super::mounts::{MountedDiskFact, mounted_disk_facts};

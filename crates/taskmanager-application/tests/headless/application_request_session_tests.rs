@@ -1,3 +1,17 @@
+use taskforest_contract::{CapabilityId, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::metrics::{
+    GpuEngineRowsSnapshot, MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow,
+    RaplPowerSnapshot, SmbiosMemorySnapshot, SmbiosModuleRow,
+};
+use taskforest_core::core::process::{
+    FrozenProcessIdentity, PriorityTier, ProcessBatchAction, ProcessBatchIntent,
+    ProcessBatchResult, ProcessBatchTargetResult, ProcessGroupScope,
+};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::target::StorageDeviceKey;
 use taskmanager_application::{
     CommandLaunchRequest, GpuEngineRowsRequestFailure, GpuEngineRowsSession, GpuEngineRowsState,
     MsrReadoutRequestFailure, MsrReadoutSession, MsrReadoutState, NetworkEscalationSession,
@@ -8,20 +22,6 @@ use taskmanager_application::{
     SmartSelfTestState, SmbiosMemoryRequestFailure, SmbiosMemorySession, SmbiosMemoryState,
     UrlOpenRequest,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::{
-    GpuEngineRowsSnapshot, MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow,
-    RaplPowerSnapshot, SmbiosMemorySnapshot, SmbiosModuleRow,
-};
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, PriorityTier, ProcessBatchAction, ProcessBatchIntent,
-    ProcessBatchResult, ProcessBatchTargetResult, ProcessGroupScope,
-};
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
-use taskmanager_core::core::target::StorageDeviceKey;
-use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 fn request(value: u64) -> RequestId {
     RequestId::new(value).expect("fixture request id is non-zero")

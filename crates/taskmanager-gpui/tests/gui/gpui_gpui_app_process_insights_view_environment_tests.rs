@@ -1,7 +1,7 @@
 use super::*;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::process_telemetry::{
     ProcessEnvironment, ProcessEnvironmentEntry, ProcessTelemetrySnapshot,
 };
 use taskmanager_ui::init;

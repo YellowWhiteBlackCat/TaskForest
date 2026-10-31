@@ -340,7 +340,7 @@ impl Theme {
     /// Resolve skin from native-adapter appearance facts. The executable
     /// composition edge feeds [`NativeAppearance`] (see
     /// `taskmanager_gpui::gpui_app::theme::detect`)
-    /// for the taskmanager-core `DesktopAppearance` adaptation + the
+    /// for the taskforest-core `DesktopAppearance` adaptation + the
     /// `TM_SKIN`/`TM_SKIN_HC` testing override).
     pub fn detect(appearance: NativeAppearance) -> Self {
         let skin = detect_skin(appearance);

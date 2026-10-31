@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use taskmanager_core::{
+use taskforest_core::{
     BatteryInfo, BatteryScalarObservations, CpuMetrics, CpuScalarObservations,
     CpuTelemetryObservation, DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence,
     DeviceState, DeviceStatus, DiskMetrics, FailureKind, GpuEngine, GpuEngineKind, GpuMetrics,
@@ -15,7 +15,7 @@ use taskmanager_core::{
 
 use super::*;
 use crate::TelemetryStore;
-use taskmanager_core::DiskScalarObservations;
+use taskforest_core::DiskScalarObservations;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 fn stamp(revision: u64) -> CorrelatedTelemetryStamp {

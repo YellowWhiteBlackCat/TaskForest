@@ -1,9 +1,9 @@
 use super::*;
-use taskmanager_core::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::{
     DeviceId, DeviceState, FailureKind, ProviderId, SourceOutcome, SourceStatus,
     SystemObservationState,
 };
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 fn partial_network_snapshot(

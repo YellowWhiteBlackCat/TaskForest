@@ -8,10 +8,10 @@
 use super::super::perf_devices::battery::battery_section_state;
 use super::super::tables::ListState;
 use super::super::*;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::power::BatteryScalarObservations;
-use taskmanager_core::core::sensors::SensorReading;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::power::BatteryScalarObservations;
+use taskforest_core::core::sensors::SensorReading;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::record_demo_history_frame;
@@ -228,9 +228,9 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
     // that device's own history (never a sibling's, never fabricated). Both
     // sections must then compose for the collecting (<2 samples) and plotted
     // (>=2 samples) states.
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
-    use taskmanager_core::core::sensors::SensorCenterSnapshot;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+    use taskforest_core::core::sensors::SensorCenterSnapshot;
 
     let mut app = crate::IcedApp::default();
 
@@ -315,8 +315,8 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
 /// per-device test to seed the per-fan RPM window without re-deriving the full
 /// observation builder inline.
 fn sample_fan_reading(label: &str, device_id: &str, rpm: u32) -> SensorReading {
-    use taskmanager_core::core::identity::DeviceGeneration;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::sensors::{
         SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
     };
 

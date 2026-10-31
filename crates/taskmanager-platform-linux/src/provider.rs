@@ -5,6 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use taskforest_contract::{CapabilityId, PlatformAxis, PlatformCapabilitySurface, PlatformSource};
+use taskforest_core::ProviderId;
 use taskmanager_application::{
     DirectoryUsageRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
     ProcessControlRequest, ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest,
@@ -13,15 +15,11 @@ use taskmanager_application::{
     ProcessThreadsRequest, SessionControlRequest, SessionInventoryRequest, StartupControlRequest,
     StartupEvidenceRequest, StartupInventoryRequest,
 };
-use taskmanager_core::ProviderId;
 #[cfg(not(target_os = "linux"))]
 use taskmanager_escalation::polkit::NetLaunchHandle;
 use taskmanager_escalation::polkit::NetLauncherProcess;
 #[cfg(target_os = "linux")]
 use taskmanager_escalation::polkit::PkexecNetLauncher;
-use taskmanager_platform_contract::{
-    CapabilityId, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
-};
 use taskmanager_platform_provider::{
     ProcessAffinityProvider, ProcessEnvironmentProvider, ProcessGpuProvider,
     ProcessIsolationProvider, ProcessListProvider, ProcessNetworkProvider,

@@ -4,14 +4,14 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::Path;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceId, ProviderId};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{DeviceDiscovery, DeviceSourceSnapshot};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceId, ProviderId};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     BatteryInfo, BatteryScalarObservations, DeviceState, DeviceStatus, PowerSupplyKind,
     PowerSupplySnapshot, ScalarAvailability, ScalarObservation,
 };
-use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 const POWER_SUPPLY_PROVIDER: ProviderId = ProviderId::borrowed("linux.power-supply.sysfs");
 const POWER_SUPPLY_SCALAR_PROVIDER: ProviderId = ProviderId::borrowed("linux.power-supply.scalars");

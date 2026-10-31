@@ -1,9 +1,9 @@
 //! Application-owned startup evidence correlation and retention policy.
 
-use taskmanager_core::{
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::{
     DeviceState, DeviceStatus, FailureKind, StartupBootEvidenceSnapshot, StartupEvidenceFailure,
 };
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 /// Application generation assigned when a startup-evidence refresh is submitted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]

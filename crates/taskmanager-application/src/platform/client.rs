@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilityRequest, RequestEnvelope, RequestId,
     RequestIdGenerator, RequestPort, SubmissionError, SubmissionErrorKind,
 };
@@ -14,7 +14,7 @@ use super::{
     StartupEvidenceRequest, StartupEvidenceRevision, StartupInventoryRequest, StorageHealthRequest,
     SystemTelemetryDomain, SystemTelemetryProjection, SystemTelemetryRevision,
 };
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskforest_core::core::process::FrozenProcessIdentity;
 
 mod drain;
 #[cfg(test)]

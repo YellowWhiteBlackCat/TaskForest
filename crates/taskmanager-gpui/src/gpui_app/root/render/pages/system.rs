@@ -4,8 +4,8 @@
 //! selected `SystemPageSection` body, from the frame-local render context.
 
 use gpui::{AnyElement, Context, Div, IntoElement, ParentElement, Styled, div, px};
+use taskforest_contract::CapabilityId;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_platform_contract::CapabilityId;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageScaffold;
 use taskmanager_ui::theme_binding::definite_length;

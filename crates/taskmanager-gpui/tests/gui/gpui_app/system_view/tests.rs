@@ -9,7 +9,7 @@
 //! `perf_views::dynamic_stats::tests`) and the thermal surface is the System
 //! Health sensor center (`system_health_view::stats::tests`).
 
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 #[cfg(test)]
 mod tests_inner {
     use super::*;

@@ -1,7 +1,7 @@
 //! Linux power-supply provider implementation.
 
-use taskmanager_core::PowerSupplySnapshot;
-use taskmanager_platform_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::PowerSupplySnapshot;
 
 use taskmanager_platform_provider::PowerSupplyProvider;
 

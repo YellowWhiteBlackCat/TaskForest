@@ -11,7 +11,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use taskmanager_core::BootTimeline;
+use taskforest_core::BootTimeline;
 
 use crate::HistoryStoreError;
 use crate::bounded_io;

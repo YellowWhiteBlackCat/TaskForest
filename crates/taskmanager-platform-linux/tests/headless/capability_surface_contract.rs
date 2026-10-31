@@ -10,11 +10,11 @@
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
-use taskmanager_application::{CpuThrottleEvent, CpuThrottleRequest, PlatformEvent};
-use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformSource, RequestEnvelope, RequestId,
 };
+use taskmanager_application::{CpuThrottleEvent, CpuThrottleRequest, PlatformEvent};
+use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
 use taskmanager_platform_linux::{LinuxPlatformRuntime, capability_surface};
 
 /// The Linux adapter registers 49 real lanes; the number is pinned so a

@@ -48,8 +48,8 @@ use bevy::ui::Pressed;
 use bevy::ui::prelude::{BackgroundColor, EmSize, Node, RemSize};
 use bevy::ui::widget::Text;
 use bevy::window::{PrimaryWindow, Window, WindowPlugin};
+use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::NativeAppHost;
-use taskmanager_ipc::SubscriptionMask;
 
 mod capture_marker;
 mod capture_state;
@@ -76,11 +76,11 @@ use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlVisual, control_background};
+use taskforest_contract::InstanceRole;
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
-use taskmanager_platform_contract::InstanceRole;
 use taskmanager_shell::FeedbackTone;
 use taskmanager_shell::ShellApp;
 

@@ -2,16 +2,16 @@
 
 use super::RootView;
 use crate::gpui_app::services_view;
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n;
 use taskmanager_application::service_submission_failure;
 use taskmanager_application::{
     RefreshRequest, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
     ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 

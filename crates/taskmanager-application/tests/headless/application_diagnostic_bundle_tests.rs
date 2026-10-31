@@ -2,19 +2,19 @@
 
 use std::path::PathBuf;
 
-use taskmanager_core::DiagnosticBundleErrorKind;
-use taskmanager_core::config::Config;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::{
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+};
+use taskforest_core::DiagnosticBundleErrorKind;
+use taskforest_core::config::Config;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::{
     ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
     ProcessOwnerIdentity, ProcessScalarObservations,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::{ProviderId, ScalarObservation};
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::{ProviderId, ScalarObservation};
 
 use super::*;
 use crate::test_support::repo_temp_dir;

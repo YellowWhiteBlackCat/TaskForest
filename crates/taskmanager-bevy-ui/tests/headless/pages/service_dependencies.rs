@@ -14,15 +14,15 @@ use bevy::asset::{AssetPlugin, Assets};
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
+    ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus,
+};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
-    ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus,
-};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::RequestId;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_test_support::pin_english;

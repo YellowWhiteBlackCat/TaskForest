@@ -4,11 +4,11 @@ use ratatui::layout::Constraint;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Cell, Paragraph, Row, Wrap};
 use ratatui::{Frame, layout::Rect};
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::{
     ApplicationHistoryProjection, ApplicationHistoryRow, ApplicationHistoryStatus,
     ApplicationHistoryUnavailableReason, i18n::t,
 };
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use super::containers::{StatePanel, StatePanelKind};

@@ -11,7 +11,7 @@
 
 use proptest::prelude::*;
 use proptest::string::string_regex;
-use taskmanager_core::ServiceId;
+use taskforest_core::ServiceId;
 
 use super::{ServiceRelationKind, ServiceStatus};
 use super::{

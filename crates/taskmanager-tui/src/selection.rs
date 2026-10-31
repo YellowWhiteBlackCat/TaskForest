@@ -14,10 +14,10 @@ mod expansion;
 
 use std::collections::HashSet;
 
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::startup::StartupEntryId;
+use taskforest_core::core::target::{ServiceId, SessionId};
 use taskmanager_application::{AppPage, PlatformEffect};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::startup::StartupEntryId;
-use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_shell::{
     APP_TREE_EXPANSION_KEY_PREFIX, InfoTable, ProcessRowId, ProcessTreeRow,
     project_process_tree_rows,

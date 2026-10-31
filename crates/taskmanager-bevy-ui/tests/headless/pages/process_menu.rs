@@ -7,15 +7,15 @@
 //! destructive ones arm the shared gate.
 
 use bevy::input::keyboard::KeyCode;
-use taskmanager_application::i18n::t;
-use taskmanager_application::{AppAction, AppPage, PendingConfirmation};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{
-    PriorityTier, ProcessBatchAction, ProcessItem, ProcessScalarObservations,
-};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
 };
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{
+    PriorityTier, ProcessBatchAction, ProcessItem, ProcessScalarObservations,
+};
+use taskmanager_application::i18n::t;
+use taskmanager_application::{AppAction, AppPage, PendingConfirmation};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_theme::tokens::UiSize;
@@ -242,8 +242,8 @@ fn the_frozen_identity_travels_with_the_session() {
 }
 
 // ---- multi-select batch tests ----
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::PlatformEffect;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 fn multi_shelved_shell() -> ShellApp {
     let mut shell = ShellApp::new();

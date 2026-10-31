@@ -18,16 +18,16 @@ use bevy::app::App;
 use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, ResMut};
+use taskforest_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, PlatformEffect};
-use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 
 use taskmanager_shell::ShellApp;
 
 use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalTrigger};
 use crate::scene_attach::insert_into;
 use crate::widgets::menu::{MenuItem, MenuSpec};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::target::ServiceId;
 
 /// The six shared verbs, in the same display order as the TUI action menu.
 pub(crate) const MENU_ACTIONS: [ServiceAction; 6] = [

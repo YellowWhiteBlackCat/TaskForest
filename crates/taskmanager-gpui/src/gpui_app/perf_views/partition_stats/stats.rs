@@ -2,8 +2,8 @@
 //! the typed partition observation reads live here so the render module only
 //! paints the folded usage.
 
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::DiskPartition;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::DiskPartition;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum PartitionUsage {

@@ -1,13 +1,13 @@
 //! Stateless System dashboard backed by typed, RootView-owned UI state.
 
 use std::collections::HashSet;
+use taskforest_core::core::alerts::AlertRuleTransferError;
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::AlertRuleEditResult;
 use taskmanager_application::ManagedAlertRuleEdit;
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, SystemPageSection, TimelineSelection,
 };
-use taskmanager_core::core::alerts::AlertRuleTransferError;
 
 mod panels;
 pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
@@ -22,12 +22,12 @@ pub use widget::{DashboardWidgetProps, render_widget};
 
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::timeline::TimelineGraphCache;
-use taskmanager_application::DesktopNotificationRequest;
-use taskmanager_application::i18n::alert_severity_label;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     Alert, AlertEvent, AlertEventId, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId,
     AlertSeverity, AlertTargetIdentity,
 };
+use taskmanager_application::DesktopNotificationRequest;
+use taskmanager_application::i18n::alert_severity_label;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::app::alert_rows::AlertRowFamily;
 use taskmanager_shell::{ProcessStatusFilter, SortCol};

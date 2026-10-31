@@ -13,6 +13,10 @@
 //! outcomes — honest capability publication, never fabricated observations
 //! (ADR-019).
 
+use taskforest_contract::{
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+};
+use taskforest_core::ProviderId;
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, DesktopNotificationRequest,
     GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest,
@@ -24,10 +28,6 @@ use taskmanager_application::{
     RaplPowerRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
     SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
     StorageTelemetryRequest,
-};
-use taskmanager_core::ProviderId;
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
 use taskmanager_platform_provider::{
     CpuThrottleProvider, GpuEngineRowsProvider, HardwareInventoryProvider, MsrReadoutProvider,

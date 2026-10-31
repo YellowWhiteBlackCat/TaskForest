@@ -10,8 +10,8 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::ScalarAvailability;
-use taskmanager_core::{
+use taskforest_core::ScalarAvailability;
+use taskforest_core::{
     DeviceId, FailureKind, ProviderId, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorReading, SensorScale, SourceOutcome, SourceStatus,
     ThermalCoolingDeviceStatus, ThermalZoneStatus,

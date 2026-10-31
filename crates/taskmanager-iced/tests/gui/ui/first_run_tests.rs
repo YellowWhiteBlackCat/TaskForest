@@ -1,9 +1,9 @@
 //! test-intent: behavior
 
 use super::*;
+use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_assets::embedded_fonts;
-use taskmanager_core::core::failure::FailureKind;
 use taskmanager_shell::fixture::setup::setup_script_info;
 
 #[test]

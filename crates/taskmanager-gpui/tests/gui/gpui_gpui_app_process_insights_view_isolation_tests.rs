@@ -2,8 +2,8 @@
 
 use super::*;
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::process_telemetry::{
     IsolationKind, LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry,
     NamespaceAuditStatus, ProcessCapabilities, ProcessIsolation, ProcessTelemetrySnapshot,
 };
@@ -112,7 +112,7 @@ fn isolation_card_renders_seccomp_filter(cx: &mut TestAppContext) {
 #[test]
 fn format_connection_renders_socket_inventory_and_rtt() {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::process_telemetry::{
         ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
         ProcessConnection,
     };

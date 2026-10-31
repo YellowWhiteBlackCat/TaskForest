@@ -5,22 +5,24 @@ use super::{ServiceControlConfirmation, requires_service_confirmation};
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::AppContext;
 use std::sync::{Arc, Mutex};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
+    StartupImpactUnknownReason, StartupScope, StartupSource,
+};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     EnvironmentFacets, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
     SessionControlConfirmation, SessionControlRequest, TelemetryRefreshPolicy,
-};
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::startup::{
-    StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
-    StartupImpactUnknownReason, StartupScope, StartupSource,
-};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::fixture::demo_direct_track;
 use taskmanager_shell::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
@@ -115,8 +117,8 @@ fn trusted_session(id: &str, created_monotonic_usec: u64) -> SessionItem {
         user: "capture-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

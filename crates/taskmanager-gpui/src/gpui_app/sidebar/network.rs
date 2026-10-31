@@ -1,7 +1,7 @@
 //! Renderer-edge network category labels and visibility classification helpers.
 
+use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 use taskmanager_shell::presentation::optional_wifi_signal_quality_percent;
 
 /// Per-network-category visibility policy projected from the Settings/RootView

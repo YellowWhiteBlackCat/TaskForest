@@ -16,8 +16,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskforest_core::core::startup::StartupEntry;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_ui_contract::IconId;
 
 use super::containers::{KeyHint, Modal};

@@ -1,6 +1,6 @@
 //! Pure application state transitions.
 
-use taskmanager_core::FrozenProcessIdentity;
+use taskforest_core::FrozenProcessIdentity;
 
 use crate::{
     AppAction, AppPage, ConfirmationKind, FocusDirection, InteractionEvent, InteractionReduction,

@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ProviderId;
+use taskforest_core::ProviderId;
 
 #[test]
 fn provider_pci_identity_normalizes_to_linux_sysfs_shape() {

@@ -23,15 +23,15 @@
 
 ## 决策
 
-采用**中立契约 + 多适配器**：托盘词汇在 `taskmanager-core` 定义一次，三个平台适配器各自
+采用**中立契约 + 多适配器**：托盘词汇在 `taskforest-core` 定义一次，三个平台适配器各自
 实现，跨平台共用逻辑收进一个共享 crate。
 
-1. **中立契约 `taskmanager-core::tray`**：`TraySpec` / `TrayMenuSpec` / `TrayMenuItem`
+1. **中立契约 `taskforest-core::tray`**：`TraySpec` / `TrayMenuSpec` / `TrayMenuItem`
    （Action/Checkmark/Radio/Submenu/Separator）/ `TrayIconData`（RGBA）/ `TrayEvent`
    （MenuActivated/IconActivated/IconDoubleClicked）。构造期校验：RGBA 长度 = 宽×高×4、
    尺寸上限 256、菜单节点 ≤64、嵌套深度 ≤3、标签/工具提示/标题长度上限、radio 组最多
    一个选中。零 unsafe、零 OS/线程/队列类型。
-2. **契约 seam**：`taskmanager-platform-contract::TrayController`（`Send + Sync`）与
+2. **契约 seam**：`taskforest-contract::TrayController`（`Send + Sync`）与
    `TrayFailure`（`Unsupported` / `MissingDependency` / `TemporarilyUnavailable` /
    `WrongThread` / `Rejected`）；`taskmanager-platform-native::tray::spawn_tray` 按
    `cfg(target_os)` 分发到各 OS crate；`taskmanager-app-host` 与
@@ -71,7 +71,7 @@
 
 ## 验收约束
 
-- `taskmanager-core` / `-contract` / `-native` / `-linux` / `-windows` / `-macos` /
+- `taskforest-core` / `-contract` / `-native` / `-linux` / `-windows` / `-macos` /
   `-tray-muda` 均保持 `#![forbid(unsafe_code)]`；`taskmanager-windows-api` 消息泵是唯一
   新增 unsafe 面且逐块 `// SAFETY:`。
 - 纯校验、映射和状态转换必须有单元测试；测试数量不在 ADR 中维护。

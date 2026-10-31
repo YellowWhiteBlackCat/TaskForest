@@ -5,9 +5,9 @@ use super::{
     ROW_TARGET_SHORTCUT, TUI_LOCAL_COMMANDS, TuiSurfaceAction, terminal_local_action,
 };
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
+use taskforest_core::core::text::contains_ascii_ci;
 use taskmanager_application::{AppPage, PlatformEffect, UrlOpenRequest};
 use taskmanager_assets::product::REPOSITORY_URL;
-use taskmanager_core::core::text::contains_ascii_ci;
 use taskmanager_shell::presentation::command_help;
 use taskmanager_shell::{InfoTable, QuitReason, shell_local_bindings};
 

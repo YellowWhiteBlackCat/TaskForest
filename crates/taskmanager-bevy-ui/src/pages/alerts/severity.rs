@@ -8,7 +8,7 @@
 
 use crate::palette::{UiPalette, theme_color};
 use bevy::color::Color;
-use taskmanager_core::core::alerts::AlertSeverity;
+use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_theme::palette::{SeverityLevel, SeverityPalette};
 
 /// The theme's severity level for one core alert severity.

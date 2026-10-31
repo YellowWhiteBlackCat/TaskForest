@@ -1,7 +1,7 @@
 //! Headless formatter tests for the process insights network-throughput card.
 
 use super::formatting::format_rate;
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 
 #[test]
 fn network_throughput_formats_observed_rates_and_keeps_absence_honest() {

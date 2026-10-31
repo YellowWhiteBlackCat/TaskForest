@@ -2,7 +2,7 @@
 
 use super::*;
 use iced::Element;
-use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
+use taskforest_core::core::metrics::{GpuMetrics, SystemSnapshot};
 
 use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
 use taskmanager_shell::presentation::{

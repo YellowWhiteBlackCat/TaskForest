@@ -43,8 +43,8 @@ fn service_control_rejects_out_of_order_wrong_target_and_wrong_action() {
 
 #[test]
 fn session_control_rejects_out_of_order_wrong_incarnation_and_wrong_action() {
-    use taskmanager_core::core::session::{SessionIdentity, SessionIncarnation};
-    use taskmanager_core::core::target::SessionId;
+    use taskforest_core::core::session::{SessionIdentity, SessionIncarnation};
+    use taskforest_core::core::target::SessionId;
 
     let identity = |created_monotonic_usec| {
         SessionIdentity::new(

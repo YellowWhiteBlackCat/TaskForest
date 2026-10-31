@@ -4,11 +4,11 @@ use super::super::details::{
     InsightDetail, environment_summary, gpu_summary, isolation_rows, network_summary,
     open_files_summary, threads_summary, unavailable_text,
 };
+use taskforest_core::core::FailureKind;
 use taskmanager_application::{
     ProcessInsightFacet, ProcessInsightFacetState, ProcessInsightUnavailable,
     ProjectedProcessInsights, i18n::t, project_process_resources,
 };
-use taskmanager_core::core::FailureKind;
 use taskmanager_shell::presentation::{process_insight_facet_label, process_resource_rows};
 
 fn rows<T>(

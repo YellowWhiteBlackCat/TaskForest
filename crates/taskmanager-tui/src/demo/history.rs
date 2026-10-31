@@ -1,7 +1,7 @@
 //! Recent deterministic telemetry samples through the shared history ingestor.
 use super::DEMO_HISTORY_FRAMES;
 use crate::TuiApp;
-use taskmanager_core::core::metrics::{ScalarObservation, ScalarObservationGroup};
+use taskforest_core::core::metrics::{ScalarObservation, ScalarObservationGroup};
 use taskmanager_shell::fixture::record_demo_history_frame;
 
 pub(super) fn seed_demo_history(app: &mut TuiApp) {

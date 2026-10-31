@@ -94,7 +94,7 @@ BASELINE_PATHS = (
     "tests/gui/accessibility_behavior.rs",
     "locales/en.json",
     "locales/zh.json",
-    "crates/taskmanager-core/src/lib.rs",
+    "crates/taskforest-core/src/lib.rs",
 )
 
 # Valid, symmetric catalogs for the locale scenarios (a non-JSON placeholder
@@ -287,7 +287,7 @@ SCENARIOS: tuple[Scenario, ...] = (
     # --- an unrelated change never enters the UI route --------------------
     Scenario(
         "unrelated",
-        "crates/taskmanager-core/src/lib.rs",
+        "crates/taskforest-core/src/lib.rs",
         "no-ui",
     ),
 )

@@ -3,7 +3,7 @@
 //! Mirrors the Processes/Services page structure (a header row + data rows in a
 //! card surface) but is self-contained — it does not touch the shared process
 //! table column code (owned elsewhere). The rollup data comes from
-//! [`taskmanager_core::core::ContainerRollup`]; the page only renders it.
+//! [`taskforest_core::core::ContainerRollup`]; the page only renders it.
 //!
 //! Honesty contract: an empty list is an explicit, localized "no containers
 //! detected" state (never a blank panel), and a typed-unavailable source
@@ -26,15 +26,15 @@ use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 
-use taskmanager_core::core::{
+use taskforest_core::core::{
     ContainerRollup, ContainerSummary, DeviceStatus, IsolationKind, ScalarAvailability,
 };
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::container_row_window;
 use taskmanager_application::i18n;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::data::row::DataRow;

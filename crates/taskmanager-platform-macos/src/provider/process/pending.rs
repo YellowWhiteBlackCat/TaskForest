@@ -9,14 +9,14 @@
 //! insight (sysinfo surfaces only the fd COUNT; the fd -> target listing has
 //! no safe accessor, so the optional facet publishes honest Unsupported).
 
-use taskmanager_core::ProcessIsolation;
-use taskmanager_core::ProcessNetworkSnapshot;
-use taskmanager_core::ResourceGroupLimitRequest;
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::ProcessIsolation;
+use taskforest_core::ProcessNetworkSnapshot;
+use taskforest_core::ResourceGroupLimitRequest;
+use taskforest_core::{
     FrozenProcessIdentity, ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessOpenFiles,
     ProcessThreads,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessGpuProvider,
     ProcessIsolationProvider, ProcessNetworkEscalationProvider, ProcessNetworkProvider,

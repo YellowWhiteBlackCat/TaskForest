@@ -1,19 +1,19 @@
 use super::*;
 use crate::app::{Message, SettingsChange};
-use taskmanager_application::i18n::{Language, set_language, t};
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::OptionalObservation;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::OptionalObservation;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::metrics::{
     CpuFrequencySource, CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations,
     MemoryMetrics, MemoryScalarObservations, NetworkAdapterType, ScalarObservation,
     ScalarObservationGroup,
 };
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations};
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations};
+use taskforest_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorQuantity, SensorScale,
 };
+use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::trend::cpu_usage_percent;

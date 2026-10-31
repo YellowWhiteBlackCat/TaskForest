@@ -5,13 +5,13 @@
 //! untouched.
 
 use super::*;
+use taskforest_core::{
+    MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow, RaplPowerSnapshot, SmbiosMemorySnapshot,
+};
 use taskmanager_application::{
     CorrelatedMsrReadoutEvent, CorrelatedRaplPowerEvent, CorrelatedSmbiosMemoryEvent,
     MsrReadoutEvent, MsrReadoutState, RaplPowerEvent, RaplPowerState, SmbiosMemoryEvent,
     SmbiosMemoryRequestFailure, SmbiosMemoryState,
-};
-use taskmanager_core::{
-    MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow, RaplPowerSnapshot, SmbiosMemorySnapshot,
 };
 
 fn smbios_memory_event(

@@ -6,8 +6,8 @@ use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::time::Duration;
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::storage_health::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::storage_health::{
     FilesystemBackingKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
     inode_usage_percent,
 };

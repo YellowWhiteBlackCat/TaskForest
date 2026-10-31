@@ -1,14 +1,14 @@
 //! Cross-page geometry proof for the shared frame layout budget.
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, WindowHandle, px, size};
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,
 };
 
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
-use taskmanager_core::core::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
+use taskforest_core::core::{StartupBootEvidenceSnapshot, StartupCriticalChainNode};
 use taskmanager_theme::Theme;
 
 fn draw(cx: &mut TestAppContext, window: WindowHandle<RootView>) {

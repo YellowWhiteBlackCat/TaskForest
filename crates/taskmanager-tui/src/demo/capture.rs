@@ -2,10 +2,12 @@
 
 use crate::{TuiApp, TuiSurface};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use taskforest_core::core::metrics::{ScalarAvailability, SmartAvailability};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamily, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::target::SessionId;
 use taskmanager_application::{AppPage, ConfirmationKind};
-use taskmanager_core::core::metrics::{ScalarAvailability, SmartAvailability};
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::target::SessionId;
 use taskmanager_shell::fixture::process_insights::process_properties_capture_data_ready;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
@@ -219,8 +221,8 @@ pub(crate) fn prepare_users_session_confirmation(app: &mut TuiApp) {
         user: String::from("capture-user"),
         seat: Some(String::from("seat0")),
         tty: Some(String::from("tty1")),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::Observed(SessionFamily::Console),
     };
     seed_projection_fact(
         &mut app.shell,

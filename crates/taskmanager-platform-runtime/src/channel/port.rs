@@ -8,11 +8,11 @@
 use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityRequest, RequestEnvelope, RequestPort, RequestTracking, SubmissionError,
     SubmissionErrorKind,
 };
+use taskforest_core::core::identity::ProviderId;
 
 use super::lanes::Queued;
 

@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     AlertSeverity, DesktopAppearance, FrozenProcessIdentity, SetupScriptAction, SetupScriptEvent,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 
 pub trait CommandLaunchProvider: Send + 'static {
     fn run_command(&mut self, command: &str) -> Result<u32, ProviderFailure>;

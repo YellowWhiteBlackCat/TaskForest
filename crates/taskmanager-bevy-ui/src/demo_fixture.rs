@@ -19,40 +19,42 @@ use taskmanager_shell::fixture::process_insights::{
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 
-use taskmanager_application::AlertEventSeed;
-use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::alerts::{
     Alert, AlertEventKind, AlertInstanceId, AlertMetric, AlertRuleId, AlertSeverity,
     AlertTargetIdentity,
 };
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::{
     CpuMetrics, DiskMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine,
     GpuEngineKind, ScalarObservation, ScalarObservationGroup, SmartAvailability,
 };
-use taskmanager_core::core::npu::{
+use taskforest_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
 };
-use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, PowerSupplySnapshot};
+use taskmanager_application::AlertEventSeed;
+use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 mod dynamic_history;
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessItem,
 };
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, SensorScale,
 };
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamily, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
@@ -266,8 +268,8 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                 user: "capture-user".into(),
                 seat: Some("seat0".into()),
                 tty: Some("tty7".into()),
-                remote: false,
                 timestamp: Some("2026-10-12 09:30".into()),
+                family: SessionFamilyFact::Observed(SessionFamily::Console),
             };
             seed_projection_fact(
                 shell,

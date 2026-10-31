@@ -10,14 +10,14 @@
 use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "windows")]
-use taskmanager_ipc::transport::TransportStream;
+use taskforest_ipc::transport::TransportStream;
 #[cfg(not(target_os = "windows"))]
-use taskmanager_ipc::transport::bind_transport;
-use taskmanager_ipc::transport::{IpcEndpoint, TransportListener};
+use taskforest_ipc::transport::bind_transport;
+use taskforest_ipc::transport::{IpcEndpoint, TransportListener};
 #[cfg(target_os = "windows")]
 use taskmanager_platform_windows::WindowsNamedPipeServer;
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     InProcessCaptureFn, NativeWindowCapture, PlatformCapabilitySurface, WindowCaptureBackend,
     WindowCaptureFailure, WindowCaptureReceipt,
 };
@@ -216,9 +216,9 @@ pub use tray::spawn_tray;
 pub mod instance;
 
 pub use instance::acquire_single_instance;
-use taskmanager_core::LocalTimeRulesObservation;
+use taskforest_core::LocalTimeRulesObservation;
 #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-use taskmanager_core::unix_millis;
+use taskforest_core::unix_millis;
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::LinuxWindowCapture;
 #[cfg(target_os = "macos")]

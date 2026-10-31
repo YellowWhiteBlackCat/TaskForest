@@ -9,7 +9,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, HostRuntimeFacts, HostRuntimeObservation, ProviderId, ScalarObservation,
     SourceOutcome, SourceStatus, SystemLoadAverage,
 };

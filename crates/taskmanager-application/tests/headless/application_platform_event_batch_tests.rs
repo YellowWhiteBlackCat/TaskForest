@@ -1,8 +1,8 @@
-use taskmanager_core::FailureKind;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventSequence, OperationFailure, PartialSourceSnapshot, RequestId,
     RetryDisposition,
 };
+use taskforest_core::FailureKind;
 
 use super::{CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ShellEvent};
 

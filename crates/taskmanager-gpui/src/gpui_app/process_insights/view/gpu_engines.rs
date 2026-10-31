@@ -15,14 +15,14 @@
 //! stable-English-for-capture convention as the capture fixture.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
+use taskforest_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::theme::mono_font_with_fallback;
-use taskmanager_core::core::ProcessGpuEngineUsage;
-use taskmanager_core::core::device_state::DeviceStatus;
+use taskforest_core::core::ProcessGpuEngineUsage;
+use taskforest_core::core::device_state::DeviceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

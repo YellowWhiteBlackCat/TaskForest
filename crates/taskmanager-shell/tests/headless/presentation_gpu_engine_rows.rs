@@ -1,7 +1,7 @@
 use super::*;
+use taskforest_contract::RequestId;
+use taskforest_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
 use taskmanager_application::GpuEngineRowsSession;
-use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
-use taskmanager_platform_contract::RequestId;
 
 fn device() -> DeviceId {
     DeviceId::new("gpu:0")

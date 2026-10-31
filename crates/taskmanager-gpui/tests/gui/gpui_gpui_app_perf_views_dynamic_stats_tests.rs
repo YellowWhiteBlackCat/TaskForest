@@ -1,8 +1,8 @@
 use super::battery_stats;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::{
+use taskforest_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceState, ScalarObservation,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::pin_english;
 

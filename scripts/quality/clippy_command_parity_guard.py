@@ -537,7 +537,7 @@ SYNTHETIC_CI_PACKAGE_SCOPED = "\n".join(
         "jobs:",
         "  lint:",
         "    steps:",
-        "      - run: cargo clippy --locked -p taskmanager-core --all-targets "
+        "      - run: cargo clippy --locked -p taskforest-core --all-targets "
         "--features test-support -- -D warnings "
         "-W clippy::cognitive_complexity -W clippy::too_many_lines",
     ]
@@ -558,7 +558,7 @@ SYNTHETIC_CI_TWO_CLIPPY = "\n".join(
         "  lint:",
         "    steps:",
         "      - run: cargo clippy --locked --workspace -- -D warnings",
-        "      - run: cargo clippy --locked -p taskmanager-core -- -D warnings",
+        "      - run: cargo clippy --locked -p taskforest-core -- -D warnings",
     ]
 )
 
@@ -633,7 +633,7 @@ def self_test() -> int:
     assert feature_drift[0].ci_only == ("extra",)
     package_drift = compare(parse_ci_clippy(SYNTHETIC_CI_PACKAGE_SCOPED), local)
     assert [item.dimension for item in package_drift] == ["packages"]
-    assert package_drift[0].ci_only == ("-p taskmanager-core",)
+    assert package_drift[0].ci_only == ("-p taskforest-core",)
     assert package_drift[0].local_only == ("<workspace>",)
 
     # Missing clippy steps and ambiguous structures fail closed at parse time.

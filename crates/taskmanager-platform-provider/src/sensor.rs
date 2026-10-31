@@ -1,5 +1,5 @@
-use taskmanager_core::SensorCenterSnapshot;
-use taskmanager_platform_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::SensorCenterSnapshot;
 
 /// Dynamic thermal, fan, and power-channel observation.
 pub trait SensorProvider: Send + 'static {

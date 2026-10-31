@@ -16,7 +16,7 @@ graph LR
     GPUI --> ASSETS[taskmanager-assets]
     GPUI --> UI_CONTRACT[taskmanager-ui-contract]
     GPUI --> APP[taskmanager-application]
-    GPUI --> CORE[taskmanager-core]
+    GPUI --> CORE[taskforest-core]
     GPUI --> STORE[taskmanager-telemetry-store]
     TUI[taskmanager-tui host] --> UI_CONTRACT
     TUI --> APP
@@ -33,7 +33,7 @@ graph LR
     BEVY --> PLATFORM_CONTRACT
     UI_CONTRACT --> APP
     UI_CONTRACT --> PLATFORM_CONTRACT
-    APP --> PLATFORM_CONTRACT[taskmanager-platform-contract]
+    APP --> PLATFORM_CONTRACT[taskforest-contract]
     APP --> CORE
     PLATFORM_CONTRACT --> CORE
     RUNTIME[taskmanager-platform-runtime] --> APP
@@ -59,29 +59,29 @@ graph LR
     WINDOWS --> RUNTIME
 ```
 
-Dependencies only point inward. `taskmanager-core` owns identity, failure and source
+Dependencies only point inward. `taskforest-core` owns identity, failure and source
 truth and does not depend on port/envelope abstractions, an application, platform
-adapter, or frontend. `taskmanager-platform-contract` depends inward on core and adds
+adapter, or frontend. `taskforest-contract` depends inward on core and adds
 only capability, correlation, provider-failure, snapshot-wrapper and port contracts.
 `taskmanager-application` cannot depend on GPUI, a terminal library, SVG rendering,
 `/proc`, `/sys`, or platform commands.
 
 The core package conventionally owns its implementation under
-`crates/taskmanager-core/src/core.rs` and `crates/taskmanager-core/src/core/`. The root
+`crates/taskforest-core/src/core.rs` and `crates/taskforest-core/src/core/`. The root
 package contains no duplicate core tree and does not forward the core or application
 surface. Every frontend imports shared facts and platform contracts from their actual
 owner crates; no `taskmanager-application::model` compatibility address exists.
 
 ## Responsibility boundaries
 
-- `taskmanager-core`: platform-neutral facts, stable provider/device identities,
+- `taskforest-core`: platform-neutral facts, stable provider/device identities,
   completed-operation failures, source truth, typed availability, typed control
   intents/outcomes, lifecycle policy, parsers, and pure read-model
   assembly. It owns no native collector/provider implementation.
 - `taskmanager-telemetry-store`: bounded, gap-aware time-series read model plus
   a separately constructed correlated-ingestion capability. It owns no pause,
   interval, provider, native I/O, or application correlation policy.
-- `taskmanager-platform-contract`: payload-free capability IDs, request/event
+- `taskforest-contract`: payload-free capability IDs, request/event
   envelopes, provider failures, composite snapshot wrappers, and generic non-blocking
   port traits. Core identity/failure/source primitives remain imported from core.
 - `taskmanager-application`: semantic commands, shortcut routing, functional state,

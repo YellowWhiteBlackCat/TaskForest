@@ -15,11 +15,11 @@ use crate::palette::ui_palette;
 use crate::widgets::chart::canvas::{CanvasFlow, CanvasSpec, rasterize};
 use crate::widgets::chart::geometry::{ChartRun, ChartVertex};
 use bevy::color::Color;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::DeviceGeneration;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskScalarObservations, ScalarObservation, SystemSnapshot,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_theme::Theme;

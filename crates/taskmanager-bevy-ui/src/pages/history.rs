@@ -29,6 +29,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
     HistoryFrontendSession,
@@ -40,16 +41,15 @@ use taskmanager_application::{
     ApplicationHistoryStatus, HistoryReplayCompletionDisposition, HistoryReplayController,
     MAX_HISTORY_REPLAY_POINTS, PerformanceHistoryProjection,
 };
-use taskmanager_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::palette::{UiPalette, space_2, space_8, space_24};
 use crate::window::{Role, TextRole};
+use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_application::ApplicationHistoryRow;
 use taskmanager_application::ApplicationHistoryUnavailableReason;
 use taskmanager_application::HistoryReplayRequest;
-use taskmanager_core::core::history::HistoryRecordSink;
 
 pub(crate) mod control;
 pub(crate) mod scene;

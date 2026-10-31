@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::identity::DeviceId;
+use taskforest_core::core::identity::DeviceId;
 
 #[test]
 fn suspending_gpu_pacing_retains_the_session_binding_for_resume() {

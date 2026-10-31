@@ -5,7 +5,7 @@
 //! revision-aware request method, so periodic work follows the same reducer,
 //! correlation, and failure path as a user-triggered refresh.
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, RequestId, SubmissionError,
     SubmissionErrorKind,
 };

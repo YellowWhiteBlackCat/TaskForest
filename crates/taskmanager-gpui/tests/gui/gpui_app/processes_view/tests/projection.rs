@@ -5,7 +5,7 @@
 //! GPUI state — they exercise the pure `rows` helpers directly.
 
 use std::collections::HashSet;
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::fixture_start_token;
@@ -153,13 +153,13 @@ mod canonical_category {
     use crate::gpui_app::processes_view::rows::{
         Toggle, VisibleRowsProps, category_tree_rows, visible_rows,
     };
-    use taskmanager_application::i18n::{self, Language};
-    use taskmanager_application::process_category_projection::category_expansion_key;
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::{
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::process::{
         ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
         ProcessMetadataObservation, ProcessScalarObservations,
     };
+    use taskmanager_application::i18n::{self, Language};
+    use taskmanager_application::process_category_projection::category_expansion_key;
     use taskmanager_shell::ProcessStatusFilter;
     use taskmanager_shell::SortCol;
 

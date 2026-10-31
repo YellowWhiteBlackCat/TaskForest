@@ -2,13 +2,13 @@
 
 use super::*;
 use crate::presentation::process_batch_action_label;
+use taskforest_contract::RequestId;
+use taskforest_core::core::history::HistoryRecordSink;
+use taskforest_core::core::process::ProcessBatchResult;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     PersistentApplicationHistoryRecorder, ProcessEvent, RefreshRequest, RequestAttemptId,
 };
-use taskmanager_core::core::history::HistoryRecordSink;
-use taskmanager_core::core::process::ProcessBatchResult;
-use taskmanager_platform_contract::RequestId;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
@@ -330,7 +330,7 @@ pub fn process_control_notice_text(feedback: &ProcessControlFeedback) -> (String
 }
 
 fn process_batch_notice_text(result: &ProcessBatchResult) -> (String, bool) {
-    use taskmanager_core::core::process::ProcessBatchTargetResult;
+    use taskforest_core::core::process::ProcessBatchTargetResult;
 
     let action = process_batch_action_label(result.intent.action);
     let total = result.targets.len();

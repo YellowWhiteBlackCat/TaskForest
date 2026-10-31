@@ -7,8 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
-use taskmanager_core::core::device_state::DeviceLifecycleRegistry;
-use taskmanager_core::{
+use taskforest_core::core::device_state::DeviceLifecycleRegistry;
+use taskforest_core::{
     DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState, DeviceStatus,
     GpuTelemetryObservation, NetworkTelemetryObservation, PowerSupplySnapshot,
     SensorCenterSnapshot, StorageTelemetryObservation,

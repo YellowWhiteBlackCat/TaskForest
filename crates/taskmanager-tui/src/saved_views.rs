@@ -2,8 +2,8 @@
 
 use crate::{TuiApp, TuiSurface, TuiSurfaceKind};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use taskforest_core::core::config::Config;
 use taskmanager_application::{AppAction, AppPage, i18n::t};
-use taskmanager_core::core::config::Config;
 use taskmanager_shell::saved_views::{
     SavedViewPreset, SavedViewTransferFeedback, default_built_in_presets, export_saved_views_json,
     import_saved_views_json, preset_to_config, restore_saved_views, review_rows, save_current_view,

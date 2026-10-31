@@ -2,7 +2,7 @@
 //!
 //! The shared contract publishes the accelerator's power draw and its
 //! cumulative energy as ONE typed fact
-//! ([`taskmanager_core::core::npu::NpuPowerReport`]). A platform that
+//! ([`taskforest_core::core::npu::NpuPowerReport`]). A platform that
 //! cannot read the capability publishes no fact at all, and this projection
 //! then has nothing to draw: the energy curve is absent, never a flat zero
 //! line and never a value borrowed from the utilization curve.
@@ -10,7 +10,7 @@
 //! The series itself lives in the shell (the bounded power history beside
 //! the NPU usage history); a frontend reads it and never owns a buffer.
 
-use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::ShellApp;
 
 /// The accelerator power fact of the current NPU inventory.

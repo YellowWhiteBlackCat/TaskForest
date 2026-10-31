@@ -17,11 +17,11 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
-use taskmanager_application::i18n::t;
-use taskmanager_application::{PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::{
     FrozenProcessIdentity, PriorityTier, ProcessItem, ProcessLiveKey,
 };
+use taskmanager_application::i18n::t;
+use taskmanager_application::{PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui_contract::IconId;
 

@@ -4,8 +4,8 @@
 //! the startup-evidence projection it consumes. It performs no I/O and
 //! depends on the core projection.
 
-use taskmanager_core::StartupBootEvidenceSnapshot;
-use taskmanager_core::core::startup::{
+use taskforest_core::StartupBootEvidenceSnapshot;
+use taskforest_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
 };
 

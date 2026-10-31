@@ -6,9 +6,9 @@
 
 use super::*;
 use std::marker::PhantomData;
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
-use taskmanager_platform_contract::OperationFailure;
+use taskforest_contract::OperationFailure;
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
 
 mod frontend_facts;
 mod inventory;

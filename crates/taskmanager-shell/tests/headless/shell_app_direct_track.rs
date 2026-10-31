@@ -1,18 +1,20 @@
 use super::*;
 use crate::fixture::{DirectTrackSeedFact, seed_direct_track_fact};
+use taskforest_core::SessionId;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::LatestControlRequest;
 use taskmanager_application::ServiceControlOutcome;
 use taskmanager_application::{
     ControlRequestId, InteractionEvent, PendingConfirmation, PlatformEffect,
     SessionControlConfirmation, SessionControlTarget,
 };
-use taskmanager_core::SessionId;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation, SessionItem};
-use taskmanager_core::core::target::ServiceId;
 
 /// Deterministic fixture: pid N carries start token N*10, so every identity
 /// is distinct and a "reused pid" is expressible by shifting the token.
@@ -261,7 +263,7 @@ fn services_order_matches_the_shell_track_semantics() {
 
 #[test]
 fn startup_order_is_enabled_first_under_ascending_status() {
-    use taskmanager_core::core::startup::{
+    use taskforest_core::core::startup::{
         StartupControlPolicy, StartupEntryId, StartupEntryLocator, StartupImpact,
         StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
     };
@@ -311,9 +313,9 @@ fn session_order_covers_user_session_and_seat() {
 
 #[test]
 fn feedback_slots_are_latest_wins() {
-    use taskmanager_core::core::failure::FailureKind;
-    use taskmanager_core::core::services::ServiceAction;
-    use taskmanager_core::core::target::ServiceId;
+    use taskforest_core::core::failure::FailureKind;
+    use taskforest_core::core::services::ServiceAction;
+    use taskforest_core::core::target::ServiceId;
 
     let mut feedback = crate::FeedbackState::default();
     assert!(feedback.service().is_none());
@@ -373,8 +375,8 @@ fn session_item(id: &str, created_monotonic_usec: u64) -> SessionItem {
         user: "test-user".into(),
         seat: Some("seat0".into()),
         tty: Some("tty7".into()),
-        remote: false,
         timestamp: None,
+        family: SessionFamilyFact::default(),
     }
 }
 

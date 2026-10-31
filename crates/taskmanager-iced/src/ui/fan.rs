@@ -8,17 +8,17 @@
 //! carries its OWN per-device RPM mini-graph (auto-scaled to that fan's finite
 //! peak, floored at 1000 RPM — GPUI parity) read from
 //! `LiveGraphHistory::fan_rpm_for`. Read-only consume of
-//! `taskmanager_core::core::sensors::SensorReading`; this crate never mutates the
+//! `taskforest_core::core::sensors::SensorReading`; this crate never mutates the
 //! shared snapshot shape.
 
 use std::rc::Rc;
 
 use iced::Element;
 use iced::widget::container;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::sensors::{
+use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
+use taskmanager_application::i18n::t;
 
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::Theme;

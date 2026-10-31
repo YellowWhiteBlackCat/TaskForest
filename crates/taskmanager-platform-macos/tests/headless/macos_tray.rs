@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::tray::{TrayIconData, TrayMenuItem, TrayMenuSpec};
+use taskforest_core::tray::{TrayIconData, TrayMenuItem, TrayMenuSpec};
 
 // Only consumed by the `cfg(not(target_os = "macos"))` test below, so the
 // helper is dead text when the suite is checked against a darwin target.

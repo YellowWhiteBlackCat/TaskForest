@@ -1,7 +1,7 @@
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
-use taskmanager_core::core::system_health::SmartSelfTestObservation;
-use taskmanager_core::core::target::StorageDeviceKey;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskforest_core::core::system_health::SmartSelfTestObservation;
+use taskforest_core::core::target::StorageDeviceKey;
 
 use super::{SharedSmartRuntimeState, SmartCommitStatus, SmartRuntimeState};
 
@@ -243,5 +243,5 @@ fn tracked_job_limit_rejects_new_identity_but_allows_same_device_replacement() {
     assert_eq!(state.snapshot().jobs.len(), 2);
 }
 use std::sync::Mutex;
+use taskforest_contract::ProviderFailure;
 use taskmanager_application::SmartStateRevision;
-use taskmanager_platform_contract::ProviderFailure;

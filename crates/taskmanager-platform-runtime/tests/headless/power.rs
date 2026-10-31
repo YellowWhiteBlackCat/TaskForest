@@ -1,9 +1,9 @@
-use taskmanager_application::PowerSupplyRequest;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityStatus, ProviderFailure, RequestEnvelope, RequestId,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::PowerSupplyRequest;
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};

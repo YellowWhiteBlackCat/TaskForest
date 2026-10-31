@@ -1,6 +1,6 @@
 use gpui::TestAppContext;
 
-use taskmanager_core::core::DirectoryScanTotals;
+use taskforest_core::core::DirectoryScanTotals;
 use taskmanager_theme::Theme;
 
 use super::*;

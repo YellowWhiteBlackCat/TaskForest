@@ -1,6 +1,6 @@
-use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
-use taskmanager_core::core::process::{
+use taskforest_core::core::ScalarObservation;
+use taskforest_core::core::process::group_aggregate::aggregate_apps_typed;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchTargetResult,
     ProcessItem, ProcessLiveKey, ProcessMetadataObservation, ProcessScalarObservations,
     ProcessSortKey, build_process_tree, execute_process_batch_with, fuzzy_filter_processes,
@@ -12,7 +12,7 @@ fn refs(items: &[ProcessItem]) -> Vec<&ProcessItem> {
 }
 // SIGSTOP/SIGCONT and setpriority are Linux-process controls exercised against
 // a real child; the rest of this module is neutral core process logic.
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 #[cfg(target_os = "linux")]
 use taskmanager_platform_linux::{ProcessManager, pause_process, resume_process};
 use taskmanager_test_support::ProcessItemFixtureBuilder;

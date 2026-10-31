@@ -240,7 +240,7 @@ fn aggregate_cells_and_full_tooltip_fit_standard_and_compact_row_widths() {
     use bevy::transform::TransformPlugin;
     use bevy::ui::{ComputedNode, OverflowAxis, UiGlobalTransform, UiPlugin};
     use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
-    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::metrics::ScalarObservation;
     use taskmanager_test_support::pin_english;
 
     pin_english();

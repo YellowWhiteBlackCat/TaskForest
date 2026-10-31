@@ -12,9 +12,9 @@ use gpui::{
     AnyElement, App, AppContext, Context, Div, IntoElement, ParentElement, Stateful, Styled,
     Window, div, px,
 };
+use taskforest_contract::CapabilityId;
+use taskforest_contract::CapabilityStatus;
 use taskmanager_application::i18n::t;
-use taskmanager_platform_contract::CapabilityId;
-use taskmanager_platform_contract::CapabilityStatus;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;

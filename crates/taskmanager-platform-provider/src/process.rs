@@ -1,13 +1,13 @@
 //! Process-domain provider SPI: inventory, per-process telemetry insights, and
 //! affinity, resource, and signal/control mutation lanes.
 
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, ProcessEnvironment,
     ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation, ProcessItem,
     ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessSignal,
     ProcessThreads, ResourceGroupLimitRequest,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 
 pub trait ProcessListProvider: Send + 'static {
     fn refresh(

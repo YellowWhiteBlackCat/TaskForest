@@ -8,7 +8,7 @@ use super::graph_options::normalize_graph_data_points;
 use super::{PROC_COL_MAX_WIDTH, PROC_COL_MIN_WIDTH, RootView, page_token};
 use crate::gpui_app::dashboard::DashboardState;
 use crate::gpui_app::processes_view::rows::is_resizable;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     ColumnWidthConfig, Config, DENSITY_COMFORTABLE, DENSITY_COMPACT, ProcessViewPresetConfig,
 };
 use taskmanager_shell::SortCol;

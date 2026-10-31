@@ -4,9 +4,9 @@ use std::io;
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::core::services::ServiceDiagnostics;
-use taskmanager_core::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::PartialSourceSnapshot;
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_core::core::services::ServiceDiagnostics;
+use taskforest_core::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
 
 use super::parsing::{extract_openrc_description, parse_systemctl_show_inventory};
 use super::target::{systemd_service_id, valid_openrc_service_name, valid_systemd_unit_name};
@@ -14,7 +14,7 @@ use super::{
     InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceItem, ServiceManager, ServiceStatus,
     parse_openrc_status, parse_openrc_update,
 };
-use taskmanager_core::ServiceRelationGraph;
+use taskforest_core::ServiceRelationGraph;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const SYSTEMD_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("linux.service.systemd");

@@ -18,12 +18,12 @@ use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px, rem};
 use bevy::ui_widgets::{Activate, Button};
 use std::sync::Arc;
-use taskmanager_application::{ConfigSubmissionStatus, ConfigSubmitError};
-use taskmanager_core::core::config::Config;
-use taskmanager_core::core::config::sidebar::{
+use taskforest_core::core::config::Config;
+use taskforest_core::core::config::sidebar::{
     move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override,
 };
-use taskmanager_core::core::metrics::NetworkAdapterType;
+use taskforest_core::core::metrics::NetworkAdapterType;
+use taskmanager_application::{ConfigSubmissionStatus, ConfigSubmitError};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 #[derive(Resource, Default)]

@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use taskmanager_core::config::Config;
+use taskforest_core::config::Config;
 
 use crate::{ConfigLoadResult, ConfigLoadSource, ConfigStoreError, ConfigStoreErrorKind};
 

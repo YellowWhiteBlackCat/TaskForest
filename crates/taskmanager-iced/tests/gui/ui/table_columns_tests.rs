@@ -245,7 +245,7 @@ fn inventory_column_specs_keep_one_flexible_remainder() {
                 &users.name,
                 &users.seat,
                 &users.tty,
-                &users.remote,
+                &users.family,
                 &users.logon,
             ]
             .into_iter()

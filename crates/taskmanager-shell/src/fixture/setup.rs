@@ -1,7 +1,7 @@
 //! Deterministic metadata for the optional native setup review.
 
 use std::path::PathBuf;
-use taskmanager_core::core::setup::SetupScriptInfo;
+use taskforest_core::core::setup::SetupScriptInfo;
 
 /// Synthetic descriptor of the fixed optional setup asset; demo never executes it.
 pub fn setup_script_info() -> SetupScriptInfo {

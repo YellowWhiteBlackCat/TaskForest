@@ -1,18 +1,16 @@
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{CpuMetrics, CpuTelemetryObservation, HardwareInfo, NpuInventorySnapshot};
-use taskmanager_platform_contract::{
-    CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId,
-};
+use taskforest_contract::{CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{CpuMetrics, CpuTelemetryObservation, HardwareInfo, NpuInventorySnapshot};
 
 use super::super::super::{
     HardwareInventoryEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent, RaplPowerEvent,
     SmbiosMemoryEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
 use super::super::{PlatformEventBatch, PlatformEventContext, test_support::test_event_context};
-use taskmanager_core::MsrReadoutSnapshot;
-use taskmanager_core::RaplPowerSnapshot;
-use taskmanager_core::SmbiosMemorySnapshot;
+use taskforest_core::MsrReadoutSnapshot;
+use taskforest_core::RaplPowerSnapshot;
+use taskforest_core::SmbiosMemorySnapshot;
 
 #[test]
 fn hardware_inventory_event_is_independent_from_telemetry() {

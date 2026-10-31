@@ -8,13 +8,13 @@ use super::{
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div};
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::FailureKind;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::project_process_resources;
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProjectedProcessInsights,
 };
-use taskmanager_core::core::FailureKind;
-use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::definite_length;
 

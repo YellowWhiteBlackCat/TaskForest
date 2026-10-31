@@ -44,8 +44,8 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use taskforest_core::ProcessIdentity;
 use taskmanager_afpacket::{CapturedPacket, FiveTuple, PacketSource, five_tuple};
-use taskmanager_core::ProcessIdentity;
 
 use super::network::{
     NetworkAccountingFailure, NetworkByteCounters, ProcessNetworkAccountingBackend,

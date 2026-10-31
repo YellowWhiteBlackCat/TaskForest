@@ -176,7 +176,7 @@ fn shared_show_system_about_command_opens_the_mounted_system_information_surface
 fn native_boot_observes_desktop_appearance_once_and_information_uses_the_response() {
     use crate::app::SharedRuntimeHandle;
     use crate::runtime::SharedRuntime;
-    use taskmanager_core::core::appearance::{
+    use taskforest_core::core::appearance::{
         DesktopAppearance, DesktopFamily, PreferredColorScheme,
     };
     use taskmanager_test_support::desktop_appearance::platform;

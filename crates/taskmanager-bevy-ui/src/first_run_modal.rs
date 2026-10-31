@@ -26,11 +26,11 @@ use bevy::ui::prelude::{BackgroundColor, FlexDirection, Node, UiRect, Val, perce
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition};
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::setup::SetupScriptAction;
 use taskmanager_application::first_run::{FirstRunController, FirstRunPhase, FirstRunUiState};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformEffect, SetupScriptRequest, UrlOpenRequest};
 use taskmanager_assets::product::REPOSITORY_URL;
-use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_shell::presentation::first_run::first_run_phase_key;
 
 #[derive(Resource, Default)]

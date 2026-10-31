@@ -8,8 +8,8 @@
 
 use std::collections::HashSet;
 
+use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_application::AppPage;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_ui_contract::TextMotion;
 
 use super::ShellApp;

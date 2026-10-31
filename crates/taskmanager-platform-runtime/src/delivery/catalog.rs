@@ -15,20 +15,20 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRecoveryOutcome,
     CapabilityRecoveryTrigger, CapabilitySnapshot, CapabilityStatus, EventQueueSchedulingSnapshot,
     MAX_PROVIDER_PANIC_MESSAGE_CHARS, MAX_PROVIDER_PANIC_NOTES, ProviderFailure, ProviderPanicNote,
     RuntimeSchedulingSnapshot,
 };
 
-use taskmanager_platform_contract::CapabilityScheduler;
+use taskforest_contract::CapabilityScheduler;
 
 use crate::config::{CapabilityRoute, RuntimeBudgets};
 use crate::delivery::event_queue::EventQueueState;
 use crate::ecs::{CompletionRejection, CompletionVerdict, StalledSubject};
 use crate::health::CapabilityHealth;
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
 
 /// Lane and request context for one isolated provider call, consumed by
 /// [`ProviderPanicLedger::record`] only when that call panics.

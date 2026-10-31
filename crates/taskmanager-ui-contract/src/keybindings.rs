@@ -107,7 +107,7 @@ pub struct FrontendBindingDeclaration {
 ///
 /// This is the command-binding declaration axis. It is deliberately named for
 /// its own subject so it can never be confused with the platform availability
-/// axis (`taskmanager-platform-contract::CapabilityStatus`) or with the other
+/// axis (`taskforest-contract::CapabilityStatus`) or with the other
 /// two declaration axes ([`crate::CapabilityCoverageStatus`] for components and
 /// [`crate::FeatureCoverageStatus`] for product features). Each coverage
 /// outcome now names what it covers.

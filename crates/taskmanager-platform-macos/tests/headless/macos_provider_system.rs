@@ -1,6 +1,6 @@
 use super::*;
 use std::collections::HashMap;
-use taskmanager_core::CpuInstructionFeature;
+use taskforest_core::CpuInstructionFeature;
 
 #[test]
 fn sysctl_optional_keys_are_unique_and_never_cover_x86_only_features() {

@@ -13,12 +13,12 @@ use std::path::Path;
 use std::process::{Command, ExitCode, Stdio};
 use std::time::Duration;
 
-use taskmanager_core::core::device_state::stable_disk_id;
-use taskmanager_core::core::smart::SmartSelfTestKind;
-use taskmanager_core::core::storage::{
+use taskforest_core::core::device_state::stable_disk_id;
+use taskforest_core::core::smart::SmartSelfTestKind;
+use taskforest_core::core::storage::{
     StorageConnection, StorageDeviceKind, StorageDeviceTarget, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_core::core::{DeviceGeneration, DeviceId, StorageDeviceKey};
+use taskforest_core::core::{DeviceGeneration, DeviceId, StorageDeviceKey};
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const SYSFS_BLOCK_ROOT: &str = "/sys/class/block";

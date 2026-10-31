@@ -1,15 +1,15 @@
 use super::*;
 use crate::app::{FocusTarget, Message, ProcessStatusFilter};
+use taskforest_core::core::alerts::Alert;
+use taskforest_core::core::alerts::AlertEventKind;
+use taskforest_core::core::alerts::AlertInstanceId;
+use taskforest_core::core::alerts::AlertMetric;
+use taskforest_core::core::alerts::AlertRuleId;
+use taskforest_core::core::alerts::AlertSeverity;
+use taskforest_core::core::alerts::AlertTargetIdentity;
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::AppPage;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-use taskmanager_core::core::alerts::Alert;
-use taskmanager_core::core::alerts::AlertEventKind;
-use taskmanager_core::core::alerts::AlertInstanceId;
-use taskmanager_core::core::alerts::AlertMetric;
-use taskmanager_core::core::alerts::AlertRuleId;
-use taskmanager_core::core::alerts::AlertSeverity;
-use taskmanager_core::core::alerts::AlertTargetIdentity;
 use taskmanager_shell::saved_views::SavedViewTransferFeedback;
 
 #[test]

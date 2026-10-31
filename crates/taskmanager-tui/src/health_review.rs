@@ -1,6 +1,6 @@
 //! Terminal health review state and bounded navigation over cached projections.
 use crate::TuiApp;
-use taskmanager_core::core::alerts::{AlertEventKind, export_alert_events_json};
+use taskforest_core::core::alerts::{AlertEventKind, export_alert_events_json};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum HealthReviewMode {

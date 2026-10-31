@@ -8,8 +8,8 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
 };
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::{ApplicationHistoryStatus, PerformanceHistoryProjection, i18n::t};
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::{history_replay::row_heading, missing_value};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {

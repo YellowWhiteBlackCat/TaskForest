@@ -1,9 +1,9 @@
 //! Window-local systems that materialize the shared platform fold.
 
 use gpui::Context;
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::ProcessAffinityState;
 use taskmanager_application::{DesktopAppearanceEvent, RefreshRequest, SystemTelemetryDomain};
-use taskmanager_core::core::process::ProcessItem;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use taskmanager_shell::BatchFoldOutput;

@@ -7,11 +7,11 @@
 
 use std::collections::VecDeque;
 
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertEngine, AlertMetric, InsufficientReason, RollingStatSnapshot, SUGGESTION_MIN_SAMPLES,
     SuggestedThreshold,
 };
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::metrics::SystemSnapshot;
 
 pub const DEFAULT_SUGGESTION_WINDOW_CAPACITY: usize = 64;
 const MIN_SUGGESTION_WINDOW_CAPACITY: usize = 10;

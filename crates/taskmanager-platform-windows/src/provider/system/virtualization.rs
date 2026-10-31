@@ -13,7 +13,7 @@
 // Consumed by the `#[cfg(windows)]` SMBIOS firmware query and by the mounted
 // headless guest-classification tests; dormant elsewhere.
 #[cfg(any(windows, test))]
-use taskmanager_core::classify_hypervisor_vendor;
+use taskforest_core::classify_hypervisor_vendor;
 
 /// Detect whether the Windows host runs under a hypervisor. Returns the
 /// hypervisor label when detected, `None` on bare metal (including

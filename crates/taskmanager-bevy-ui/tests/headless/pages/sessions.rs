@@ -18,23 +18,23 @@ use bevy::app::App;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::session::{
+    SessionControlAction, SessionFamilyFact, SessionIdentity, SessionIncarnation, SessionItem,
+};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::target::SessionId;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedSessionEvent, EnvironmentFacets, HostTelemetryRequest, LatestControlRequest,
     PlatformClient, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
     SessionControlOutcome, SessionControlRequest, SessionEvent, SystemFacets,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::session::{
-    SessionControlAction, SessionIdentity, SessionIncarnation, SessionItem,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::core::target::SessionId;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
-    RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 use taskmanager_shell::presentation::MISSING_VALUE;
@@ -44,8 +44,7 @@ use taskmanager_theme::Theme;
 use super::{
     SessionKind, SessionKindMarker, SessionRowClicked, SessionSelection, SessionSelectionMoved,
     SessionSortClicked, SessionsRowMarker, SessionsStatusLine, bubble, empty_state_text,
-    feedback_line_text, kind, moved_row, selected_row, session_rows, session_seat_text,
-    session_tty_text,
+    feedback_line_text, moved_row, selected_row, session_rows, session_seat_text, session_tty_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
 use crate::palette::ui_palette;
@@ -66,8 +65,8 @@ fn session_item(id: &str, user: &str, seat: Option<&str>, tty: Option<&str>) -> 
         user: user.to_owned(),
         seat: seat.map(str::to_owned),
         tty: tty.map(str::to_owned),
-        remote: false,
         timestamp: Some("2026-08-24 09:00".to_owned()),
+        family: SessionFamilyFact::default(),
     }
 }
 
@@ -577,10 +576,10 @@ fn sessions_table_columns_match_shared_contract() {
             t("common.user"),
             t("users.seat"),
             t("users.tty"),
-            t("users.remote"),
+            t("users.family"),
             t("users.logon"),
         ],
-        "table column headers must align to Session, User, Seat, TTY, Remote, Logon"
+        "table column headers must align to Session, User, Seat, TTY, Family, Logon"
     );
 }
 
@@ -660,49 +659,57 @@ fn sessions_toolbar_buttons_arm_confirmation_for_selected_session() {
 // ---- terminal family marks (BEVY-150) ----
 
 #[test]
-fn session_kind_classifies_the_observed_terminal_family() {
-    let graphical = session_item("3", "ada", Some("seat0"), Some("wayland-0"));
+fn session_kind_maps_each_reported_family_to_its_own_mark() {
+    use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
+
     assert_eq!(
-        kind::classify(&graphical),
+        SessionKind::from_fact(SessionFamilyFact::Observed(SessionFamily::Graphical)),
         SessionKind::Graphical,
-        "a Wayland compositor terminal owns a display session"
+        "a display-server session wears the display mark"
     );
-    let x11 = session_item("4", "bo", Some("seat0"), Some(":0"));
-    assert_eq!(kind::classify(&x11), SessionKind::Graphical);
-    let console = session_item("5", "cy", Some("seat0"), Some("tty2"));
     assert_eq!(
-        kind::classify(&console),
+        SessionKind::from_fact(SessionFamilyFact::Observed(SessionFamily::Console)),
         SessionKind::Console,
-        "a physical console line owns a terminal session"
+        "a console session wears the terminal mark"
     );
-    let pseudo = session_item("6", "di", None, Some("pts/3"));
-    assert_eq!(kind::classify(&pseudo), SessionKind::Console);
-    let mut remote = session_item("7", "ed", Some("seat0"), Some("tty1"));
-    remote.remote = true;
     assert_eq!(
-        kind::classify(&remote),
+        SessionKind::from_fact(SessionFamilyFact::Observed(SessionFamily::Remote)),
         SessionKind::Remote,
-        "the transport outranks the terminal that carries it"
+        "a remote session wears the globe, whatever terminal carries it"
     );
-    let bare = session_item("8", "fi", None, None);
     assert_eq!(
-        kind::classify(&bare),
+        SessionKind::from_fact(SessionFamilyFact::Observed(SessionFamily::Unknown)),
         SessionKind::Unknown,
-        "an unobserved family is unknown, never a guess"
+        "an observed session with no identified family wears the neutral plate"
+    );
+    // The frontend must not invent a family the contract did not report: both
+    // the unobserved and the unavailable fact wear the neutral plate instead of
+    // borrowing a neighbouring row's mark.
+    assert_eq!(
+        SessionKind::from_fact(SessionFamilyFact::Unobserved),
+        SessionKind::Unknown
+    );
+    assert_eq!(
+        SessionKind::from_fact(SessionFamilyFact::Unavailable),
+        SessionKind::Unknown,
+        "an unavailable family is never guessed into a real one"
     );
 }
 
 #[test]
 fn session_rows_carry_their_terminal_family_mark() {
+    use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
+
     let (mut app, events) = headless_sessions_app();
     route_to_sessions(&mut app);
-    push_sessions(
-        &events,
-        vec![
-            session_item("2", "ada", Some("seat0"), Some("wayland-0")),
-            session_item("3", "bo", None, Some("tty1")),
-        ],
-    );
+    let mut graphical = session_item("2", "ada", Some("seat0"), Some("wayland-0"));
+    graphical.family = SessionFamilyFact::Observed(SessionFamily::Graphical);
+    let mut console = session_item("3", "bo", None, Some("tty1"));
+    console.family = SessionFamilyFact::Observed(SessionFamily::Console);
+    // A third row whose provider reported no family: it must wear the neutral
+    // plate rather than inherit a neighbour's family.
+    let unclassified = session_item("4", "cy", None, None);
+    push_sessions(&events, vec![graphical, console, unclassified]);
     app.update();
     app.update();
 
@@ -712,10 +719,13 @@ fn session_rows_carry_their_terminal_family_mark() {
         .iter(app.world())
         .map(|marker| marker.0)
         .collect();
-    assert_eq!(marks.len(), 2, "every session row carries one family mark");
+    assert_eq!(marks.len(), 3, "every session row carries one family mark");
     assert!(
-        marks.contains(&SessionKind::Graphical) && marks.contains(&SessionKind::Console),
-        "the marks name the two observed families: {marks:?}"
+        marks.contains(&SessionKind::Graphical)
+            && marks.contains(&SessionKind::Console)
+            && marks.contains(&SessionKind::Unknown),
+        "the marks name the reported families and stay neutral for the row that reported none: \
+         {marks:?}"
     );
 }
 

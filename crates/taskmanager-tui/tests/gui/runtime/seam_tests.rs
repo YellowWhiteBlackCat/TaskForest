@@ -14,10 +14,10 @@ use super::seam_support::{apply_terminal_event, run_event_loop};
 use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event_with_plan};
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::session::{SessionControlAction, SessionIncarnation};
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::session::{SessionControlAction, SessionIncarnation};
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP, SearchSlot,

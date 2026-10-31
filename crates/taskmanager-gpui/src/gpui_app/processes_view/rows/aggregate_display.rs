@@ -1,9 +1,9 @@
 //! Availability-preserving display text for process-group aggregate cells.
 
+use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::ScalarAvailability;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::control_error_detail;
 
 /// One stable text projection for aggregate CPU. Its full string is reused by

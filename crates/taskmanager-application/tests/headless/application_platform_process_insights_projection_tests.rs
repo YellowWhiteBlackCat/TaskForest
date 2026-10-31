@@ -1,7 +1,7 @@
 use super::*;
 use crate::ProcessInsightsRevision;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::process_telemetry::{
     ProcessIdentity, ProcessInsightSnapshot, ProcessNetworkSnapshot, ProcessResourceObservations,
     ProcessThreadInfo, ThreadState,
 };

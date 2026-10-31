@@ -1,8 +1,8 @@
 use std::fs;
 
 use super::*;
-use taskmanager_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
-use taskmanager_core::{
+use taskforest_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
+use taskforest_core::{
     DeviceId, DiskMetrics, DiskSmart, ProviderId, SourceOutcome, SourceStatus, StorageDeviceTarget,
     SystemObservationState,
 };

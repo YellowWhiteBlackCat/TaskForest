@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "linux")]
-use taskmanager_core::core::metrics::{StorageConnection, StorageInterconnect};
+use taskforest_core::core::metrics::{StorageConnection, StorageInterconnect};
 
 mod ebpf;
 #[cfg(test)]
@@ -23,7 +23,7 @@ mod ebpf_tests;
 
 #[cfg(target_os = "linux")]
 use crate::engine::hardware::classify_storage_connection;
-use taskmanager_core::core::time::unix_millis;
+use taskforest_core::core::time::unix_millis;
 
 const CAPABILITY_RECEIPT_SCHEMA_VERSION: u8 = 6;
 

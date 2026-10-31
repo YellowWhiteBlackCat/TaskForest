@@ -3,7 +3,7 @@
 //! This module owns the CONNECTION between the three axes, not a fourth
 //! vocabulary. It composes two axes this crate owns ([`FeatureId`] and
 //! [`FrontendShape`]) with the platform axis and the static registration
-//! surface owned by `taskmanager-platform-contract` ([`PlatformAxis`],
+//! surface owned by `taskforest-contract` ([`PlatformAxis`],
 //! [`PlatformSource`], [`PlatformCapabilitySurface`]; consumers import those
 //! types from their owner, this crate never re-exports them) and folds them
 //! with one mechanical function, [`classify`].
@@ -13,7 +13,7 @@
 //! | Layer | Fact | Authority |
 //! |---|---|---|
 //! | A | what a feature needs from the platform | [`FeatureId::platform_binding`] |
-//! | B | which source a platform registers per capability | [`PlatformCapabilitySurface`] - owned by `taskmanager-platform-contract`, next to the capability identity and the platform axis; the caller supplies the concrete declarations |
+//! | B | which source a platform registers per capability | [`PlatformCapabilitySurface`] - owned by `taskforest-contract`, next to the capability identity and the platform axis; the caller supplies the concrete declarations |
 //! | C | what the runtime catalog reports right now | `CapabilityCatalog::snapshot`, consumed only by platform conformance - never folded into this static ledger |
 //!
 //! Layer C is deliberately excluded: the runtime catalog seeds descriptors only
@@ -56,7 +56,7 @@
 //! gap that is merely not implemented yet must stay `Requires` + absent or
 //! undeclared; marking it `NotApplicable` would legitimize the gap.
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
     RetryDisposition,
 };

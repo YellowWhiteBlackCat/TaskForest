@@ -1,11 +1,11 @@
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::process_telemetry::ProcessResourceObservations;
-use taskmanager_platform_contract::DeviceDiscovery;
+use taskforest_contract::DeviceDiscovery;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::process_telemetry::ProcessResourceObservations;
 
 use super::*;
-use taskmanager_core::CpuMetrics;
-use taskmanager_core::core::process_telemetry::ProcessIdentity;
+use taskforest_core::CpuMetrics;
+use taskforest_core::core::process_telemetry::ProcessIdentity;
 
 fn source(outcome: SourceOutcome) -> SourceStatus {
     SourceStatus {

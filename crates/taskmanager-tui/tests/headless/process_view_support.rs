@@ -4,8 +4,8 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{SortCol, SortDir, project_process_tree_rows};
 
 use super::{ProcessRow, materialize_rows};

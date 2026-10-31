@@ -4,8 +4,8 @@
 //! calling them unqualified.
 
 use super::*;
-use taskmanager_core::core::process::PriorityTier;
-use taskmanager_core::core::process::ProcessBatchAction;
+use taskforest_core::core::process::PriorityTier;
+use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_shell::presentation::priority_tier_label;
 
 /// The three nice-level presets the Applications action bar offers (mirrors the

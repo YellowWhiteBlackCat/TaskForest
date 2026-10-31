@@ -10,13 +10,13 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskforest_core::core::process::ProcessSignal;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessSignal;
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message, ProcessMenuAction};
 use crate::{focus, theme};
-use taskmanager_core::core::process::PriorityTier;
+use taskforest_core::core::process::PriorityTier;
 use taskmanager_shell::presentation::priority_tier_label;
 
 /// The floating action panel for one open process menu. Self-owned (the

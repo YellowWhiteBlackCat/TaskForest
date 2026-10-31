@@ -15,9 +15,9 @@ use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px, rem};
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::smart::SmartSelfTestKind;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::smart::SmartSelfTestKind;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::health_review::{
     HealthReviewSection, sensor_groups, storage_groups,

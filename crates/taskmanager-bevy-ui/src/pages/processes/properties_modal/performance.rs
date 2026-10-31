@@ -2,12 +2,12 @@
 
 use crate::widgets::chart::MAX_CHART_POINTS;
 use std::sync::Arc;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_shell::presentation::{MISSING_VALUE, peak_of};
 
 #[derive(Clone, Debug)]

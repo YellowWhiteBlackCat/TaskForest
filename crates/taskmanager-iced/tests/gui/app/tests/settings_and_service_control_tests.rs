@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use super::*;
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::services::ServiceStatus;
 use taskmanager_application::DirectoryUsageRequest;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::{
     PlatformEvent, PlatformFacets, PlatformHandle, RaplPowerRequest, ServiceControlRequest,
     ServiceFacets, SystemFacets,
-};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::services::ServiceStatus;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
@@ -168,11 +168,11 @@ fn directory_usage_client(port: Arc<RecordingDirectoryUsage>) -> PlatformClient 
 /// Cancel by its own scan id.
 #[test]
 fn directory_usage_action_queues_start_then_cancel_through_the_shell_lane() {
-    use taskmanager_application::DirectoryUsageRequest;
-    use taskmanager_core::core::directory_usage::{
+    use taskforest_core::core::directory_usage::{
         DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus,
         DirectoryScanTotals, DirectoryUsageSnapshot,
     };
+    use taskmanager_application::DirectoryUsageRequest;
 
     let recorded = Arc::new(RecordingDirectoryUsage::default());
     let mut app = IcedApp::new(Some(directory_usage_client(recorded.clone())));
@@ -331,7 +331,7 @@ fn request_service_action_rejects_rows_without_provider_authority() {
 
 // --- Performance chart history (G-02/ADR-028) ---------------------------
 
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     SystemSnapshot,
 };

@@ -1,7 +1,7 @@
 //! Neutral process-details row ViewModel (ARCH.md §8.1 data layer).
 //!
 //! The single fold from a typed
-//! [`taskmanager_core::core::process::ProcessItem`] observation to the
+//! [`taskforest_core::core::process::ProcessItem`] observation to the
 //! label/value rows every frontend's process-details panel and
 //! process-properties dialog renders. Before this module the TUI
 //! (`ui/process_details.rs` + `ui/process_properties.rs`), the Iced
@@ -49,7 +49,7 @@
 //! # Adjudicated formats
 //!
 //! * Byte quantities go through the neutral
-//!   [`taskmanager_core::core::units`] ladder with the
+//!   [`taskforest_core::core::units`] ladder with the
 //!   caller's `core::units::UnitPreferences`: memory family for
 //!   `Memory`/`Pss`/`Uss`/`Shared`/`Swap`,
 //!   drive family for the four disk fields (rates append `/s`). With the
@@ -73,10 +73,10 @@
 use crate::i18n;
 use std::path::Path;
 
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::{
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::{
     QuantityFamily, UnitPreferences, format_memory, format_quantity,
 };
 
@@ -145,7 +145,7 @@ pub enum ProcessDetailsField {
     Uss,
     /// Derived shared physical memory (`RSS - USS`): the resident pages this
     /// process does not hold privately. The derivation is owned by
-    /// [`taskmanager_core::core::process::ProcessItem::current_memory_shared_bytes`],
+    /// [`taskforest_core::core::process::ProcessItem::current_memory_shared_bytes`],
     /// so it keeps the shared honest-absence semantics when either RSS or USS
     /// was not observed.
     Shared,

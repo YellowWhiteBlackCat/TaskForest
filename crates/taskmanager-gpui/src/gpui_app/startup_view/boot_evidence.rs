@@ -7,9 +7,9 @@
 //! [`StartupBootEvidenceSnapshot`] arrives as a render param.
 
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
-use taskmanager_core::core::BootSegmentDelta;
-use taskmanager_core::core::segment_deltas;
-use taskmanager_core::core::startup::StartupCriticalChainNode;
+use taskforest_core::core::BootSegmentDelta;
+use taskforest_core::core::segment_deltas;
+use taskforest_core::core::startup::StartupCriticalChainNode;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
@@ -18,11 +18,11 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
-use taskmanager_application::i18n;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot,
 };
+use taskmanager_application::i18n;
 use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;

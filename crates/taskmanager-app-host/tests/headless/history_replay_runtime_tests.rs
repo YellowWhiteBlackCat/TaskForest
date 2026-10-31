@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::bounded;
+use taskforest_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
 use taskmanager_application::{
     HistoryReplayCompletionOutcome, HistoryReplayController, HistoryReplayErrorKind,
 };
-use taskmanager_core::{HistoricalSample, HistoryMetric, HistorySeriesKey};
 use taskmanager_history_store::{PersistentHistoryStore, RecordSampleOutcome, RetentionPolicy};
 
 use super::*;

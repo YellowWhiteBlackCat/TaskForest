@@ -1,17 +1,17 @@
-use taskmanager_application::service_submission_failure;
-use taskmanager_application::{
-    ServiceDependenciesLifecycle, ServiceLifecycleState, ServiceLogStreamLifecycle,
-    ServiceRequestCorrelation,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
+use taskforest_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
     ServiceAction, ServiceDeps, ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind,
     ServiceLogFailure, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind,
     ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::service_submission_failure;
+use taskmanager_application::{
+    ServiceDependenciesLifecycle, ServiceLifecycleState, ServiceLogStreamLifecycle,
+    ServiceRequestCorrelation,
+};
 
 fn request(value: u64) -> RequestId {
     RequestId::new(value).expect("test request id is nonzero")

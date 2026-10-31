@@ -1,10 +1,10 @@
 use super::super::*;
-use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ProcessEvent};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventSequence, OperationFailure, ProviderFailure, RequestId,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ProcessEvent};
 
 fn process_snapshot_batch(sequence: u64) -> PlatformEventBatch {
     let mut batch = PlatformEventBatch::default();

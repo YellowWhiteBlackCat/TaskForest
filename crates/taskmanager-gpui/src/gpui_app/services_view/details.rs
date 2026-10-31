@@ -17,12 +17,12 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::{RootView, prop_row};
 use crate::gpui_app::theme::mono_font_with_fallback;
-use taskmanager_application::i18n;
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::services::{
     ServiceDeps, ServiceLogErrorKind, ServiceLogLevelFilter, ServiceLogState, ServiceLogTimeFilter,
     ServiceRelationKind,
 };
+use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

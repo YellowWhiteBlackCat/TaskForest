@@ -8,16 +8,16 @@ use crate::ui::confirmations::confirmations_support::render_startup_control_conf
 use crate::ui::pages::{startup_impact_text, startup_source_text};
 use crate::ui::startup_menu;
 
-use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::startup::{
     DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, StartupEntry, StartupEntryId, StartupImpactEvidence,
     StartupImpactUnknownReason,
 };
-use taskmanager_core::core::startup::{
+use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
 };
+use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -57,7 +57,7 @@ fn evidence_fixture() -> StartupBootEvidenceSnapshot {
 }
 
 fn entry_fixture() -> StartupEntry {
-    use taskmanager_core::core::startup::{
+    use taskforest_core::core::startup::{
         StartupControlPolicy, StartupImpact, StartupImpactEvidence, StartupScope, StartupSource,
     };
     StartupEntry {

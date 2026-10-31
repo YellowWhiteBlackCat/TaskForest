@@ -17,14 +17,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crossbeam_channel::Receiver;
-use taskmanager_application::{DirectoryUsageEvent, DirectoryUsageRequest, PlatformEvent};
-use taskmanager_core::core::directory_usage::{
+use taskforest_contract::{CapabilityId, ProviderFailure, RequestId};
+use taskforest_core::core::directory_usage::{
     DirectoryScanControl, DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus,
     DirectoryScanTotals, DirectoryUsageSnapshot,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_platform_contract::{CapabilityId, ProviderFailure, RequestId};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskmanager_application::{DirectoryUsageEvent, DirectoryUsageRequest, PlatformEvent};
 
 use crate::channel::Queued;
 use crate::delivery::{

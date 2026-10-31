@@ -1,8 +1,8 @@
-use taskmanager_platform_contract::{CapabilityRequest, RequestTracking};
+use taskforest_contract::{CapabilityRequest, RequestTracking};
 
 use super::*;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::target::StorageDeviceKey;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::target::StorageDeviceKey;
 
 fn target(generation: u64, locator: &str) -> StorageDeviceTarget {
     StorageDeviceTarget {

@@ -12,11 +12,11 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     DeviceId, FailureKind, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, NpuPowerObservation,
     NpuPowerReport, ScalarObservation,
 };
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::NpuInventoryProvider;
 
 /// Bounded enumeration: a host with more accelerator nodes than this is not a

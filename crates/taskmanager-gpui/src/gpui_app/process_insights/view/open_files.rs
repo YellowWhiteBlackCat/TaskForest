@@ -16,16 +16,16 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_application::project_process_resources;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::{
     OpenFileEntry, ProcessOpenFiles, ProcessResourceSnapshot,
 };
+use taskmanager_application::project_process_resources;
 use taskmanager_shell::presentation::format_open_files_saturation;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
-use taskmanager_core::core::device_state::DeviceStatus;
+use taskforest_core::core::device_state::DeviceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

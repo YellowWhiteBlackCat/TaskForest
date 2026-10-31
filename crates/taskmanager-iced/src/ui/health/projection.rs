@@ -1,7 +1,7 @@
 //! Pure system-health observation projection.
 
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
 use crate::i18n::{self, Key, Language};

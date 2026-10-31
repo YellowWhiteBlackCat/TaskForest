@@ -20,9 +20,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, TextInput};
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use taskmanager_shell::ShellApp;
 

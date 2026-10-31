@@ -7,9 +7,9 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::sync::Arc;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::truncate_text;
-use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_ui::primitives::scrollbar::rail::ScrollbarRail;
 use taskmanager_ui::theme_binding::definite_length;
@@ -20,11 +20,11 @@ use taskmanager_ui::theme_binding::hsla;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::RootView;
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

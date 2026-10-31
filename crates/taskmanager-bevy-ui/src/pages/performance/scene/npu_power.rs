@@ -3,7 +3,7 @@
 //!
 //! The shared contract publishes the accelerator's power draw and its
 //! cumulative energy as ONE typed fact
-//! ([`taskmanager_core::core::npu::NpuPowerReport`]). A platform that cannot
+//! ([`taskforest_core::core::npu::NpuPowerReport`]). A platform that cannot
 //! read the capability publishes no fact at all, and this section then does
 //! not exist: the NPU card keeps its compute curve alone, never a flat zero
 //! line standing in for the energy series and never a value derived from the

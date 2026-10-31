@@ -5,12 +5,12 @@
 //! `pub use` in `lib.rs`.
 
 use crate::TuiApp;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process_telemetry::{
     ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
 pub(crate) mod capture;

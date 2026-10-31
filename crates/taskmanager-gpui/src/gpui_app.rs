@@ -1,6 +1,6 @@
 //! gpui-based Mission Center UI (replacing the legacy wgpu stack).
 //!
-//! Reuses the framework-agnostic data layer in [`taskmanager_core::core`] (collector, metrics,
+//! Reuses the framework-agnostic data layer in [`taskforest_core::core`] (collector, metrics,
 //! process, services, hardware). This module owns only the gpui view code.
 
 pub mod about;

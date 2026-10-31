@@ -1,7 +1,7 @@
 use super::memory_stats::optional_memory;
 use super::network_stats::network_link_speed_graph_max_mbps;
 use super::{finite_graph_summary, gpu_percentage_readout};
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_theme::Theme;
 
 #[test]

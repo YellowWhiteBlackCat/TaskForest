@@ -1,15 +1,15 @@
 //! Service-log open/poll/follow/close state-machine coverage, split out of the
 //! main tests module so the file stays under the 800-line source ceiling.
 use super::super::*;
-use taskmanager_application::{
-    CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ServiceUpdate,
-};
-use taskmanager_core::core::services::ServiceLogLevel;
-use taskmanager_core::core::services::{
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::services::ServiceLogLevel;
+use taskforest_core::core::services::{
     ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
     ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+use taskmanager_application::{
+    CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ServiceUpdate,
+};
 
 #[test]
 fn service_log_open_poll_follow_and_close_follow_the_shared_state_machine() {

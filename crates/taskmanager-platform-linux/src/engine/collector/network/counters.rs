@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, FailureKind, ScalarAvailability, ScalarObservation, SourceOutcome,
 };
 

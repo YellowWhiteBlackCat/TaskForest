@@ -3,9 +3,9 @@ use std::io;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::source::SourceOutcome;
 
 use super::wireless::{
     IwLinkResult, iw_output_failure, parse_iw_info_details, parse_iw_link, parse_proc_wireless,
@@ -15,7 +15,7 @@ use super::{
     command_spawn_failure, io_failure, read_counter, read_link_speed, read_link_up, read_mtu,
     read_sysfs_inventory, read_tx_queue_len,
 };
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 #[test]
 fn wireless_parser_preserves_unknown_zero_as_no_measurement() {

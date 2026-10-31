@@ -4,8 +4,8 @@ use crate::{
     DetachedAccessibilityBridge, ProcessAggregateSemantics, ProcessRowBehavior,
     ProcessRowObservations, SemanticNodeIssue, SemanticSnapshotError,
 };
-use taskmanager_core::core::process::aggregate::{aggregate_f32, aggregate_u64};
-use taskmanager_core::core::{FailureKind, ScalarAvailability, ScalarObservation};
+use taskforest_core::core::process::aggregate::{aggregate_f32, aggregate_u64};
+use taskforest_core::core::{FailureKind, ScalarAvailability, ScalarObservation};
 
 fn sample_rows() -> [ProcessRowInput; 2] {
     [

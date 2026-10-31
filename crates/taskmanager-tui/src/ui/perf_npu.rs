@@ -6,8 +6,8 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
+use taskforest_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::{TuiApp, TuiTheme};

@@ -1,11 +1,11 @@
 //! Linux desktop and shell integration providers.
 
-use taskmanager_core::{DesktopAppearance, FrozenProcessIdentity};
-use taskmanager_core::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::{DesktopAppearance, FrozenProcessIdentity};
+use taskforest_core::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 use taskmanager_escalation::polkit::{
     SetupScriptFailure, SetupScriptOperation, SetupScriptOutcome, invoke_setup_script,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     CommandLaunchProvider, DesktopAppearanceProvider, DesktopNotificationProvider,
     ResourceRevealProvider, SetupScriptProvider, UrlOpenProvider,
@@ -13,7 +13,7 @@ use taskmanager_platform_provider::{
 
 use super::process_target::validate_process_identity;
 use crate::engine::process::{ProcessManager, validate_exact_start_token};
-use taskmanager_core::AlertSeverity;
+use taskforest_core::AlertSeverity;
 
 const SETUP_SCRIPT_PATH: &str = "/usr/share/taskforest/setup/99-taskforest.rules";
 const SETUP_HELPER_PATH: &str = "/usr/libexec/taskforest-setup-helper";

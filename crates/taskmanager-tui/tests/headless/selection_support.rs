@@ -1,7 +1,7 @@
 //! Test-side selection reference helpers on [`TuiApp`]: the cache-validity
 //! probe and the detail-row resolver the runtime tests compare against.
 
-use taskmanager_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessItem;
 
 use super::process_view;
 use crate::TuiApp;

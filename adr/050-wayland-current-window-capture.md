@@ -19,7 +19,7 @@ version 2 with no active-window target advertised.
    `--activewindow --background --output` argument vector. The executable is
    optional; absence, denial, timeout, malformed PNG and provider failure remain
    distinct typed outcomes.
-2. `taskmanager-platform-contract` owns the in-process renderer hook, native
+2. `taskforest-contract` owns the in-process renderer hook, native
    adapter trait, `WindowCaptureReceipt`, backend provenance and bounded failure
    vocabulary. `taskmanager-application` owns the `Closed | Queued | Running |
    Ready | Failed` request lifecycle.

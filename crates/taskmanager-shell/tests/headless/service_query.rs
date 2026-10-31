@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 
 fn service(name: &str, description: &str) -> ServiceItem {
     ServiceItem::from_inventory(name, name, ServiceStatus::Active, description, "", "", "")

@@ -1,8 +1,8 @@
 //! GPUI adapter for background taskforest-daemon streaming integration.
 
 use crossbeam_channel::Receiver;
+use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
-use taskmanager_ipc::DaemonMessage;
 
 use super::RootView;
 

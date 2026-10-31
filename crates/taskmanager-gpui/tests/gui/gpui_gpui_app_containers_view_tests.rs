@@ -6,11 +6,11 @@
 use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
+use taskforest_core::core::process_telemetry::ContainerQuota;
+use taskforest_core::core::units::QuantityFamily;
+use taskforest_core::core::units::UnitPreferences;
+use taskforest_core::core::{DeviceState, FailureKind, ScalarObservation};
 use taskmanager_application::MAX_CONTAINER_ROWS;
-use taskmanager_core::core::process_telemetry::ContainerQuota;
-use taskmanager_core::core::units::QuantityFamily;
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_core::core::{DeviceState, FailureKind, ScalarObservation};
 
 fn sample_container(cpu: Option<f32>, mem: Option<u64>) -> ContainerSummary {
     ContainerSummary {

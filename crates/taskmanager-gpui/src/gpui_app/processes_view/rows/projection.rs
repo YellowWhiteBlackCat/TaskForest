@@ -3,19 +3,19 @@
 
 use std::collections::HashSet;
 use std::rc::Rc;
-use taskmanager_core::core::text::match_ranges_ascii_ci;
-use taskmanager_core::core::time::LocalTimeRulesCacheKey;
+use taskforest_core::core::text::match_ranges_ascii_ci;
+use taskforest_core::core::time::LocalTimeRulesCacheKey;
 
 use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
 use gpui::Entity;
-use taskmanager_application::i18n;
-use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::{
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
 };
-use taskmanager_core::core::time::LocalTimeRulesObservation;
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::i18n;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::matches_process_query;

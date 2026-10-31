@@ -17,7 +17,7 @@ fn process_connections_split_transport_family_endpoint_and_provider_token_shapes
     let repository = repository();
     let model = read_source(
         &repository,
-        "crates/taskmanager-core/src/core/process_telemetry/connection.rs",
+        "crates/taskforest-core/src/core/process_telemetry/connection.rs",
     );
     for conflated in [
         "pub enum ConnectionProtocol",
@@ -88,23 +88,20 @@ fn frontend_sources_import_domain_owners_directly() {
         ("App host", "crates/taskmanager-app-host/src"),
         ("GPUI", "crates/taskmanager-gpui/src"),
         ("Iced", "crates/taskmanager-iced/src"),
-        (
-            "Platform contract",
-            "crates/taskmanager-platform-contract/src",
-        ),
+        ("Platform contract", "crates/taskforest-contract/src"),
         ("Platform native", "crates/taskmanager-platform-native/src"),
         ("TUI", "crates/taskmanager-tui/src"),
         ("Bevy", "crates/taskmanager-bevy-ui/src"),
     ] {
         let code = rust_code_without_line_comments(&repository.join(root));
         assert!(
-            code.contains("taskmanager_core"),
-            "{name} must consume domain facts from taskmanager-core directly"
+            code.contains("taskforest_core"),
+            "{name} must consume domain facts from taskforest-core directly"
         );
         assert!(
             !code.contains("pub use taskmanager_application")
-                && !code.contains("pub use taskmanager_core")
-                && !code.contains("pub use taskmanager_platform_contract"),
+                && !code.contains("pub use taskforest_core")
+                && !code.contains("pub use taskforest_contract"),
             "{name} restored a cross-layer forwarding re-export"
         );
     }

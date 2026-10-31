@@ -3,6 +3,8 @@
 //! helper it shares with the platform-batch fold. Split out of the parent app
 //! module so the file stays under the source-line ceiling.
 use super::{ProcessControlKind, ShellApp};
+use taskforest_contract::{RequestId, SubmissionError, SubmissionErrorKind};
+use taskforest_core::core::services::{ServiceLogErrorKind, ServiceLogFailure};
 use taskmanager_application::{
     DesktopAppearanceRequest, PlatformClient, PlatformEffect, PlatformEventBatch,
     ProcessControlRequest, ServiceControlRequest, SessionControlRequest, ShellUiActionIntent,
@@ -10,8 +12,6 @@ use taskmanager_application::{
 use taskmanager_application::{
     SmartControlRequest, request_submission_failure, service_submission_failure,
 };
-use taskmanager_core::core::services::{ServiceLogErrorKind, ServiceLogFailure};
-use taskmanager_platform_contract::{RequestId, SubmissionError, SubmissionErrorKind};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum SubmissionState {

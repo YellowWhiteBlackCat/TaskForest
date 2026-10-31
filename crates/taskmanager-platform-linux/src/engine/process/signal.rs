@@ -6,12 +6,12 @@ use nix::sys::signal::{Signal, kill};
 #[cfg(unix)]
 use nix::unistd::Pid;
 
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 use tracing::{info, warn};
 
 use super::ProcessManager;
 #[cfg(not(unix))]
-use taskmanager_core::ProcessSignal;
+use taskforest_core::ProcessSignal;
 
 impl ProcessManager {
     // ── process control: Unix (real nix/rustix syscalls) ───────────────────
@@ -93,7 +93,7 @@ impl ProcessManager {
     // ── process control: non-Unix stubs (identical signatures; unsupported) ──
 
     /// Non-Unix stub: sending signals is unsupported. The parameter takes the
-    /// platform-neutral [`taskmanager_core::ProcessSignal`] because nix's
+    /// platform-neutral [`taskforest_core::ProcessSignal`] because nix's
     /// `Signal` type does not exist off Unix.
     #[cfg(not(unix))]
     pub fn send_signal(_pid: u32, _sig: ProcessSignal) -> Result<(), FailureKind> {

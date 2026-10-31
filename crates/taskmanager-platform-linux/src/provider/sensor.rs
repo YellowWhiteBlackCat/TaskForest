@@ -1,7 +1,7 @@
 //! Linux sensor-center provider implementation.
 
-use taskmanager_core::SensorCenterSnapshot;
-use taskmanager_platform_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_contract::{DeviceSourceSnapshot, ProviderFailure};
+use taskforest_core::SensorCenterSnapshot;
 
 use taskmanager_platform_provider::SensorProvider;
 

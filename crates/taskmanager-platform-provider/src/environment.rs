@@ -1,7 +1,7 @@
-use taskmanager_core::{
+use taskforest_contract::{PartialSourceSnapshot, ProviderFailure};
+use taskforest_core::{
     SessionControlAction, SessionIdentity, SessionItem, StartupBootEvidenceSnapshot, StartupEntry,
 };
-use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 
 pub trait StartupInventoryProvider: Send + 'static {
     fn refresh(&mut self) -> Result<PartialSourceSnapshot<StartupEntry>, ProviderFailure>;

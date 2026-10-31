@@ -1,10 +1,10 @@
 //! Platform-neutral control requests and their asynchronous outcomes.
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::ServiceAction;
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity};
-use taskmanager_core::core::startup::{StartupEntry, StartupEntryId};
-use taskmanager_core::core::target::ServiceId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity};
+use taskforest_core::core::startup::{StartupEntry, StartupEntryId};
+use taskforest_core::core::target::ServiceId;
 
 /// Correlates an asynchronous control result with the latest UI intent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

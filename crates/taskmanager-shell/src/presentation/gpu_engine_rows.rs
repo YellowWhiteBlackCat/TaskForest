@@ -1,11 +1,11 @@
 //! One renderer-neutral presentation fold for the on-demand GPU-engine
 //! request session and the runtime capability catalog.
 
+use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::GpuEngineMetric;
 use taskmanager_application::{GpuEngineRowsRequestFailure, GpuEngineRowsState};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::GpuEngineMetric;
-use taskmanager_platform_contract::CapabilityStatus;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GpuEngineRowsAction {

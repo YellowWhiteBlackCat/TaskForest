@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 use taskmanager_windows_api::WindowsAdapterType;
 use taskmanager_windows_api::WindowsNetworkAdapter;
 

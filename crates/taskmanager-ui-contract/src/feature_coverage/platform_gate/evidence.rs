@@ -7,7 +7,7 @@
 //! (`scripts/parity/resolve_frontend_evidence.py`) proves every anchored row is
 //! a real `cargo nextest list` id.
 
-use taskmanager_platform_contract::{PlatformAxis, PlatformCapabilitySurface, PlatformSource};
+use taskforest_contract::{PlatformAxis, PlatformCapabilitySurface, PlatformSource};
 
 use super::super::FeatureId;
 use super::super::NO_EVIDENCE;

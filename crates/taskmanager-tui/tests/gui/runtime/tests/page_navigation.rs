@@ -1,16 +1,14 @@
 //! Applications category-tree paging and inert TUI-only chords.
 
 use super::super::*;
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{
     AppAction, AppPage, CorrelatedServiceEvent, PlatformEventBatch, ServiceEvent,
-};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
 };
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{InfoTable, PAGE_STEP};

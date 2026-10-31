@@ -19,15 +19,15 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use taskforest_core::core::config::Config;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::config::Config;
 use taskmanager_theme::Skin;
 use taskmanager_ui_contract::IconId;
 
 use crate::ThemeParams;
 use crate::TuiTheme;
+use taskforest_core::core::alerts::{NotificationPolicy, QuietHours};
 use taskmanager_application::i18n::Language;
-use taskmanager_core::core::alerts::{NotificationPolicy, QuietHours};
 mod footer;
 mod layout;
 use footer::settings_footer;

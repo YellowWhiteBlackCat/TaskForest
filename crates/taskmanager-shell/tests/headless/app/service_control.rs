@@ -2,17 +2,17 @@
 //! tests module so the file stays under the source-line ceiling.
 use super::super::*;
 use std::sync::{Arc, Mutex};
+use taskforest_contract::{
+    CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    EventSequence, RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::{
     ConfirmationKind, ControlRequestId, CorrelatedEvent, PlatformClient, PlatformEvent,
     PlatformEventContext, PlatformFacets, PlatformHandle, ServiceControlOutcome,
     ServiceControlRequest, ServiceEvent, ServiceFacets, ServiceUpdate, SurfaceKind,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    EventSequence, RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 #[test]

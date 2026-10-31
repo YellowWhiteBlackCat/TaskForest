@@ -7,9 +7,9 @@
 use std::path::Path;
 
 use iced::Size;
+use taskforest_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::AppPage;
-use taskmanager_core::core::hardware::CoreBreakdown;
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::app::PerfDevice;
 use crate::ui::responsive::PerformancePageBudget;

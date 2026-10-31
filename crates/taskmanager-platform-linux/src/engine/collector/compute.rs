@@ -6,11 +6,11 @@
 
 use super::*;
 use sysinfo::System;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::CompositeSourceSnapshot;
+use taskforest_core::core::metrics::{
     CpuFrequencySource, CpuScalarObservations, ScalarAvailability, ScalarObservationGroup,
     ScalarObservationSlot, cpu_usage_pct_observation,
 };
-use taskmanager_platform_contract::CompositeSourceSnapshot;
 
 #[cfg(target_os = "linux")]
 use nix::unistd::{SysconfVar, sysconf};

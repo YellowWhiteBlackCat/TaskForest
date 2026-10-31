@@ -17,7 +17,7 @@
 jobs = 4
 # Warning gate for local packages. `build.warnings` is Cargo's own knob for
 # exactly this scope and is stable since Cargo 1.97 (this repository pins
-# 1.99.0). It replaces `rustflags = ["-D", "warnings"]`, which applied the flag
+# 1.99.1). It replaces `rustflags = ["-D", "warnings"]`, which applied the flag
 # to every compiler invocation and therefore invalidated the whole build cache
 # whenever the flag set changed. ADR-058.
 #

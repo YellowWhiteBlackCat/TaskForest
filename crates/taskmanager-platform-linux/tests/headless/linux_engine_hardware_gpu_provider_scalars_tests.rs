@@ -1,4 +1,4 @@
-use taskmanager_core::{GpuMetricProvenance, ScalarAvailability};
+use taskforest_core::{GpuMetricProvenance, ScalarAvailability};
 
 use super::*;
 

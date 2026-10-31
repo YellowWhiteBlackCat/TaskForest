@@ -10,7 +10,7 @@ The workspace has two structural rules:
   exhaustive presence transition instead.
 
 Established aggregate modules may use a wildcard to forward their one owned
-surface (for example ``taskmanager-core::core``). The guard therefore checks
+surface (for example ``taskforest-core::core``). The guard therefore checks
 the ambiguity-causing alias, not a hand-maintained list of facade files or
 symbols. Explicit and wildcard re-exports remain visible to the compiler and
 are owned by the module boundary that declares them.

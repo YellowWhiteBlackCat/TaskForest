@@ -95,10 +95,10 @@ export TMPDIR="$scratch_root/local-gates-$$-$(date +%s)/tmp"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
 
-# Keep local Cargo invocations on the same pinned 1.99.0 toolchain and warning
+# Keep local Cargo invocations on the same pinned 1.99.1 toolchain and warning
 # policy as CI. The repository's rust-version remains a compatibility floor;
 # it is not the toolchain selected for the current gate run.
-export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.0}"
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-1.99.1}"
 export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
 export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
 rustflags="${RUSTFLAGS:-}"
@@ -244,7 +244,7 @@ esac
 # the same set the tier would compile for the crate, and never a hand-copy.
 scope_roots_for() {
     case "$scope" in
-    core) printf '%s\n' taskmanager-core taskmanager-application taskmanager-shell ;;
+    core) printf '%s\n' taskforest-core taskmanager-application taskmanager-shell ;;
     bevy) printf '%s\n' taskmanager-bevy-ui ;;
     gpui) printf '%s\n' taskmanager-gpui taskmanager-ui ;;
     iced) printf '%s\n' taskmanager-iced ;;
@@ -555,6 +555,12 @@ if maybe flatpak-manifest-self; then
 fi
 if maybe flatpak-manifest; then
     run_stage flatpak-manifest quick run_py scripts/quality/test_flatpak_manifest.py
+fi
+if maybe linux-sandbox-packaging-self; then
+    run_stage linux-sandbox-packaging-self quick run_py scripts/quality/test_linux_sandbox_packaging.py --self-test
+fi
+if maybe linux-sandbox-packaging; then
+    run_stage linux-sandbox-packaging quick run_py scripts/quality/test_linux_sandbox_packaging.py
 fi
 if maybe soak-stability-self; then
     run_stage soak-stability-self quick run_py scripts/quality/soak_stability_guard.py --self-test
@@ -1020,7 +1026,7 @@ if maybe mutants; then
     if scope_skip mutants "workspace-wide measurement" extended; then
         # Decision logic in core/application plus the Linux fixture parsers: all
         # three are the layers whose silent breakage the behavior gates must catch.
-        run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskmanager-core,taskmanager-application,taskmanager-platform-linux --min-score 80
+        run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskforest-core,taskmanager-application,taskmanager-platform-linux --min-score 80
     fi
 fi
 if maybe miri; then

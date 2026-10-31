@@ -26,7 +26,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::{
+use taskforest_core::{
     ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, DeviceStatus,
     FailureKind, IsolationKind, ScalarObservation,
 };

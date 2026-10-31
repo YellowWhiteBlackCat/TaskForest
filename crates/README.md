@@ -18,7 +18,7 @@ frontend → application → core / shell → platform runtime → app-host / na
 
 - **core / application / shell**：所有前端共享的领域事实、命令与投影。`core` 拥有类型化事实与
   纯规则，`application` 拥有命令、reducer 与端口，`shell` 拥有前端中立的投影、缓存与交互词汇。
-- **contract**：`taskmanager-ui-contract` 与 `taskmanager-platform-contract` 规定前端和平台
+- **contract**：`taskmanager-ui-contract` 与 `taskforest-contract` 规定前端和平台
   「必须提供什么」，本身不含实现。
 - **platform**：provider SPI 与各平台适配器负责真实 I/O，runtime 负责调度、并发、背压与事件
   投递，app-host 负责挑选并组合平台实现。
@@ -36,21 +36,21 @@ Cargo metadata 决定，下表是按层归组的阅读地图：
 
 **领域与应用编排**
 
-- [taskmanager-core](taskmanager-core/README.md) — 类型化领域事实、可用性语义与纯规则
+- [taskforest-core](taskforest-core/README.md) — 类型化领域事实、可用性语义与纯规则
 - [taskmanager-application](taskmanager-application/README.md) — 命令、reducer、端口与能力请求
 - [taskmanager-shell](taskmanager-shell/README.md) — 前端中立状态机与共享投影
 
 **契约与 SPI**
 
 - [taskmanager-ui-contract](taskmanager-ui-contract/README.md) — 前端必须提供的 UI 语义契约
-- [taskmanager-platform-contract](taskmanager-platform-contract/README.md) — 平台能力、请求、事件与端口契约
+- [taskforest-contract](taskforest-contract/README.md) — 平台能力、请求、事件与端口契约
 - [taskmanager-platform-provider](taskmanager-platform-provider/README.md) — provider SPI 与注册
-- [taskmanager-ipc](taskmanager-ipc/README.md) — 守护进程跨进程二进制通信协议与传输通道
+- [taskforest-ipc](taskforest-ipc/README.md) — 守护进程跨进程二进制通信协议与传输通道
 
 **执行运行时**
 
 - [taskmanager-platform-runtime](taskmanager-platform-runtime/README.md) — 有界执行、公平投递与 ECS 调度内核
-- [taskmanager-daemon](taskmanager-daemon/README.md) — 后台系统守护进程服务与时序持久化单写者
+- [taskforest-daemon](taskforest-daemon/README.md) — 后台系统守护进程服务与时序持久化单写者
 
 **平台适配器与 OS 边界**
 

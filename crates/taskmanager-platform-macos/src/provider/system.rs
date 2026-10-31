@@ -24,21 +24,21 @@ pub use smbios_memory::PendingSmbiosMemoryProvider;
 
 use std::time::{Duration, Instant};
 
-use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
-    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
-    SmbiosMemoryRequest, StorageTelemetryRequest,
-};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     ComputeTopology, ContainerRollup, CpuMetrics, CpuTelemetryObservation, DeviceId, DeviceState,
     DeviceStatus, FailureKind, FirmwareInfo, GpuEngineRowsSnapshot, HardwareInfo, HostIdentity,
     HostRuntimeFacts, HostRuntimeObservation, KernelInfo, MemoryMetrics,
     MemoryTelemetryObservation, NpuInventorySnapshot, ProviderId, ScalarObservation,
     ScalarObservationGroup,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskmanager_application::{
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
+    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
+    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
+    SmbiosMemoryRequest, StorageTelemetryRequest,
+};
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
     GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
@@ -51,10 +51,10 @@ use taskmanager_platform_runtime::{
 };
 
 use crate::provider::process_facts::ProcessFactsCache;
-use taskmanager_core::CpuInstructionFeature;
-use taskmanager_core::CpuScalarObservations;
-use taskmanager_core::MemoryOptionalObservations;
-use taskmanager_core::metrics::MemoryScalarObservations;
+use taskforest_core::CpuInstructionFeature;
+use taskforest_core::CpuScalarObservations;
+use taskforest_core::MemoryOptionalObservations;
+use taskforest_core::metrics::MemoryScalarObservations;
 use taskmanager_platform_portable::run_with_timeout;
 
 type HostRegistration = ProviderRegistration<HostTelemetryRequest, Box<dyn HostTelemetryProvider>>;

@@ -1,15 +1,15 @@
-use taskmanager_application::DirectoryUsageRequest;
-use taskmanager_application::{HardwareInventoryEvent, HardwareInventoryRequest, PlatformEvent};
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
-};
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, CapabilityRequest, CapabilityScheduler, CompositeSourceSnapshot, EventPort,
     MAX_REQUEST_SCOPE_BYTES, ProviderFailure, RequestId, RequestScope, RequestTracking,
     RequestTrackingError, SidebandPolicy, SubmissionErrorKind,
 };
+use taskforest_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
+};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_application::DirectoryUsageRequest;
+use taskmanager_application::{HardwareInventoryEvent, HardwareInventoryRequest, PlatformEvent};
 
 use super::*;
 
@@ -56,8 +56,8 @@ impl CapabilityRequest for UnownedFixtureRequest {
 }
 
 use crate::delivery::LaneFlow;
-use taskmanager_core::FailureKind;
-use taskmanager_core::HardwareInfo;
+use taskforest_core::FailureKind;
+use taskforest_core::HardwareInfo;
 
 #[test]
 fn invalid_target_scope_never_reaches_the_lane_or_ecs() {

@@ -21,8 +21,8 @@
 //! The second test enforces AGENTS.md's architecture rule: a `pub use` whose
 //! first path segment names another crate is a cross-crate forwarding facade —
 //! a second public address for a type the owner crate already exports.
-//! Consumers must import the owner module (`taskmanager-core`,
-//! `taskmanager-platform-contract`, `taskmanager-theme`, …) directly. The one
+//! Consumers must import the owner module (`taskforest-core`,
+//! `taskforest-contract`, `taskmanager-theme`, …) directly. The one
 //! sanctioned exception is `taskmanager-platform-native`, whose whole purpose
 //! is `cfg`-selecting the OS adapter behind one composition name; that is
 //! adapter selection, not a shared-type second address.

@@ -7,12 +7,12 @@
 //! occupancy row is a distinct fact and never stands in for it.
 
 use super::memory_page_stats;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{
     MemoryMetrics, MemoryOptionalObservations, MemoryScalarObservations, ScalarObservation,
 };
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::i18n::t;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::pin_english;
 

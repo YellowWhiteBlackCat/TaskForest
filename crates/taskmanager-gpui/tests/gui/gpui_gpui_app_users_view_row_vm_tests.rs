@@ -1,4 +1,5 @@
 use super::*;
+use taskforest_core::core::session::SessionFamilyFact;
 
 fn session(
     seat: Option<&str>,
@@ -6,15 +7,18 @@ fn session(
     timestamp: Option<&str>,
     remote: bool,
 ) -> SessionItem {
+    let seat = seat.map(str::to_owned);
+    let tty = tty.map(str::to_owned);
+    let family = SessionFamilyFact::classify(seat.as_deref(), tty.as_deref(), remote);
     SessionItem {
         id: "session-7".to_owned().into(),
         incarnation: None,
         uid: 1000,
         user: "alice".to_owned(),
-        seat: seat.map(str::to_owned),
-        tty: tty.map(str::to_owned),
-        remote,
+        seat,
+        tty,
         timestamp: timestamp.map(str::to_owned),
+        family,
     }
 }
 
@@ -42,18 +46,21 @@ fn present_cells_pass_through_verbatim() {
 }
 
 #[test]
-fn remote_folds_to_the_localized_yes_no_labels() {
+fn family_folds_through_the_shared_localized_fact_labels() {
     assert_eq!(
-        user_row_vm(&session(None, None, None, true)).remote_label,
-        i18n::t("common.yes")
+        user_row_vm(&session(None, None, None, true)).family_label,
+        i18n::t("users.family_remote")
     );
     assert_eq!(
-        user_row_vm(&session(None, None, None, false)).remote_label,
-        i18n::t("common.no")
+        user_row_vm(&session(None, None, None, false)).family_label,
+        i18n::t("users.family_unobserved")
     );
-    assert_ne!(
-        i18n::t("common.yes"),
-        i18n::t("common.no"),
-        "the yes/no keys must resolve to distinct labels"
+    assert!(
+        user_row_vm(&session(None, None, None, true)).family_is_remote,
+        "the renderer accent key follows the typed remote family"
+    );
+    assert!(
+        !user_row_vm(&session(None, None, None, false)).family_is_remote,
+        "absence does not borrow the remote accent"
     );
 }

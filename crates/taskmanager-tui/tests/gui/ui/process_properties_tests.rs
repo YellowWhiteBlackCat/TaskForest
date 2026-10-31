@@ -4,20 +4,20 @@
 //! and appends peak metadata (behavior acceptance, not source text).
 use super::*;
 use std::path::PathBuf;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::process_ancestor_lineage;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField, detail_value};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::process_ancestor_lineage;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_application::SurfaceKind;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 fn fixture() -> ProcessItem {

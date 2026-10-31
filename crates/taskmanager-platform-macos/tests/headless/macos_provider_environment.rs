@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::session::{SessionIdentity, SessionIncarnation};
+use taskforest_core::core::session::{SessionIdentity, SessionIncarnation};
 
 #[cfg(not(target_os = "macos"))]
 #[test]

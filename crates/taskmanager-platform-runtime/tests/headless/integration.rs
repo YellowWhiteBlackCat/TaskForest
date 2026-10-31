@@ -1,9 +1,9 @@
+use taskforest_contract::{CapabilityId, RequestEnvelope, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::setup::{SetupScriptAction, SetupScriptEvent};
 use taskmanager_application::{
     CommandLaunchRequest, PlatformEvent, SetupScriptRequest, ShellEvent,
 };
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
-use taskmanager_platform_contract::{CapabilityId, RequestEnvelope, RequestId};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};

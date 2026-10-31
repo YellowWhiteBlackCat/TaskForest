@@ -1,7 +1,7 @@
 //! Pure CPU sysfs parsing regressions (zero host dependencies).
 
 use super::*;
-use taskmanager_core::MAX_TRACKED_LOGICAL_CPUS;
+use taskforest_core::MAX_TRACKED_LOGICAL_CPUS;
 
 #[test]
 fn parse_cpulist_decodes_kernel_lists_and_skips_malformed_tokens() {

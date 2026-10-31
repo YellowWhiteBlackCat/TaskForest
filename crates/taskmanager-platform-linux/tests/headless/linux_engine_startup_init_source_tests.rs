@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use taskmanager_core::SourceOutcome;
+use taskforest_core::SourceOutcome;
 
 use super::super::BLAME_PROVIDER_ID;
 use super::*;

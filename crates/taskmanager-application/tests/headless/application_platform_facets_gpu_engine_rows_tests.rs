@@ -1,8 +1,8 @@
-use taskmanager_core::GpuEngineMetric;
-use taskmanager_platform_contract::CapabilityRequest;
+use taskforest_contract::CapabilityRequest;
+use taskforest_core::GpuEngineMetric;
 
 use super::*;
-use taskmanager_core::GpuEngineKind;
+use taskforest_core::GpuEngineKind;
 
 #[test]
 fn gpu_engine_rows_request_owns_the_telemetry_gpu_engines_capability() {

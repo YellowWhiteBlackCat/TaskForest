@@ -39,7 +39,7 @@ use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_runs};
 use crate::theme;
 use crate::ui::components::styled_scrollable;
-use taskmanager_core::core::hardware::CpuType;
+use taskforest_core::core::hardware::CpuType;
 
 /// Cells per row in the grid.
 const CELLS_PER_ROW: usize = 6;

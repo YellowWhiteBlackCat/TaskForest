@@ -4,8 +4,8 @@ use super::{
     ProcessDetailsSection, RefreshRequest, RootView, TopPage, services_view, startup_view,
 };
 use gpui::{App, Context, KeyDownEvent, ModifiersChangedEvent, Window};
+use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_application::TelemetryRefreshPolicyChange;
-use taskmanager_core::core::process::ProcessBatchAction;
 use taskmanager_shell::ProcessControlScope;
 
 use taskmanager_application::{

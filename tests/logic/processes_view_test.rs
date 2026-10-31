@@ -20,7 +20,7 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_gpui::gpui_app::processes_view::{
     VisibleRow, category_tree_rows, default_category_expansions,
 };
@@ -797,11 +797,11 @@ fn query_no_match_returns_empty() {
 
 // ── typed observations drive visible rows ─────────────────────────────────
 
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskforest_core::core::units::UnitPreferences;
+use taskforest_core::core::{FailureKind, ScalarObservation};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_core::core::{FailureKind, ScalarObservation};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
 
 /// One process whose typed observations carry either a measured value or an

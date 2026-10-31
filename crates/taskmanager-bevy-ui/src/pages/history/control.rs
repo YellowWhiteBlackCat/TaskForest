@@ -8,8 +8,8 @@ use bevy::ecs::{
     resource::Resource,
     system::{Commands, NonSendMut, ResMut},
 };
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::PerformanceHistoryProjection;
-use taskmanager_core::core::history::HistoryWindow;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) enum PerformancePresentation {

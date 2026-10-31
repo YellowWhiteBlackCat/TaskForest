@@ -2,7 +2,7 @@
 //! telemetry and hardware inventory.
 
 use super::*;
-use taskmanager_core::GpuEngineKind;
+use taskforest_core::GpuEngineKind;
 
 impl HostTelemetryProvider for FakeProvider {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<HostRuntimeObservation, ProviderFailure> {

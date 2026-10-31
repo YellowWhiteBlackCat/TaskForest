@@ -2,13 +2,13 @@
 
 use super::ShellApp;
 use crate::presentation::smart::self_test_supported;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::startup::StartupEntry;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, PendingConfirmation, PlatformEffect,
     SessionControlConfirmation, StartupControlRequest, SurfaceDismissReason,
 };
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 impl ShellApp {
     /// Arm the shared session-control confirmation gate for an exact

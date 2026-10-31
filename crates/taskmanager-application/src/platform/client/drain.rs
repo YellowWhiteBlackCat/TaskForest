@@ -1,6 +1,6 @@
 //! Bounded event draining and correlated projection updates.
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventPortError, OperationFailure, ProviderFailure, RequestId,
 };
 
@@ -14,7 +14,7 @@ use crate::platform::{
 use super::PlatformClient;
 use super::startup_projection::append_startup_evidence_projection;
 use super::system_projection::{append_system_projection, system_telemetry_domain};
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 const MAX_EVENTS_PER_DRAIN: usize = 64;
 

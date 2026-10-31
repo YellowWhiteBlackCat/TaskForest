@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     MemoryCompositionObservations, MemoryCompressionObservations, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation,
 };

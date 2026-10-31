@@ -2,14 +2,18 @@
 name = "taskmanager-test-support"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Dev-only typed behavior-fixture builders for TaskForest tests"
+readme = "README.md"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+documentation = "https://docs.rs/taskmanager-test-support"
 
 [dependencies]
-taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 
 [lib]
 name = "taskmanager_test_support"

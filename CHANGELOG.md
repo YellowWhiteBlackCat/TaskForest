@@ -112,7 +112,7 @@
   数值逐帧前进。
 - **Bevy 前端（B）会话气泡卡被共享模态压掉**：气泡卡只在共享确认模态未挂载时显示，避免
   两个确认面同时存在；会话页自身的控制按钮按产品路径武装会话控制门，气泡卡随之出现。
-- **搜索匹配引擎单一权威**：`taskmanager-ui` 的高亮匹配组件与 `taskmanager_core::core::text`
+- **搜索匹配引擎单一权威**：`taskmanager-ui` 的高亮匹配组件与 `taskforest_core::core::text`
   的匹配引擎重复实现同一语义，现已删除前端副本，匹配范围只由核心层产出。
 
 ## [0.3.2] — 2026-10-20
@@ -144,7 +144,7 @@
   - 增加长驻留浸泡稳定性检测守卫（`soak_stability_guard.py`），验证连续高频数据采样与文件轮转下物理驻留内存（RSS）收敛及文件描述符（FD）零泄漏；
   - 快速质量门禁阶段扩展至 56 stages 全部打通。
 - **Crates.io 独立底层库发布预备态达成**：
-  - 补全 `taskmanager-core`、`taskmanager-ipc`、`taskmanager-daemon`、`taskmanager-platform-contract` 的发布级元数据、文档与独立 LICENSE 副本，独立沙箱打包与校验通过。
+  - 补全 `taskforest-core`、`taskforest-ipc`、`taskforest-daemon`、`taskforest-contract` 的发布级元数据、文档与独立 LICENSE 副本，独立沙箱打包与校验通过。
 
 ## [0.3.0] — 2026-10-17
 
@@ -154,7 +154,7 @@
   - 正式落地 ADR-055 架构决策，支持 7×24 小时后台连续遥测采集与时序滚动持久化，彻底突破进程退出即丢失历史记录的痛点。
   - 拥有唯一的后台历史持久化单写锁，前端只作为非特权观察客户端连接，实现特权面与复杂 GUI 渲染栈解耦。
   - 编写系统级与用户会话级 systemd 服务单元（`packaging/daemon/`），并打包为独立的 `TaskForest-Daemon` DEB 与 RPM 安装包。
-- **高性能跨进程二进制通信协议 (`taskmanager-ipc`)**：
+- **高性能跨进程二进制通信协议 (`taskforest-ipc`)**：
   - 基于 20 字节固定帧头（Magic `TFIP`、版本 1、Sequence、CRC32 校验码与 16 MiB 熔断保护），保障跨进程通信的极端安全与防腐。
   - 抽象跨平台传输通道：Linux/macOS 走 Unix Domain Socket，Windows 映射 Named Pipe。
   - 引入强类型按需采样位掩码 `SubscriptionMask`，服务端动态聚合多前端订阅集，无活跃连接时自动休眠降频。
@@ -166,7 +166,7 @@
   - GPUI 标题栏与侧边栏接入官方品牌 Logo 渲染；TUI 终端标题栏接入常青松树品牌徽标 `🌲 TaskForest`。
   - 修正 Linux 打包安装路径，同时安装全套尺寸的逆向域名 hicolor 阶梯图标（`io.github.YellowWhiteBlackCat.TaskForest`），彻底消除 GNOME/KDE 任务栏与 Dock 显示空白默认齿轮的问题。
 - **crates.io 独立底层库发布标准与跨平台铁律**：
-  - `taskmanager-core` 就地升格，补齐发布元数据、Doctest、开源 Headless 范例（<50 行），固化零 I/O、零时钟纯粹性并保证确定性。
+  - `taskforest-core` 就地升格，补齐发布元数据、Doctest、开源 Headless 范例（<50 行），固化零 I/O、零时钟纯粹性并保证确定性。
   - 全网实时查重锁定 `taskforest-*` 独占命名矩阵，并在 `docs/STANDARDS.md` 第 7 节与 `AGENTS.md` 确立平台无关律、三平台对等适配律、平台小尾巴特化律与 SemVer 兼容性门禁。
 
 ## [0.2.3] — 2026-10-16

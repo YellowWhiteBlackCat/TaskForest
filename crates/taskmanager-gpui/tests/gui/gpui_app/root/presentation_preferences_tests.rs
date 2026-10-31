@@ -87,7 +87,7 @@ fn whole_snapshot_replace_preserves_unrelated_fingerprints_and_noop_is_inert() {
 
 #[test]
 fn window_decorations_mutation_bumps_only_the_appearance_axis_and_noop_is_inert() {
-    use taskmanager_core::core::config::{
+    use taskforest_core::core::config::{
         WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
     };
     let mut preferences = PresentationPreferences::default();

@@ -19,7 +19,7 @@ use crate::HistoryRetention;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use taskmanager_core::{DeviceId, GpuEngineMetricPoint, MetricSample};
+use taskforest_core::{DeviceId, GpuEngineMetricPoint, MetricSample};
 
 use crate::{
     CorrelatedMetricHistory, CorrelatedMetricSample, CorrelatedSystemTelemetryIngestor,

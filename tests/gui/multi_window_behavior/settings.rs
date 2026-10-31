@@ -2,7 +2,7 @@
 //! (refresh slider, Startup-page select, text-rendering pills, switches).
 
 use gpui::{Entity, Keystroke, TestAppContext, VisualTestContext, WindowHandle, point, px};
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_PLATFORM_DEFAULT,

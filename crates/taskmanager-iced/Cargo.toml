@@ -2,7 +2,7 @@
 name = "taskmanager-iced"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Iced desktop frontend product (taskforest-i) for the TaskForest native system monitor (ADR-027/028)"
 readme = "README.md"
@@ -62,11 +62,11 @@ serde_json = "1.0"
 # selects naga's correct NoColor path. See the naga source
 # (src/error.rs DiagnosticBuffer cfg_if).
 naga = { version = "=27.0.3", default-features = false, features = ["termcolor"] }
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
-taskmanager-ipc = { path = "../taskmanager-ipc" }
+taskforest-ipc = { path = "../taskforest-ipc" }
 crossbeam-channel = "0.5"
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }

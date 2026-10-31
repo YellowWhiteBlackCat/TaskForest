@@ -9,7 +9,7 @@
 //!   translation — bypassing it is the wrong-row defect class);
 //! - the seat/tty summary renders per row with the shared `MISSING_VALUE`
 //!   marker for unobserved fields (never a fabricated empty string), and the
-//!   remote column reads Yes/No from the shared catalog;
+//!   family column renders the contract's typed family and availability;
 //! - an empty list from a FAILED source renders the typed reason via the
 //!   source-status notice — never "no sessions";
 //! - the last accepted session-control outcome renders as one caption line
@@ -40,11 +40,11 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
-use taskmanager_application::i18n::t;
+use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::core::target::SessionId;
+use taskmanager_application::i18n::{session_family_label, t};
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
-use taskmanager_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::SessionId;
 
 use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
@@ -77,7 +77,7 @@ pub(crate) struct SessionRowModel {
     pub(crate) seat: String,
     pub(crate) tty: String,
     pub(crate) kind: SessionKind,
-    pub(crate) remote: &'static str,
+    pub(crate) family: &'static str,
     pub(crate) since: String,
 }
 
@@ -93,12 +93,8 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
             user: session.user.clone(),
             seat: session_seat_text(session),
             tty: session_tty_text(session),
-            kind: kind::classify(session),
-            remote: if session.remote {
-                t("common.yes")
-            } else {
-                t("common.no")
-            },
+            kind: SessionKind::from_fact(session.family),
+            family: session_family_label(session.family),
             since: session
                 .timestamp
                 .clone()
@@ -268,8 +264,8 @@ fn columns() -> Vec<Column> {
         },
         Column {
             sort: None,
-            label: t("users.remote").to_owned(),
-            width_px: 100.0,
+            label: t("users.family").to_owned(),
+            width_px: 120.0,
         },
         Column {
             sort: None,

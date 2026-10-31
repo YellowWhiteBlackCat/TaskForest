@@ -2,12 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use taskmanager_core::core::device_state::{
+use taskforest_core::core::device_state::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceLifecycle, DeviceLifecycleRegistry,
     DeviceRefreshOutcome, DeviceState, DeviceStatus,
 };
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId};
+use taskforest_core::core::npu::NpuInventorySnapshot;
 
 use super::{
     DeviceLifecycleApplyResult, DeviceLifecyclePartition, DeviceLifecycleProjection,

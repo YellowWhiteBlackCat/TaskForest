@@ -13,12 +13,12 @@
 //!   verdict: the badge reads "unavailable", never a green shield;
 //! - a disk without endurance or temperature facts has NO gauge at all.
 
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
-use taskmanager_core::core::storage_health::{
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskforest_core::core::storage_health::{
     FilesystemHealthSnapshot, FilesystemHealthStatus, is_nvme_wear_critical, is_nvme_wear_warning,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{
     bytes, device_status_i18n_key, effective_smart_status, missing_value,
 };

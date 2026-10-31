@@ -3,6 +3,14 @@
 use std::sync::Arc;
 
 use crate::system_timeline::project_timeline;
+use taskforest_contract::{CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId};
+use taskforest_core::core::source::SourceStatus;
+use taskforest_core::{
+    ContainerRollup, DirectoryUsageSnapshot, FrozenProcessIdentity, HardwareInfo,
+    NpuInventorySnapshot, PowerSupplySnapshot, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
+    ProcessLiveKey, ProcessSignal, SensorCenterSnapshot, ServiceAction, ServiceItem, SessionItem,
+    StartupBootEvidenceSnapshot, StartupEntry, SystemSnapshot,
+};
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, TimelineSeries, TimelineState,
 };
@@ -18,16 +26,6 @@ use taskmanager_application::{
     SmartEvent, SmartObservationProjection, SmartProjectionApplyResult, StartupControlRequest,
     StartupEvent, StartupEvidenceUnavailable, StorageHealthEvent, SurfaceKind, SurfaceTransition,
     TelemetryRefreshPolicy, reduce,
-};
-use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::{
-    ContainerRollup, DirectoryUsageSnapshot, FrozenProcessIdentity, HardwareInfo,
-    NpuInventorySnapshot, PowerSupplySnapshot, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
-    ProcessLiveKey, ProcessSignal, SensorCenterSnapshot, ServiceAction, ServiceItem, SessionItem,
-    StartupBootEvidenceSnapshot, StartupEntry, SystemSnapshot,
-};
-use taskmanager_platform_contract::{
-    CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId,
 };
 use taskmanager_ui_contract::TextEditState;
 
@@ -94,16 +92,16 @@ use self::process_rows::{ProcessProjectionGeneration, ProcessRowId};
 pub use self::service_log::OpenServiceLog;
 pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
+use taskforest_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
+use taskforest_core::core::storage::StorageDeviceTarget;
+use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
+use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     AlertEventSeed, AlertRuleEditResult, AlertSuggestionWindow, InteractionEvent,
     ManagedAlertRuleEdit, PersistentApplicationHistoryRecorder, ServiceDependenciesLifecycle,
     SessionControlOutcome,
 };
-use taskmanager_core::core::alerts::{AlertRuleTransferError, NotificationPolicy};
-use taskmanager_core::core::storage::StorageDeviceTarget;
-use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
-use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 

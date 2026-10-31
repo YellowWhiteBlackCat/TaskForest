@@ -4,7 +4,7 @@
 //! A hover pill that answers "which number is that?" with a sample OFFSET
 //! (`-3`) answers a question nobody asked: the reader wants to know WHEN the
 //! value was observed. The shared contract publishes that instant
-//! ([`taskmanager_core::core::metrics::MetricSample::measured_at_ms`]) and
+//! ([`taskforest_core::core::metrics::MetricSample::measured_at_ms`]) and
 //! the shared formatter prints it
 //! ([`taskmanager_shell::presentation::trend::sample_timestamp_text`]), so
 //! this module reads the instant of the sample under the pointer and never
@@ -22,8 +22,8 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Query, Res};
 use bevy::ui::ComputedNode;
 use bevy::ui::widget::Text;
-use taskmanager_core::core::metrics::MetricSample;
-use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+use taskforest_core::core::metrics::MetricSample;
+use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::{sample_timestamp_text, timestamped_window};

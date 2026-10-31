@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     CpuMetrics, CpuTelemetryObservation, DeviceGeneration, DeviceId, DeviceLifecycle,
     DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation, HostRuntimeFacts,
     HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation, NetworkTelemetryObservation,
     ScalarObservation, StorageTelemetryObservation,
 };
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use crate::device_lifecycle::{DeviceLifecyclePartition, DeviceLifecycleProjection};
 use crate::platform::SystemTelemetryDomainOutcome;
@@ -17,7 +17,7 @@ use crate::platform::event_batch::{
 };
 
 use super::*;
-use taskmanager_core::CpuScalarObservations;
+use taskforest_core::CpuScalarObservations;
 
 fn source(name: &'static str) -> Vec<SourceStatus> {
     vec![SourceStatus {

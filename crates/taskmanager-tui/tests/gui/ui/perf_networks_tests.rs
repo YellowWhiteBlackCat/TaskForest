@@ -1,8 +1,8 @@
 use super::*;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::metrics::{NetworkAdapterType, OptionalObservation, SystemSnapshot};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::identity::DeviceGeneration;
-use taskmanager_core::core::metrics::{NetworkAdapterType, OptionalObservation, SystemSnapshot};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::presentation::wifi_signal_quality_percent;

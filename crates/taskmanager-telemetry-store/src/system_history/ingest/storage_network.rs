@@ -1,6 +1,6 @@
 //! Correlated storage and network device-domain ingestion.
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceStatus, DiskMetrics, NetworkTelemetryObservation, SmartAvailability,
     StorageTelemetryObservation,
 };
@@ -16,7 +16,7 @@ use super::super::{
 use super::{
     CorrelatedSystemTelemetryIngestor, NETWORK_RATE_PERSISTED, STORAGE_ACTIVITY_PERSISTED, finite,
 };
-use taskmanager_core::NetworkAdapterType;
+use taskforest_core::NetworkAdapterType;
 
 impl CorrelatedSystemTelemetryIngestor {
     pub fn ingest_correlated_storage(

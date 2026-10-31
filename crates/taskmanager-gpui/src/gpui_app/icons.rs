@@ -6,7 +6,7 @@
 //! provider-asset image adapter below.
 
 use gpui::Img;
-use taskmanager_core::core::{ApplicationIconAsset, ApplicationIconFormat};
+use taskforest_core::core::{ApplicationIconAsset, ApplicationIconFormat};
 use taskmanager_ui::icons_binding::ApplicationImageFormat;
 
 /// Adapt a provider-resolved, toolkit-neutral icon asset to a GPUI image.

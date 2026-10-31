@@ -26,9 +26,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_shell::ShellApp;
 
 use crate::app::FrontendTrack;

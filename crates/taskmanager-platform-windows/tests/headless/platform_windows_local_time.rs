@@ -4,7 +4,7 @@
 //! transitions Windows reported.
 
 use super::*;
-use taskmanager_core::LocalTimeRules;
+use taskforest_core::LocalTimeRules;
 use taskmanager_windows_api::{WindowsTransitionRule, WindowsYearZoneRule};
 
 fn transition(month: u16, week: u16, at_utc_seconds: i64) -> WindowsTransitionRule {
@@ -256,7 +256,7 @@ fn local_time_observation_stays_typed_unavailable_off_windows() {
     let observation = local_time_rules();
     #[cfg(windows)]
     {
-        use taskmanager_core::LocalTimeRulesObservation;
+        use taskforest_core::LocalTimeRulesObservation;
         match &observation {
             LocalTimeRulesObservation::Current { rules, .. } => {
                 eprintln!(
@@ -272,7 +272,7 @@ fn local_time_observation_stays_typed_unavailable_off_windows() {
     }
     #[cfg(not(windows))]
     {
-        use taskmanager_core::{FailureKind, LocalTimeRulesObservation};
+        use taskforest_core::{FailureKind, LocalTimeRulesObservation};
         assert!(matches!(
             observation,
             LocalTimeRulesObservation::Unavailable {

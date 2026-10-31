@@ -11,8 +11,8 @@ use bevy::ui::widget::Text;
 
 use crate::palette::{UiPalette, space_4, space_8, space_12};
 use crate::window::{Role, TextRole};
+use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::presentation::bytes;
 
 /// One measured segment of the memory comparison bar.

@@ -4,10 +4,10 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::metrics::CpuTemperatureSource;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::metrics::CpuTemperatureSource;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
 pub(super) mod diagnostics;
 mod temperatures;

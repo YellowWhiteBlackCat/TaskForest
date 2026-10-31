@@ -27,7 +27,7 @@ use crate::theme;
 use iced::Length;
 use iced::widget::{canvas, column, row, text};
 use std::rc::Rc;
-use taskmanager_core::core::metrics::CpuTemperatureSource;
+use taskforest_core::core::metrics::CpuTemperatureSource;
 
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::viewmodel::StatRow;

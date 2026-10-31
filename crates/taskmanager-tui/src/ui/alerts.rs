@@ -18,12 +18,12 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use taskmanager_application::ManagedAlertRule;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{
+use taskforest_core::core::alerts::{
     AlertEvent, AlertEventKind, AlertMetric, AlertSeverity, InsufficientReason,
     SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
+use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
 use crate::TuiTheme;

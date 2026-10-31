@@ -2,7 +2,7 @@
 name = "taskmanager-gpui"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "GPUI desktop frontend product (taskforest-g) for the TaskForest native system monitor"
 publish = false
@@ -20,11 +20,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracing = "0.1"
 
-taskmanager-core = { path = "../taskmanager-core" }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-core = { path = "../taskforest-core" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
-taskmanager-ipc = { path = "../taskmanager-ipc" }
+taskforest-ipc = { path = "../taskforest-ipc" }
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-theme = { path = "../taskmanager-theme" }

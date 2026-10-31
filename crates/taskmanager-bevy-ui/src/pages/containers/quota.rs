@@ -34,8 +34,8 @@ use bevy::ui::prelude::{
     AlignItems, BorderColor, BorderRadius, Node, Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
+use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::palette::{UiPalette, space_2, space_4};

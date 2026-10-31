@@ -33,7 +33,7 @@ use iced::{Color, Point, Rectangle, Size};
 
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, line_path, sample_x};
-use taskmanager_core::core::process::ProcessLiveKey;
+use taskforest_core::core::process::ProcessLiveKey;
 
 /// Fixed sparkline canvas height (matches the gpui per-row sparkline's 16 px
 /// band). Width is the column width (`56`); the `Canvas` reports this height to

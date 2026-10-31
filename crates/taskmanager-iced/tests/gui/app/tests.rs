@@ -1,19 +1,19 @@
 use super::focus_state::{FocusCommand, focus_command, pending_end_focus_target};
 use super::motion::viewport_compact;
 use super::*;
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_ipc::protocol::{DaemonMessage, SubscriptionMask};
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{FocusDirection, KeyCode, Modifiers};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_ipc::protocol::{DaemonMessage, SubscriptionMask};
 
+use taskforest_contract::RequestEnvelope;
+use taskforest_contract::RequestPort;
+use taskforest_contract::SubmissionError;
+use taskforest_core::core::process::ProcessBatchAction;
+use taskforest_core::core::process_telemetry::ContainerRollup;
 use taskmanager_application::AppPage;
 use taskmanager_application::PlatformEvent;
 use taskmanager_application::SessionInventoryRequest;
-use taskmanager_core::core::process::ProcessBatchAction;
-use taskmanager_core::core::process_telemetry::ContainerRollup;
-use taskmanager_platform_contract::RequestEnvelope;
-use taskmanager_platform_contract::RequestPort;
-use taskmanager_platform_contract::SubmissionError;
 use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_shell::fixture::ProjectionSeedFact;
@@ -35,12 +35,12 @@ impl RequestPort for RecordingSessionInventory {
 }
 
 fn session_refresh_client(port: std::sync::Arc<RecordingSessionInventory>) -> PlatformClient {
+    use taskforest_contract::{CapabilityCatalog, CapabilitySnapshot};
     use taskmanager_application::{
         EnvironmentFacets, PlatformClient, PlatformFacets, PlatformHandle,
     };
-    use taskmanager_platform_contract::{CapabilityCatalog, CapabilitySnapshot};
 
-    use taskmanager_platform_contract::{EventEnvelope, EventPort, EventPortError};
+    use taskforest_contract::{EventEnvelope, EventPort, EventPortError};
 
     #[derive(Default)]
     struct EmptyCapabilities;
@@ -315,10 +315,10 @@ fn startup_toggle_gates_behind_confirmation_like_gpui() {
 /// the full open → request → rollup → render chain without a live platform.
 #[test]
 fn opening_the_containers_modal_requests_and_renders_a_rollup() {
+    use taskforest_contract::{CapabilityId, EventSequence, RequestId};
     use taskmanager_application::{
         ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch, PlatformEventContext,
     };
-    use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = IcedApp::demo();
     assert!(app.shell.projection().containers.is_none());

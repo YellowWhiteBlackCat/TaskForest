@@ -88,7 +88,7 @@ all" plus a single honest shape for "this platform has no qualified source".
 
 ## Verification
 
-- `crates/taskmanager-platform-contract/tests/headless/capability_surface.rs`
+- `crates/taskforest-contract/tests/headless/capability_surface.rs`
   pins the identity census in both directions, proves the typed-absence shape
   is honest and distinguishable from a registered-pending lane, and proves
   unknown/vendor identities stay outside the surface.

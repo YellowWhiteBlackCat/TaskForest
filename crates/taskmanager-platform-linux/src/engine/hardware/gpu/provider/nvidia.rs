@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::ProviderId;
+use taskforest_core::ProviderId;
 
 use super::super::GpuProviderSample;
 #[cfg(feature = "nvidia")]

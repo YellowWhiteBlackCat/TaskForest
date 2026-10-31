@@ -96,7 +96,7 @@ jobs:
           python3 scripts/quality/public_repo_guard.py --history-since "$PREVIOUS_RELEASE_TAG"
       # `cargo metadata --locked` fails the moment the committed Cargo.lock
       # does not satisfy the manifest, proving the tag builds reproducibly.
-      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: dtolnay/rust-toolchain@1.99.1
       - name: Fetch private shared UI kit dependency
         env:
           SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}

@@ -20,11 +20,11 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, Gauge, GraphType, Paragraph, Wrap};
+use taskforest_core::core::hardware::HardwareInfo;
+use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_application::MsrReadoutState;
 use taskmanager_application::RaplPowerState;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::HardwareInfo;
-use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_shell::presentation::trend;
 use taskmanager_shell::presentation::{graph_summary, missing_value};
 

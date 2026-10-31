@@ -4,7 +4,7 @@
 //! dismissal clearing the gate without submitting.
 
 use super::*;
-use taskmanager_core::core::session::SessionIncarnation;
+use taskforest_core::core::session::SessionIncarnation;
 
 fn demo_session(id: &str) -> SessionItem {
     SessionItem {

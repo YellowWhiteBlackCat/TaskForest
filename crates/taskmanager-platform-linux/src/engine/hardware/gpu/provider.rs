@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use taskmanager_core::{
+use taskforest_core::{
     DeviceId, DeviceRefreshOutcome, DeviceStatus, FailureKind, GpuMetrics, ProviderId,
     ProviderRuntimeState, SourceOutcome, SourceStatus,
 };

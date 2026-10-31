@@ -8,11 +8,11 @@
 //! and unit-tested: every non-ready variant is a typed placeholder, never a
 //! fabricated slot or module row.
 
+use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::SmbiosMemoryRequestFailure;
 use taskmanager_application::SmbiosMemoryState;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_platform_contract::CapabilityStatus;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
 
 /// Render-entry inputs for the subsection: the shared session state plus the

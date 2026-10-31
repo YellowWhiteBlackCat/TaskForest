@@ -2,8 +2,8 @@
 
 use super::*;
 #[cfg(any(windows, test))]
-use taskmanager_core::ResourceGroupCpuLimit;
-use taskmanager_core::ResourceGroupLimitRequest;
+use taskforest_core::ResourceGroupCpuLimit;
+use taskforest_core::ResourceGroupLimitRequest;
 #[cfg(any(windows, test))]
 use taskmanager_escalation::EscalationDenialReason;
 #[cfg(any(windows, test))]
@@ -415,7 +415,7 @@ impl WinProcessResourceControlProvider {
     fn job_limit_request(
         limits: &ResourceGroupLimitRequest,
     ) -> Result<Option<WindowsJobLimitRequest>, ProviderFailure> {
-        use taskmanager_core::LimitValue;
+        use taskforest_core::LimitValue;
 
         let memory_limit_bytes = match limits.memory {
             Some(LimitValue::Value(bytes)) => Some(bytes),
@@ -448,7 +448,7 @@ impl WinProcessResourceControlProvider {
     /// runs in `u128` so a large quota can never wrap into a bogus rate.
     #[cfg(any(windows, test))]
     fn cpu_rate_percent(cpu: &ResourceGroupCpuLimit) -> Result<Option<u32>, ProviderFailure> {
-        use taskmanager_core::LimitValue;
+        use taskforest_core::LimitValue;
 
         let quota = match cpu.quota {
             LimitValue::Value(quota) => quota,

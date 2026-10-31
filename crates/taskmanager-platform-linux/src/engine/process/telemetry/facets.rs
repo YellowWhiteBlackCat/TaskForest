@@ -9,12 +9,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use taskmanager_core::{
+use taskforest_contract::ProviderFailure;
+use taskforest_core::{
     DeviceState, ProcessEnvironment, ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot,
     ProcessIsolation, ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot,
     ProcessThreads,
 };
-use taskmanager_platform_contract::ProviderFailure;
 
 use super::super::procfs::clock_ticks_per_second;
 use super::{

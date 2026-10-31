@@ -189,7 +189,7 @@ mod card_shadow_tests {
 mod highlighted_text_tests {
     use std::ops::Range;
 
-    use taskmanager_core::core::text::match_ranges_ascii_ci;
+    use taskforest_core::core::text::match_ranges_ascii_ci;
 
     /// One engine case: the haystack, the needle and the expected match
     /// windows (start, end).

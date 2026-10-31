@@ -4,9 +4,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::channel;
 
+use taskforest_contract::{TrayController, TrayFailure};
+use taskforest_core::core::tray::{TrayActionId, TrayEvent, TrayMenuItem};
 use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product};
-use taskmanager_core::core::tray::{TrayActionId, TrayEvent, TrayMenuItem};
-use taskmanager_platform_contract::{TrayController, TrayFailure};
 
 use super::*;
 use taskmanager_application::i18n::t;

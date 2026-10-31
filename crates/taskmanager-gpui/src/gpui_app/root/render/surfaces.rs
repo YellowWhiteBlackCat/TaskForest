@@ -8,10 +8,10 @@ use super::super::{
 };
 use super::overlays;
 use gpui::{AnyElement, App, Context, Div, IntoElement, ParentElement, Stateful, Window, px};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::target::ServiceId;
 use taskmanager_application::SmartSelfTestState;
 use taskmanager_application::{PendingConfirmation, SurfaceDismissReason, SurfaceKind};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::SPACE_16;
 

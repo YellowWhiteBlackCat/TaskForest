@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use taskmanager_core::config::{
+use taskforest_core::config::{
     ColumnWidthConfig, ProcessViewPresetConfig, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
 };
 

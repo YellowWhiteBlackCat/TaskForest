@@ -1,6 +1,6 @@
 use super::event_kind_label;
+use taskforest_core::core::alerts::AlertEventKind;
 use taskmanager_application::i18n::{self, Language};
-use taskmanager_core::core::alerts::AlertEventKind;
 
 #[test]
 fn alert_event_kinds_use_the_shared_locale_catalog() {

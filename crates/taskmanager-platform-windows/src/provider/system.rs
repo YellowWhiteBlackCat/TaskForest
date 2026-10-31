@@ -10,20 +10,20 @@
 //! the WSL rollup lane, which runs the fixed `wsl.exe` management binary (see
 //! `provider::system::wsl`) — never a shell and never an interpreter.
 
+use taskforest_contract::ProviderFailure;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
+    ContainerRollup, DeviceId, DeviceState, FailureKind, GpuEngineKind, GpuEngineMetric,
+    GpuEngineRowsSnapshot, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
+    MemoryTelemetryObservation, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, ProviderId,
+    ScalarObservation,
+};
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
     GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
     MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
     SmbiosMemoryRequest, StorageTelemetryRequest,
 };
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
-    ContainerRollup, DeviceId, DeviceState, FailureKind, GpuEngineKind, GpuEngineMetric,
-    GpuEngineRowsSnapshot, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
-    MemoryTelemetryObservation, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, ProviderId,
-    ScalarObservation,
-};
-use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
     GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
@@ -60,10 +60,10 @@ pub use msr_readout::PendingMsrReadoutProvider;
 pub use network::WinNetworkTelemetryProvider;
 pub use rapl_power::PendingRaplPowerProvider;
 pub use smbios_memory::PendingSmbiosMemoryProvider;
-use taskmanager_core::DeviceStatus;
-use taskmanager_core::MemoryOptionalObservations;
-use taskmanager_core::OptionalObservation;
-use taskmanager_core::metrics::MemoryScalarObservations;
+use taskforest_core::DeviceStatus;
+use taskforest_core::MemoryOptionalObservations;
+use taskforest_core::OptionalObservation;
+use taskforest_core::metrics::MemoryScalarObservations;
 use taskmanager_windows_api::WindowsApiError;
 use taskmanager_windows_api::WindowsComputeAccelerator;
 use taskmanager_windows_api::WindowsGpuEngineSample;

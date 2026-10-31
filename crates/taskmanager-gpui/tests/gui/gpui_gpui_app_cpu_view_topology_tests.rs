@@ -1,11 +1,11 @@
-use taskmanager_core::core::hardware::CoreBreakdown;
+use taskforest_core::core::hardware::CoreBreakdown;
 use taskmanager_test_support::pin_english;
 
 use super::{
     cpu_frequency_readout, cpu_frequency_readout_for_source, cpu_temperature_readout,
     cpu_temperature_readout_for_source, heterogeneous_core_rows,
 };
-use taskmanager_core::core::metrics::{CpuFrequencySource, CpuTemperatureSource};
+use taskforest_core::core::metrics::{CpuFrequencySource, CpuTemperatureSource};
 
 #[test]
 fn optional_cpu_readouts_distinguish_missing_from_measured_zero() {

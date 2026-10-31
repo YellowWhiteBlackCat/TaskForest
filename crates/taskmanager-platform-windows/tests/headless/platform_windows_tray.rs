@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::tray::{TrayIconData, TrayMenuItem, TrayMenuSpec};
+use taskforest_core::tray::{TrayIconData, TrayMenuItem, TrayMenuSpec};
 use taskmanager_tray_muda::decode_menu_id;
 use taskmanager_tray_muda::menu_id_for;
 

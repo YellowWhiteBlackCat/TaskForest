@@ -1,4 +1,4 @@
-use taskmanager_core::{GpuMetricProvenance, ProviderId};
+use taskforest_core::{GpuMetricProvenance, ProviderId};
 
 use super::super::super::GpuProviderFieldFailure;
 use super::*;

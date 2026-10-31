@@ -1,10 +1,11 @@
 //! Process-table and inventory sort coverage, split out of the main tests
 //! module so the file stays under the source-line ceiling.
 use super::super::*;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::services::ServiceStatus;
-use taskmanager_core::core::startup::{
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::services::ServiceStatus;
+use taskforest_core::core::session::SessionFamilyFact;
+use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
@@ -183,8 +184,8 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
             user: "root".into(),
             seat: None,
             tty: None,
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         },
         SessionItem {
             id: "9".into(),
@@ -193,8 +194,8 @@ fn inventory_sorts_start_from_provider_order_and_apply_per_table() {
             user: "alice".into(),
             seat: Some("seat1".into()),
             tty: None,
-            remote: false,
             timestamp: None,
+            family: SessionFamilyFact::default(),
         },
     ]);
 
@@ -335,7 +336,7 @@ fn indexed_inventory_sorts_preserve_provider_identity_without_pointer_scans() {
 
 #[test]
 fn cycle_info_sort_column_walks_the_tables_own_columns_and_wraps() {
-    use taskmanager_core::core::services::ServiceStatus;
+    use taskforest_core::core::services::ServiceStatus;
     let mut app = crate::demo_app();
     // Provider order: cycle starts at the first column of the table's cycle.
     app.cycle_info_sort_column(InfoTable::Services);

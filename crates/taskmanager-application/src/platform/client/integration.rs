@@ -1,7 +1,7 @@
 //! Integration-axis request submission on `PlatformClient`: command launch,
 //! resource reveal, URL open, and desktop appearance.
 
-use taskmanager_platform_contract::{RequestId, SubmissionError};
+use taskforest_contract::{RequestId, SubmissionError};
 
 use crate::platform::{
     CommandLaunchRequest, DesktopAppearanceRequest, DesktopNotificationRequest,

@@ -5,9 +5,9 @@
 //! by — the accepted payload survives replacement and provider failures.
 
 use crate::{RequestAttemptId, RequestCorrelation};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{SmbiosMemoryFailure, SmbiosMemorySnapshot};
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{SmbiosMemoryFailure, SmbiosMemorySnapshot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SmbiosMemoryRequestFailure {

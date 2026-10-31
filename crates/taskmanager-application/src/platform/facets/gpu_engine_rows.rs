@@ -7,9 +7,9 @@
 //! exactly one [`GpuEngineRowsEvent::Update`] — real rows on success, a typed
 //! failure (denied / helper unavailable / unsupported) otherwise.
 
-use taskmanager_core::{DeviceId, GpuEngineRowsSnapshot};
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::{DeviceId, GpuEngineRowsSnapshot};
 
 /// One per-engine read for `device_id`. The frontend chooses the device (it
 /// knows which card it is rendering); the provider echoes the identity in the

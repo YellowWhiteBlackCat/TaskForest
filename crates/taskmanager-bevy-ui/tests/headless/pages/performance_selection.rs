@@ -87,8 +87,8 @@ fn smart_source_recovery_replaces_the_mounted_guidance_without_changing_identity
     use crate::drain::ShellProjectionFolded;
     use crate::pages::performance::{DynField, DynText};
     use bevy::ui::widget::Text;
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::metrics::SmartAvailability;
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::metrics::SmartAvailability;
     use taskmanager_shell::fixture::edit_snapshot;
     use taskmanager_test_support::pin_english;
     pin_english();

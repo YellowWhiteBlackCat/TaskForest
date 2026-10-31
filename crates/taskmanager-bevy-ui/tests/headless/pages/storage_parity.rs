@@ -21,15 +21,15 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
 use std::path::PathBuf;
-use taskmanager_application::i18n::t;
-use taskmanager_core::core::FailureKind;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::{
     DiskPartition, DiskPartitionScalarObservations, ScalarObservation, SmartAvailability,
 };
-use taskmanager_core::core::storage_health::{
+use taskforest_core::core::storage_health::{
     FilesystemBackingKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 

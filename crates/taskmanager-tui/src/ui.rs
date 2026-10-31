@@ -79,9 +79,9 @@ use containers::Panel;
 use units::{memory_text_pref, observed_percentage};
 
 use perf_selector_instances::perf_selector_instances;
+use taskforest_core::core::device_state::DeviceState;
 use taskmanager_application::{PendingConfirmation, SurfaceKind};
 use taskmanager_assets::product::NAME;
-use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_shell::SortDir;
 
 pub fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme) {
@@ -623,7 +623,7 @@ pub(crate) enum DeviceHealth {
 }
 
 pub(crate) fn classify_device_state(state: &DeviceState) -> DeviceHealth {
-    use taskmanager_core::core::failure::FailureKind;
+    use taskforest_core::core::failure::FailureKind;
     if state.status == DeviceState::healthy(0).status {
         return DeviceHealth::Healthy;
     }

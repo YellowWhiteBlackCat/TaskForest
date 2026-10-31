@@ -7,17 +7,17 @@
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
+use taskforest_contract::SubmissionErrorKind;
+use taskforest_core::core::tray::TrayEvent;
 use taskmanager_application::{PlatformClient, PlatformEffect};
-use taskmanager_core::core::tray::TrayEvent;
-use taskmanager_platform_contract::SubmissionErrorKind;
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use super::IcedApp;
-use taskmanager_platform_contract::InstanceEvent;
-use taskmanager_platform_contract::InstanceGuard;
-use taskmanager_platform_contract::RequestId;
-use taskmanager_platform_contract::TrayController;
+use taskforest_contract::InstanceEvent;
+use taskforest_contract::InstanceGuard;
+use taskforest_contract::RequestId;
+use taskforest_contract::TrayController;
 use taskmanager_shell::queue_effect_result;
 
 /// Keep one UI tick responsive even when a lifecycle producer is busier than

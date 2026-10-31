@@ -4,6 +4,7 @@ use taskmanager_telemetry_store::HistoryRetention;
 
 use std::rc::Rc;
 
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_application::{
     CorrelatedEvent, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
     DeviceLifecycleProjection, PlatformEventContext, ProjectedSystemTelemetry,
@@ -11,11 +12,10 @@ use taskmanager_application::{
     SystemTelemetryProjection, SystemTelemetryProjectionApplyResult, SystemTelemetryRevision,
     SystemTelemetryUnavailable,
 };
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use taskmanager_telemetry_store::{CorrelatedIngestionError, SystemHistoryDomain, TelemetryStore};
 
-use taskmanager_core::core::{
+use taskforest_core::core::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DeviceGeneration, DeviceId,
     DeviceLifecycle, DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation,
     HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation,

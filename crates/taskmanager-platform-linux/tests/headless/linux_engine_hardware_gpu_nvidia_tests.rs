@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_core::FailureKind;
-use taskmanager_core::ProviderId;
+use taskforest_core::FailureKind;
+use taskforest_core::ProviderId;
 
 fn complete_readout(pci_bus_id: &str) -> NvmlDeviceReadout {
     NvmlDeviceReadout {

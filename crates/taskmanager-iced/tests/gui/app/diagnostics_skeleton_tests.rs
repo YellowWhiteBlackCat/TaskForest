@@ -4,12 +4,12 @@
 //! finished report or a failure.
 
 use super::*;
+use taskforest_core::DiagnosticBundlePlan;
+use taskforest_core::DiagnosticSource;
+use taskforest_core::core::diagnostics::DiagnosticBundleError;
+use taskforest_core::core::diagnostics::DiagnosticBundleErrorKind;
+use taskforest_core::core::diagnostics::{DiagnosticPreview, RedactionSummary};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
-use taskmanager_core::DiagnosticBundlePlan;
-use taskmanager_core::DiagnosticSource;
-use taskmanager_core::core::diagnostics::DiagnosticBundleError;
-use taskmanager_core::core::diagnostics::DiagnosticBundleErrorKind;
-use taskmanager_core::core::diagnostics::{DiagnosticPreview, RedactionSummary};
 
 fn preview() -> DiagnosticPreview {
     DiagnosticPreview {

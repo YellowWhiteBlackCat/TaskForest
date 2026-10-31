@@ -7,8 +7,8 @@ use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

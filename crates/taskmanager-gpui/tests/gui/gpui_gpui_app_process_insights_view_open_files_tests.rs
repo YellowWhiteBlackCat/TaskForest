@@ -2,10 +2,10 @@ use super::*;
 use gpui::{
     AppContext, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window, px,
 };
-use taskmanager_core::ProcessResourceSnapshot;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::ProcessResourceSnapshot;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::process_telemetry::ProcessTelemetrySnapshot;
+use taskforest_core::core::process_telemetry::{
     OpenFileEntry, OpenFileKind, ProcessOpenFiles, ProcessResourceObservations, ResourceObservation,
 };
 
@@ -190,7 +190,7 @@ fn populated_open_files_render_with_unreadable_marker(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn open_files_card_renders_fd_limit_saturation(cx: &mut TestAppContext) {
-    use taskmanager_core::{LimitValue, ResourceLimit, ResourceLimitKind};
+    use taskforest_core::{LimitValue, ResourceLimit, ResourceLimitKind};
 
     let mut snapshot = snapshot_with(populated_open_files());
     let obs = ProcessResourceObservations {

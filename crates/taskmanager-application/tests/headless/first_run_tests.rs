@@ -5,7 +5,7 @@ use crate::{
     IntegrationFacets, PlatformEvent, PlatformEventContext, PlatformFacets, PlatformHandle,
 };
 use std::sync::{Arc, Mutex};
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityDescriptor, CapabilitySnapshot, CapabilityStatus, EventEnvelope, EventPort,
     EventPortError, EventSequence, RequestEnvelope, RequestPort, RetryDisposition, SubmissionError,
 };

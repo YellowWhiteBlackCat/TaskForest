@@ -14,9 +14,9 @@ use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div,
 };
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::DiskMetrics;
 use taskmanager_application::i18n;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_shell::presentation::device_action_i18n_key;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::{effective_smart_status, has_smart_fields};

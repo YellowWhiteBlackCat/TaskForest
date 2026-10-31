@@ -1,10 +1,10 @@
 use super::*;
-use taskmanager_core::SmartProviderFailureKind;
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::smart::DiskSmart;
-use taskmanager_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
+use taskforest_core::SmartProviderFailureKind;
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::smart::DiskSmart;
+use taskforest_core::core::smart::{SmartSelfTestCapabilities, SmartSelfTestSupport};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 #[test]

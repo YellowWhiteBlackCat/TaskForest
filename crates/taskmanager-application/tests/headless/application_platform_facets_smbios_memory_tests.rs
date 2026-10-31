@@ -1,5 +1,5 @@
-use taskmanager_core::core::metrics::SmbiosModuleRow;
-use taskmanager_platform_contract::CapabilityRequest;
+use taskforest_contract::CapabilityRequest;
+use taskforest_core::core::metrics::SmbiosModuleRow;
 
 use super::*;
 

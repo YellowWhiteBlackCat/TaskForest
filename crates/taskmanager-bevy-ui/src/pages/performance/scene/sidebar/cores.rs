@@ -39,8 +39,8 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
+use taskforest_core::core::hardware::CpuType;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::hardware::CpuType;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
 

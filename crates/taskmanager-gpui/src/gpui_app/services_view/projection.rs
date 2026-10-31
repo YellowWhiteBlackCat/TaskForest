@@ -1,6 +1,6 @@
 //! Pure Services filter/sort projection and its render cache key.
 
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_shell::matches_service_query;
 use taskmanager_shell::order_service_rows;
 use taskmanager_shell::{InfoSortCol, SortDir};

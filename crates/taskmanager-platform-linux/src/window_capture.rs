@@ -13,7 +13,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     WindowCaptureBackend, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,
 };
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
@@ -23,7 +23,7 @@ const MAX_PNG_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 32_768;
 const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
-use taskmanager_platform_contract::NativeWindowCapture;
+use taskforest_contract::NativeWindowCapture;
 
 /// Linux native window capture using KDE Spectacle.
 #[derive(Clone, Copy, Debug, Default)]

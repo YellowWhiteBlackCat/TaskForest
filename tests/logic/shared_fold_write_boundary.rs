@@ -17,7 +17,7 @@
 //!    wifi_signal_quality_percent`. A private copy drifts the first time the
 //!    clamp window or the percentage scaling is tuned.
 //! 3. **The saved-view transfer protocol** — format tag, version, and limits
-//!    are core-owned (`taskmanager-core::core::config`). A frontend imports
+//!    are core-owned (`taskforest-core::core::config`). A frontend imports
 //!    them; a second declaration lets two protocols claim the same clipboard
 //!    document.
 //!
@@ -61,7 +61,7 @@ const FRONTEND_SCAN_ROOTS: [&str; 4] = [
 const TUI_SCAN_ROOT: &str = "crates/taskmanager-tui/src";
 const SHELL_PRESENTATION: &str = "crates/taskmanager-shell/src/presentation.rs";
 const CORE_SAVED_VIEW_TRANSFER: &str =
-    "crates/taskmanager-core/src/core/config/saved_view_transfer.rs";
+    "crates/taskforest-core/src/core/config/saved_view_transfer.rs";
 
 /// Direct writes to the shell's selection state, anchored on the shell
 /// receiver (ADR-027).
@@ -432,7 +432,7 @@ fn assert_local_dbm_helpers_delegate() {
 }
 
 /// The saved-view transfer protocol (format tag, version, limits) is
-/// core-owned: a frontend imports `taskmanager-core`'s constants and never
+/// core-owned: a frontend imports `taskforest-core`'s constants and never
 /// re-declares or re-spells them, so one clipboard document can only ever
 /// mean one protocol.
 #[test]
@@ -453,7 +453,7 @@ fn the_saved_view_transfer_protocol_is_owned_by_core() {
     assert_no_violations(
         &violations,
         "second declaration of the saved-view transfer protocol in a frontend — import the \
-         constants from taskmanager-core::core::config (SAVED_VIEW_TRANSFER_FORMAT and its \
+         constants from taskforest-core::core::config (SAVED_VIEW_TRANSFER_FORMAT and its \
          family) instead of re-declaring them",
     );
     assert_allowlist_is_absorbing(

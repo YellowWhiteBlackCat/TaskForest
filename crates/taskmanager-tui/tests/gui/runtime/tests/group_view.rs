@@ -1,10 +1,10 @@
 //! Canonical Applications category-tree interaction tests.
 
 use super::super::*;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::ProcessScalarObservations;
+use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_application::AppAction;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessScalarObservations;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::{ProcessRowId, SortCol, SortDir};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
@@ -128,7 +128,7 @@ fn selection_motion_emits_and_then_dedupes_process_insights() {
 
 #[test]
 fn application_aggregate_selection_is_pidless() {
-    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
     let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
         .expect("identity fixture");
     let mut process = trustworthy_process(11, "editor", None);
@@ -156,10 +156,10 @@ fn application_aggregate_selection_is_pidless() {
 /// collapse, and a dead application root's expansion key cannot linger.
 #[test]
 fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
+    use taskforest_contract::{CapabilityId, EventSequence, RequestId};
     use taskmanager_application::{
         CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
     };
-    use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = TuiApp::from_shell(ShellApp::new());
     seed_projection_fact(
@@ -221,10 +221,10 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
 
 #[test]
 fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
+    use taskforest_contract::{CapabilityId, EventSequence, RequestId};
     use taskmanager_application::{
         CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
     };
-    use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = TuiApp::from_shell(ShellApp::new());
     seed_projection_fact(

@@ -4,11 +4,11 @@
 //! engine and split memory facts. This module materializes that complete set
 //! once; the renderer has no selected engine or metric state.
 
-use taskmanager_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
+use taskforest_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
 
 use crate::gpui_app::formatting;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 
 /// Render-neutral rows for one discovered accelerator.
 #[derive(Debug, Clone, PartialEq, Eq)]

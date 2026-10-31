@@ -1,6 +1,6 @@
 //! Assembly of typed process-row scalar observations.
 
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, ProcessItem, ProcessScalarObservations, ScalarObservation, SourceOutcome,
 };
 
@@ -10,8 +10,8 @@ use super::procfs::{
     read_proc_oom_score, read_proc_stat, read_proc_status_memory,
 };
 use super::rates::{ProcessRateInput, ProcessRateState};
-use taskmanager_core::ProcessMetadataFailure;
-use taskmanager_core::ProcessSchedulingPolicy;
+use taskforest_core::ProcessMetadataFailure;
+use taskforest_core::ProcessSchedulingPolicy;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ProcessScalarEvidence {

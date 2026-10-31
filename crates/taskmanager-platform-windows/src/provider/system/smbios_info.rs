@@ -8,7 +8,7 @@ use smbioslib::{
     SMBiosData, SMBiosInformation, SMBiosMemoryDevice, SMBiosPhysicalMemoryArray,
     SMBiosSystemInformation,
 };
-use taskmanager_core::FirmwareInfo;
+use taskforest_core::FirmwareInfo;
 #[cfg(windows)]
 use taskmanager_windows_api::raw_smbios_table;
 

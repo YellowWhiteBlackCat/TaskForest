@@ -7,7 +7,7 @@
 //! generation is a separate stale-geometry guard and must not be confused with
 //! either the process start token or a dangerous frozen control identity.
 
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
 mod semantic;
 mod tree;

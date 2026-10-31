@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use taskmanager_core::{DeviceStatus, GpuMetricField, GpuMetrics, ProviderId};
+use taskforest_core::{DeviceStatus, GpuMetricField, GpuMetrics, ProviderId};
 
 use super::super::{GpuProviderSample, build_drm_identity_metrics, scan_drm_cards};
 use super::{GpuProviderFailure, GpuTelemetryProvider};

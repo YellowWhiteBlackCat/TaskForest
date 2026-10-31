@@ -24,9 +24,9 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::{
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::{
     FailureKind, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessIdentity,
 };
 

@@ -1,8 +1,8 @@
 use super::gpu_stats;
+use taskforest_core::GpuGraphicsApi;
+use taskforest_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
-use taskmanager_core::GpuGraphicsApi;
-use taskmanager_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
-use taskmanager_core::core::units::UnitPreferences;
 
 /// A default GPU (no sysfs facts at all) keeps only the status row and
 /// the headline utilization row — the utilization stays an honest `None`

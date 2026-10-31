@@ -5,7 +5,7 @@
 //! exists renders (dash only for a live gap), a fact that does not exist on
 //! this host omits its row, and a section with no facts at all is omitted.
 
-use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::health_score_summary;
 use taskmanager_shell::presentation::kernel_error_summary;
@@ -18,16 +18,16 @@ pub(crate) use tiles::build_tiles;
 
 use taskmanager_ui_contract::IconId;
 
+use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskforest_core::core::metrics::{DmiIdentityFacts, SystemSnapshot};
 use taskmanager_application::SmbiosMemoryState;
-use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
-use taskmanager_core::core::metrics::{DmiIdentityFacts, SystemSnapshot};
 
 use super::{
     fmt_cache_kb, fmt_clock_ghz, fmt_observed_clock_ghz, joined_optional_text, kernel_display,
     optional_text, truncate_cmdline,
 };
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 
 /// One horizontal progress meter inside a section card (memory in use,
 /// battery charge). `pct` is 0..=100; the renderer clamps.

@@ -2,7 +2,7 @@
 //!
 //! Service details modal behavior in Bevy.
 
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::tokens::UiSize;
 
 use super::details_modal::{ServiceDetailsModalState, service_details_modal_scene};

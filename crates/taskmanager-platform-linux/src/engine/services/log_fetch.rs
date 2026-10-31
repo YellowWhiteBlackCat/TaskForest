@@ -9,7 +9,7 @@ use super::{SERVICE_LOG_LINE_LIMIT, ServiceLogErrorKind, ServiceLogFailure, Serv
 #[cfg(any(test, feature = "test-support"))]
 use super::{ServiceLogSnapshot, ServiceManager};
 #[cfg(any(test, feature = "test-support"))]
-use taskmanager_core::ServiceId;
+use taskforest_core::ServiceId;
 
 /// Platform/process outcome kept separate from presentation-state classification.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,4 +1,4 @@
-use taskmanager_platform_contract::ProviderFailure;
+use taskforest_contract::ProviderFailure;
 
 use super::assert_identity_change_is_side_effect_free;
 

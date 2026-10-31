@@ -6,7 +6,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::time::SystemTime;
 
-use taskmanager_core::{
+use taskforest_core::{
     FailureKind, LocalTimeRules, LocalTimeRulesObservation, MAX_LOCAL_TIME_RULE_BYTES, unix_millis,
 };
 

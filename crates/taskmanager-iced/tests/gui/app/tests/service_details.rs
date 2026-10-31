@@ -1,8 +1,8 @@
 use super::*;
+use taskforest_contract::RequestId;
+use taskforest_core::core::services::ServiceLogState;
+use taskforest_core::core::services::ServiceRelationKind;
 use taskmanager_application::i18n::Language;
-use taskmanager_core::core::services::ServiceLogState;
-use taskmanager_core::core::services::ServiceRelationKind;
-use taskmanager_platform_contract::RequestId;
 
 #[test]
 fn service_details_entry_projects_lifecycle_and_dependency_facts() {
@@ -57,13 +57,13 @@ fn service_details_entry_projects_lifecycle_and_dependency_facts() {
 /// paused. Demo mode seeds the panel on open (no host I/O).
 #[test]
 fn service_details_merged_log_panel_folds_its_own_stream() {
-    use taskmanager_application::ServiceUpdate;
-    use taskmanager_application::i18n::set_language;
-    use taskmanager_core::core::services::{
+    use taskforest_core::core::services::{
         ServiceLogEntries, ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter,
         ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
     };
-    use taskmanager_core::core::target::ServiceId;
+    use taskforest_core::core::target::ServiceId;
+    use taskmanager_application::ServiceUpdate;
+    use taskmanager_application::i18n::set_language;
 
     set_language(Language::En);
 

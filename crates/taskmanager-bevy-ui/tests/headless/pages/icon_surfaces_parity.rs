@@ -27,21 +27,20 @@ use bevy::ecs::query::With;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::{BackgroundColor, Node, Val};
-use taskmanager_application::{CorrelatedSessionEvent, PlatformEventBatch, SessionEvent};
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::{CapabilityId, EventSequence, PartialSourceSnapshot, RequestId};
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
-use taskmanager_core::core::process_telemetry::{
+use taskforest_core::core::process_telemetry::{
     ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::storage_health::{
+use taskforest_core::core::session::SessionFamilyFact;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::storage_health::{
     FilesystemBackingKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
-};
+use taskmanager_application::{CorrelatedSessionEvent, PlatformEventBatch, SessionEvent};
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_theme::Theme;
@@ -144,23 +143,33 @@ fn assert_plate_is_drawable(icon: IconId) {
 
 // ---- the sessions page: one glyph per terminal family (BEVY-150) ----
 
-fn session_item(id: &str, user: &str, seat: Option<&str>, tty: Option<&str>) -> SessionItem {
+fn session_item(
+    id: &str,
+    user: &str,
+    seat: Option<&str>,
+    tty: Option<&str>,
+    remote: bool,
+) -> SessionItem {
+    let seat = seat.map(str::to_owned);
+    let tty = tty.map(str::to_owned);
+    // A provider reports the observed facts; the contract turns them into a
+    // family. The fixture states the same facts, so the plate assertion below
+    // exercises the real path instead of a hand-written classification.
+    let family = SessionFamilyFact::classify(seat.as_deref(), tty.as_deref(), remote);
     SessionItem {
         id: id.to_owned().into(),
         incarnation: None,
         uid: 1000,
         user: user.to_owned(),
-        seat: seat.map(str::to_owned),
-        tty: tty.map(str::to_owned),
-        remote: false,
+        seat,
+        tty,
+        family,
         timestamp: Some("2026-08-24 09:00".to_owned()),
     }
 }
 
 /// The shell with one session per observable terminal family.
 fn sessions_shell() -> ShellApp {
-    let mut remote = session_item("4", "rem", Some("seat0"), Some("tty1"));
-    remote.remote = true;
     let mut shell = ShellApp::new();
     shell.apply_platform_batch(PlatformEventBatch {
         session_events: vec![CorrelatedSessionEvent {
@@ -171,11 +180,11 @@ fn sessions_shell() -> ShellApp {
             observed_at_ms: 1,
             event: SessionEvent::Snapshot(PartialSourceSnapshot {
                 items: vec![
-                    session_item("2", "ada", Some("seat0"), Some("wayland-0")),
-                    session_item("3", "bo", None, Some("tty1")),
-                    session_item("5", "cy", None, Some("pts/3")),
-                    session_item("6", "di", None, None),
-                    remote,
+                    session_item("2", "ada", Some("seat0"), Some("wayland-0"), false),
+                    session_item("3", "bo", None, Some("tty1"), false),
+                    session_item("5", "cy", None, Some("pts/3"), false),
+                    session_item("6", "di", None, None, false),
+                    session_item("4", "rem", Some("seat0"), Some("tty1"), true),
                 ],
                 sources: Vec::new(),
             }),

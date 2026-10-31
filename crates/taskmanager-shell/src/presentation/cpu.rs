@@ -4,9 +4,9 @@
 //! PROCHOT assertion from the privileged MSR lane. Each fold is
 //! renderer-neutral and never fabricates an unobserved value.
 
+use taskforest_core::core::metrics::{CpuMetrics, MsrReadoutSnapshot, MsrThermalStatusReadout};
 use taskmanager_application::MsrReadoutState;
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::{CpuMetrics, MsrReadoutSnapshot, MsrThermalStatusReadout};
 
 use super::{MISSING_VALUE, megahertz, missing_value};
 

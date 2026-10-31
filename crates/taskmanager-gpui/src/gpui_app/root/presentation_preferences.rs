@@ -12,12 +12,12 @@ use gpui::{App, Context, Pixels, SharedString, Window};
 use super::startup::text_rendering_mode_from_token;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
-use taskmanager_application::i18n;
-use taskmanager_core::core::config::{
+use taskforest_core::core::config::{
     COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_PLATFORM_DEFAULT, WINDOW_DECORATIONS_SYSTEM,
 };
-use taskmanager_core::core::units::UnitPreferences;
+use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::i18n;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{FontPreference, Skin};

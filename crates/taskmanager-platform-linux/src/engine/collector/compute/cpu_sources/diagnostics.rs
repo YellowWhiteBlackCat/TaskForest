@@ -1,7 +1,7 @@
 //! Package topology, power limits, idle counters and interrupt distribution.
 
 use std::{fs, path::Path};
-use taskmanager_core::core::metrics::{CpuIdleState, CpuInterruptSnapshot, CpuPackageMetrics};
+use taskforest_core::core::metrics::{CpuIdleState, CpuInterruptSnapshot, CpuPackageMetrics};
 
 use super::throttle::{collect_package_counters_at, read_trimmed, read_u32, read_u64};
 

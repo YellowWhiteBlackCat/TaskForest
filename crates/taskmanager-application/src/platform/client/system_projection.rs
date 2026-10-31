@@ -1,6 +1,6 @@
 //! Correlation and fail-closed publication for system-domain completions.
 
-use taskmanager_platform_contract::{CapabilityId, RequestId};
+use taskforest_contract::{CapabilityId, RequestId};
 
 use super::PlatformClient;
 use crate::platform::{
@@ -8,7 +8,7 @@ use crate::platform::{
     SystemTelemetryDomainOutcome, SystemTelemetryProjectionApplyResult,
     SystemTelemetryProjectionRejection, SystemTelemetryUnavailable,
 };
-use taskmanager_core::FailureKind;
+use taskforest_core::FailureKind;
 
 pub(super) struct SystemEventProjectionOutcome {
     pub(super) projection: Option<SystemTelemetryProjectionApplyResult>,

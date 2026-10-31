@@ -1548,12 +1548,12 @@ dependencies = [
  "crossbeam-channel",
  "serde",
  "serde_json",
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-core",
+ "taskforest-contract",
 ]
 
 [[package]]
-name = "taskmanager-core"
+name = "taskforest-core"
 version = "0.2.2"
 dependencies = [
  "serde",
@@ -1583,10 +1583,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "taskmanager-platform-contract"
+name = "taskforest-contract"
 version = "0.2.2"
 dependencies = [
- "taskmanager-core",
+ "taskforest-core",
 ]
 
 [[package]]
@@ -1604,10 +1604,10 @@ dependencies = [
  "sysinfo",
  "taskmanager-afpacket",
  "taskmanager-application",
- "taskmanager-core",
+ "taskforest-core",
  "taskmanager-escalation",
  "taskmanager-perf-ioctl",
- "taskmanager-platform-contract",
+ "taskforest-contract",
  "taskmanager-platform-portable",
  "taskmanager-platform-provider",
  "taskmanager-platform-runtime",
@@ -1633,8 +1633,8 @@ version = "0.2.2"
 dependencies = [
  "nix",
  "starship-battery",
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-core",
+ "taskforest-contract",
  "taskmanager-platform-provider",
 ]
 
@@ -1642,8 +1642,8 @@ dependencies = [
 name = "taskmanager-platform-provider"
 version = "0.2.2"
 dependencies = [
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-core",
+ "taskforest-contract",
 ]
 
 [[package]]
@@ -1654,8 +1654,8 @@ dependencies = [
  "bevy_ecs",
  "crossbeam-channel",
  "taskmanager-application",
- "taskmanager-core",
- "taskmanager-platform-contract",
+ "taskforest-core",
+ "taskforest-contract",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 //! Frontend-local Alerts-page state and messages (the Iced alerts UI face).
 //!
 //! The shared alert domain (rule set, evaluation, delivery gate) lives in the
-//! shell's [`taskmanager_core::core::alerts::AlertCenter`] — this module owns
+//! shell's [`taskforest_core::core::alerts::AlertCenter`] — this module owns
 //! only the Iced-side view state: the frontend-local typed route (the alerts
 //! page is an Iced-local route outside the shared `AppPage` set, mirroring how
 //! GPUI keeps its Containers page renderer-specific). The complete managed
@@ -10,13 +10,13 @@
 //! evaluates alerts; it reads the shell's typed rule and active-alert
 //! projections.
 
+use taskforest_core::core::alerts::{
+    AlertRule, AlertRuleId, AlertRuleTransferEntry, AlertRuleTransferError,
+    export_alert_rules_json, import_alert_rules_json,
+};
 use taskmanager_application::{
     AlertRuleEditResult, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
     ManagedAlertRuleEditOutcome, PlatformEffect,
-};
-use taskmanager_core::core::alerts::{
-    AlertRule, AlertRuleId, AlertRuleTransferEntry, AlertRuleTransferError,
-    export_alert_rules_json, import_alert_rules_json,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
@@ -364,9 +364,9 @@ impl IcedApp {
 // Pure data-layer fact folds live here (ARCH.md §8.1), separating observation
 // reads from the Iced widget tree in `ui/alerts.rs`.
 
+use taskforest_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
-use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// One rendered rule row (pure seam the headless tests assert on).
 #[derive(Clone, Debug, PartialEq)]

@@ -16,7 +16,7 @@ Those paths were historical convenience surfaces, not independent owners.
 ## Decision
 
 1. A cross-crate consumer imports a fact from its actual owner module:
-   `taskmanager-core` for domain facts and `taskmanager-platform-contract` for
+   `taskforest-core` for domain facts and `taskforest-contract` for
    capability, request, event, failure and port contracts.
 2. `taskmanager-application` exposes only application-owned commands, reducers,
    lifecycles and projections. Its former model module is retired.
@@ -35,8 +35,8 @@ Those paths were historical convenience surfaces, not independent owners.
   actual use.
 - Removing or changing an owner type has one compiler-visible consumer set;
   compatibility aliases cannot silently preserve a retired facade.
-- Frontend crates carry direct `taskmanager-core` and, where needed,
-  `taskmanager-platform-contract` edges. Their write sets remain independent.
+- Frontend crates carry direct `taskforest-core` and, where needed,
+  `taskforest-contract` edges. Their write sets remain independent.
 - Composition code still owns OS selection and lifecycle wiring, but shared
   vocabulary cannot drift through a second public address.
 

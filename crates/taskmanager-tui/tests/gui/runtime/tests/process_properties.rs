@@ -295,13 +295,13 @@ fn insights_tab_shows_collecting_when_no_projection_is_seeded() {
 
 #[test]
 fn insights_tab_renders_thread_list_when_projection_is_present() {
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{
+        ProcessIdentity, ProcessInsightSnapshot, ProcessThreadInfo, ProcessThreads, ThreadState,
+    };
     use taskmanager_application::{
         ProcessInsightFacetEvent, ProcessInsightObservation, ProcessInsightsProjection,
         ProcessInsightsRevision,
-    };
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
-        ProcessIdentity, ProcessInsightSnapshot, ProcessThreadInfo, ProcessThreads, ThreadState,
     };
 
     let mut app = app_on_processes();
@@ -518,12 +518,12 @@ fn esc_closes_modal_and_restores_table_navigation() {
 /// network facet for `app`'s selected row (the same `apply_failure` path the
 /// provider takes), returning the frozen target it was seeded for.
 fn seed_requires_escalation_network(app: &mut TuiApp) -> u32 {
+    use taskforest_core::core::failure::FailureKind;
     use taskmanager_application::i18n::set_language;
     use taskmanager_application::{
         ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
         ProcessInsightsRevision,
     };
-    use taskmanager_core::core::failure::FailureKind;
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
@@ -629,11 +629,11 @@ fn e_without_the_requires_escalation_facet_produces_no_effect() {
         .selected_process
         .clone()
         .expect("selected row has a frozen identity");
+    use taskforest_core::core::failure::FailureKind;
     use taskmanager_application::{
         ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
         ProcessInsightsRevision,
     };
-    use taskmanager_core::core::failure::FailureKind;
     let revision = ProcessInsightsRevision::new(1);
     let mut tracker = ProcessInsightsProjection::default();
     tracker.begin(target.clone(), revision);
@@ -735,7 +735,7 @@ fn e_on_the_applications_page_fires_only_for_the_escalation_facet() {
 #[test]
 fn command_identity_mismatch_renders_masquerading_warning() {
     use std::path::PathBuf;
-    use taskmanager_core::core::process::{ProcessItem, ProcessMetadataObservations, ProcessOwner};
+    use taskforest_core::core::process::{ProcessItem, ProcessMetadataObservations, ProcessOwner};
     use taskmanager_shell::presentation::command_identity_summary;
 
     let mut item = ProcessItem::new(100, "fake");
@@ -753,13 +753,13 @@ fn command_identity_mismatch_renders_masquerading_warning() {
 #[test]
 fn network_connections_surface_renders_socket_inventory_and_rtt() {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use taskmanager_application::{
-        ProcessInsightFacetState, ProcessInsightsProjection, ProcessInsightsRevision,
-    };
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::process_telemetry::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::process_telemetry::{
         ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
         ProcessConnection, ProcessNetworkSnapshot,
+    };
+    use taskmanager_application::{
+        ProcessInsightFacetState, ProcessInsightsProjection, ProcessInsightsRevision,
     };
 
     let mut app = app_on_processes();

@@ -13,9 +13,9 @@ use taskmanager_shell::order_session_rows;
 
 use super::RootView;
 use crate::gpui_app::{app_history_view, services_view, startup_view};
-use taskmanager_core::core::services::ServiceItem;
-use taskmanager_core::core::session::SessionItem;
-use taskmanager_core::core::startup::StartupEntry;
+use taskforest_core::core::services::ServiceItem;
+use taskforest_core::core::session::SessionItem;
+use taskforest_core::core::startup::StartupEntry;
 
 use taskmanager_shell::InfoTable;
 

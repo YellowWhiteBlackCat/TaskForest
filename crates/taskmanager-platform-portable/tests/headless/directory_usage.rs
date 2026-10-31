@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::SystemTime;
 
-use taskmanager_core::metrics::ScalarAvailability;
+use taskforest_core::metrics::ScalarAvailability;
 
 use super::*;
 

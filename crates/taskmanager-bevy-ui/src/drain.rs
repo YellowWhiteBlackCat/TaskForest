@@ -17,25 +17,25 @@ use crate::window_surface::{
 };
 use crossbeam_channel::Receiver;
 use std::time::{SystemTime, UNIX_EPOCH};
+use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
-use taskmanager_ipc::DaemonMessage;
 use taskmanager_shell::FeedbackTone;
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
+use taskforest_contract::CapabilitySnapshot;
 use taskmanager_application::{PlatformClient, PlatformEffect, RefreshRequest};
-use taskmanager_platform_contract::CapabilitySnapshot;
 
 use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, SharedRuntimeHandle};
 use crate::window::WindowPalette;
+use taskforest_core::core::appearance::DesktopAppearance;
+use taskforest_core::core::tray::TrayEvent;
 use taskmanager_application::AppAction;
 use taskmanager_application::DesktopAppearanceEvent;
-use taskmanager_core::core::appearance::DesktopAppearance;
-use taskmanager_core::core::tray::TrayEvent;
 use taskmanager_shell::QuitReason;
 use taskmanager_shell::queue_effect;
 
@@ -187,7 +187,7 @@ pub(crate) fn capability_summary_line(snapshot: &CapabilitySnapshot) -> String {
     let mut other_states = 0;
     let total = snapshot.iter().count();
     for descriptor in snapshot.iter() {
-        use taskmanager_platform_contract::CapabilityStatus;
+        use taskforest_contract::CapabilityStatus;
         match descriptor.status {
             CapabilityStatus::Available => available += 1,
             CapabilityStatus::PermissionRequired => permission_required += 1,

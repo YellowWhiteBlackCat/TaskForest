@@ -1,8 +1,8 @@
 use super::*;
 
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessScalarObservations};
-use taskmanager_core::core::process_telemetry::ProcessIdentity;
+use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessScalarObservations};
+use taskforest_core::core::process_telemetry::ProcessIdentity;
 
 #[test]
 fn row_identity_is_derived_only_from_a_current_process_observation() {

@@ -5,7 +5,7 @@ use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, select};
-use taskmanager_platform_contract::CapabilityId;
+use taskforest_contract::CapabilityId;
 
 use super::{WorkerRuntime, WorkerSpawnError};
 use crate::channel::Queued;

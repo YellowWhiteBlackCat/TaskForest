@@ -14,7 +14,7 @@ parallel provider registry.
 ## Contract and verification
 
 Every target must expose the same typed platform surface with honest fallbacks;
-shared contract types remain owned by `taskmanager-platform-contract` and are
+shared contract types remain owned by `taskforest-contract` and are
 not forwarded through this selector.
 OS-specific process liveness and native path knowledge remain in the selected
 adapter; the application host receives only safe probes and owned paths. The

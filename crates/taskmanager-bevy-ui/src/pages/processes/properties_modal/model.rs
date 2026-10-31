@@ -3,11 +3,11 @@
 use super::insights::insight_rows;
 use super::performance::{PerformanceCurve, performance_curves};
 use super::{ProcessPropertiesSection, ProcessPropertiesView};
+use taskforest_core::core::process::ProcessLiveKey;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{ProcessDetailsField, process_details_rows};
-use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
 

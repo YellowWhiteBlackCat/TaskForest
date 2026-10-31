@@ -13,14 +13,14 @@ use super::{
     CompactDetailViewport, PerfDetail, available_perf_devices, bounded_sidebar_label, chunk_count,
     compact_detail_viewport, perf_detail_kind, performance_sidebar_label,
 };
-use taskmanager_core::core::device_state::DeviceState;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::DiskPartitionScalarObservations;
-use taskmanager_core::core::metrics::DiskScalarObservations;
-use taskmanager_core::core::metrics::NetworkAdapterType;
-use taskmanager_core::core::metrics::OptionalObservation;
-use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::device_state::DeviceState;
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::DiskPartitionScalarObservations;
+use taskforest_core::core::metrics::DiskScalarObservations;
+use taskforest_core::core::metrics::NetworkAdapterType;
+use taskforest_core::core::metrics::OptionalObservation;
+use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::metrics::{
     DiskMetrics, GpuScalarObservations, GpuThrottleReason, NetworkMetrics, ScalarObservation,
     SystemSnapshot,
 };
@@ -55,8 +55,8 @@ pub(crate) fn flat(rows: &[StatRow]) -> Vec<(&str, &str)> {
 
 #[test]
 fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
+    use taskforest_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetrics};
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetrics};
 
     // The shared catalog auto-detects the host locale on first use; pin English
     // so the label assertions are deterministic and independent of the host.
@@ -141,8 +141,8 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
 
 #[test]
 fn gpu_selector_enumerates_every_projected_adapter() {
+    use taskforest_core::core::metrics::GpuMetrics;
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_core::core::metrics::GpuMetrics;
     set_language(Language::En);
 
     // A dGPU and an iGPU in one projection: each adapter must get its own
@@ -218,8 +218,8 @@ fn gpu_selector_enumerates_every_projected_adapter() {
 
 #[test]
 fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
+    use taskforest_core::core::metrics::GpuMetrics;
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_core::core::metrics::GpuMetrics;
 
     set_language(Language::En);
 
@@ -273,8 +273,8 @@ fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
 
 #[test]
 fn gpu_summary_promotes_the_pci_marketing_name_without_losing_the_fact_row() {
+    use taskforest_core::core::metrics::GpuMetrics;
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_core::core::metrics::GpuMetrics;
 
     set_language(Language::En);
     let mut gpu = GpuMetrics::new("", "Intel Xe Graphics");

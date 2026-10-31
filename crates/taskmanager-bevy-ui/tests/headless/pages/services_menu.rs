@@ -8,22 +8,22 @@
 //! nothing.
 
 use bevy::input::keyboard::KeyCode;
+use taskforest_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage, PlatformEffect};
-use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
 
 use taskmanager_shell::ShellApp;
 
 use super::menu::{ServiceMenuCtx, ServiceMenuModal, open_for};
 use crate::menu_modal::ActionMenuContext;
 use crate::pages::services::ServiceSelection;
+use taskforest_contract::CapabilityId;
+use taskforest_contract::EventSequence;
+use taskforest_contract::PartialSourceSnapshot;
+use taskforest_contract::RequestId;
 use taskmanager_application::CorrelatedServiceEvent;
 use taskmanager_application::PlatformEventBatch;
 use taskmanager_application::ServiceEvent;
-use taskmanager_platform_contract::CapabilityId;
-use taskmanager_platform_contract::EventSequence;
-use taskmanager_platform_contract::PartialSourceSnapshot;
-use taskmanager_platform_contract::RequestId;
 
 // ---- fixtures -----------------------------------------------------------
 

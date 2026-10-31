@@ -42,13 +42,13 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
+use taskforest_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::services::{
     ServiceAction, ServiceDeps, ServiceLogFailure, ServiceLogQuery, ServiceLogStreamSnapshot,
     ServiceLogStreamState, ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
+use taskforest_core::core::target::ServiceId;
 
 /// Canonical operational lifecycle state of a system service for shared application use.
 ///

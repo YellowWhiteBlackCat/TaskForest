@@ -16,8 +16,8 @@
 //! value was measured at, so a hover pill shows the real sampling time
 //! instead of a sample offset.
 
-use taskmanager_core::core::metrics::MetricSample;
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::metrics::MetricSample;
+use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_telemetry_store::live_graph::{ChartSeriesQuery, LiveGraphHistory, MetricSeries};
 
 /// One trend window a renderer may chart, in the canonical order that backs

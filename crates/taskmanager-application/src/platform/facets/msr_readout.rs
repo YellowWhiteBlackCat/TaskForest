@@ -9,9 +9,9 @@
 //! lane is system-scoped: the request is a unit `Refresh` payload mirroring
 //! [`super::rapl_power::RaplPowerRequest`].
 
-use taskmanager_core::MsrReadoutSnapshot;
-use taskmanager_platform_contract::CapabilityRequest;
-use taskmanager_platform_contract::{CapabilityId, RequestPort};
+use taskforest_contract::CapabilityRequest;
+use taskforest_contract::{CapabilityId, RequestPort};
+use taskforest_core::MsrReadoutSnapshot;
 
 /// One CPU MSR-readout read for the host.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

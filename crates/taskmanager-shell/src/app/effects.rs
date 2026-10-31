@@ -14,13 +14,13 @@ use super::input_mode::SearchSlot;
 use super::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP, ShellApp, SystemProjectionStore,
 };
+use taskforest_contract::{EventPortError, OperationFailure, SubmissionError};
 use taskmanager_application::{
     AppPage, FocusDirection, PlatformEffect, ProcessInsightsSubmissionError, SelectionDirection,
     ServiceUpdate, SessionControlOutcome, StartupControlOutcome, TelemetryInterval,
     TelemetryRefreshPolicyChange, UiEffect,
 };
 use taskmanager_application::{DirectoryUsageRequest, SmartControlRequest};
-use taskmanager_platform_contract::{EventPortError, OperationFailure, SubmissionError};
 
 impl SystemProjectionStore {
     /// Accept a correlated session-control outcome. Returns the outcome only

@@ -1,10 +1,8 @@
 //! Process-axis request submission on `PlatformClient`: list, control,
 //! five-facet insights under one revision, and affinity/resource control.
 
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_platform_contract::{
-    CapabilityId, RequestId, SubmissionError, SubmissionErrorKind,
-};
+use taskforest_contract::{CapabilityId, RequestId, SubmissionError, SubmissionErrorKind};
+use taskforest_core::core::process::FrozenProcessIdentity;
 
 use crate::platform::{
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,

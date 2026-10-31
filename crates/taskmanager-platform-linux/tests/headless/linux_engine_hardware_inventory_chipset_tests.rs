@@ -5,7 +5,7 @@ use super::super::{
     FirmwareSource, InventoryContext, InventoryPaths, InventorySource, SystemProbe,
 };
 use super::*;
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::source::SourceOutcome;
 
 /// hwdata-style fixture database: an Intel host bridge with only a generic
 /// topology label plus a Z690 PCH ISA bridge carrying the marketing name, and

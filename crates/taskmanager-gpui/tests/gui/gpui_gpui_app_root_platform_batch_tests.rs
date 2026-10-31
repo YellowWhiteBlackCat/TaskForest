@@ -1,12 +1,12 @@
 use super::*;
 use gpui::AppContext;
-use taskmanager_application::PlatformEventBatch;
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::{
+use taskforest_contract::{
     CapabilityId, EventSequence, OperationFailure, RequestIdGenerator, RetryDisposition,
 };
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::ProviderId;
+use taskforest_core::core::source::SourceOutcome;
+use taskmanager_application::PlatformEventBatch;
 use taskmanager_theme::Theme;
 
 #[gpui::test]

@@ -97,7 +97,7 @@ fn battery_scenes_ingest_both_real_chart_windows_before_the_presented_marker() {
 
 #[test]
 fn smart_failure_scenes_open_the_normal_detail_and_do_not_accept_another_status() {
-    use taskmanager_core::core::device_state::DeviceStatus;
+    use taskforest_core::core::device_state::DeviceStatus;
     use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
     use taskmanager_shell::presentation::effective_smart_status;
 

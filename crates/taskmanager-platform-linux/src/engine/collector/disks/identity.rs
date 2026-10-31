@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::DiskPartition;
-use taskmanager_core::core::metrics::{DiskMetrics, StorageIdentityStability};
-use taskmanager_core::core::source::SourceOutcome;
+use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::metrics::DiskPartition;
+use taskforest_core::core::metrics::{DiskMetrics, StorageIdentityStability};
+use taskforest_core::core::source::SourceOutcome;
 
 /// Keep stable disk identity across transient sysfs metadata degradation.
 ///

@@ -15,9 +15,9 @@ fn fan_summary_lines_project_typed_values_and_honest_dashes() {
     use crate::ui::fan::{fan_section_state, fan_summary_lines};
     use taskmanager_application::i18n::{Language, set_language};
     set_language(Language::En);
-    use taskmanager_core::core::device_state::DeviceState;
-    use taskmanager_core::core::identity::DeviceGeneration;
-    use taskmanager_core::core::sensors::{
+    use taskforest_core::core::device_state::DeviceState;
+    use taskforest_core::core::identity::DeviceGeneration;
+    use taskforest_core::core::sensors::{
         SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
         SensorReading, SensorScale,
     };

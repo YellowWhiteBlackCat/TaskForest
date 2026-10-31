@@ -15,14 +15,14 @@ use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
-use taskmanager_core::core::metrics::{
+use taskforest_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind,
     GpuMetrics, GpuScalarObservations, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation, ScalarObservationGroup,
     VirtualMemoryCommitObservations,
 };
-use taskmanager_core::core::{
+use taskforest_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceId, DeviceState,
     PowerSupplySnapshot, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorReading, SensorScale,

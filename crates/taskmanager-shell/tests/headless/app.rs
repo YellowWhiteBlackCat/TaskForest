@@ -1,9 +1,9 @@
 use super::*;
+use taskforest_core::core::alerts::NotificationPolicy;
+use taskforest_core::core::alerts::{AlertRuleId, AlertTargetIdentity};
+use taskforest_core::core::metrics::CpuMetrics;
+use taskforest_core::core::session::SessionIncarnation;
 use taskmanager_application::DeviceLifecycleSnapshotRevision;
-use taskmanager_core::core::alerts::NotificationPolicy;
-use taskmanager_core::core::alerts::{AlertRuleId, AlertTargetIdentity};
-use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_core::core::session::SessionIncarnation;
 
 impl ShellApp {
     pub(crate) fn apply_session_control_outcome(
@@ -135,28 +135,28 @@ mod sort;
 #[path = "app/source_status.rs"]
 mod source_status;
 
+use taskforest_contract::{
+    CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, EventSequence, RequestId,
+};
+use taskforest_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+use taskforest_core::core::directory_usage::{
+    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceId, ProviderId};
+use taskforest_core::core::metrics::{CpuScalarObservations, ScalarObservation};
+use taskforest_core::core::power::PowerSupplySnapshot;
+use taskforest_core::core::process::ProcessItem;
+use taskforest_core::core::process::{
+    ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
+};
+use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_application::{
     CorrelatedDirectoryUsageEvent, CorrelatedEvent, DeviceLifecyclePartition, DirectoryUsageEvent,
     KeyCode, Modifiers, PlatformEventContext, SensorEvent, SessionControlOutcome,
     StartupControlOutcome,
-};
-use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceId, ProviderId};
-use taskmanager_core::core::metrics::{CpuScalarObservations, ScalarObservation};
-use taskmanager_core::core::power::PowerSupplySnapshot;
-use taskmanager_core::core::process::ProcessItem;
-use taskmanager_core::core::process::{
-    ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
-};
-use taskmanager_core::core::sensors::SensorCenterSnapshot;
-use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_platform_contract::{
-    CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, EventSequence, RequestId,
 };
 
 fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
@@ -317,8 +317,8 @@ fn delete_uses_shared_reducer_and_never_executes_before_confirmation() {
 
 #[test]
 fn legacy_process_row_cannot_open_or_confirm_a_dangerous_action() {
-    use taskmanager_core::core::metrics::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskforest_core::core::metrics::ScalarObservation;
+    use taskforest_core::core::process::ProcessScalarObservations;
 
     let mut app = ShellApp::new();
     // Direct construction (not the fixture builder): this row deliberately

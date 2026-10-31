@@ -4,10 +4,10 @@
 //! sidebar (`sidebar.rs` + `sidebar/captions.rs`).
 
 use super::*;
-use taskmanager_core::core::metrics::GpuMetrics;
-use taskmanager_core::core::metrics::SystemSnapshot;
-use taskmanager_core::core::sensors::SensorQuantity;
-use taskmanager_core::core::units::format_quantity_with;
+use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::sensors::SensorQuantity;
+use taskforest_core::core::units::format_quantity_with;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::trend;
 use taskmanager_shell::presentation::{gpu_display_identity, missing_value};

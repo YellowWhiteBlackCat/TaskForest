@@ -14,7 +14,7 @@ and snapshot validation only accepts expansion keys on tree-item nodes.
 Display-only process rows stay visible while exposing no focus, selection, or
 expand/collapse action.
 
-The contract imports measurement types from `taskmanager-core` and has no shell
+The contract imports measurement types from `taskforest-core` and has no shell
 dependency. `taskmanager-shell::append_process_semantic_rows` maps its canonical
 ordered process tree rows into these inputs; frontend builders consume the
 resulting semantic snapshot without recreating process identity or aggregate

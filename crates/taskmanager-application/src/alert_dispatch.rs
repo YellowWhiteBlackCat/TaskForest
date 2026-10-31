@@ -15,13 +15,13 @@
 //! hours, the opt-in switch) so a second frontend can never diverge on policy.
 //! It performs no I/O and has no platform dependency.
 
-use taskmanager_core::alerts::{
+use taskforest_core::alerts::{
     Alert, AlertInstanceId, AlertRuleId, NotificationGate, NotificationPolicy,
 };
 
 use crate::platform::DesktopNotificationRequest;
 use std::collections::HashSet;
-use taskmanager_core::alerts::AlertMetric;
+use taskforest_core::alerts::AlertMetric;
 
 /// Shared alert-to-notification delivery state.
 #[derive(Debug, Clone)]

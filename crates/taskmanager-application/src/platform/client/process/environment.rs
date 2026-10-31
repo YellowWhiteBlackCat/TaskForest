@@ -1,8 +1,8 @@
 //! Submission helper for the independently scheduled Environment insight
 //! facet (working directory + bounded environment table).
 
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_platform_contract::{RequestId, SubmissionError};
+use taskforest_contract::{RequestId, SubmissionError};
+use taskforest_core::core::process::FrozenProcessIdentity;
 
 use crate::platform::{ProcessEnvironmentRequest, ProcessInsightFacet};
 

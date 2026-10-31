@@ -15,9 +15,9 @@ use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
+use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::MemoryMetrics;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme, with_alpha};
 

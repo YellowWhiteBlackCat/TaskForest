@@ -7,10 +7,10 @@ use crate::gpui_app::theme::detect;
 use gpui::{
     App, AppContext, Bounds, Entity, TitlebarOptions, WindowBounds, WindowOptions, point, px, size,
 };
+use taskforest_core::core::appearance::DesktopAppearance;
 use taskmanager_app_host::WindowPresentation;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_assets::product;
-use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_theme::Theme;
 use taskmanager_ui::init;
 use taskmanager_ui::theme_binding::background_appearance;

@@ -6,8 +6,8 @@ use super::{
     export_process_batch_history_with, process_batch_failure_feedback_key,
     record_completed_process_batch, result_counts,
 };
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryFormat,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessLiveKey,
 };
@@ -18,8 +18,8 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
 ) {
     use crate::gpui_app::root::RootView;
     use gpui::AppContext;
-    use taskmanager_core::core::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskforest_core::core::ScalarObservation;
+    use taskforest_core::core::process::ProcessScalarObservations;
     use taskmanager_theme::Theme;
 
     let process = |pid, parent_pid, token| {
@@ -66,8 +66,8 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
 fn multi_select_reversible_verb_arms_the_shared_confirmation(cx: &mut gpui::TestAppContext) {
     use crate::gpui_app::root::RootView;
     use gpui::AppContext;
-    use taskmanager_core::core::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskforest_core::core::ScalarObservation;
+    use taskforest_core::core::process::ProcessScalarObservations;
     use taskmanager_theme::Theme;
 
     let process = |pid: u32, name: String| {
@@ -114,8 +114,8 @@ fn multi_select_reversible_verb_arms_the_shared_confirmation(cx: &mut gpui::Test
 fn single_reversible_verb_submits_without_the_shared_gate(cx: &mut gpui::TestAppContext) {
     use crate::gpui_app::root::RootView;
     use gpui::AppContext;
-    use taskmanager_core::core::ScalarObservation;
-    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskforest_core::core::ScalarObservation;
+    use taskforest_core::core::process::ProcessScalarObservations;
     use taskmanager_theme::Theme;
 
     let item = ProcessItemFixtureBuilder::new()

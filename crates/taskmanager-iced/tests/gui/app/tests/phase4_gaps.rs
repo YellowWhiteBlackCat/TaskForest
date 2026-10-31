@@ -2,26 +2,26 @@
 
 use crate::IcedApp;
 use crate::app::{FocusTarget, Message};
-use taskmanager_application::PlatformEvent;
-use taskmanager_application::ServiceDependenciesLifecycle;
-use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
-use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_core::core::metrics::{
+use taskforest_contract::CapabilityCatalog;
+use taskforest_contract::CapabilitySnapshot;
+use taskforest_contract::EventEnvelope;
+use taskforest_contract::EventPort;
+use taskforest_contract::EventPortError;
+use taskforest_contract::RequestId;
+use taskforest_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskforest_core::core::metrics::CpuMetrics;
+use taskforest_core::core::metrics::{
     CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryCompressionObservations,
     MemoryMetrics, MemoryOptionalObservations, OptionalObservation, ScalarObservation,
     SystemSnapshot,
 };
-use taskmanager_core::core::services::{
+use taskforest_core::core::services::{
     ServiceDeps, ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
     ServiceStatus,
 };
-use taskmanager_core::core::target::ServiceId;
-use taskmanager_platform_contract::CapabilityCatalog;
-use taskmanager_platform_contract::CapabilitySnapshot;
-use taskmanager_platform_contract::EventEnvelope;
-use taskmanager_platform_contract::EventPort;
-use taskmanager_platform_contract::EventPortError;
-use taskmanager_platform_contract::RequestId;
+use taskforest_core::core::target::ServiceId;
+use taskmanager_application::PlatformEvent;
+use taskmanager_application::ServiceDependenciesLifecycle;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
@@ -246,10 +246,10 @@ fn test_run_new_task_modal_lifecycle() {
 /// success semantics and nothing ever launched.
 #[test]
 fn submitting_run_task_launches_the_command_through_the_platform_lane() {
+    use taskforest_contract::{RequestEnvelope, RequestPort, SubmissionError};
     use taskmanager_application::{
         CommandLaunchRequest, IntegrationFacets, PlatformClient, PlatformFacets, PlatformHandle,
     };
-    use taskmanager_platform_contract::{RequestEnvelope, RequestPort, SubmissionError};
 
     #[derive(Default)]
     struct RecordingLaunch(std::sync::Mutex<Vec<String>>);

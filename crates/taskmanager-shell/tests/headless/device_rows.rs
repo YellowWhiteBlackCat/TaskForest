@@ -7,6 +7,22 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use crate::app::ShellApp;
+use taskforest_contract::{CapabilityId, EventSequence, RequestId};
+use taskforest_core::core::device_state::{
+    DeviceLifecycle, DevicePresence, DeviceState, DeviceStatus,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
+use taskforest_core::core::metrics::{
+    CpuMetrics, CpuTelemetryObservation, DiskMetrics, DiskPartition, GpuMetrics,
+    GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
+    MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation, ScalarObservation,
+    StorageTelemetryObservation, SystemSnapshot,
+};
+use taskforest_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorReading};
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_application::{
     CorrelatedEvent, CorrelatedNpuInventoryEvent, CorrelatedSystemTelemetryOutcome,
     DeviceLifecycleApplyResult, DeviceLifecyclePartition, DeviceLifecycleProjectionIssue,
@@ -15,22 +31,6 @@ use taskmanager_application::{
     SystemTelemetryDomainState, SystemTelemetryProjection, SystemTelemetryProjectionApplyResult,
     SystemTelemetryRevision,
 };
-use taskmanager_core::core::device_state::{
-    DeviceLifecycle, DevicePresence, DeviceState, DeviceStatus,
-};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
-use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuTelemetryObservation, DiskMetrics, DiskPartition, GpuMetrics,
-    GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
-    MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation, ScalarObservation,
-    StorageTelemetryObservation, SystemSnapshot,
-};
-use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
-use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
-use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorReading};
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 fn lifecycle(now_ms: u64) -> DeviceLifecycle {
     DeviceLifecycle {

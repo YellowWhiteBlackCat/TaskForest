@@ -3,8 +3,8 @@
 //! Keeping this classification in its own module makes it harder for one
 //! renderer to silently invent a virtual/physical taxonomy of its own.
 
+use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 use taskmanager_application::i18n;
-use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 
 /// Coarse network interface classification for grouped UI presentation
 /// (physical vs virtual).

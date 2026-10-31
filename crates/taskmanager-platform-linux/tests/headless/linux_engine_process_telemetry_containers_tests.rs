@@ -1,7 +1,7 @@
 use super::*;
 use crate::engine::process::telemetry::safe_cgroup_path;
 use std::collections::HashSet;
-use taskmanager_core::ScalarAvailability;
+use taskforest_core::ScalarAvailability;
 
 fn fixture_tree(label: &str) -> PathBuf {
     // Reuse the agent lease tmp when present (mirrors the facet fixture

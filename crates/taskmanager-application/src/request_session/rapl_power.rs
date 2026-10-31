@@ -5,9 +5,9 @@
 //! by — the accepted payload survives replacement and provider failures.
 
 use crate::{RequestAttemptId, RequestCorrelation};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{RaplPowerFailure, RaplPowerSnapshot};
-use taskmanager_platform_contract::RequestId;
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::{RaplPowerFailure, RaplPowerSnapshot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RaplPowerRequestFailure {

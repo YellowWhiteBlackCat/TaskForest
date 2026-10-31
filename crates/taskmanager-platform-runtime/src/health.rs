@@ -4,10 +4,12 @@
 //! single `Available`/`Degraded`/`Unavailable` verdict without treating a
 //! successful provider or a retained timestamp as proof of a trustworthy value.
 
-use taskmanager_application::{ProcessInsightObservation, SystemTelemetryRevision};
-use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_core::{
+use taskforest_contract::{
+    CompositeSourceSnapshot, DeviceSourceSnapshot, PartialSourceSnapshot, ProviderFailure,
+};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskforest_core::{
     ContainerRollup, CpuTelemetryObservation, DeviceState, DeviceStatus, GpuTelemetryObservation,
     HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
     ProcessEnvironment, ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation,
@@ -15,9 +17,7 @@ use taskmanager_core::{
     ProcessThreads, StartupBootEvidenceSnapshot, StorageTelemetryObservation,
     SystemObservationState, SystemSnapshot,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, DeviceSourceSnapshot, PartialSourceSnapshot, ProviderFailure,
-};
+use taskmanager_application::{ProcessInsightObservation, SystemTelemetryRevision};
 
 /// Health evidence attached to a successful domain event.
 ///

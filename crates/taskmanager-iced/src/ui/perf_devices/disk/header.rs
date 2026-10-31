@@ -1,6 +1,6 @@
 //! Pure disk detail header projections.
 
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskforest_core::core::metrics::DiskMetrics;
 
 /// One disk's display identity (GPUI parity): the model when known, else the
 /// `/dev/`-stripped name — no family prefix.

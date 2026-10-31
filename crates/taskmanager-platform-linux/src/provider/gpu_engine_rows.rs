@@ -18,7 +18,8 @@
 //! privileged read needs sudo and is an integrator on-box receipt item. No
 //! fabricated rows exist on any path: failures stay typed failures.
 
-use taskmanager_core::{
+use taskforest_contract::{CapabilityStatus, ProviderFailure};
+use taskforest_core::{
     DeviceId, FailureKind, GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot,
 };
 use taskmanager_escalation::polkit::PerfHelperErrorKind;
@@ -26,7 +27,6 @@ use taskmanager_escalation::polkit::{PerfHelperOutcome, PolkitGate, invoke_perf_
 use taskmanager_escalation::{
     EscalationAvailability, EscalationDenialReason, EscalationFeature, PrivilegeGate,
 };
-use taskmanager_platform_contract::{CapabilityStatus, ProviderFailure};
 use taskmanager_platform_provider::GpuEngineRowsProvider;
 
 pub(super) struct NativeGpuEngineRowsProvider {

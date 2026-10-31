@@ -8,10 +8,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 #[cfg(any(test, feature = "test-support"))]
 use std::{collections::HashMap, time::Instant};
-use taskmanager_core::FailureKind;
-use taskmanager_core::core::device_state::{DeviceState, DeviceStatus, stable_gpu_id};
-use taskmanager_core::core::metrics::GpuThrottleReason;
-use taskmanager_core::core::metrics::{
+use taskforest_core::FailureKind;
+use taskforest_core::core::device_state::{DeviceState, DeviceStatus, stable_gpu_id};
+use taskforest_core::core::metrics::GpuThrottleReason;
+use taskforest_core::core::metrics::{
     GpuEngine, GpuEngineKind, GpuMetricField, GpuMetrics, GpuScalarObservations, ScalarObservation,
 };
 

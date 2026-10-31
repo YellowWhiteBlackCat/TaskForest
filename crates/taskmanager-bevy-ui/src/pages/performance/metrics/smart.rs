@@ -1,6 +1,6 @@
 //! Actionable SMART source state remains separate from older measurements.
+use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 
 pub(in crate::pages::performance) fn smart_source_status(disk: &DiskMetrics) -> String {

@@ -93,11 +93,11 @@ mod visibility;
 mod projection_render_tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use taskforest_core::core::metrics::{CpuMetrics, CpuTelemetryObservation};
     use taskmanager_application::{
         PlatformEventBatch, ProjectedSystemTelemetry, SystemTelemetryDomainEvent,
         SystemTelemetryProjection, SystemTelemetryProjectionApplyResult, SystemTelemetryRevision,
     };
-    use taskmanager_core::core::metrics::{CpuMetrics, CpuTelemetryObservation};
 
     use crate::TuiTheme;
     use crate::render;

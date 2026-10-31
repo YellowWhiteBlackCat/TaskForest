@@ -5,8 +5,8 @@ use gpui::{
     AppContext, Context, InteractiveElement, IntoElement, ParentElement, Render, Styled,
     TestAppContext, VisualTestContext, Window, div, px,
 };
+use taskforest_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
 

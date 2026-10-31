@@ -2,7 +2,7 @@
 name = "taskmanager-app-host"
 version = "0.5.1"
 edition = "2024"
-rust-version = "1.99.0"
+rust-version = "1.99.1"
 license = "Apache-2.0"
 description = "Toolkit-neutral native application composition for TaskForest"
 publish = false
@@ -13,12 +13,12 @@ publish = false
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application" }
-taskmanager-core = { path = "../taskmanager-core" }
+taskforest-core = { path = "../taskforest-core" }
 taskmanager-history-store = { path = "../taskmanager-history-store" }
 taskmanager-platform-native = { path = "../taskmanager-platform-native", default-features = false }
-taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
-taskmanager-ipc = { path = "../taskmanager-ipc" }
+taskforest-ipc = { path = "../taskforest-ipc" }
 crossbeam-channel = "0.5"
 ctrlc = { version = "3.5", features = ["termination"] }
 

@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use taskmanager_core::{CounterDelta, CumulativeCounter, FailureKind, ScalarObservation};
+use taskforest_core::{CounterDelta, CumulativeCounter, FailureKind, ScalarObservation};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) struct ProcessRateObservations {

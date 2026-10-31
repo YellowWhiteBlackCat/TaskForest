@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::time::Duration;
 
-use taskmanager_core::{
+use taskforest_core::{
     ContainerQuota, ContainerSummary, FailureKind, IsolationKind, ScalarObservation,
 };
 

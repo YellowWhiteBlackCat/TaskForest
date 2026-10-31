@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_core::core::SmartAvailability;
+use taskforest_core::core::SmartAvailability;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
@@ -75,7 +75,7 @@ fn device_reinsert_generation_cannot_reuse_previous_samples() {
 fn storage_temperature_projection_is_identity_and_generation_scoped() {
     use std::collections::BTreeMap;
 
-    use taskmanager_core::core::{
+    use taskforest_core::core::{
         DeviceLifecycle, DevicePresence, DeviceState, StorageTelemetryObservation,
     };
     use taskmanager_telemetry_store::TelemetryStore;
@@ -145,7 +145,7 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
 fn engine_projection_keeps_missing_engine_samples_as_gaps() {
     use std::collections::BTreeMap;
 
-    use taskmanager_core::core::{
+    use taskforest_core::core::{
         DeviceLifecycle, DevicePresence, DeviceState, GpuEngine, GpuEngineKind,
         GpuTelemetryObservation,
     };

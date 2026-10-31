@@ -21,8 +21,8 @@ use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ListSizingBehavior,
     ParentElement, Styled, UniformListScrollHandle, Window, div, px, uniform_list,
 };
+use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::{ApplicationHistoryProjection, ApplicationHistoryStatus};
-use taskmanager_core::core::history::HistoryWindow;
 
 use taskmanager_ui::data::row::DataRow;
 use taskmanager_ui::layout::pinned_scroll_region;
@@ -35,8 +35,8 @@ use crate::gpui_app::formatting;
 use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 

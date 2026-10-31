@@ -1,6 +1,6 @@
 use super::{diagnostic_failure_feedback_key, diagnostic_failure_message};
+use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
 #[test]
 fn every_typed_failure_maps_to_localized_feedback_without_raw_detail() {

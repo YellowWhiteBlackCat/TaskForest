@@ -13,7 +13,7 @@
 # `SEMVER_BASELINE_REV` (default: `origin/main`). The revision must resolve
 # in the local clone; fetch the missing history first (`git fetch origin`).
 #
-# Local triage: `SEMVER_ONLY="taskmanager-core taskmanager-ipc"` restricts the
+# Local triage: `SEMVER_ONLY="taskforest-core taskforest-ipc"` restricts the
 # run to the named packages. It exists so a maintainer can reproduce a single
 # failure without rebuilding all publishable crates; CI never sets it.
 #
@@ -46,6 +46,14 @@
 #   SEMVER_IGNORE_FILE              override for the ignore-list path
 #                                   (default: scripts/quality/semver-ignore-lints.txt)
 #   SEMVER_CRATE_TIMEOUT            per-crate deadline in seconds (default 900)
+#   SEMVER_RUSTDOC_JSON             auto (default) | 1 | 0 — generate both sides
+#                                   with `cargo rustdoc --locked` and hand the two
+#                                   JSON files to the tool, so the baseline side is
+#                                   pinned by its own tree lockfile. `auto` uses the
+#                                   flow only when the tool accepts prebuilt rustdoc
+#                                   JSON and the nightly toolchain is installed
+#   SEMVER_RUSTDOC_TOOLCHAIN        toolchain that can emit rustdoc JSON
+#                                   (default: nightly; rustdoc JSON is unstable)
 #
 # Exit codes:
 #   0  every checked crate kept its public API
@@ -301,6 +309,53 @@ if grep -qE '^[[:space:]]+--ignore([[:space:]]|,|$)' <<<"$combined_help"; then
     supports_ignore=1
 fi
 
+# ---------------------------------------------------------------------------
+# Lockfile-pinned rustdoc-JSON flow
+# ---------------------------------------------------------------------------
+# The tool resolves the baseline side in a placeholder workspace of its own, so
+# the repository lockfile does not pin that side. Where the tool accepts
+# prebuilt rustdoc JSON, the gate can generate BOTH sides itself with
+# `cargo rustdoc --locked` and hand over the two files: each side then comes
+# from a tree whose own lockfile pins it, and the tool only compares the JSON.
+# Emitting rustdoc JSON is an unstable rustdoc feature, so the flow needs a
+# nightly toolchain and stays optional.
+supports_current_rustdoc=0
+supports_baseline_rustdoc=0
+if grep -qE '^[[:space:]]+--current-rustdoc([[:space:]]|,|$)' <<<"$combined_help"; then
+    supports_current_rustdoc=1
+fi
+if grep -qE '^[[:space:]]+--baseline-rustdoc([[:space:]]|,|$)' <<<"$combined_help"; then
+    supports_baseline_rustdoc=1
+fi
+rustdoc_toolchain="${SEMVER_RUSTDOC_TOOLCHAIN:-nightly}"
+rustdoc_json=0
+case "${SEMVER_RUSTDOC_JSON:-auto}" in
+    0) ;;
+    1)
+        if [[ "$supports_current_rustdoc" -eq 1 && "$supports_baseline_rustdoc" -eq 1 ]] &&
+            rustup run "$rustdoc_toolchain" rustdoc -vV >/dev/null 2>&1 &&
+            command -v python3 >/dev/null 2>&1; then
+            rustdoc_json=1
+        else
+            fail "SEMVER_RUSTDOC_JSON=1 was requested but the lockfile-pinned flow is unavailable:"
+            fail "  the tool must accept --current-rustdoc/--baseline-rustdoc, the"
+            fail "  '$rustdoc_toolchain' toolchain must be installed, and 'command -v python3' must succeed."
+            exit 1
+        fi
+        ;;
+    auto)
+        if [[ "$supports_current_rustdoc" -eq 1 && "$supports_baseline_rustdoc" -eq 1 ]] &&
+            rustup run "$rustdoc_toolchain" rustdoc -vV >/dev/null 2>&1 &&
+            command -v python3 >/dev/null 2>&1; then
+            rustdoc_json=1
+        fi
+        ;;
+    *)
+        fail "SEMVER_RUSTDOC_JSON must be auto, 0, or 1"
+        exit 1
+        ;;
+esac
+
 ignore_arg=""
 if [[ "${#ignore_lints[@]}" -gt 0 ]]; then
     if [[ "$supports_ignore" -eq 1 ]]; then
@@ -326,6 +381,10 @@ fi
 
 if [[ "$supports_locked" -eq 1 ]]; then
     log "the tool accepts --locked; the check runs against the pinned lockfile"
+elif [[ "$rustdoc_json" -eq 1 ]]; then
+    log "no --locked flag in this release; both sides are generated here with"
+    log "  'cargo rustdoc --locked' on $rustdoc_toolchain, so each side is pinned by its"
+    log "  own tree lockfile and the tool only compares the two rustdoc JSON files."
 else
     log "note: this cargo-semver-checks release has no --locked flag; it resolves the"
     log "      checked crates in its own placeholder workspace, so the repository"
@@ -338,6 +397,19 @@ fi
 log_dir="$(mktemp -d "${TMPDIR:-/tmp}/semver-api-gate.XXXXXX")"
 cleanup() { rm -rf "$log_dir"; }
 trap cleanup EXIT
+
+# cargo-semver-checks keeps a small working cache under XDG_CACHE_HOME. The
+# lockfile-pinned flow needs a writable one; when the ambient cache is missing
+# or read-only (sandboxed runs, read-only CI caches) point the tool at the
+# run's own temporary directory instead of dying on a cache-directory error.
+if [[ "$rustdoc_json" -eq 1 ]]; then
+    cache_home="${XDG_CACHE_HOME:-${HOME:-/nonexistent}/.cache}"
+    if [[ ! -d "$cache_home" || ! -w "$cache_home" ]]; then
+        export XDG_CACHE_HOME="$log_dir/cache"
+        mkdir -p "$XDG_CACHE_HOME"
+        log "pointing the tool cache at the run directory (ambient cache is not writable)"
+    fi
+fi
 
 summarize_failures() {
     # First few findings of a failed check, one line per lint.
@@ -367,9 +439,73 @@ first_error_line() {
     printf '%s' "${line:0:200}"
 }
 
+# The library target name (underscored) of one package inside one tree. The
+# rustdoc-JSON artifact is named after the target, never after the package, and
+# the two differ whenever a crate's package and lib names diverge.
+cargo_lib_target_name() {
+    local root="$1" package="$2"
+    (cd "$root" && cargo metadata --no-deps --locked --format-version 1 2>/dev/null) |
+        SEMVER_TARGET_PACKAGE="$package" timeout 60s python3 -c '
+import json, os, sys
+
+package = os.environ["SEMVER_TARGET_PACKAGE"]
+try:
+    metadata = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for candidate in metadata.get("packages", []):
+    if candidate.get("name") != package:
+        continue
+    for target in candidate.get("targets", []):
+        if "lib" in target.get("kind", []):
+            print(target["name"].replace("-", "_"))
+            sys.exit(0)
+sys.exit(1)
+'
+}
+
+# Emit rustdoc JSON for one package in one tree, with that tree's lockfile
+# pinning the dependency graph. `build.warnings = "deny"` is relaxed for the
+# doc build only: this gate compares API shapes, and a doc lint is not an API
+# break. Returns non-zero so the caller can fall back to the tool-driven path.
+rustdoc_json_for() {
+    local root="$1" package="$2" output="$3" target="$4"
+    local lib_name
+    lib_name="$(cargo_lib_target_name "$root" "$package")" || return 1
+    [[ -n "$lib_name" ]] || return 1
+    if ! (cd "$root" && timeout --kill-after=30s "$crate_timeout" \
+        env RUSTUP_TOOLCHAIN="$rustdoc_toolchain" \
+        cargo rustdoc -p "$package" --lib --locked \
+        --config 'build.warnings="warn"' \
+        -Z unstable-options --output-format json \
+        --target-dir "$target" >/dev/null 2>&1); then
+        return 1
+    fi
+    local produced="$target/doc/$lib_name.json"
+    [[ -f "$produced" ]] || return 1
+    cp "$produced" "$output"
+}
+
 results=()
 failures=0
 compared=0
+
+# Baseline side of the lockfile-pinned flow: the exact baseline tree, checked
+# out beside the current one, so its own Cargo.lock pins its own build.
+baseline_tree=""
+rustdoc_target="${CARGO_TARGET_DIR:-$repo/target}"
+if [[ "$rustdoc_json" -eq 1 ]]; then
+    baseline_tree="$log_dir/baseline-tree"
+    mkdir -p "$baseline_tree"
+    if git -C "$repo" archive "$baseline_sha" | tar -x -C "$baseline_tree"; then
+        log "materialized the baseline tree for the lockfile-pinned flow"
+    else
+        log "note: the baseline tree could not be materialized; falling back to the"
+        log "      tool-driven baseline (the baseline side is then not lockfile-pinned)."
+        rustdoc_json=0
+        baseline_tree=""
+    fi
+fi
 
 for crate_name in "${publishable_crates[@]}"; do
     if ! baseline_has_crate "$crate_name"; then
@@ -378,21 +514,58 @@ for crate_name in "${publishable_crates[@]}"; do
         continue
     fi
 
-    cmd=(cargo semver-checks)
-    if [[ -n "$subcommand" ]]; then
-        cmd+=("$subcommand")
-    fi
-    cmd+=(--baseline-rev "$baseline_sha" --package "$crate_name")
-    if [[ "$supports_locked" -eq 1 ]]; then
-        cmd+=(--locked)
-    fi
-    if [[ -n "$ignore_arg" ]]; then
-        cmd+=(--ignore "$ignore_arg")
+    # Preferred: build both sides here with `cargo rustdoc --locked` and hand
+    # the two JSON files over, so the baseline side is pinned by the baseline
+    # tree's own lockfile. Fall back to `--baseline-rev` (whose baseline side
+    # the tool resolves itself, unpinned) when either side cannot be produced,
+    # or when the tool cannot read the JSON. Either way the run is logged.
+    used_rustdoc=0
+    if [[ "$rustdoc_json" -eq 1 ]]; then
+        cur_json="$log_dir/$crate_name.current-rustdoc.json"
+        base_json="$log_dir/$crate_name.baseline-rustdoc.json"
+        if rustdoc_json_for "$repo" "$crate_name" "$cur_json" "$rustdoc_target" &&
+            rustdoc_json_for "$baseline_tree" "$crate_name" "$base_json" "$rustdoc_target"; then
+            used_rustdoc=1
+        else
+            log "  $crate_name: rustdoc JSON could not be produced; using the tool-driven baseline"
+        fi
     fi
 
-    log "checking $crate_name ..."
-    rc=0
-    timeout --kill-after=30s "$crate_timeout" "${cmd[@]}" >"$log_dir/$crate_name.log" 2>&1 || rc=$?
+    if [[ "$used_rustdoc" -eq 1 ]]; then
+        cmd=(cargo semver-checks)
+        if [[ -n "$subcommand" ]]; then
+            cmd+=("$subcommand")
+        fi
+        cmd+=(--manifest-path "$repo/Cargo.toml" --package "$crate_name"
+            --current-rustdoc "$cur_json" --baseline-rustdoc "$base_json")
+        if [[ -n "$ignore_arg" ]]; then
+            cmd+=("--ignore" "$ignore_arg")
+        fi
+        log "checking $crate_name ... (lockfile-pinned rustdoc JSON)"
+        rc=0
+        timeout --kill-after=30s "$crate_timeout" "${cmd[@]}" >"$log_dir/$crate_name.log" 2>&1 || rc=$?
+        if [[ "$rc" -eq 101 ]]; then
+            log "  $crate_name: the rustdoc JSON comparison could not complete; retrying against the tool-driven baseline"
+            used_rustdoc=0
+        fi
+    fi
+
+    if [[ "$used_rustdoc" -eq 0 ]]; then
+        cmd=(cargo semver-checks)
+        if [[ -n "$subcommand" ]]; then
+            cmd+=("$subcommand")
+        fi
+        cmd+=(--baseline-rev "$baseline_sha" --package "$crate_name")
+        if [[ "$supports_locked" -eq 1 ]]; then
+            cmd+=("--locked")
+        fi
+        if [[ -n "$ignore_arg" ]]; then
+            cmd+=("--ignore" "$ignore_arg")
+        fi
+        log "checking $crate_name ..."
+        rc=0
+        timeout --kill-after=30s "$crate_timeout" "${cmd[@]}" >"$log_dir/$crate_name.log" 2>&1 || rc=$?
+    fi
     compared=$((compared + 1))
 
     case "$rc" in

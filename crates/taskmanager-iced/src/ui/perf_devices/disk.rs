@@ -5,8 +5,8 @@ use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use super::*;
 use iced::Element;
-use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
+use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
 
 use crate::ui::smart_self_test_confirmation::confirmation;
 use taskmanager_shell::presentation::{
