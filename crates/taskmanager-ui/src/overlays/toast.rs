@@ -10,10 +10,10 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, FocusHandle, InteractiveElement,
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
-    Styled, Task, Window, div, px,
+    Styled, Task, Window, div, px, rems,
 };
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, Palette};
+use taskmanager_theme::{Color, GlassTier, Palette};
 use taskmanager_ui_contract::IconId;
 
 /// Toast severity; each maps to a palette semantic color.
@@ -128,6 +128,8 @@ pub struct Toast {
     state: Entity<ToastState>,
     palette: Palette,
     on_dismiss: OptCallback,
+    single_line: bool,
+    indicator: bool,
 }
 
 impl Toast {
@@ -137,7 +139,23 @@ impl Toast {
             state,
             palette,
             on_dismiss: None,
+            single_line: false,
+            indicator: false,
         }
+    }
+
+    /// Keep the receipt on one bounded line for compact chrome slots.
+    #[must_use]
+    pub fn single_line(mut self) -> Self {
+        self.single_line = true;
+        self
+    }
+
+    /// Render only the semantic icon when the host slot cannot carry text.
+    #[must_use]
+    pub fn indicator(mut self, indicator: bool) -> Self {
+        self.indicator = indicator;
+        self
     }
 
     /// Dismiss handler (fired from the close button / auto-dismiss).
@@ -156,62 +174,88 @@ impl RenderOnce for Toast {
         let palette = self.palette;
         let accent = kind.color(&palette);
         let on_dismiss = self.on_dismiss.clone();
+        let single_line = self.single_line;
+        let indicator = self.indicator;
 
-        // Mission-Center-style entrance: the toast fades in and rises 4px as
+        // Mission-Center-style entrance: the toast fades in and rises 4/14 REM as
         // it mounts (a fresh toast always replays the animation).
         div()
+            .debug_selector(|| "tm-toast-card".to_string())
             .flex()
             .flex_row()
             .items_center()
-            .gap(crate::theme_binding::definite_length(tokens::SPACE_10))
-            .px(crate::theme_binding::definite_length(tokens::SPACE_12))
-            .py(crate::theme_binding::definite_length(tokens::SPACE_10))
-            .rounded(crate::theme_binding::absolute(palette.panel_radius))
-            .bg(crate::theme_binding::fill(palette.surface))
-            .border_1()
-            .border_color(crate::theme_binding::hsla(palette.border))
-            .shadow_md()
+            .min_w(px(0.0))
+            .gap(crate::theme_binding::rem_length(tokens::SPACE_10))
+            .px(crate::theme_binding::rem_length(tokens::SPACE_12))
+            .py(crate::theme_binding::rem_length(tokens::SPACE_10))
+            .when(single_line, |card| {
+                card.py(crate::theme_binding::rem_length(tokens::SPACE_4))
+            })
+            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
+            .bg(crate::theme_binding::glass_fill(
+                &palette.theme,
+                GlassTier::Card,
+            ))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(crate::theme_binding::hsla(palette.theme.glass_card().edge))
+            .shadow(crate::theme_binding::glass_shadow(
+                &palette.theme,
+                GlassTier::Card,
+            ))
             .text_sm()
             .text_color(crate::theme_binding::hsla(palette.fg))
             .child(
                 icon(kind.icon())
-                    .size(px(16.0))
+                    .size(crate::theme_binding::rem_value(16.0))
                     .text_color(crate::theme_binding::hsla(accent)),
             )
-            .child(div().child(message))
-            .when_some(on_dismiss, |el, on_dismiss| {
-                el.child(
-                    div()
-                        .id("tm-toast-dismiss")
-                        .debug_selector(|| "tm-toast-dismiss".into())
-                        .track_focus(&dismiss_focus)
-                        .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
-                        .cursor_pointer()
-                        .text_color(crate::theme_binding::hsla(palette.fg_muted))
-                        .on_key_down({
-                            let on_dismiss = on_dismiss.clone();
-                            move |event: &KeyDownEvent, window, cx| {
-                                let stroke = &event.keystroke;
-                                if !stroke.modifiers.modified()
-                                    && matches!(stroke.key.as_str(), "enter" | "space")
-                                {
-                                    cx.stop_propagation();
-                                    on_dismiss(window, cx);
+            .when(!indicator, |card| {
+                let text = div()
+                    .flex_1()
+                    .min_w(px(0.0))
+                    .overflow_hidden()
+                    .when(single_line, |text| text.truncate())
+                    .child(message);
+                card.child(text).when_some(on_dismiss, |el, on_dismiss| {
+                    el.child(
+                        div()
+                            .id("tm-toast-dismiss")
+                            .debug_selector(|| "tm-toast-dismiss".into())
+                            .flex_shrink_0()
+                            .track_focus(&dismiss_focus)
+                            .focus(|style| {
+                                style.border_color(crate::theme_binding::hsla(palette.ring))
+                            })
+                            .cursor_pointer()
+                            .text_color(crate::theme_binding::hsla(palette.fg_muted))
+                            .on_key_down({
+                                let on_dismiss = on_dismiss.clone();
+                                move |event: &KeyDownEvent, window, cx| {
+                                    let stroke = &event.keystroke;
+                                    if !stroke.modifiers.modified()
+                                        && matches!(stroke.key.as_str(), "enter" | "space")
+                                    {
+                                        cx.stop_propagation();
+                                        on_dismiss(window, cx);
+                                    }
                                 }
-                            }
-                        })
-                        .on_click(move |_event: &ClickEvent, window, cx| {
-                            on_dismiss(window, cx);
-                        })
-                        .child("×"),
-                )
+                            })
+                            .on_click(move |_event: &ClickEvent, window, cx| {
+                                on_dismiss(window, cx);
+                            })
+                            .child("×"),
+                    )
+                })
             })
             // Mission-Center-style entrance: the toast fades in and rises 4px
             // as it mounts (a fresh toast always replays the animation).
             .with_animation(
                 "toast-entrance",
                 crate::theme_binding::appear(),
-                |el, delta| el.opacity(delta).mt(px((1.0 - delta) * 4.0)),
+                |el, delta| {
+                    el.opacity(delta)
+                        .mt(crate::theme_binding::rem_value((1.0 - delta) * 4.0))
+                },
             )
     }
 }

@@ -26,10 +26,3 @@ pub(crate) fn fan_fact_line(fan: &SensorReading) -> String {
         .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
     format!("{} {rpm}", t("fan.rpm"))
 }
-
-/// A fan row's short caption (the RPM readout), for the sidebar's accessory
-/// text; an unread channel keeps the shared dash.
-pub(crate) fn fan_caption(fan: &SensorReading) -> String {
-    fan.current_number()
-        .map_or_else(missing_value, |value| format!("{value:.0} RPM"))
-}

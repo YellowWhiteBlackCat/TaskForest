@@ -8,7 +8,7 @@ use ratatui::layout::Rect;
 use ratatui::text::Line;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
-use taskmanager_theme::Skin;
+use taskmanager_theme::{FontRole, Skin};
 
 use super::footer::settings_footer_plain;
 use super::{
@@ -57,12 +57,12 @@ pub(super) fn settings_field_rows(app: &crate::TuiApp) -> Vec<SettingsFieldRow> 
     rows.push(SettingsFieldRow {
         field: 3,
         label: t("settings.desktop_ui_font").to_owned(),
-        value: font_display_label(form.ui_font).to_owned(),
+        value: font_display_label(FontRole::Ui, form.ui_font).to_owned(),
     });
     rows.push(SettingsFieldRow {
         field: 4,
         label: t("settings.desktop_mono_font").to_owned(),
-        value: font_display_label(form.mono_font).to_owned(),
+        value: font_display_label(FontRole::Mono, form.mono_font).to_owned(),
     });
     rows.push(SettingsFieldRow {
         field: 5,

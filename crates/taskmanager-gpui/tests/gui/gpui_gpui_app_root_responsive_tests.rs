@@ -2,20 +2,24 @@ use gpui::{px, size};
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use super::{
-    DeviceNavigationPresentation, FrameBudget, FrameChromeBudget, LayoutProfile,
-    NavigationPresentation, PageLayoutBudget, PerformanceChartInventory,
-    PerformanceDetailsPresentation, PerformancePageBudget, SystemPageBudget,
-    SystemSurfacePresentation, VerticalSpace, layout_profile, parse_window_size,
-    settings_content_max_height,
+    FrameBudget, FrameChromeBudget, layout_profile, page_layout_for_frame,
+    page_layout_for_viewport, parse_window_size, performance_budget_from_frame,
+    performance_budget_from_page_layout, settings_content_max_height,
+};
+use taskmanager_ui_contract::presentation::budget::{PageLayoutBudget, SystemPageBudget};
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
+    PERFORMANCE_MAIN_MIN_WIDTH, PerformanceChartInventory, PerformanceDetailsPresentation,
+    SystemSurfacePresentation, VerticalSpace,
 };
 
 #[test]
 fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
-    let ultra = PageLayoutBudget::for_viewport(size(px(720.0), px(480.0)));
+    let ultra = page_layout_for_viewport(size(px(720.0), px(480.0)));
     assert_eq!(ultra.profile, LayoutProfile::UltraCompact);
     assert_eq!(ultra.vertical_space, VerticalSpace::Constrained);
     assert_eq!(ultra.navigation, NavigationPresentation::IconOnly);
-    let ultra_performance = PerformancePageBudget::from_page_layout(ultra);
+    let ultra_performance = performance_budget_from_page_layout(ultra);
     assert_eq!(
         ultra_performance.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -33,12 +37,12 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
         SystemSurfacePresentation::SingleColumn
     );
 
-    let standard = PageLayoutBudget::for_viewport(size(px(1180.0), px(780.0)));
+    let standard = page_layout_for_viewport(size(px(1180.0), px(780.0)));
     assert_eq!(standard.profile, LayoutProfile::Standard);
     assert_eq!(standard.vertical_space, VerticalSpace::Standard);
     assert_eq!(standard.page_padding, 16.0);
     assert_eq!(
-        PerformancePageBudget::from_page_layout(standard).chart_inventory,
+        performance_budget_from_page_layout(standard).chart_inventory,
         PerformanceChartInventory::Full
     );
     assert_eq!(
@@ -48,11 +52,11 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
 
     // A panoramic but short window must retain wide horizontal composition
     // while independently collapsing height-hungry graph inventory.
-    let wide_short = PageLayoutBudget::for_viewport(size(px(2048.0), px(540.0)));
+    let wide_short = page_layout_for_viewport(size(px(2048.0), px(540.0)));
     assert_eq!(wide_short.profile, LayoutProfile::Wide);
     assert_eq!(wide_short.vertical_space, VerticalSpace::Constrained);
     assert_eq!(wide_short.navigation, NavigationPresentation::Labeled);
-    let wide_short_performance = PerformancePageBudget::from_page_layout(wide_short);
+    let wide_short_performance = performance_budget_from_page_layout(wide_short);
     assert_eq!(
         wide_short_performance.device_navigation,
         DeviceNavigationPresentation::Sidebar
@@ -71,8 +75,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
         LayoutProfile::Compact
     );
 
-    let vertical =
-        PageLayoutBudget::for_frame(size(px(900.0), px(1200.0)), NavOrientation::Vertical);
+    let vertical = page_layout_for_frame(size(px(900.0), px(1200.0)), NavOrientation::Vertical);
     // The profile is now resolved against the post-rail, post-padding content
     // slot. At this size the icon rail plus its outer inset leaves an 818px
     // page canvas, which is intentionally UltraCompact even though the outer
@@ -80,7 +83,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(vertical.profile, LayoutProfile::UltraCompact);
     assert_eq!(vertical.navigation, NavigationPresentation::IconOnly);
     let vertical_standard =
-        PageLayoutBudget::for_frame(size(px(1180.0), px(780.0)), NavOrientation::Vertical);
+        page_layout_for_frame(size(px(1180.0), px(780.0)), NavOrientation::Vertical);
     assert_eq!(vertical_standard.profile, LayoutProfile::Compact);
     assert_eq!(
         vertical_standard.navigation,
@@ -133,42 +136,42 @@ fn performance_slots_reflow_as_a_unit_instead_of_starving_the_main_view() {
         NavOrientation::Horizontal,
         FrameChromeBudget::new(36.0, false, false),
     );
-    let medium_perf = PerformancePageBudget::from_frame(medium, true, 320.0);
+    let medium_perf = performance_budget_from_frame(medium, true, 320.0);
     assert_eq!(
         medium_perf.device_navigation,
         DeviceNavigationPresentation::Sidebar
     );
     assert_eq!(medium_perf.details, PerformanceDetailsPresentation::Pinned);
     assert!(medium_perf.sidebar_width < 320.0);
-    assert!(medium_perf.main_width >= super::PERFORMANCE_MAIN_MIN_WIDTH);
+    assert!(medium_perf.main_width >= PERFORMANCE_MAIN_MIN_WIDTH);
 
     let tight = FrameBudget::for_root(
         size(px(560.0), px(780.0)),
         NavOrientation::Horizontal,
         FrameChromeBudget::new(36.0, false, false),
     );
-    let tight_perf = PerformancePageBudget::from_frame(tight, true, 260.0);
+    let tight_perf = performance_budget_from_frame(tight, true, 260.0);
     assert_eq!(
         tight_perf.device_navigation,
         DeviceNavigationPresentation::Strip
     );
     assert_eq!(tight_perf.details, PerformanceDetailsPresentation::Stacked);
     assert_eq!(tight_perf.sidebar_width, 0.0);
-    assert!(tight_perf.main_width >= super::PERFORMANCE_MAIN_MIN_WIDTH);
+    assert!(tight_perf.main_width >= PERFORMANCE_MAIN_MIN_WIDTH);
 
     let short_vertical = FrameBudget::for_root(
         size(px(560.0), px(480.0)),
         NavOrientation::Horizontal,
         FrameChromeBudget::new(36.0, false, false),
     );
-    let short_vertical_perf = PerformancePageBudget::from_frame(short_vertical, true, 260.0);
+    let short_vertical_perf = performance_budget_from_frame(short_vertical, true, 260.0);
     assert_eq!(
         short_vertical_perf.details,
         PerformanceDetailsPresentation::Hidden,
         "a short stacked layout hides the rail instead of clipping its bottom"
     );
 
-    let hidden_sidebar = PerformancePageBudget::from_frame(medium, false, 320.0);
+    let hidden_sidebar = performance_budget_from_frame(medium, false, 320.0);
     assert_eq!(
         hidden_sidebar.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -179,7 +182,7 @@ fn performance_slots_reflow_as_a_unit_instead_of_starving_the_main_view() {
         PerformanceDetailsPresentation::Pinned
     );
 
-    let invalid_preference = PerformancePageBudget::from_frame(medium, true, f32::NAN);
+    let invalid_preference = performance_budget_from_frame(medium, true, f32::NAN);
     assert!(invalid_preference.sidebar_width.is_finite());
 }
 
@@ -222,8 +225,11 @@ fn every_performance_and_system_profile_state_has_one_explicit_allocation() {
                 vertical_space,
                 page_padding: 16.0,
                 navigation: NavigationPresentation::Labeled,
+                content_width: 0.0,
+                content_height: 0.0,
+                chrome: None,
             };
-            let performance = PerformancePageBudget::from_page_layout(layout);
+            let performance = performance_budget_from_page_layout(layout);
             assert_eq!(
                 performance.device_navigation,
                 match profile {

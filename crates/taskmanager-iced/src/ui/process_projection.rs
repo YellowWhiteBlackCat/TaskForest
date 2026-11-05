@@ -86,6 +86,8 @@ pub(crate) enum ProjectedRow {
         nice: Option<i32>,
         start_time_secs: Option<u64>,
         start_clock: String,
+        /// Observed container runtime for a container group header.
+        container_badge: Option<String>,
     },
     /// A process node within the canonical recursive hierarchy.
     Tree {
@@ -208,6 +210,31 @@ fn projected_row_from_shared(
     local_time_rules: &LocalTimeRulesObservation,
 ) -> Option<ProjectedRow> {
     match row {
+        ProcessTreeRow::Container {
+            metadata,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+        } => Some(ProjectedRow::GroupHeader {
+            flat_index: 0,
+            main_pid: 0,
+            row_key: None,
+            name: metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
+            expansion_key,
+            member_count,
+            expanded,
+            metrics: Box::new(aggregate),
+            user: missing_value(),
+            status: missing_value(),
+            nice: None,
+            start_time_secs: None,
+            start_clock: missing_value(),
+            container_badge: Some(metadata.runtime.display_label().to_owned()),
+        }),
         ProcessTreeRow::Category {
             category,
             expansion_key,
@@ -226,6 +253,7 @@ fn projected_row_from_shared(
                 aggregate,
                 flat_index: representative_index,
                 local_time_rules,
+                container_badge: None,
             },
         ),
         ProcessTreeRow::Application {
@@ -252,6 +280,7 @@ fn projected_row_from_shared(
                     aggregate,
                     flat_index: visible_index,
                     local_time_rules,
+                    container_badge: None,
                 },
             )
         }
@@ -290,6 +319,7 @@ struct GroupHeaderInput<'a> {
     aggregate: ProcessRowAggregate,
     flat_index: usize,
     local_time_rules: &'a LocalTimeRulesObservation,
+    container_badge: Option<String>,
 }
 
 fn group_header_from_shared(
@@ -305,6 +335,7 @@ fn group_header_from_shared(
         aggregate,
         flat_index,
         local_time_rules,
+        container_badge,
     } = input;
     let structural = row_key.is_none() || matches!(row_key, Some(ProcessRowId::Category(_)));
     let start_time_secs = if structural {
@@ -338,6 +369,7 @@ fn group_header_from_shared(
         },
         start_time_secs,
         start_clock: start_clock_local(start_time_secs, local_time_rules),
+        container_badge,
     })
 }
 
@@ -414,12 +446,11 @@ impl ProcessProjection {
             .iter()
             .map(|process| build_row_cells_with_rules(process, local_time_rules))
             .collect();
-        let shared_rows =
-            project_process_tree_rows(flat, expanded_groups, expanded_tree, sort, observed_at_ms);
-        let mut rows: Vec<ProjectedRow> = shared_rows
-            .into_iter()
-            .filter_map(|row| projected_row_from_shared(row, flat, local_time_rules))
-            .collect();
+        let mut rows: Vec<ProjectedRow> =
+            project_process_tree_rows(flat, expanded_groups, expanded_tree, sort, observed_at_ms)
+                .into_iter()
+                .filter_map(|row| projected_row_from_shared(row, flat, local_time_rules))
+                .collect();
         for row in &mut rows {
             match row {
                 ProjectedRow::Tree { .. } => {}

@@ -9,6 +9,7 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::message::MessageWriter;
 use bevy::ecs::query::With;
 use bevy::ecs::system::RunSystemOnce;
+use bevy::image::Image;
 use bevy::input::ButtonState;
 use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput};
@@ -21,9 +22,12 @@ use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
-use super::{TooltipOverlay, TooltipSession, TooltipState, TooltipText};
+use super::{TooltipOverlay, TooltipSession, TooltipState, TooltipText, tooltip_card_scene};
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
+use bevy::scene::WorldSceneExt;
+use bevy::ui::prelude::{BackgroundColor, BorderColor, BorderRadius, BoxShadow, Node, UiRect, Val};
 
 #[test]
 fn tooltip_state_transitions_are_explicit_and_discrete() {
@@ -323,4 +327,54 @@ fn overlay_count(app: &mut App) -> usize {
         .query_filtered::<Entity, With<TooltipOverlay>>()
         .iter(world)
         .count()
+}
+
+/// GLASS-01: the hover hint is a floating card, so it must wear the shared
+/// Card glass material — the same fill/edge/shadow/grain the menus and cards
+/// paint — instead of the bare `panel_fill` it carried before. The scene is
+/// spawned for real so the assertion reads the components the renderer mounts.
+#[test]
+fn tooltip_card_scene_carries_the_card_glass_material() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        ..
+    } = card_material(&palette);
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    app.init_resource::<Assets<Image>>();
+    crate::glass::register(&mut app);
+
+    let scene = tooltip_card_scene("CPU usage breakdown", &palette, None);
+    let root = app
+        .world_mut()
+        .spawn_scene(scene)
+        .expect("the tooltip card scene mounts");
+    let root = root.id();
+
+    assert_eq!(
+        app.world().get::<BackgroundColor>(root),
+        Some(&BackgroundColor(fill)),
+        "the card paints the Card glass fill"
+    );
+    assert_eq!(
+        app.world().get::<BorderColor>(root),
+        Some(&BorderColor::all(edge)),
+        "the card paints the Card specular edge"
+    );
+    assert_eq!(
+        app.world().get::<BoxShadow>(root),
+        Some(&BoxShadow(shadows)),
+        "the card paints the theme's two-layer glass shadow"
+    );
+    let node = app.world().get::<Node>(root).expect("the card is a Node");
+    assert_eq!(node.border, UiRect::all(Val::Rem(edge_width_rem)));
+    assert_eq!(node.border_radius, BorderRadius::all(Val::Rem(radius_rem)));
 }

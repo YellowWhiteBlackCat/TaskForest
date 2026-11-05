@@ -4,9 +4,10 @@ use gpui::{
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_shell::fixture::health::{HealthFixture, health_fixture};
 
-use crate::gpui_app::root::responsive::{PageLayoutBudget, SystemPageBudget};
+use crate::gpui_app::root::responsive::page_layout_for_viewport;
 use taskforest_core::core::SmartSelfTestKind;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::SystemPageBudget;
 
 use super::{
     SmartSelfTestConfirmationRequest, SystemHealthCallbacks, capture_english_text,
@@ -59,7 +60,7 @@ async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppC
     let window = cx.add_window(|_window, _cx| FixtureView {
         fixture: health_fixture(),
         theme: Theme::dark(),
-        layout: SystemPageBudget::from_page_layout(PageLayoutBudget::for_viewport(size(
+        layout: SystemPageBudget::from_page_layout(page_layout_for_viewport(size(
             px(1180.0),
             px(780.0),
         ))),
@@ -68,9 +69,10 @@ async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppC
         cx.simulate_window_resize(window.into(), size(px(width), px(height)));
         window
             .update(cx, |view, _window, cx| {
-                view.layout = SystemPageBudget::from_page_layout(PageLayoutBudget::for_viewport(
-                    size(px(width), px(height)),
-                ));
+                view.layout = SystemPageBudget::from_page_layout(page_layout_for_viewport(size(
+                    px(width),
+                    px(height),
+                )));
                 cx.notify();
             })
             .unwrap();

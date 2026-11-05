@@ -90,9 +90,12 @@ pub(super) const HEADLINE_CHART_PRESENCE: f32 = 300.0;
 pub(super) fn gauge(
     title: &'static str,
     value: Option<f32>,
+    theme_snapshot: Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let progress: Element<'static, Message, iced::Theme, iced::Renderer> = match value {
-        Some(value) => progress_bar(0.0..=100.0, value).into(),
+        Some(value) => progress_bar(0.0..=100.0, value)
+            .style(move |_| theme::progress_style(&theme_snapshot))
+            .into(),
         None => text(t("dashboard.unavailable")).into(),
     };
     column![text(percent_text(title, value)), progress,]

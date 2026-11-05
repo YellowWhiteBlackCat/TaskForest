@@ -13,15 +13,16 @@ use iced::widget::{Id, column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::viewmodel::StatRow;
-use taskmanager_theme::tokens;
+use taskmanager_theme::{FontSize, Weight, tokens};
 
-use super::responsive::{
-    DeviceNavigationPresentation, PERFORMANCE_STATS_STACK_HEIGHT, PerformanceDetailsPresentation,
-    PerformancePageBudget,
-};
+use super::responsive::PERFORMANCE_STATS_STACK_HEIGHT;
 use crate::app::Message;
 use crate::theme;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PerformanceDetailsPresentation,
+};
 
 type Elem<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -86,12 +87,17 @@ impl DetailExtent {
     }
 }
 
-/// The typed title-size contract shared by every Performance detail card
-/// (strip frames render the smaller heading). Statistics and rail widths are
-/// NOT geometry literals anymore: they come from the frame budget.
+/// The typed title contract shared by every Performance detail card: the
+/// device-detail heading keeps the GPUI `perf_page` rung (the release surface
+/// paints `FONT_26` + extra-bold there) and the strip frame steps one rung
+/// down. Statistics and rail widths are NOT geometry literals: they come from
+/// the frame budget; type size and weight are never literals either, they come
+/// from the theme's public scale (ADR-063).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct GeometryContract {
-    pub title_size: f32,
+    pub title_size: FontSize,
+    pub title_weight: Weight,
+    pub subtitle_size: FontSize,
     pub compact: bool,
 }
 
@@ -99,12 +105,16 @@ pub(super) struct GeometryContract {
 pub(super) const fn geometry_contract(compact: bool) -> GeometryContract {
     if compact {
         GeometryContract {
-            title_size: 19.0,
+            title_size: tokens::FONT_20,
+            title_weight: tokens::FONT_WEIGHT_EXTRA_BOLD,
+            subtitle_size: tokens::FONT_12,
             compact: true,
         }
     } else {
         GeometryContract {
-            title_size: 24.0,
+            title_size: tokens::FONT_26,
+            title_weight: tokens::FONT_WEIGHT_EXTRA_BOLD,
+            subtitle_size: tokens::FONT_15,
             compact: false,
         }
     }
@@ -163,19 +173,29 @@ pub(super) fn main_with_stats<'a>(
     } = body;
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let geometry = geometry_contract(compact);
-    let subtitle_size = if geometry.compact { 12 } else { 15 };
     // GPUI header hierarchy (ICED-024-6): the page title owns the left edge,
     // the device model right-aligns on the same baseline — not a left-packed
     // pair that leaves the row's right half unread.
     let heading = row![
         text(bounded_heading(&title, if compact { 28 } else { 24 }))
-            .size(geometry.title_size)
+            .size(f32::from(geometry.title_size))
+            // The display rung binds the theme's own leading: a larger title
+            // must not buy vertical slots out of the page under it.
+            .line_height(f32::from(tokens::LINE_HEIGHT_DISPLAY))
+            .font(crate::theme_binding::ui_font_weight(
+                theme_snapshot,
+                geometry.title_weight,
+            ))
             .width(Length::Fill),
         text(bounded_heading(&subtitle, if compact { 32 } else { 72 }))
-            .size(subtitle_size)
+            .size(f32::from(geometry.subtitle_size))
             .color(theme::muted_text_color(theme_snapshot)),
     ]
-    .spacing(if compact { 6 } else { 10 })
+    .spacing(f32::from(if compact {
+        tokens::SPACE_6
+    } else {
+        tokens::SPACE_10
+    }))
     .align_y(iced::Alignment::Center);
 
     // The vital line is the page's undroppable one-line fact: unlike the
@@ -314,13 +334,13 @@ fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
     .padding(rail_padding);
     match edge {
         RailEdge::Left => {
-            rail = rail.style(move |_| theme::rail_divider_left(theme_snapshot));
+            rail = rail.style(move |_| theme::stats_rail_style(theme_snapshot));
         }
         RailEdge::Top => {
             rail = rail
                 .height(Length::Fixed(PERFORMANCE_STATS_STACK_HEIGHT))
                 .max_height(PERFORMANCE_STATS_STACK_HEIGHT)
-                .style(move |_| theme::rail_divider_top(theme_snapshot));
+                .style(move |_| theme::stats_rail_style(theme_snapshot));
         }
     }
     rail.into()
@@ -336,7 +356,16 @@ pub(super) fn stats_panel(
     stats: Vec<StatRow>,
     compact: bool,
 ) -> Elem<'static> {
-    let value_size = if compact { 11 } else { 13 };
+    let value_size = if compact {
+        tokens::FONT_11
+    } else {
+        tokens::FONT_13
+    };
+    let label_size = if compact {
+        tokens::FONT_10
+    } else {
+        tokens::FONT_12
+    };
     let rows: Vec<Elem<'static>> = stats
         .into_iter()
         .map(|stat| {
@@ -348,12 +377,12 @@ pub(super) fn stats_panel(
             let value = bounded_stat_text(&value, compact, false);
             row![
                 text(label)
-                    .size(if compact { 10 } else { 12 })
+                    .size(f32::from(label_size))
                     .color(theme::muted_text_color(theme_snapshot))
                     .width(Length::FillPortion(1))
                     .wrapping(iced::widget::text::Wrapping::None),
                 text(value)
-                    .size(value_size)
+                    .size(f32::from(value_size))
                     .color(if missing {
                         theme::muted_text_color(theme_snapshot)
                     } else {
@@ -363,7 +392,11 @@ pub(super) fn stats_panel(
                     .align_x(Horizontal::Right)
                     .wrapping(iced::widget::text::Wrapping::None),
             ]
-            .spacing(if compact { 4 } else { 8 })
+            .spacing(f32::from(if compact {
+                tokens::SPACE_4
+            } else {
+                tokens::SPACE_8
+            }))
             .align_y(iced::Alignment::Start)
             .width(Length::Fill)
             .into()
@@ -371,7 +404,11 @@ pub(super) fn stats_panel(
         .collect();
 
     column(rows)
-        .spacing(if compact { 5 } else { 9 })
+        .spacing(f32::from(if compact {
+            tokens::SPACE_5
+        } else {
+            tokens::SPACE_9
+        }))
         .width(Length::Fill)
         .into()
 }
@@ -428,10 +465,10 @@ pub(super) fn graph_card_with_padding<'a>(
     padding: u16,
 ) -> Elem<'a> {
     container(content)
-        .padding(padding)
+        .padding(super::components::chart_inset(theme_snapshot).max(f32::from(padding)))
         .width(Length::Fill)
         .height(extent.length())
-        .style(move |_| theme::card_style(theme_snapshot))
+        .style(move |_| super::components::chart_surface(theme_snapshot))
         .into()
 }
 

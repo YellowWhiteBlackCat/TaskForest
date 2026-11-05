@@ -12,10 +12,10 @@ use taskmanager_shell::presentation::{
     device_action_i18n_key, device_status_i18n_key, missing_value,
 };
 
-use super::responsive::PerformancePageBudget;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::SPACE_7;
 use taskmanager_theme::tokens::SPACE_10;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 
 /// The frame-local render context shared by every Performance device block
 /// (fan / disk / network / battery) and the graph helpers they delegate to.
@@ -99,7 +99,7 @@ pub(crate) fn device_status_footer<'a>(
                     border: iced::Border {
                         color: iced::Color::TRANSPARENT,
                         width: 0.0,
-                        radius: f32::from(palette.control_radius).into(),
+                        radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
                     },
                     text_color: Some(crate::theme_binding::color(theme_snapshot.fg)),
                     ..Style::default()

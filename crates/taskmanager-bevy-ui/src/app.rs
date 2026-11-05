@@ -41,6 +41,8 @@ pub(crate) mod app_support;
 mod deferred;
 use deferred::{DeferredPageDespawn, flush_page_despawns, hide_outgoing_contents};
 
+pub(crate) mod nav_strip;
+
 #[path = "pages/containers.rs"]
 pub(crate) mod containers;
 use bevy::ecs::component::Component;
@@ -60,12 +62,10 @@ use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px, rem,
+    UiRect, Val, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{
-    Activate, Button, ControlOrientation, SelectedTab, Tab, TabActivation, TabList, ValueChange,
-};
+use bevy::ui_widgets::{Activate, Button, SelectedTab, Tab, ValueChange};
 use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
@@ -797,15 +797,19 @@ impl Plugin for AppShellPlugin {
 // through the semantic registry (`IconId`), never through text codepoints.
 
 /// The strip's tab set: exactly the shared pages this frontend implements,
-/// in `AppPage::ALL` order. Tests pin this list against the shared constant.
+/// screened in the reference surface's display order (performance first,
+/// history before system). `Containers` is a rendered tab here even though it
+/// owns no shared `AppPage`, and the parity test pins the shared subset
+/// against the shared vocabulary in this same order.
 pub(crate) const NAV_TABS: &[Page] = &[
     Page::Performance,
     Page::Processes,
     Page::Services,
-    Page::System,
     Page::Startup,
     Page::Sessions,
     Page::AppHistory,
+    Page::Containers,
+    Page::System,
 ];
 
 /// The semantic icon identity for a route. Total over `Page` so trailing
@@ -897,45 +901,6 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
         on(nav_button_activated)
         Children [
              @{ crate::icons::icon_scene(tab_icon(page), palette, ink) } NavItemLabel Pickable::IGNORE
-        ]
-    }
-}
-
-/// The navigation strip: shared tabs + trailing Alerts/Settings affordances,
-/// on one nav-surface band. The single product chrome every page renders.
-pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + use<> {
-    let tabs: Vec<Box<dyn Scene>> = NAV_TABS
-        .iter()
-        .map(|&page| Box::new(nav_tab_scene(page, page == route, palette)) as Box<dyn Scene>)
-        .collect();
-    let trailing: Vec<Box<dyn Scene>> = [Page::Containers, Page::Alerts, Page::Settings]
-        .iter()
-        .map(|&page| Box::new(nav_trailing_scene(page, page == route, palette)) as Box<dyn Scene>)
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_8())),
-        }
-        BackgroundColor({ palette.nav_bg })
-        crate::navigation::NavigationStrip
-        // The headless tab-list widget: roving arrow-key focus, the shared
-        // tablist/tab AT-SPI roles, and `ValueChange` selection events. The
-        // route resource stays the sole selection authority — this strip
-        // mirrors it through `sync_selected_tab`, never a local copy.
-        TabList {
-            orientation: ControlOrientation::Horizontal,
-            activation: TabActivation::Manual,
-        }
-        on(nav_strip_ready)
-        bevy::ui_widgets::ScrollArea
-        Children [
-            @{crate::navigation::button(palette)} -- { tabs }--
-             Node { flex_grow: 1.0 } crate::navigation::NavigationSpacer --
-            { trailing }
         ]
     }
 }

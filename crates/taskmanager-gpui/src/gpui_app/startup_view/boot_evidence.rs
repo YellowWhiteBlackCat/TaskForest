@@ -6,16 +6,17 @@
 //! functions and their unit tests; holds no UI state of its own — the typed
 //! [`StartupBootEvidenceSnapshot`] arrives as a render param.
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
+use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative, rems};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
 use taskforest_core::core::startup::StartupCriticalChainNode;
-use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rem_length;
 
 use crate::gpui_app::formatting;
 use taskforest_core::core::startup::{
@@ -23,9 +24,9 @@ use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot,
 };
 use taskmanager_application::i18n;
-use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, GlassTier};
 
 // ── boot evidence strip: failed units + critical chain ──────────────────────
 //
@@ -117,13 +118,13 @@ pub(super) fn boot_evidence_strip(
             .flex()
             .flex_row()
             .items_center()
-            .gap(definite_length(tokens::SPACE_3))
-            .px(definite_length(tokens::SPACE_3))
-            .py(definite_length(tokens::SPACE_2))
-            .rounded(absolute(tokens::card_radius(theme)))
-            .border(px(1.0))
-            .border_color(hsla(theme.border))
-            .bg(fill(theme.card_surface()))
+            .gap(rem_length(tokens::SPACE_3))
+            .px(rem_length(tokens::SPACE_3))
+            .py(rem_length(tokens::SPACE_2))
+            .rounded(rem_length(tokens::card_radius(theme)))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+            .bg(glass_fill(theme, GlassTier::Card))
             .child(
                 div()
                     .text_size(font_size(tokens::FONT_11))
@@ -241,15 +242,15 @@ pub(super) fn boot_timeline_block(
                         .flex_1()
                         .min_w(px(48.0))
                         .h(px(8.0))
-                        .rounded(px(4.0))
+                        .rounded_full()
                         .overflow_hidden()
-                        .bg(fill(theme.card_surface()))
+                        .bg(glass_fill(theme, GlassTier::Card))
                         .child(
                             div()
                                 .w(relative(fraction.clamp(0.0, 1.0)))
                                 .min_w(px(TIMELINE_MIN_BAR_PX))
                                 .h(px(8.0))
-                                .rounded(px(4.0))
+                                .rounded_full()
                                 .bg(fill(theme.accent))
                                 .child(div()),
                         ),
@@ -326,13 +327,13 @@ pub(super) fn boot_timeline_block(
             .debug_selector(|| "boot-timeline".to_string())
             .flex()
             .flex_col()
-            .gap(definite_length(tokens::SPACE_4))
-            .px(definite_length(tokens::SPACE_4))
-            .py(definite_length(tokens::SPACE_3))
-            .rounded(absolute(tokens::card_radius(theme)))
-            .border(px(1.0))
-            .border_color(hsla(theme.border))
-            .bg(fill(theme.card_surface()))
+            .gap(rem_length(tokens::SPACE_4))
+            .px(rem_length(tokens::SPACE_4))
+            .py(rem_length(tokens::SPACE_3))
+            .rounded(rem_length(tokens::card_radius(theme)))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+            .bg(glass_fill(theme, GlassTier::Card))
             .child(
                 div()
                     .flex()

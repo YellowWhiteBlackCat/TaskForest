@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check the audited scene registry against real test and capture discovery.
 
-The parity audit names 55 product scenes. ``scripts/parity/scene_registry.tsv``
+The parity audit names 58 product scenes. ``scripts/parity/scene_registry.tsv``
 binds every scene, in audit order, to one evidence anchor per frontend:
 
 * ``test:<nextest name>`` — a behavior test resolved through that frontend's
@@ -145,7 +145,7 @@ def evaluate(
     registry_text: str,
     tests: dict[str, set[str]] | None = None,
     captures: dict[str, set[str]] | None = None,
-    expected_scenes: int = 55,
+    expected_scenes: int = 58,
 ) -> Verdict:
     try:
         scenes = audit_scenes(scene_text)

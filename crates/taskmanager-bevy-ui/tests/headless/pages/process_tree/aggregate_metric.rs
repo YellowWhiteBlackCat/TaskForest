@@ -352,7 +352,11 @@ fn aggregate_cells_and_full_tooltip_fit_standard_and_compact_row_widths() {
         assert!(summary.contains(control_error_detail(FailureKind::PermissionDenied)));
         assert!(summary.contains(control_error_detail(FailureKind::MissingDependency)));
         app.world_mut()
-            .spawn_scene(tooltip_card_scene(&summary, &palette))
+            .spawn_scene(tooltip_card_scene(
+                &summary,
+                &palette,
+                Some(width as f32 * 0.9),
+            ))
             .expect("the full tooltip scene resolves");
         app.update();
 
@@ -418,10 +422,31 @@ fn aggregate_cells_and_full_tooltip_fit_standard_and_compact_row_widths() {
             tooltip_right <= width as f32 + 0.5,
             "tooltip crosses viewport edge"
         );
-        let tooltip_text = tooltip_children.first().expect("full tooltip text child");
+        // The card carries the shared glass material, so its first child is the
+        // grain overlay; select the text-bearing child by component instead of
+        // relying on child order.
+        let tooltip_text = tooltip_children
+            .iter()
+            .find(|child| world.get::<TextLayout>(**child).is_some())
+            .expect("full tooltip text child");
         let tooltip_text_node = world
             .get::<ComputedNode>(*tooltip_text)
             .expect("tooltip text has measured bounds");
+        assert!(
+            tooltip_text_node.size().x >= 200.0,
+            "the full summary must keep a readable multi-word line before wrapping"
+        );
+        let tooltip_runs = world
+            .get::<bevy::text::TextLayoutInfo>(*tooltip_text)
+            .expect("tooltip text has resolved glyph runs");
+        assert!(
+            tooltip_runs.run_geometry.len() >= 2,
+            "a viewport-capped summary wraps onto multiple runs"
+        );
+        assert!(
+            tooltip_text_node.size().y > 20.0,
+            "wrapped tooltip text is taller than one caption line"
+        );
         let tooltip_text_transform = world
             .get::<UiGlobalTransform>(*tooltip_text)
             .expect("tooltip text has a viewport position");

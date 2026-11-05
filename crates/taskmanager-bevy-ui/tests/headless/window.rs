@@ -15,13 +15,27 @@ use std::sync::{Arc, Mutex};
 use taskmanager_theme::tokens::UiSize;
 
 use bevy::MinimalPlugins;
-use bevy::app::{App, Plugin};
-use bevy::asset::AssetPlugin;
+use bevy::app::{App, Plugin, PostUpdate};
+use bevy::asset::{AssetPlugin, Assets, Handle};
+use bevy::camera::{Camera, Camera2d, RenderTarget};
+use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
+use bevy::ecs::system::RunSystemOnce;
+use bevy::image::{Image, TextureAtlasLayout};
 use bevy::input_focus::InputFocusPlugin;
+use bevy::math::{UVec2, Vec2};
+use bevy::picking::DefaultPickingPlugins;
+use bevy::picking::Pickable;
 use bevy::scene::ScenePlugin;
-use bevy::text::{RemSize, TextColor, TextFont};
+use bevy::text::{RemSize, TextColor, TextFont, TextPlugin};
+use bevy::transform::TransformPlugin;
 use bevy::ui::widget::Text;
+use bevy::ui::{
+    ComputedUiRenderTargetInfo, ComputedUiTargetCamera, DefaultUiCamera, UiPlugin, UiTargetCamera,
+};
+use bevy::window::{
+    ExitCondition, PrimaryWindow, Window, WindowPlugin, WindowRef, WindowResolution,
+};
 use taskforest_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
     EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
@@ -31,10 +45,19 @@ use taskmanager_application::{
     SystemFacets,
 };
 
-use taskmanager_theme::{LightDark, Skin, Theme};
+use taskmanager_theme::optical_glass::OpticalGlassContext;
+use taskmanager_theme::{AppearanceOverride, GlassTier, LightDark, Skin, Theme};
 
 use super::appearance::resolve_demo_theme;
-use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
+use super::backdrop_capture::{
+    BackdropCaptureCamera, BackdropCaptureRoot, BackdropCaptureTarget, BackdropRevision,
+    PresentationCamera, drive_backdrop_capture,
+};
+use super::{
+    AppShellRoot, FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, WindowPalette,
+};
+use crate::drain::ShellProjectionFolded;
+use crate::glass::optical::{OpticalGlassRaster, OpticalGlassSurface};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use taskmanager_shell::FeedbackLifecycle;
@@ -160,6 +183,261 @@ pub(crate) fn scripted_frontend_app() -> App {
 }
 
 #[test]
+fn offscreen_capture_camera_never_owns_the_interactive_shell() {
+    let (client, _host_requests) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime starts");
+    let mut app = headless_window_app(runtime);
+    app.update();
+
+    let world = app.world_mut();
+    let presentation_cameras = world
+        .query_filtered::<Entity, With<PresentationCamera>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    let capture_cameras = world
+        .query_filtered::<Entity, With<BackdropCaptureCamera>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        presentation_cameras.len(),
+        1,
+        "the frontend must spawn exactly one presentation camera"
+    );
+    assert_eq!(
+        capture_cameras.len(),
+        1,
+        "the frontend must spawn exactly one offscreen capture camera"
+    );
+    let presentation = presentation_cameras[0];
+    let capture = capture_cameras[0];
+
+    assert_eq!(
+        world
+            .get::<Camera>(presentation)
+            .expect("presentation camera component")
+            .order,
+        -1
+    );
+    assert_eq!(
+        world
+            .get::<Camera>(capture)
+            .expect("capture camera component")
+            .order,
+        -2
+    );
+    assert!(matches!(
+        world.get::<RenderTarget>(presentation),
+        Some(RenderTarget::Window(WindowRef::Primary))
+    ));
+    assert!(matches!(
+        world.get::<RenderTarget>(capture),
+        Some(RenderTarget::Image(_))
+    ));
+
+    let default = world
+        .run_system_once(|default: DefaultUiCamera| default.get())
+        .expect("default UI camera query runs")
+        .expect("the presentation camera is the default UI target");
+    assert_eq!(
+        default, presentation,
+        "the offscreen camera must not steal the default UI target"
+    );
+
+    let capture_roots = world
+        .query_filtered::<Entity, With<BackdropCaptureRoot>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    assert_eq!(capture_roots.len(), 1);
+    assert_eq!(
+        world
+            .get::<UiTargetCamera>(capture_roots[0])
+            .expect("capture root has an explicit target camera")
+            .0,
+        capture
+    );
+    assert_eq!(
+        world.get::<Pickable>(capture_roots[0]),
+        Some(&Pickable::IGNORE),
+        "the offscreen backdrop root must stay pointer-transparent"
+    );
+
+    let shell_roots = world
+        .query_filtered::<Entity, With<AppShellRoot>>()
+        .iter(world)
+        .collect::<Vec<_>>();
+    assert_eq!(shell_roots.len(), 1);
+    assert!(
+        world.get::<UiTargetCamera>(shell_roots[0]).is_none(),
+        "the interactive shell must keep the production default-camera path, not the capture target"
+    );
+}
+
+#[test]
+fn backdrop_target_tracks_window_physical_size_and_scale_factor() {
+    let (client, _host_requests) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime starts");
+    let mut app = headless_window_app(runtime);
+    app.add_plugins(WindowPlugin {
+        primary_window: None,
+        exit_condition: ExitCondition::DontExit,
+        ..Default::default()
+    });
+    let initial_size = UVec2::new(1600, 900);
+    app.world_mut().spawn((
+        Window {
+            resolution: WindowResolution::new(initial_size.x, initial_size.y)
+                .with_scale_factor_override(1.5),
+            ..Default::default()
+        },
+        PrimaryWindow,
+    ));
+    app.update();
+
+    let world = app.world_mut();
+    let target = world.resource::<BackdropCaptureTarget>().clone();
+    assert_eq!(target.physical_size, initial_size);
+    assert!((target.scale_factor - 1.5).abs() < f32::EPSILON);
+    let image_size = world
+        .resource::<Assets<Image>>()
+        .get(&target.image)
+        .expect("the capture target image is registered")
+        .size();
+    assert_eq!(image_size, initial_size);
+    let capture_target = world
+        .get::<RenderTarget>(target.camera)
+        .expect("capture camera has a render target");
+    let RenderTarget::Image(capture_target) = capture_target else {
+        panic!("capture camera must target an image");
+    };
+    assert!((capture_target.scale_factor - 1.5).abs() < f32::EPSILON);
+
+    let window_entity = world
+        .query_filtered::<Entity, With<PrimaryWindow>>()
+        .iter(world)
+        .next()
+        .expect("primary window exists");
+    {
+        let mut window = world
+            .get_mut::<Window>(window_entity)
+            .expect("primary window component");
+        window.resolution.set_physical_resolution(1024, 768);
+        window.resolution.set_scale_factor_override(Some(2.0));
+    }
+
+    app.update();
+    let world = app.world_mut();
+    let target = world.resource::<BackdropCaptureTarget>();
+    assert_eq!(target.physical_size, UVec2::new(1024, 768));
+    assert!((target.scale_factor - 2.0).abs() < f32::EPSILON);
+    assert_eq!(
+        world
+            .resource::<Assets<Image>>()
+            .get(&target.image)
+            .expect("the resized capture target remains registered")
+            .size(),
+        UVec2::new(1024, 768)
+    );
+    let capture_target = world
+        .get::<RenderTarget>(target.camera)
+        .expect("capture camera has a render target");
+    let RenderTarget::Image(capture_target) = capture_target else {
+        panic!("capture camera must target an image");
+    };
+    assert!((capture_target.scale_factor - 2.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn ui_layout_targets_the_shell_to_presentation_and_the_backdrop_to_capture() {
+    let (client, _host_requests) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime starts");
+    let mut app = headless_window_app(runtime);
+    app.add_plugins((
+        WindowPlugin {
+            primary_window: None,
+            exit_condition: ExitCondition::DontExit,
+            ..Default::default()
+        },
+        DefaultPickingPlugins,
+        TransformPlugin,
+        TextPlugin,
+        UiPlugin,
+    ));
+    app.init_resource::<Assets<TextureAtlasLayout>>();
+    let size = UVec2::new(800, 600);
+    app.world_mut().spawn((
+        Window {
+            resolution: size.into(),
+            ..Default::default()
+        },
+        PrimaryWindow,
+    ));
+    app.update();
+    app.update();
+
+    let world = app.world_mut();
+    let presentation = world
+        .query_filtered::<Entity, With<PresentationCamera>>()
+        .iter(world)
+        .next()
+        .expect("presentation camera");
+    let capture = world
+        .query_filtered::<Entity, With<BackdropCaptureCamera>>()
+        .iter(world)
+        .next()
+        .expect("capture camera");
+    let shell = world
+        .query_filtered::<Entity, With<AppShellRoot>>()
+        .iter(world)
+        .next()
+        .expect("interactive shell root");
+    let capture_root = world
+        .query_filtered::<Entity, With<BackdropCaptureRoot>>()
+        .iter(world)
+        .next()
+        .expect("backdrop root");
+
+    assert_eq!(
+        world
+            .get::<ComputedUiTargetCamera>(shell)
+            .expect("shell target is computed by the UI layout")
+            .get(),
+        Some(presentation),
+        "the interactive shell must stay on the primary-window camera"
+    );
+    assert_eq!(
+        world
+            .get::<ComputedUiRenderTargetInfo>(shell)
+            .expect("shell render-target metadata")
+            .physical_size(),
+        size
+    );
+    assert_eq!(
+        world
+            .get::<ComputedUiTargetCamera>(capture_root)
+            .expect("capture root target is computed by the UI layout")
+            .get(),
+        Some(capture),
+        "the backdrop tree must stay on the offscreen camera"
+    );
+    assert_eq!(
+        world
+            .get::<ComputedUiRenderTargetInfo>(capture_root)
+            .expect("capture root render-target metadata")
+            .physical_size(),
+        size
+    );
+}
+
+#[test]
 fn drain_reaches_the_summary_line_and_initial_refresh_is_one_shot() {
     // The bevy World holds a `'static` shared-runtime handle, exactly like the
     // production window; leaking the test cache models the process-lifetime
@@ -253,12 +531,16 @@ fn text_role_observer_stamps_palette_typography() {
     );
 }
 
-/// The shared `TM_SKIN` testing override selects the demo/capture appearance.
+/// The theme owner's shared override vocabulary selects the demo/capture
+/// appearance (the same parser GPUI, Iced and the TUI read).
 /// Unset (and invalid) keeps today's GNOME-light reference skin; a valid token
 /// resolves the requested skin/mode and repaints the window palette.
 #[test]
 fn tm_skin_override_resolves_the_demo_theme() {
-    let default = resolve_demo_theme(None, false);
+    let parse = |value: &str, high_contrast: bool| {
+        resolve_demo_theme(AppearanceOverride::parse(value, high_contrast))
+    };
+    let default = resolve_demo_theme(None);
     assert_eq!(default.skin, Skin::Gnome, "unset keeps the GNOME skin");
     assert_eq!(
         default.mode,
@@ -266,12 +548,12 @@ fn tm_skin_override_resolves_the_demo_theme() {
         "unset keeps the light reference mode"
     );
     assert_eq!(
-        resolve_demo_theme(Some("plasma-dark"), false).skin,
+        parse("plasma-dark", false).skin,
         Skin::Gnome,
         "an unknown skin is not an override"
     );
 
-    let dark = resolve_demo_theme(Some("gnome-dark"), false);
+    let dark = parse("gnome-dark", false);
     assert_eq!(dark.skin, Skin::Gnome);
     assert_eq!(dark.mode, LightDark::Dark);
     assert_ne!(
@@ -280,7 +562,7 @@ fn tm_skin_override_resolves_the_demo_theme() {
         "gnome-dark must repaint the window backdrop"
     );
 
-    let contrast = resolve_demo_theme(Some("KDE-DARK"), true);
+    let contrast = parse("KDE-DARK", true);
     assert_eq!(contrast.skin, Skin::Kde, "case-insensitive skin alias");
     assert_eq!(contrast.mode, LightDark::Dark);
     assert!(contrast.hc, "TM_SKIN_HC rides the same override");
@@ -394,5 +676,153 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
     assert_eq!(
         line, "Waiting for telemetry…",
         "feedback line must return to background activity after timed notice expires"
+    );
+}
+
+/// One live optical surface: the shared spec resolved into physical
+/// geometry, bound to the offscreen target the controller mirrors.
+fn live_optical_surface() -> OpticalGlassSurface {
+    let spec = Theme::dark()
+        .optical_glass_spec(GlassTier::Card)
+        .expect("card optical spec");
+    let geometry = spec
+        .resolve(OpticalGlassContext::new(1.0, 1.0))
+        .expect("valid optical geometry");
+    OpticalGlassSurface {
+        spec,
+        geometry,
+        raster: OpticalGlassRaster {
+            origin_px: Vec2::ZERO,
+            size_px: Vec2::new(120.0, 80.0),
+            viewport_px: Vec2::new(800.0, 600.0),
+            device_scale_factor: 1.0,
+        },
+        backdrop: Handle::<Image>::default(),
+    }
+}
+
+/// The invalidation controller on a minimal app: the offscreen camera, the
+/// revision resources and the drive system, with nothing else.
+fn backdrop_controller_app() -> (App, Entity) {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    super::backdrop_capture::register(&mut app);
+    app.add_systems(PostUpdate, drive_backdrop_capture);
+    let camera = app
+        .world_mut()
+        .spawn((
+            Camera2d,
+            Camera {
+                is_active: false,
+                ..Camera::default()
+            },
+            BackdropCaptureCamera,
+        ))
+        .id();
+    (app, camera)
+}
+
+#[test]
+fn the_backdrop_capture_stays_dormant_without_a_live_optical_surface() {
+    let (mut app, camera) = backdrop_controller_app();
+    app.world_mut().resource_mut::<BackdropRevision>().bump();
+
+    for _ in 0..3 {
+        app.update();
+        assert!(
+            !app.world()
+                .get::<Camera>(camera)
+                .expect("capture camera")
+                .is_active,
+            "an unsupported renderer never renders the offscreen backdrop"
+        );
+    }
+}
+
+#[test]
+fn a_live_optical_surface_captures_exactly_one_frame_per_revision() {
+    let (mut app, camera) = backdrop_controller_app();
+    app.world_mut().spawn(live_optical_surface());
+
+    app.update();
+    assert!(
+        app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active,
+        "the first live optical surface captures the lower composite"
+    );
+    app.update();
+    assert!(
+        !app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active,
+        "an unchanged lower composite is not re-rendered"
+    );
+
+    app.world_mut().resource_mut::<BackdropRevision>().bump();
+    app.update();
+    assert!(
+        app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active,
+        "a new revision captures the lower composite again"
+    );
+    app.update();
+    assert!(
+        !app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active,
+        "the capture stops once the revision is mirrored"
+    );
+}
+
+#[test]
+fn a_palette_change_rearms_the_capture_for_a_live_surface() {
+    let (mut app, camera) = backdrop_controller_app();
+    app.world_mut().spawn(live_optical_surface());
+    app.update();
+    app.update();
+    assert!(
+        !app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active
+    );
+
+    app.world_mut().insert_resource(WindowPalette {
+        inner: ui_palette(&Theme::dark(), UiSize::Large),
+    });
+    app.update();
+    assert!(
+        app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active,
+        "a palette swap invalidates the captured lower composite"
+    );
+    app.update();
+    assert!(
+        !app.world()
+            .get::<Camera>(camera)
+            .expect("capture camera")
+            .is_active
+    );
+}
+
+#[test]
+fn a_projection_fold_bumps_the_backdrop_revision() {
+    let (mut app, _camera) = backdrop_controller_app();
+    let before = app.world().resource::<BackdropRevision>().0;
+
+    app.world_mut().trigger(ShellProjectionFolded);
+
+    assert_eq!(
+        app.world().resource::<BackdropRevision>().0,
+        before + 1,
+        "a fold invalidates the captured lower composite"
     );
 }

@@ -57,6 +57,7 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         hidden_columns: std::rc::Rc::new(hidden_columns),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
         open_menu_identity: None,
+        tooltip_capture_marker: None,
     };
     applications_table_rows(&ctx, &projection).len()
 }
@@ -77,6 +78,7 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
         open_menu_identity: None,
+        tooltip_capture_marker: None,
     };
     let base = applications_table_key(7, &render);
     assert_eq!(base, applications_table_key(7, &render));
@@ -185,6 +187,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
         open_menu_identity: None,
+        tooltip_capture_marker: None,
     };
     let window = VirtualWindow::for_rows(
         projection.len(),

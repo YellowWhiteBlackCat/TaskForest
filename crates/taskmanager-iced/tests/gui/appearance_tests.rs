@@ -24,37 +24,52 @@ fn os_theme_mode_resolves_light_dark_with_none_as_light() {
 }
 
 /// Explicit mode choices win absolutely against every observation state, and
-/// `System` follows the observation (Dark until the first platform event —
-/// the default this frontend shipped before the appearance provider).
+/// follow-native resolves from the observation (Dark until the first platform
+/// event — the default this frontend shipped before the appearance provider).
+/// The resolver is the theme owner's, so the same table decides in all four
+/// products (ADR-063).
 #[test]
 fn explicit_choices_ignore_the_observation_and_system_follows_it() {
     let observations = [None, Some(OsColorScheme::Light), Some(OsColorScheme::Dark)];
+    let resolve = |preference: ModePreference, observed: Option<OsColorScheme>| {
+        preference.resolve(observed.map(OsColorScheme::light_dark))
+    };
     for observed in observations {
         assert_eq!(
-            resolve_color_mode_with(ModeChoice::Light, observed),
+            resolve(ModePreference::Explicit(LightDark::Light), observed),
             LightDark::Light
         );
         assert_eq!(
-            resolve_color_mode_with(ModeChoice::Dark, observed),
+            resolve(ModePreference::Explicit(LightDark::Dark), observed),
             LightDark::Dark
         );
         assert_eq!(
-            resolve_color_mode_with(ModeChoice::EyeForest, observed),
-            LightDark::EyeForest
+            resolve(ModePreference::Explicit(LightDark::EyeForest), observed),
+            LightDark::EyeForest,
+            "an explicit EyeForest is never displaced by a desktop event"
         );
     }
     assert_eq!(
-        resolve_color_mode_with(ModeChoice::System, None),
+        resolve(ModePreference::FollowNative, None),
         LightDark::Dark,
-        "System before any observation keeps the Dark default"
+        "follow-native before any observation keeps the Dark default"
     );
     assert_eq!(
-        resolve_color_mode_with(ModeChoice::System, Some(OsColorScheme::Light)),
+        resolve(ModePreference::FollowNative, Some(OsColorScheme::Light)),
         LightDark::Light
     );
     assert_eq!(
-        resolve_color_mode_with(ModeChoice::System, Some(OsColorScheme::Dark)),
+        resolve(ModePreference::FollowNative, Some(OsColorScheme::Dark)),
         LightDark::Dark
+    );
+    // And the persisted token resolves to the same preference the picker sends.
+    assert_eq!(
+        ModePreference::from_config_token("System"),
+        ModePreference::FollowNative
+    );
+    assert_eq!(
+        ModePreference::from_config_token(""),
+        ModePreference::FollowNative
     );
 }
 
@@ -66,7 +81,9 @@ fn explicit_choices_ignore_the_observation_and_system_follows_it() {
 fn system_mode_follows_the_desktop_and_explicit_choices_do_not() {
     let mut app = IcedApp::demo();
     // An explicit Dark choice: OS observations land but never move the theme.
-    app.apply_settings_change(SettingsChange::Mode(ModeChoice::Dark));
+    app.apply_settings_change(SettingsChange::Mode(ModePreference::Explicit(
+        LightDark::Dark,
+    )));
     assert_eq!(app.theme().mode, LightDark::Dark);
     app.apply_observed_color_scheme(iced::theme::Mode::Light);
     assert_eq!(
@@ -77,7 +94,7 @@ fn system_mode_follows_the_desktop_and_explicit_choices_do_not() {
 
     // Switching into System resolves against the observation stored while the
     // explicit choice was active.
-    app.apply_settings_change(SettingsChange::Mode(ModeChoice::System));
+    app.apply_settings_change(SettingsChange::Mode(ModePreference::FollowNative));
     assert_eq!(app.theme().mode, LightDark::Light);
 
     // The desktop flipping moves a System preference live, in both directions.
@@ -95,8 +112,8 @@ fn system_mode_follows_the_desktop_and_explicit_choices_do_not() {
 fn os_observations_are_isolated_between_app_instances() {
     let mut light = IcedApp::demo();
     let mut dark = IcedApp::demo();
-    light.apply_settings_change(SettingsChange::Mode(ModeChoice::System));
-    dark.apply_settings_change(SettingsChange::Mode(ModeChoice::System));
+    light.apply_settings_change(SettingsChange::Mode(ModePreference::FollowNative));
+    dark.apply_settings_change(SettingsChange::Mode(ModePreference::FollowNative));
 
     light.apply_observed_color_scheme(iced::theme::Mode::Light);
     dark.apply_observed_color_scheme(iced::theme::Mode::Dark);

@@ -6,15 +6,16 @@
 //! quiet-hours token, and the shortcut legend derives from the Iced binding
 //! declaration rather than a copied key table.
 
+use taskmanager_application::i18n::Language;
 use taskmanager_shell::command_help;
-use taskmanager_theme::tokens::{MotionPolicy, UiSize};
-use taskmanager_theme::{FontChoice, Skin};
+use taskmanager_theme::tokens::{MotionPolicy, RowDensity, UiSize};
+use taskmanager_theme::{FontAvailability, FontChoice, FontRole, LightDark, Skin};
 use taskmanager_ui_contract::BindingEntry;
 
 use super::shortcuts::shortcut_rows;
 use super::*;
-use crate::app::ModeChoice;
 use crate::ui::overlays::binding_declaration;
+use taskmanager_theme::ModePreference;
 
 /// Every segmented/switch callback mapper resolves the control's value to
 /// the exact enum the legacy pill published, and unknown persisted tokens
@@ -28,17 +29,15 @@ fn control_value_mappers_reproduce_legacy_choices() {
     }
     assert_eq!(skin_value("not-a-skin"), SEGMENT_NONE);
 
-    // Mode: the four segments and the empty→System first-launch sentinel.
-    assert_eq!(mode_for_value(0), ModeChoice::Light);
-    assert_eq!(mode_for_value(1), ModeChoice::Dark);
-    assert_eq!(mode_for_value(2), ModeChoice::EyeForest);
-    assert_eq!(mode_for_value(3), ModeChoice::System);
-    assert_eq!(mode_for_value(usize::MAX), ModeChoice::System);
-    assert_eq!(mode_value("Light"), 0);
-    assert_eq!(mode_value("Dark"), 1);
-    assert_eq!(mode_value("EyeForest"), 2);
-    assert_eq!(mode_value("System"), 3);
-    assert_eq!(mode_value(""), 3);
+    // Mode: the segments ARE the theme owner's published ladder, so a picker
+    // cannot carry a fourth local variant of the color-scheme axis.
+    for (index, choice) in ModePreference::CHOICES.into_iter().enumerate() {
+        assert_eq!(mode_for_value(index), choice);
+        assert_eq!(mode_value(choice.config_token()), index);
+    }
+    assert_eq!(mode_for_value(usize::MAX), ModePreference::FollowNative);
+    // The empty first-launch sentinel behaves like follow-native.
+    assert_eq!(mode_value(""), ModePreference::CHOICES.len() - 1);
     assert_eq!(mode_value("nope"), SEGMENT_NONE);
 
     // Interface size follows UiSize::ALL; the fallback is the Standard
@@ -50,17 +49,36 @@ fn control_value_mappers_reproduce_legacy_choices() {
     assert_eq!(ui_size_for_value(usize::MAX), UiSize::Standard);
 
     // Density and the two-state unit axes: 1 = Compact / Bits / Base 10.
-    assert_eq!(density_value(true), 1);
-    assert_eq!(density_value(false), 0);
+    assert_eq!(density_value(RowDensity::Comfortable.config_token()), 0);
+    assert_eq!(density_value(RowDensity::Compact.config_token()), 1);
+    assert_eq!(density_value("not-a-density-token"), 0);
     assert_eq!(unit_toggle_value(true), 0);
     assert_eq!(unit_toggle_value(false), 1);
 
     // Font source: 0 = System, 1 = Bundled, custom families select nothing.
     assert_eq!(font_choice_for_value(0), FontChoice::System);
     assert_eq!(font_choice_for_value(1), FontChoice::Bundled);
-    assert_eq!(font_choice_value(true, false), 0);
-    assert_eq!(font_choice_value(false, true), 1);
-    assert_eq!(font_choice_value(false, false), SEGMENT_NONE);
+    let embedded_only = FontAvailability::embedded_only(true);
+    assert_eq!(
+        font_choice_value(
+            FontChoice::System.config_token(FontRole::Ui),
+            FontRole::Ui,
+            &embedded_only
+        ),
+        0
+    );
+    assert_eq!(
+        font_choice_value(
+            FontChoice::Bundled.config_token(FontRole::Ui),
+            FontRole::Ui,
+            &embedded_only
+        ),
+        1
+    );
+    assert_eq!(
+        font_choice_value("not-a-font-token", FontRole::Ui, &embedded_only),
+        0
+    );
 
     // Motion: the three segments follow MotionPolicy::ALL over the persisted
     // "normal"/"reduced"/"none" wire tokens; the empty sentinel and unknown
@@ -129,7 +147,10 @@ fn control_changes_round_trip_through_preferences() {
 
     apply(&mut app, SettingsChange::Skin(Skin::Kde));
     assert!(app.preferences().skin.eq_ignore_ascii_case("KDE"));
-    apply(&mut app, SettingsChange::Mode(ModeChoice::Dark));
+    apply(
+        &mut app,
+        SettingsChange::Mode(ModePreference::Explicit(LightDark::Dark)),
+    );
     assert!(app.preferences().mode.eq_ignore_ascii_case("Dark"));
     apply(&mut app, SettingsChange::UiSize(UiSize::Large));
     assert_eq!(app.ui_size(), UiSize::Large);
@@ -157,7 +178,7 @@ fn control_changes_round_trip_through_preferences() {
     assert!(app.preferences().gray_zero_values);
 
     // The startup select publishes exactly the three legacy tokens.
-    for choice in startup_choices(crate::i18n::Language::En) {
+    for choice in startup_choices(Language::En) {
         apply(&mut app, SettingsChange::StartupPage(choice.token));
         assert_eq!(app.preferences().startup_page, choice.token);
     }
@@ -227,7 +248,7 @@ fn grouped_modal_renders_from_non_default_preferences() {
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::SettingsChanged(SettingsChange::Skin(Skin::Macos)));
     let _ = app.update(Message::SettingsChanged(SettingsChange::Mode(
-        ModeChoice::EyeForest,
+        ModePreference::Explicit(LightDark::EyeForest),
     )));
     let _ = app.update(Message::SettingsChanged(SettingsChange::CompactDensity(
         true,

@@ -52,8 +52,10 @@
 
 - **浮层与上下文菜单**：行右键通过 `Popover` 浮层挂载，脱离表格视口裁切限制，
   包含 `EndTask`、`Kill`、`Priority`（高/正常/低）、`EfficiencyMode` 等完整动作；
-- **纯净多语言**：严禁中英文混排（如 `Delete 确认` 统一为 `按 Delete 键确认`），
-  浮层与提示文本统一通过 `taskmanager_application::i18n::t` 单源解析。
+- **纯净多语言**：严禁中英文混排（如 `Delete 确认` 统一为 `按 Delete 键确认`）。
+  浮层、提示与设置项文本一律通过 `taskmanager_application::i18n::t` 单源解析：
+  Iced 不持有本地字典、本地 `Language` 或本地 key 枚举（历史上的 `src/i18n.rs`
+  已删除），语言偏好只写回共享目录再渲染。
 
 ## 5. 锚定证据边界
 

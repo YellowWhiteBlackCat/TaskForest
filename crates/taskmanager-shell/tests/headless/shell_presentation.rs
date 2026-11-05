@@ -2,9 +2,10 @@ use super::*;
 use crate::presentation::smart::{self_test_intent, smart_section_visible};
 use taskforest_contract::RequestId;
 use taskforest_core::SystemHealthScore;
+use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{
-    CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, MsrReadoutSnapshot,
-    MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics,
+    CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, DiskMetrics, MsrReadoutSnapshot,
+    MsrThermalStatusReadout, NetworkAdapterType, NetworkMetrics, SmartAvailability,
 };
 use taskforest_core::core::services::ServiceDiagnostics;
 use taskforest_core::core::smart::{
@@ -14,6 +15,7 @@ use taskforest_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskforest_core::{DeviceGeneration, SystemLoadAverage};
 use taskmanager_application::AppAction;
 use taskmanager_application::MsrReadoutSession;
+use taskmanager_application::{AppPage, CommandId};
 
 #[test]
 fn health_summary_names_the_red_yellow_green_saturation_grade() {
@@ -357,6 +359,9 @@ fn sensor_unit_formatting_matches_the_exact_conventions() {
     assert_eq!(fan_rpm(1234.6), "1235 RPM");
     assert_eq!(power_w(12.34), "12.3 W");
     assert_eq!(megahertz(2400.4), "2400 MHz");
+    assert_eq!(gigahertz(3280.0), "3.28 GHz");
+    assert_eq!(cpu_clock_readout(3280), "3.28 GHz");
+    assert_eq!(cpu_clock_readout(900), "900 MHz");
     // Health-page convention: deliberately different precisions.
     assert_eq!(temperature_c_precise(36.76), "36.8 °C");
     assert_eq!(fan_rpm_i(1234), "1234 RPM");

@@ -5,9 +5,9 @@
 //! module stays under the repository's source-size budget.
 
 use taskmanager_theme::tokens::{MotionPolicy, UiSize};
-use taskmanager_theme::{FontChoice, Skin};
+use taskmanager_theme::{FontChoice, ModePreference, Skin};
 
-use crate::i18n::Language;
+use taskmanager_application::i18n::Language;
 
 /// The process-details modal's section tab (GPUI `ProcessDetailsSection`
 /// parity: Overview / Performance / Command / Insights). Frontend-local —
@@ -45,12 +45,12 @@ impl DetailsSection {
 }
 
 /// One settings mutation: the persisted token change plus the resolved theme
-/// axis. The iced frontend owns the token↔enum mapping (the same split as
-/// `gpui_app::root`); `Config` itself stays opaque to this crate.
+/// axis. The token↔enum mapping is the theme owner's public codec (ADR-063);
+/// `Config` itself stays opaque to this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsChange {
     Skin(Skin),
-    Mode(ModeChoice),
+    Mode(ModePreference),
     HighContrast(bool),
     UiFont(FontChoice),
     MonoFont(FontChoice),
@@ -152,45 +152,6 @@ impl DeviceKind {
             Self::NetworkVirtual => "network-virtual",
             Self::NetworkOther => "network-other",
             Self::Gpus => "device-gpus",
-        }
-    }
-}
-
-/// The color-scheme preference with the frontend-local `System` resolution.
-/// `System` keeps the currently resolved mode when no native appearance
-/// provider exists (the iced slice has none yet); the stored token is
-/// `"System"` regardless. EyeForest is a product-owned palette shared with
-/// GPUI and the TUI.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ModeChoice {
-    #[default]
-    Light,
-    Dark,
-    EyeForest,
-    System,
-}
-
-impl ModeChoice {
-    /// The persisted token for one choice (matches the shared
-    /// `Config::mode` vocabulary).
-    pub const fn token(self) -> &'static str {
-        match self {
-            ModeChoice::Light => "Light",
-            ModeChoice::Dark => "Dark",
-            ModeChoice::EyeForest => "EyeForest",
-            ModeChoice::System => "System",
-        }
-    }
-
-    /// Parse a stored `Config::mode` token back into a choice; an empty or
-    /// unknown token behaves like `System` (the legacy first-launch sentinel).
-    #[must_use]
-    pub fn from_token(token: &str) -> Self {
-        match token.to_ascii_lowercase().as_str() {
-            "light" => ModeChoice::Light,
-            "dark" => ModeChoice::Dark,
-            "eyeforest" | "eye-forest" => ModeChoice::EyeForest,
-            _ => ModeChoice::System,
         }
     }
 }

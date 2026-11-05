@@ -16,16 +16,33 @@
 
 use std::time::Duration;
 
-use gpui::{AbsoluteLength, Background, DefiniteLength, Fill, FontWeight, Hsla, Pixels, Rgba};
-use gpui::{Animation, WindowBackgroundAppearance, ease_in_out, px, rems};
+use gpui::{
+    AbsoluteLength, Animation, Background, BoxShadow, DefiniteLength, Fill, FontWeight, Hsla,
+    Pixels, Point, Rgba, WindowBackgroundAppearance, ease_in_out, linear_color_stop,
+    linear_gradient, px, rems,
+};
 
 use taskmanager_theme::color::{Color, FontSize, Length, Ratio, Weight};
 use taskmanager_theme::fonts::FontAvailability;
+use taskmanager_theme::optical_glass::OpticalGlassCapability;
 use taskmanager_theme::platform::{WeightCompensationAxis, effective_weight};
-use taskmanager_theme::theme::{EdgeTiling, Material, Theme, WindowChromeState};
+use taskmanager_theme::theme::{
+    EdgeTiling, GlassTier, Material, STANDARD_ROOT_REM_SIZE, Theme, WindowChromeState,
+};
 use taskmanager_theme::tokens::{DURATION_FAST, DURATION_MEDIUM, MotionPolicy};
 
 // ── token → gpui value conversions (one function per target type) ──────────
+
+/// The optical-glass capability of the locked GPUI renderer.
+///
+/// `gpui-pre 0.3.10` exposes no sampleable lower composite or backdrop
+/// primitive, so the production renderer reports no optical capability. This
+/// remains [`OpticalGlassCapability::UNSUPPORTED`] until an upstream release
+/// passes the documented P0 gate without a vendor/fork/patch.
+#[must_use]
+pub fn optical_glass_capability() -> OpticalGlassCapability {
+    OpticalGlassCapability::UNSUPPORTED
+}
 
 /// Map a neutral color onto gpui's straight-alpha RGBA.
 #[must_use]
@@ -50,6 +67,17 @@ pub fn fill(color: Color) -> Fill {
     Fill::Color(hsla(color).into())
 }
 
+/// Project the shared glass sheen into GPUI's native rounded-surface fill.
+#[must_use]
+pub fn glass_fill(theme: &Theme, tier: GlassTier) -> Fill {
+    let [top, bottom] = theme.glass_gradient(tier);
+    Fill::from(linear_gradient(
+        180.0,
+        linear_color_stop(hsla(top), 0.0),
+        linear_color_stop(hsla(bottom), 1.0),
+    ))
+}
+
 /// Map a neutral color onto gpui's background vocabulary.
 #[must_use]
 pub fn background(color: Color) -> Background {
@@ -66,6 +94,55 @@ pub fn pixels(length: Length) -> Pixels {
 #[must_use]
 pub fn absolute(length: Length) -> AbsoluteLength {
     AbsoluteLength::Pixels(pixels(length))
+}
+
+/// Express a skin radius on the live root-relative scale.
+#[must_use]
+pub fn rem_length(length: Length) -> gpui::Rems {
+    rems(length.0 / STANDARD_ROOT_REM_SIZE)
+}
+
+/// Express a raw pixel value on the live root-relative scale. Callers that
+/// hold a neutral [`Length`] should prefer [`rem_length`]; this exists for the
+/// authored literal dimensions (dialog bounds, icon sizes, entrance offsets)
+/// the product states directly in the standard root.
+#[must_use]
+pub fn rem_value(value: f32) -> gpui::Rems {
+    rems(value / STANDARD_ROOT_REM_SIZE)
+}
+
+/// Convert one root-relative value at the renderer boundary. GPUI's shadow
+/// primitive only accepts pixels; the source token and live theme remain REM.
+fn rem_pixels(theme: &Theme, value: f32) -> Pixels {
+    AbsoluteLength::Rems(rems(value)).to_pixels(Pixels::from(theme.root_rem_size))
+}
+
+/// Resolve the theme-owned two-layer glass shadow onto GPUI's pixel-only
+/// shadow type. All dimensions originate in [`GlassTier`] REM values.
+#[must_use]
+pub fn glass_shadow(theme: &Theme, tier: GlassTier) -> Vec<BoxShadow> {
+    let ink = hsla(theme.glass_layer(tier).shadow);
+    let (ambient_y, ambient_blur) = tier.ambient_shadow_rem();
+    let (contact_y, contact_blur) = tier.contact_shadow_rem();
+    vec![
+        BoxShadow {
+            color: Hsla {
+                a: ink.a * 0.6,
+                ..ink
+            },
+            offset: Point::new(Pixels::default(), rem_pixels(theme, ambient_y)),
+            blur_radius: rem_pixels(theme, ambient_blur),
+            spread_radius: Pixels::default(),
+            inset: false,
+        },
+        BoxShadow {
+            color: ink,
+            offset: Point::new(Pixels::default(), rem_pixels(theme, contact_y)),
+            blur_radius: rem_pixels(theme, contact_blur),
+            spread_radius: Pixels::default(),
+            inset: false,
+        },
+    ]
 }
 
 /// Map a neutral authored font size onto gpui rem lengths. 14px is the Small

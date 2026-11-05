@@ -20,6 +20,7 @@ use taskmanager_application::{
     ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
+use taskmanager_theme::ModePreference;
 
 /// Stable token for one shell [`SortCol`], compatible with the GPUI frontend's
 /// persisted tokens (`"PID"` / `"Name"` / `"CPU"` / …) so a shared config file
@@ -514,7 +515,9 @@ impl TuiApp {
             &mut config,
             &mut self.theme_params,
         );
-        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+        // Only a follow-native preference re-resolves; the mode token is the
+        // theme owner's codec, never a string this frontend compares (ADR-063).
+        if ModePreference::from_config_token(&config.mode).follows_native() {
             self.theme_params = ThemeParams::from_config_tokens_with_appearance(
                 &config.skin,
                 &config.mode,

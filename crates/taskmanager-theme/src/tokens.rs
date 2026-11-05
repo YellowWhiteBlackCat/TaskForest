@@ -42,6 +42,13 @@ pub fn window_radius(t: &Theme) -> Length {
     Length(t.radius(RadiusScale::XLarge))
 }
 
+/// Inset a rectangular plot inside a rounded surface without relying on a
+/// toolkit's overflow clip to follow the curved corners. The diagonal of the
+/// inset rectangle clears the corner arc, with one extra unit for antialiasing.
+pub fn rounded_content_inset(radius: Length) -> Length {
+    Length(radius.0.max(0.0) * (1.0 - std::f32::consts::FRAC_1_SQRT_2) + 1.0)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Spacing + type scale: layout governance pass. Unlike the radius scale these
 // are skin-INDEPENDENT constants (light/dark skins share spacing and type),
@@ -122,10 +129,28 @@ pub const FONT_HEADER: FontSize = FontSize(12.0);
 /// Caption tier — badges, the Trend micro-label (one step below body).
 pub const FONT_CAPTION: FontSize = FontSize(10.0);
 
+/// The micro tier as a root-relative factor — the smallest type the product
+/// paints (a service-log timestamp, a dense inline stamp). A renderer that
+/// sizes text in `rem` multiplies this factor by its own root, so the tier
+/// follows the user's UI-size choice exactly like every other rung instead of
+/// each frontend inventing a 0.75 of its own.
+pub const FONT_RATIO_MICRO: Ratio = Ratio(0.75);
+
 /// Body-row line-height — Fluent Body ratio ~1.4 (14px → ~20px line box).
 pub const LINE_HEIGHT_NORMAL: Ratio = Ratio(1.4);
 /// Header-row line-height — Fluent Caption ratio ~1.33 (12px → 16px line box).
 pub const LINE_HEIGHT_HEADER: Ratio = Ratio(1.33);
+/// Display-rung line-height — the hero/page-title tier (FONT_20/FONT_26)
+/// carries a TIGHTER leading than body: larger type needs less relative
+/// leading to stay readable (Fluent Display sizes ~1.2), and a page budget
+/// must not lose vertical slots to a heading that scales its own box. A
+/// frontend that paints a display rung binds this token instead of letting
+/// the toolkit's default leading decide how much page the title owns.
+pub const LINE_HEIGHT_DISPLAY: Ratio = Ratio(1.2);
+/// The line box of a caption-sized value badge (the graph readout pill): a
+/// tighter leading than body so the pill hugs its run instead of carrying a
+/// per-frontend number into the shape call.
+pub const LINE_HEIGHT_BADGE: Ratio = Ratio(1.2);
 
 // -----------------------------------------------------------------------------
 // User-facing UI size. This axis is intentionally independent from
@@ -162,10 +187,9 @@ impl UiSize {
     /// both fail closed to the readability-first Standard profile.
     #[must_use]
     pub fn from_config_token(token: &str) -> Self {
-        match token.trim() {
-            "Small" => Self::Small,
-            "Large" => Self::Large,
-            "Standard" | "" => Self::Standard,
+        match token.trim().to_ascii_lowercase().as_str() {
+            "small" => Self::Small,
+            "large" => Self::Large,
             _ => Self::Standard,
         }
     }
@@ -216,12 +240,38 @@ impl UiSize {
         }
     }
 
+    /// The line box of a display rung (page titles, hero metrics). One fold
+    /// for every frontend: large type reads better with TIGHTER relative
+    /// leading, and a page that lets the toolkit default decide how tall its
+    /// title box is silently spends the vertical slots it promised the
+    /// content underneath.
+    #[must_use]
+    pub const fn display_line_height(self) -> Ratio {
+        match self {
+            Self::Small | Self::Standard | Self::Large => LINE_HEIGHT_DISPLAY,
+        }
+    }
+
     /// Standard inline icon extent paired with body/control copy.
     pub const fn icon_size(self) -> Length {
         match self {
             Self::Small => Length(14.0),
             Self::Standard => Length(18.0),
             Self::Large => Length(22.0),
+        }
+    }
+    /// Express one absolute type/extent metric as a root-relative factor for a
+    /// renderer that sizes text in `rem` (Bevy) instead of absolute pixels.
+    /// The root is this size profile's body type, so the same ladder the other
+    /// three products read in pixels resolves identically here. A non-finite or
+    /// non-positive metric yields the neutral `Ratio(1.0)` rather than a zero
+    /// that would collapse the text.
+    pub const fn rem_ratio(self, size: Length) -> Ratio {
+        let body = self.body_font_size().0;
+        if size.0.is_finite() && size.0 > 0.0 && body > 0.0 {
+            Ratio(size.0 / body)
+        } else {
+            Ratio(1.0)
         }
     }
 
@@ -290,6 +340,20 @@ pub const DURATION_HOVER: Duration = Duration::from_millis(120);
 /// Panel/appear transition duration — 180ms (Fluent Normal class).
 pub const DURATION_MEDIUM: Duration = Duration::from_millis(180);
 
+// The persisted motion-preference vocabulary (see
+// [`MotionPolicy::config_token`]). `taskforest-core` carries the same strings
+// as wire constants for the opaque `Config::motion` field; the
+// `taskmanager-gates` census welds the two tables so neither can drift.
+
+/// The full-motion token.
+pub const MOTION_TOKEN_NORMAL: &str = "normal";
+/// The reduced-motion token.
+pub const MOTION_TOKEN_REDUCED: &str = "reduced";
+/// The no-motion token.
+pub const MOTION_TOKEN_NONE: &str = "none";
+/// The retired no-motion spelling still accepted on read.
+pub const MOTION_TOKEN_NONE_ALIAS: &str = "no-motion";
+
 /// Accessibility-aware policy for one-shot visual transitions.
 ///
 /// `Normal` preserves the semantic token passed by the caller. `Reduced`
@@ -312,6 +376,33 @@ pub enum MotionPolicy {
 impl MotionPolicy {
     /// All policies in their stable semantic order.
     pub const ALL: [Self; 3] = [Self::Normal, Self::Reduced, Self::NoMotion];
+
+    /// The persisted motion token for this policy. Same single-vocabulary rule
+    /// as [`RowDensity::config_token`]: the strings pair with the
+    /// `taskforest-core` `MOTION_*` wire constants and the `taskmanager-gates`
+    /// census welds them, so one user choice means the same restriction in
+    /// every product.
+    pub const fn config_token(self) -> &'static str {
+        match self {
+            Self::Normal => MOTION_TOKEN_NORMAL,
+            Self::Reduced => MOTION_TOKEN_REDUCED,
+            Self::NoMotion => MOTION_TOKEN_NONE,
+        }
+    }
+
+    /// Resolve a persisted motion token. Case-insensitive; the retired
+    /// `no-motion` spelling stays legal as the alias early builds wrote. Empty
+    /// and unknown tokens resolve to [`MotionPolicy::Normal`], the
+    /// pre-preference animated default, so a newer or hand-edited config never
+    /// fabricates a restriction the user did not ask for.
+    #[must_use]
+    pub fn from_config_token(token: &str) -> Self {
+        match token.trim().to_ascii_lowercase().as_str() {
+            MOTION_TOKEN_REDUCED => Self::Reduced,
+            MOTION_TOKEN_NONE | MOTION_TOKEN_NONE_ALIAS => Self::NoMotion,
+            _ => Self::Normal,
+        }
+    }
 
     /// Resolve a token duration for an animation-capable renderer.
     ///
@@ -364,8 +455,39 @@ pub enum RowDensity {
     Compact,
 }
 
+/// The persisted row-density token for the comfortable profile.
+/// `taskforest-core` carries the same strings as wire constants for the
+/// opaque `Config::density` field; the `taskmanager-gates` census welds the two
+/// tables so neither drifts.
+pub const DENSITY_TOKEN_COMFORTABLE: &str = "Comfortable";
+/// The persisted row-density token for the compact profile.
+pub const DENSITY_TOKEN_COMPACT: &str = "Compact";
+
 impl RowDensity {
     pub const ALL: [RowDensity; 2] = [RowDensity::Comfortable, RowDensity::Compact];
+
+    /// The persisted density token. The label and the wire token are one
+    /// vocabulary (ADR-063), so a preference written by one product reads back
+    /// as the same geometry in the other three.
+    pub const fn config_token(self) -> &'static str {
+        match self {
+            Self::Comfortable => DENSITY_TOKEN_COMFORTABLE,
+            Self::Compact => DENSITY_TOKEN_COMPACT,
+        }
+    }
+
+    /// Resolve a persisted density token. Case and surrounding whitespace are
+    /// irrelevant. An empty token means "no recorded preference" and yields the
+    /// comfortable default; an unknown token yields `None` so a config written
+    /// by a newer version never forces an unresolvable geometry.
+    #[must_use]
+    pub fn from_config_token(token: &str) -> Option<Self> {
+        match token.trim().to_ascii_lowercase().as_str() {
+            "compact" => Some(Self::Compact),
+            "comfortable" | "" => Some(Self::Comfortable),
+            _ => None,
+        }
+    }
 
     /// Body-row vertical padding for this density.
     pub const fn row_padding_y(self) -> Length {
@@ -400,3 +522,16 @@ impl RowDensity {
 
 /// Width of the selected-row accent rail in the leading edge of the row.
 pub const SELECTION_RAIL: Length = Length(4.0);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline icon extents. [`IconId`] plus `taskmanager-icons`/`taskmanager-assets`
+// own WHICH glyph paints; the theme owns the EXTENT an inline glyph is handed
+// beside a rung of copy, so a spinner or status icon never carries a number a
+// frontend invented. [`UiSize::icon_size`] is the axis-aware step a data row
+// uses; these are the fixed status-surface tiers.
+
+/// The icon inline with caption/body copy in a status line.
+pub const ICON_INLINE: Length = Length(16.0);
+/// The icon that leads a standalone status surface (a warmup card, an empty
+/// state) beside its headline.
+pub const ICON_STANDALONE: Length = Length(18.0);

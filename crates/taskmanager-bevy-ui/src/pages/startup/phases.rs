@@ -154,7 +154,7 @@ fn phase_row_scene(slice: PhaseSlice, total_ms: u64, palette: &UiPalette) -> Box
             Node {
                 width: percent(share * 100.0),
                 height: percent(100),
-                border_radius: BorderRadius::all(Val::Px(space_2())),
+                border_radius: BorderRadius::all(rem(palette.control_height_rem * 0.225)),
             }
             BackgroundColor({ palette.accent })
             StartupPhaseBar(phase)
@@ -183,7 +183,7 @@ fn phase_row_scene(slice: PhaseSlice, total_ms: u64, palette: &UiPalette) -> Box
                  width: percent(48),
                  min_width: Val::Px(0.0),
                  height: rem(palette.control_height_rem * 0.45),
-                 border_radius: BorderRadius::all(Val::Px(space_2())),
+                 border_radius: BorderRadius::all(rem(palette.control_height_rem * 0.225)),
                  overflow: Overflow::clip_x(),
              }
              BackgroundColor({ palette.panel_fill })

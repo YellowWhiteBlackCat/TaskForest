@@ -4,9 +4,10 @@
 
 use super::IcedApp;
 use super::motion::viewport_compact;
-use crate::ui::responsive::{NavigationPresentation, PageLayoutBudget, nav_rail_width};
-use taskmanager_theme::tokens::UiSize;
+use crate::ui::responsive::{nav_rail_width, page_layout_for_frame};
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_ui_contract::navigation::NavOrientation;
+use taskmanager_ui_contract::presentation::vocabulary::NavigationPresentation;
 
 impl IcedApp {
     /// Whether the current viewport is at the GPUI compact breakpoint
@@ -32,13 +33,11 @@ impl IcedApp {
     }
 
     pub(crate) fn navigation_rail_compact(&self) -> bool {
-        PageLayoutBudget::for_frame(self.viewport.size(), self.nav_orientation).navigation
+        page_layout_for_frame(self.viewport.size(), self.nav_orientation).navigation
             == NavigationPresentation::IconOnly
     }
     pub(crate) fn navigation_rail_width(&self) -> f32 {
-        nav_rail_width(
-            PageLayoutBudget::for_frame(self.viewport.size(), self.nav_orientation).navigation,
-        )
+        nav_rail_width(page_layout_for_frame(self.viewport.size(), self.nav_orientation).navigation)
     }
     pub(crate) fn page_viewport_size(&self) -> iced::Size {
         let mut size = self.viewport.size();
@@ -50,8 +49,17 @@ impl IcedApp {
 
     /// Resolved row-density preference for the view layer.
     #[must_use]
+    pub fn density(&self) -> RowDensity {
+        // The persisted token resolves through the theme owner's codec, so an
+        // empty or unknown token keeps the comfortable geometry instead of a
+        // frontend-local string comparison.
+        RowDensity::from_config_token(&self.preferences().density).unwrap_or_default()
+    }
+
+    /// Resolved row-density preference as the compact flag the views read.
+    #[must_use]
     pub fn compact_density(&self) -> bool {
-        self.preferences().density.eq_ignore_ascii_case("Compact")
+        self.density() == RowDensity::Compact
     }
 
     #[must_use]

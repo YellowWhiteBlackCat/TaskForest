@@ -2,7 +2,13 @@ use super::*;
 use crate::theme_binding::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use iced::Font;
 use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{FONT_MISANS_VF, HighContrast, LightDark, ResolvedFonts, Skin};
+use taskmanager_theme::{FONT_MISANS_VF, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin};
+
+fn combined_shadow_alpha(ink_alpha: f32, opacity: f32) -> f32 {
+    let ambient = ink_alpha * opacity * 0.6;
+    let contact = ink_alpha * opacity;
+    1.0 - (1.0 - ambient) * (1.0 - contact)
+}
 
 /// Font helpers read the resolved family names off the neutral theme, the
 /// weighted helper preserves the family, and the bundled const pins the
@@ -73,11 +79,8 @@ fn color_conversion_is_channel_exact() {
 fn panel_and_button_styles_read_theme_tokens() {
     let theme = Theme::dark();
     let panel = panel_style(&theme);
-    assert_eq!(
-        panel.background,
-        Some(color(theme.palette().surface).into())
-    );
-    assert_eq!(panel.border.color, color(theme.palette().border));
+    assert_eq!(panel.background, Some(glass_fill(&theme, GlassTier::Card)));
+    assert_eq!(panel.border.color, color(theme.glass_card().edge));
     // The primary button wears the shared accent-gradient token pair (the
     // same wash the GPUI component layer renders); the destructive variant
     // keeps the flat danger fill.
@@ -90,6 +93,58 @@ fn panel_and_button_styles_read_theme_tokens() {
     assert_eq!(
         destructive.background,
         Some(color(theme.palette().danger).into())
+    );
+}
+
+#[test]
+fn performance_rail_and_controls_scale_the_theme_radii() {
+    for skin in Skin::ALL {
+        let theme = Theme::build(
+            skin,
+            LightDark::Light,
+            HighContrast::Off,
+            ResolvedFonts::system_for(skin),
+        )
+        .with_root_rem_size(21.0);
+        let scale = theme.root_rem_size / STANDARD_ROOT_REM_SIZE;
+        let panel = f32::from(theme.palette().panel_radius) * scale;
+        let control = f32::from(theme.palette().control_radius) * scale;
+        let rail = stats_rail_style(&theme);
+        assert!((rail.border.radius.top_left - panel).abs() < 1e-4);
+        assert_eq!(rail.background, Some(glass_fill(&theme, GlassTier::Card)));
+        let chart = crate::ui::components::chart_surface(&theme);
+        assert_eq!(chart.shadow, iced::Shadow::default());
+        assert_eq!(chart.border, rail.border);
+        assert!((progress_style(&theme).border.radius.top_left - control).abs() < 1e-4);
+        assert!(
+            (ghost_button_style(&theme, button::Status::Active)
+                .border
+                .radius
+                .top_left
+                - control)
+                .abs()
+                < 1e-4
+        );
+    }
+}
+
+#[test]
+fn navigation_chrome_uses_the_sidebar_glass_tier() {
+    let theme = Theme::dark();
+    let chrome = chrome_style(&theme);
+    assert_eq!(
+        chrome.background,
+        Some(glass_fill(&theme, GlassTier::Sidebar))
+    );
+    assert_eq!(chrome.border.color, color(theme.glass_chrome().edge));
+    assert_eq!(
+        chrome.shadow.color,
+        color(
+            theme
+                .glass_chrome()
+                .shadow
+                .with_alpha(combined_shadow_alpha(theme.glass_chrome().shadow.a, 0.45,))
+        )
     );
 }
 
@@ -275,11 +330,13 @@ fn zebra_index_stripes_even_rows_and_selection_beats_the_stripe() {
     );
 }
 
-/// The Mission-Center elevation stack is token-derived and layered: the
-/// scrim dims the window backdrop toward black, the elevated modal carries
-/// a real shadow (iced 0.14 wgpu renders container shadows — no
-/// self-drawn approximation), and the card shadow is strictly fainter so
-/// modals stay the highest elevation. Every color traces back to a theme
+/// The Mission-Center elevation stack is token-derived: the scrim dims the
+/// window backdrop toward black, the elevated modal carries a real shadow
+/// (iced 0.14 wgpu renders container shadows — no self-drawn approximation),
+/// and the card shadow is strictly fainter so modals stay the highest
+/// elevation. Iced can paint one shadow quad, so the projection folds the
+/// theme's ambient + contact layers into one alpha-weighted shadow instead of
+/// silently dropping the contact layer. Every color traces back to a theme
 /// token, never a literal.
 #[test]
 fn scrim_elevated_and_card_styles_are_token_derived_and_layered() {
@@ -289,29 +346,93 @@ fn scrim_elevated_and_card_styles_are_token_derived_and_layered() {
     let scrim = scrim_style(&theme);
     assert_eq!(
         scrim.background,
-        Some(color(mix(palette.window_backdrop, Color::BLACK, 0.45)).into())
+        Some(color(theme.glass_scrim().fill).into()),
+        "the modal mask consumes the theme's scrim tier"
     );
 
     let elevated = elevated_style(&theme);
-    assert_eq!(elevated.shadow.color, color(Color::BLACK.with_alpha(0.30)));
-    assert_eq!(elevated.shadow.offset, iced::Vector::new(0.0, 6.0));
-    assert_eq!(elevated.shadow.blur_radius, 18.0);
-    // The elevated panel keeps the card family's border + radius contract.
-    assert_eq!(elevated.border.color, color(palette.border));
-    assert_eq!(elevated.border.width, 1.0);
+    let modal_shadow = theme.glass_modal().shadow;
+    let ambient_alpha = modal_shadow.a * 0.6;
+    let contact_alpha = modal_shadow.a;
+    assert_eq!(
+        elevated.shadow.color,
+        iced::Color {
+            a: combined_shadow_alpha(modal_shadow.a, 1.0),
+            ..color(modal_shadow)
+        }
+    );
+    let modal_ambient = GlassTier::Modal.ambient_shadow_rem();
+    let modal_contact = GlassTier::Modal.contact_shadow_rem();
+    let expected_offset = (modal_ambient.0 * ambient_alpha + modal_contact.0 * contact_alpha)
+        / (ambient_alpha + contact_alpha);
+    let expected_blur = (modal_ambient.1 * ambient_alpha + modal_contact.1 * contact_alpha)
+        / (ambient_alpha + contact_alpha);
+    let expected_offset = expected_offset * theme.root_rem_size;
+    let expected_blur = expected_blur * theme.root_rem_size;
+    assert!((elevated.shadow.offset.y - expected_offset).abs() < 1e-5);
+    assert!((elevated.shadow.blur_radius - expected_blur).abs() < 1e-5);
+    assert_eq!(elevated.border.color, color(theme.glass_modal().edge));
+    assert_eq!(
+        elevated.border.width,
+        theme.root_rem_size * GlassTier::Modal.edge_width_rem()
+    );
     assert_eq!(
         elevated.border.radius,
         f32::from(palette.panel_radius).into()
     );
 
     let card = card_style(&theme);
-    assert_eq!(card.shadow.color, color(Color::BLACK.with_alpha(0.16)));
+    let card_shadow = theme.glass_card().shadow;
+    let card_ambient_alpha = card_shadow.a * 0.6;
+    let card_contact_alpha = card_shadow.a;
+    assert_eq!(
+        card.shadow.color,
+        iced::Color {
+            a: combined_shadow_alpha(card_shadow.a, 0.7),
+            ..color(card_shadow)
+        }
+    );
     assert!(
         card.shadow.color.a < elevated.shadow.color.a,
         "cards must read as lower elevation than modals"
     );
-    assert!(card.shadow.blur_radius < elevated.shadow.blur_radius);
-    assert_eq!(card.background, elevated.background);
+    let card_ambient = GlassTier::Card.ambient_shadow_rem();
+    let card_contact = GlassTier::Card.contact_shadow_rem();
+    let expected_offset = (card_ambient.0 * card_ambient_alpha
+        + card_contact.0 * card_contact_alpha)
+        / (card_ambient_alpha + card_contact_alpha);
+    let expected_blur = (card_ambient.1 * card_ambient_alpha + card_contact.1 * card_contact_alpha)
+        / (card_ambient_alpha + card_contact_alpha);
+    let expected_offset = expected_offset * theme.root_rem_size;
+    let expected_blur = expected_blur * theme.root_rem_size;
+    assert!((card.shadow.offset.y - expected_offset).abs() < 1e-5);
+    assert!((card.shadow.blur_radius - expected_blur).abs() < 1e-5);
+    assert_eq!(card.background, Some(glass_fill(&theme, GlassTier::Card)));
+}
+
+#[test]
+fn glass_styles_paint_the_shared_gradient_stops() {
+    for mode in LightDark::ALL {
+        let theme = Theme::build(
+            Skin::Gnome,
+            mode,
+            HighContrast::Off,
+            ResolvedFonts::system_for(Skin::Gnome),
+        );
+        let iced::Background::Gradient(iced::Gradient::Linear(gradient)) =
+            card_style(&theme).background.expect("card background")
+        else {
+            panic!("the card must paint a gradient");
+        };
+        let stops: Vec<_> = gradient
+            .stops
+            .iter()
+            .flatten()
+            .map(|stop| (stop.offset, stop.color))
+            .collect();
+        let [top, bottom] = theme.glass_gradient(GlassTier::Card);
+        assert_eq!(stops, vec![(0.0, color(top)), (1.0, color(bottom))]);
+    }
 }
 
 #[test]

@@ -12,17 +12,17 @@ use bevy::ecs::hierarchy::Children;
 use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{Scene, bsn};
-use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use zhuge_ui_kit_bevy::control::{ButtonLayout, button_scene};
-use zhuge_ui_kit_bevy::surface::{self, SurfaceLayout};
 
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
+use crate::widgets::bounded_text::BoundedText;
 use crate::window::{Role, TextRole};
 use bevy::text::{LineBreak, TextLayout};
 
@@ -61,6 +61,10 @@ pub(crate) enum ControlTone {
     /// the content surface while idle.
     #[default]
     Surface,
+    /// A table row. `zebra` carries the row's parity inside the visible
+    /// window, which is the only place the stripe has meaning: the stripe
+    /// alternates what the user can see, not what the model indexes.
+    Row { zebra: bool },
 }
 
 /// Stable visual state carried by every product-owned button. Interaction
@@ -87,11 +91,19 @@ pub(crate) fn control_background(
         match visual.0 {
             ControlTone::Nav => palette.accent,
             ControlTone::Surface => palette.nav_active_bg,
+            ControlTone::Row { .. } => palette.selection_bg,
         }
     } else {
         match visual.0 {
             ControlTone::Nav => palette.nav_active_bg,
             ControlTone::Surface => palette.content_bg,
+            // A table row is not a control surface: the reference surface
+            // leaves an unselected row open so the page canvas reads through
+            // it, and marks every other row with the theme's zebra tint for
+            // scanning. Painting every row with a panel fill turns the whole
+            // table into one flat block and erases the stripe.
+            ControlTone::Row { zebra: true } => palette.zebra_bg,
+            ControlTone::Row { zebra: false } => Color::NONE,
         }
     }
 }
@@ -103,32 +115,54 @@ pub(crate) enum SurfaceTone {
     Content,
 }
 
-fn surface_fill(tone: SurfaceTone, palette: &UiPalette) -> bevy::color::Color {
-    match tone {
-        SurfaceTone::Elevated => palette.panel_fill,
-        SurfaceTone::Content => palette.content_bg,
-    }
-}
-
 /// A token-backed panel that accepts a dynamic scene list as its children.
 pub(crate) fn surface_scene(
     tone: SurfaceTone,
     children: Vec<Box<dyn Scene>>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    surface::surface_scene(
-        SurfaceLayout {
+    let elevated = tone == SurfaceTone::Elevated;
+    let surface_gap_rem = palette.rem_ratio(space_2());
+    let surface_padding_rem = palette.rem_ratio(space_16());
+    let radius_rem = palette.panel_radius_rem();
+    let (fill, edge, shadows, edge_width_rem, grain) = if elevated {
+        let GlassPanelMaterial {
+            fill,
+            edge,
+            shadows,
+            edge_width_rem,
+            grain,
+            ..
+        } = card_material(palette);
+        (fill, edge, shadows, edge_width_rem, Some(grain))
+    } else {
+        (
+            palette.content_bg,
+            palette.border_color,
+            Vec::new(),
+            0.0,
+            None,
+        )
+    };
+    bsn! {
+        Node {
             width: percent(100),
             min_width: Val::Auto,
             max_width: Val::Auto,
-            direction: FlexDirection::Column,
-            gap: Val::Px(space_2()),
-            padding: UiRect::all(Val::Px(space_16())),
-            radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-        },
-        surface_fill(tone, palette),
-        children,
-    )
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Rem(surface_gap_rem),
+            padding: UiRect::all(Val::Rem(surface_padding_rem)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
+        }
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
+        Children [
+            @{ grain } --
+            { children }
+        ]
+    }
 }
 
 /// A compact key/value row. The label is caption ink; the value is body ink
@@ -150,23 +184,20 @@ pub(crate) fn stat_row_scene(
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-
                 Node {
-                    flex_shrink: 0.0,
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
             --
-
                 Node {
-                    min_width: px(0.0),
-                    flex_shrink: 1.0,
+                    flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::FlexEnd,
                     overflow: Overflow::clip_x(),
                 }
                 Children [  @{ value }  ]
-
         ]
     }
 }
@@ -222,7 +253,6 @@ pub(crate) fn device_row_with_accessory_scene(
     selected: bool,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let title = bounded_device_title(&title);
     bsn! {
         Node {
             width: percent(100),
@@ -230,7 +260,7 @@ pub(crate) fn device_row_with_accessory_scene(
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_8()),
-            padding: UiRect::axes(Val::Px(space_12()), Val::Px(space_4())),
+            padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_4())),
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
         }
         BackgroundColor({
@@ -247,33 +277,20 @@ pub(crate) fn device_row_with_accessory_scene(
                     flex_direction: FlexDirection::Column,
                     justify_content: JustifyContent::Center,
                     row_gap: Val::Px(space_2()),
+                    // Both lines of the identity column are bounded slots:
+                    // the ellipsis system needs the line's own shaped width,
+                    // which a stretched line never reports.
+                    align_items: AlignItems::FlexStart,
                     overflow: Overflow::clip_x(),
                 }
                 Pickable::IGNORE
                 Children [
-                     Text(title) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE --
+                     Text(title) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap } BoundedText Pickable::IGNORE --
                      @{ caption } Pickable::IGNORE
                 ]
 
         ]
     }
-}
-
-/// Keep the identity line in a device-sidebar row visibly bounded. Bevy's
-/// `NoWrap`/`clip_x` pair prevents layout damage, but a raw clip leaves a
-/// model such as `Intel Graphics (xe)` ending in an unexplained `(`. The
-/// ellipsis is part of the product contract and is measured in Unicode scalar
-/// values here because the sidebar title is a semantic identity preview; the
-/// full model remains available in the selected detail surface.
-#[must_use]
-pub(crate) fn bounded_device_title(value: &str) -> String {
-    const MAX_CHARS: usize = 15;
-    let chars: Vec<char> = value.chars().collect();
-    if chars.len() <= MAX_CHARS {
-        return value.to_owned();
-    }
-    let take = MAX_CHARS.saturating_sub(1).max(1);
-    format!("{}…", chars.into_iter().take(take).collect::<String>())
 }
 
 /// Chrome around one graph body. The graph itself remains a separate Scene so
@@ -286,23 +303,30 @@ pub(crate) fn graph_card_scene(
     graph: Box<dyn Scene>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows: _,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_2()),
             padding: UiRect::all(Val::Px(space_16())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ surface_fill(SurfaceTone::Content, palette) })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
         Children [
+             @{ grain } --
              Text(title) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } --
              Text(subtitle) TextRole(Role::Caption) --
              @{ graph }
         ]
     }
 }
-
-#[cfg(test)]
-#[path = "../../tests/headless/widgets/controls.rs"]
-mod tests;

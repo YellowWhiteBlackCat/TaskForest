@@ -5,8 +5,8 @@ use taskforest_core::core::npu::{NpuDevice, NpuEngineKind};
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_shell::viewmodel::StatRow;
 
-use super::super::responsive::PerformancePageBudget;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 
 pub(crate) fn npu_section(
     app: &crate::IcedApp,

@@ -25,6 +25,7 @@ use taskmanager_application::ConfigStore;
 use taskmanager_application::KeyCode;
 use taskmanager_application::Modifiers;
 use taskmanager_application::PlatformEffect;
+use taskmanager_application::i18n::Language;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
@@ -38,6 +39,7 @@ use taskmanager_theme::FONT_MISANS_VF;
 use taskmanager_theme::FONT_ROBOTO_MONO;
 use taskmanager_theme::FontAvailability;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{FontChoice, Skin};
 
 #[test]
 fn user_row_menu_opens_selects_and_routes_actions() {
@@ -626,7 +628,7 @@ fn settings_change_round_trips_through_the_store_and_rebuilds_the_theme() {
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::Skin(Skin::Kde)));
     let _ = app.update(Message::SettingsChanged(SettingsChange::Mode(
-        ModeChoice::Dark,
+        ModePreference::Explicit(LightDark::Dark),
     )));
     let _ = app.update(Message::SettingsChanged(SettingsChange::HighContrast(true)));
     let _ = app.update(Message::SettingsChanged(SettingsChange::CompactDensity(
@@ -676,7 +678,7 @@ fn settings_apply_unknown_mode_tokens_as_system_and_keep_font_fallbacks() {
     let mut app = IcedApp::with_config_store(None, ConfigStore::new(&path));
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::Mode(
-        ModeChoice::System,
+        ModePreference::FollowNative,
     )));
     assert_eq!(app.preferences().mode, "System");
     // System resolves to the dark fallback (no native appearance provider).
@@ -695,9 +697,9 @@ fn settings_apply_unknown_mode_tokens_as_system_and_keep_font_fallbacks() {
     assert!(!app.memory_use_bytes());
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::Language(
-        crate::i18n::Language::Zh,
+        Language::Zh,
     )));
-    assert_eq!(app.language(), crate::i18n::Language::Zh);
+    assert_eq!(app.language(), Language::Zh);
 
     drop(app);
     std::fs::remove_dir_all(dir).unwrap();

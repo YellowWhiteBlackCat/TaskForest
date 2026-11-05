@@ -254,7 +254,7 @@ def make_layout(repo_root: Path, frontend: str, run_uuid: uuid.UUID) -> tuple[Pa
     run_root = (
         repo_root
         / "target"
-        / EVIDENCE_ROOTS[frontend]
+        / evidence_root_name(frontend)
         / "runs"
         / str(run_uuid)
     )
@@ -266,6 +266,21 @@ def make_layout(repo_root: Path, frontend: str, run_uuid: uuid.UUID) -> tuple[Pa
     )
     os.chmod(runtime_root, 0o700)
     return run_root, runtime_root
+
+
+def evidence_root_name(frontend: str) -> str:
+    """Return the evidence root a run belongs to.
+
+    One frontend can render two data regimes — the live host and the
+    compiled-in fixture — and their frames are not comparable with each
+    other. A separate root keeps the two regimes from mixing into one
+    `latest` pointer, so a reader never has to ask which regime a frame
+    came from.
+    """
+    override = os.environ.get("TM_CAPTURE_EVIDENCE_ROOT")
+    if override:
+        return override
+    return EVIDENCE_ROOTS[frontend]
 
 
 def write_cleanup_status(run_root: Path, status: str) -> None:
@@ -512,7 +527,12 @@ def run_capture(repo_root: Path, frontend: str, command: Sequence[str]) -> int:
         metadata["child_start_time"] = proc_start_time(child.pid)
         atomic_json(run_root / "supervisor.json", metadata)
 
-        for _ in range(18_000):
+        # The child's own runtime is bounded by the caller's `timeout`; this
+        # loop only has to outlive that bound so the supervisor can reap the
+        # child and its cgroup rather than being killed first. It stays
+        # generous and is overridable for a longer single-invocation matrix.
+        child_wait_ticks = int(os.environ.get("TM_CAPTURE_SUPERVISOR_WAIT_TICKS", "18000"))
+        for _ in range(child_wait_ticks):
             if child.poll() is not None:
                 break
             if stop_requested:

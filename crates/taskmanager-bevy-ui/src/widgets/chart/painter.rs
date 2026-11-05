@@ -29,10 +29,10 @@ use crate::widgets::chart::canvas::{
     CanvasCrosshair, CanvasFill, CanvasFlow, CanvasGrid, CanvasImage, CanvasSpec, rasterize,
 };
 use crate::widgets::chart::geometry::{
-    CHART_LINE_THICKNESS_PX, ChartRun, ChartScale, ChartVertex, MAX_CHART_POINTS, chart_runs,
+    CHART_LINE_THICKNESS_PX, ChartRun, ChartScale, ChartVertex, MAX_CHART_POINTS, chart_runs_in,
 };
 use crate::widgets::chart::hover::{
-    ChartHoverLabel, ChartPointer, hover_position, hover_slot, hover_text,
+    ChartHoverLabel, ChartPointer, hover_position, hover_slot_in, hover_text,
 };
 
 /// How long one sample slot takes to slide in, in seconds — the same slide
@@ -58,7 +58,14 @@ pub(crate) enum ChartContent {
         source: Vec2,
     },
     /// Raw samples; the painter projects them against the measured slot.
-    Samples { values: Vec<f32>, ceiling: f32 },
+    Samples {
+        values: Vec<f32>,
+        ceiling: f32,
+        /// The window's slot capacity: the frame is `capacity` samples wide,
+        /// so a window holding fewer samples grows from the right edge
+        /// instead of claiming the whole frame.
+        capacity: usize,
+    },
     /// Nothing measured yet.
     #[default]
     Empty,
@@ -94,11 +101,32 @@ impl Default for ChartStyle {
     }
 }
 
+impl PartialEq for ChartStyle {
+    fn eq(&self, other: &Self) -> bool {
+        self.line == other.line
+            && self.thickness == other.thickness
+            && self.fill == other.fill
+            && self.grid == other.grid
+            && self.flow == other.flow
+    }
+}
+
 /// The canvas marker: the chart's content and style, declared by the scene.
-#[derive(Component, Clone, Debug, Default)]
+#[derive(Component, Clone, Debug, Default, PartialEq)]
 pub(crate) struct ChartCanvas {
     pub(crate) content: ChartContent,
     pub(crate) style: ChartStyle,
+}
+
+impl ChartCanvas {
+    /// The frame's slot capacity: how many samples the canvas's width
+    /// represents. A window holding fewer samples grows from the right edge.
+    pub(crate) fn capacity(&self) -> usize {
+        match &self.content {
+            ChartContent::Samples { capacity, .. } => *capacity,
+            _ => 1,
+        }
+    }
 }
 
 /// The painter's per-canvas state: the slide progress and the signature of
@@ -177,12 +205,17 @@ impl ChartTextures {
 /// The projection of a canvas's content onto the measured slot.
 fn canvas_runs(canvas: &ChartCanvas, size: Vec2) -> Vec<ChartRun> {
     match &canvas.content {
-        ChartContent::Samples { values, ceiling } => chart_runs(
+        ChartContent::Samples {
+            values,
+            ceiling,
+            capacity,
+        } => chart_runs_in(
             values,
             size.x,
             size.y,
             MAX_CHART_POINTS,
             ChartScale::Ceiling(*ceiling),
+            *capacity,
         ),
         ChartContent::Points { vertices, source } => {
             if vertices.is_empty() || source.x <= 0.0 || source.y <= 0.0 {
@@ -226,8 +259,13 @@ fn mix(hash: &mut u64, value: u64) {
 fn content_signature(content: &ChartContent) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     match content {
-        ChartContent::Samples { values, ceiling } => {
+        ChartContent::Samples {
+            values,
+            ceiling,
+            capacity,
+        } => {
             mix(&mut hash, u64::from(ceiling.to_bits()));
+            mix(&mut hash, *capacity as u64);
             for value in values {
                 mix(&mut hash, u64::from(value.to_bits()));
             }
@@ -341,7 +379,8 @@ pub(crate) fn paint_chart_canvases(
             }
         }
         let hover = hover_position(pointer.and_then(|pointer| pointer.normalized), size);
-        let slot = hover.and_then(|position| hover_slot(points, size.x, position.x));
+        let capacity = canvas.capacity();
+        let slot = hover.and_then(|position| hover_slot_in(points, capacity, size.x, position.x));
         let signature = canvas_signature(canvas, size, state.slide, state.flow_phase, hover);
         if state.painted && state.signature == signature {
             continue;
@@ -402,6 +441,7 @@ fn canvas_signature(
     hover: Option<Vec2>,
 ) -> u64 {
     let mut hash = content_signature(&canvas.content);
+    mix_style(&mut hash, canvas.style);
     mix(&mut hash, u64::from(size.x.to_bits()));
     mix(&mut hash, u64::from(size.y.to_bits()));
     mix(&mut hash, u64::from(slide.to_bits()));
@@ -411,6 +451,46 @@ fn canvas_signature(
         mix(&mut hash, u64::from(position.y.to_bits()));
     }
     hash
+}
+
+fn mix_style(hash: &mut u64, style: ChartStyle) {
+    mix_color(hash, style.line);
+    mix(hash, u64::from(style.thickness.to_bits()));
+    if let Some(fill) = style.fill {
+        mix(hash, 1);
+        mix_color(hash, fill.color);
+        mix(hash, u64::from(fill.alpha.to_bits()));
+    } else {
+        mix(hash, 0);
+    }
+    if let Some(grid) = style.grid {
+        mix(hash, 1);
+        mix_color(hash, grid.color);
+        mix(hash, u64::from(grid.alpha.to_bits()));
+        mix(hash, grid.horizontal as u64);
+        mix(hash, grid.vertical as u64);
+        mix(hash, grid.reference.len() as u64);
+        for reference in grid.reference {
+            mix(hash, u64::from(reference.to_bits()));
+        }
+        mix(hash, u64::from(grid.reference_alpha.to_bits()));
+    } else {
+        mix(hash, 0);
+    }
+    if let Some(flow) = style.flow {
+        mix(hash, 1);
+        mix_color(hash, flow.color);
+        mix(hash, u64::from(flow.radius.to_bits()));
+    } else {
+        mix(hash, 0);
+    }
+}
+
+fn mix_color(hash: &mut u64, color: Color) {
+    let color = color.to_srgba();
+    for channel in [color.red, color.green, color.blue, color.alpha] {
+        mix(hash, u64::from(channel.to_bits()));
+    }
 }
 
 /// Write the raster into the canvas texture.

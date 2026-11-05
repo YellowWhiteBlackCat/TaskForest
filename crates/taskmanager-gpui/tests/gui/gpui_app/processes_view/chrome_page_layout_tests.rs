@@ -2,8 +2,9 @@ use super::page_layout::{
     ProcessActionPresentation, ProcessActionSurface, ProcessChromePresentation,
     ProcessControlPresentation, ProcessOverviewPresentation,
 };
-use crate::gpui_app::root::{
-    LayoutProfile, NavigationPresentation, PageLayoutBudget, VerticalSpace,
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    LayoutProfile, NavigationPresentation, VerticalSpace,
 };
 
 fn page_layout(profile: LayoutProfile, vertical_space: VerticalSpace) -> PageLayoutBudget {
@@ -12,6 +13,9 @@ fn page_layout(profile: LayoutProfile, vertical_space: VerticalSpace) -> PageLay
         vertical_space,
         page_padding: 16.0,
         navigation: NavigationPresentation::Labeled,
+        content_width: 0.0,
+        content_height: 0.0,
+        chrome: None,
     }
 }
 

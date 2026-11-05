@@ -19,7 +19,9 @@ use crate::palette::{UiPalette, space_8};
 use crate::tooltip::TooltipText;
 use crate::window::{Role, TextRole};
 
-use super::badge::{TreeAggregateValue, aggregate_badge_scene, zombie_badge_scene};
+use super::badge::{
+    TreeAggregateValue, aggregate_badge_scene, container_badge_scene, zombie_badge_scene,
+};
 use super::chevron::chevron_scene;
 use super::guide::guide_scene;
 use super::hover::hover_frame_scene;
@@ -52,6 +54,9 @@ pub(super) fn plan_scene(plan: &TreeRowPlan, palette: &UiPalette) -> impl Scene 
     }
     if let Some(badge) = &plan.aggregate_badge {
         children.push(aggregate_badge_scene(badge.clone(), palette));
+    }
+    if let Some(badge) = &plan.container_badge {
+        children.push(container_badge_scene(badge.clone(), palette));
     }
     if plan.zombie_badge {
         children.push(zombie_badge_scene(palette));

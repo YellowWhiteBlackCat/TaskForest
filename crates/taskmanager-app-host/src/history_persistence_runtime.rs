@@ -31,7 +31,11 @@ use crate::worker_fault::catch_worker_panic;
 
 pub const HISTORY_RECORD_COMMAND_CAPACITY: usize = 4_096;
 const HISTORY_FLUSH_INTERVAL: Duration = Duration::from_secs(10);
-const HISTORY_BOOTSTRAP_WAIT: Duration = Duration::from_millis(100);
+// The bootstrap worker keeps storage I/O off the renderer, but a 100 ms
+// deadline is too tight for a cold directory scan and lock claim under the
+// repository's four-way test load. Keep the frontend non-blocking while
+// allowing the same bounded start path to finish on a loaded workstation.
+const HISTORY_BOOTSTRAP_WAIT: Duration = Duration::from_secs(1);
 const HISTORY_SHUTDOWN_WAIT: Duration = Duration::from_millis(100);
 const HISTORY_PERSISTENCE_SHUTDOWN_WAIT: Duration = Duration::from_secs(2);
 

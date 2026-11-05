@@ -19,6 +19,7 @@ use taskforest_contract::InstanceGuard;
 use taskforest_contract::InstanceRole;
 use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::acquire_single_instance;
+use taskmanager_application::i18n::set_language;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
@@ -127,8 +128,8 @@ pub fn run(demo: bool) -> iced::Result {
                     app.install_history_frontend_connector(host.history_frontend_connector());
                 }
                 // The demo boot skips `load_config`; pin the shared catalog to
-                // the demo's language here (see `i18n::sync_shared_language`).
-                crate::i18n::sync_shared_language(app.language());
+                // the demo's language here.
+                set_language(app.language());
                 (app, Task::none())
             } else {
                 let platform = initial_platform.borrow_mut().take().flatten();

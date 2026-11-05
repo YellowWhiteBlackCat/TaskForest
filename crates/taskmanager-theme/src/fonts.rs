@@ -22,11 +22,61 @@ use crate::theme::Skin;
 pub const FONT_MISANS_VF: &str = "MiSans VF";
 pub const FONT_ROBOTO_MONO: &str = "Roboto Mono";
 
+/// The complete public font collection: every family the product bundles, in
+/// role order (UI, then monospace). This is the ONE address for the bundled
+/// family names — a frontend, an asset table, or a settings picker never
+/// re-spells `"MiSans VF"` (ADR-063). `taskmanager-assets` owns the registered
+/// bytes, and the `taskmanager-gates` census welds one face per role to one
+/// embedded blob.
+pub const BUNDLED_FONT_FAMILIES: [&str; 2] = [FONT_MISANS_VF, FONT_ROBOTO_MONO];
+
+/// The persisted `Config::ui_font` / `Config::mono_font` token that explicitly
+/// requests the host's own skin family. The ABSENT (empty) token is not this
+/// choice: it means "no recorded preference" and resolves to the bundled
+/// product faces, which is why an explicit token exists at all.
+pub const FONT_TOKEN_SYSTEM: &str = "system";
+
 /// The two roles a user can pick a face for.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum FontRole {
     Ui,
     Mono,
+}
+
+impl FontRole {
+    /// Every role, in the order a picker lists them.
+    pub const ALL: [Self; 2] = [Self::Ui, Self::Mono];
+
+    /// The bundled product face this role resolves to when registration was
+    /// verified (MiSans VF for the UI role, Roboto Mono for metrics).
+    #[must_use]
+    pub const fn bundled_family(self) -> &'static str {
+        match self {
+            Self::Ui => FONT_MISANS_VF,
+            Self::Mono => FONT_ROBOTO_MONO,
+        }
+    }
+
+    /// The installed-family ladder this role falls back to when both the skin
+    /// family and the bundled face are absent. Public so a capability probe or
+    /// a diagnostics view reads the same order the resolver uses.
+    #[must_use]
+    pub const fn fallback_families(self) -> &'static [&'static str] {
+        match self {
+            Self::Ui => &UI_FALLBACK_FAMILIES,
+            Self::Mono => &MONO_FALLBACK_FAMILIES,
+        }
+    }
+
+    /// The literal the resolver uses when the host catalog is empty, that is,
+    /// when no candidate in [`Self::fallback_families`] can be observed.
+    #[must_use]
+    pub const fn empty_catalog_fallback(self) -> &'static str {
+        match self {
+            Self::Ui => EMPTY_CATALOG_UI_FALLBACK,
+            Self::Mono => EMPTY_CATALOG_MONO_FALLBACK,
+        }
+    }
 }
 
 /// User preference per role. `System` means the current skin's recommended
@@ -42,6 +92,47 @@ pub enum FontChoice {
     Bundled,
 }
 
+impl FontChoice {
+    /// The fixed product ladder a picker offers: the host's own family first,
+    /// then the bundled product face (the shipped default). Every frontend uses
+    /// this order so a keyboard-navigated picker cannot drift.
+    pub const PICKER_LADDER: [Self; 2] = [Self::System, Self::Bundled];
+
+    /// The persisted token for this choice. `Bundled` writes the role's own
+    /// bundled family, so a saved config names what the product shipped instead
+    /// of an ambiguous marker.
+    #[must_use]
+    pub const fn config_token(self, role: FontRole) -> &'static str {
+        match self {
+            Self::System => FONT_TOKEN_SYSTEM,
+            Self::Bundled => role.bundled_family(),
+            Self::Custom(family) => family,
+        }
+    }
+
+    /// Resolve a persisted or user-supplied token into a choice with the
+    /// product-wide policy every frontend shares: the absent token is the
+    /// bundled product default, a token naming a bundled face of this role is
+    /// `Bundled`, the explicit system token is `System`, and any other name is
+    /// accepted ONLY when the bounded startup catalog observed it. An unobserved
+    /// name fails closed to `System`, which resolves to the skin's verified
+    /// fallback — a config file can never force a request for a family the host
+    /// lacks. The UI role also reads the monospace face's name as a bundled
+    /// request (early configs carried it there); the monospace role never treats
+    /// the UI face as its own, so one policy still keeps the roles distinct.
+    #[must_use]
+    pub fn from_config_token(token: &str, role: FontRole, availability: &FontAvailability) -> Self {
+        let token = token.trim();
+        if token.is_empty() || is_bundled_token_for(token, role) {
+            return Self::Bundled;
+        }
+        if token.eq_ignore_ascii_case(FONT_TOKEN_SYSTEM) {
+            return Self::System;
+        }
+        availability.choice_for(token).unwrap_or(Self::System)
+    }
+}
+
 /// User font intent, one choice per role. Default = bundled product faces
 /// (MiSans VF for UI, Roboto Mono for mono).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -55,6 +146,32 @@ impl Default for FontPreference {
         Self {
             ui: FontChoice::Bundled,
             mono: FontChoice::Bundled,
+        }
+    }
+}
+
+impl FontPreference {
+    /// The persisted `(ui, mono)` tokens, in configuration-field order.
+    #[must_use]
+    pub const fn config_tokens(self) -> (&'static str, &'static str) {
+        (
+            self.ui.config_token(FontRole::Ui),
+            self.mono.config_token(FontRole::Mono),
+        )
+    }
+
+    /// Rebuild a preference from the two persisted tokens through
+    /// [`FontChoice::from_config_token`], so every product reads one config file
+    /// into the same families.
+    #[must_use]
+    pub fn from_config_tokens(
+        ui_token: &str,
+        mono_token: &str,
+        availability: &FontAvailability,
+    ) -> Self {
+        Self {
+            ui: FontChoice::from_config_token(ui_token, FontRole::Ui, availability),
+            mono: FontChoice::from_config_token(mono_token, FontRole::Mono, availability),
         }
     }
 }
@@ -126,12 +243,20 @@ impl FontAvailability {
         let ui_fallback = if bundled_ui {
             FONT_MISANS_VF
         } else {
-            first_installed(&names, UI_FALLBACK_FAMILIES, "Noto Sans")
+            first_installed(
+                &names,
+                UI_FALLBACK_FAMILIES,
+                FontRole::Ui.empty_catalog_fallback(),
+            )
         };
         let mono_fallback = if bundled_mono {
             FONT_ROBOTO_MONO
         } else {
-            first_installed(&names, MONO_FALLBACK_FAMILIES, "Noto Sans Mono")
+            first_installed(
+                &names,
+                MONO_FALLBACK_FAMILIES,
+                FontRole::Mono.empty_catalog_fallback(),
+            )
         };
         let custom_families = names
             .iter()
@@ -166,6 +291,37 @@ impl FontAvailability {
     /// The system-or-bundled families for one skin (no user override applied).
     pub fn resolved_for(&self, skin: Skin) -> ResolvedFonts {
         self.per_skin[skin.idx()]
+    }
+
+    /// The snapshot for a renderer that registers ONLY the embedded faces and
+    /// cannot load a host family by name (Bevy's font store consumes asset
+    /// bytes, not the platform catalog). Every skin then resolves to the faces
+    /// this renderer can actually paint, and no custom family can authorize
+    /// itself because no catalog was observed. `embedded_registered` is the
+    /// renderer's honest registration result, never an assumption: when it is
+    /// `false` both roles report unavailable and resolve through the same
+    /// deterministic fallback ladder a missing bundle uses elsewhere.
+    #[must_use]
+    pub fn embedded_only(embedded_registered: bool) -> Self {
+        let resolved = |role: FontRole| {
+            if embedded_registered {
+                role.bundled_family()
+            } else {
+                role.empty_catalog_fallback()
+            }
+        };
+        let faces = ResolvedFonts {
+            ui: resolved(FontRole::Ui),
+            mono: resolved(FontRole::Mono),
+        };
+        Self {
+            per_skin: Skin::ALL.map(|_| faces),
+            bundled_ui: embedded_registered,
+            bundled_mono: embedded_registered,
+            families: Vec::new(),
+            custom_families: Vec::new(),
+            catalog_truncated: false,
+        }
     }
 
     /// Whether the embedded product faces were observed in the toolkit font
@@ -276,6 +432,21 @@ const MONO_FALLBACK_FAMILIES: [&str; 6] = [
     "DejaVu Sans Mono",
     "Liberation Mono",
 ];
+
+/// The literal each role ends on when the toolkit reports no families at all.
+/// Reached only through [`FontRole::empty_catalog_fallback`], so the two ladders
+/// and this last resort never disagree about which face is the tail.
+const EMPTY_CATALOG_UI_FALLBACK: &str = "Noto Sans";
+const EMPTY_CATALOG_MONO_FALLBACK: &str = "Noto Sans Mono";
+
+/// Whether a persisted token names a bundled face this role resolves to the
+/// [`FontChoice::Bundled`] choice. The UI role also accepts the monospace face's
+/// name because early configs carried it in `ui_font`; the monospace role does
+/// not accept the UI face, which would silently drop aligned digits.
+fn is_bundled_token_for(token: &str, role: FontRole) -> bool {
+    token.eq_ignore_ascii_case(role.bundled_family())
+        || (matches!(role, FontRole::Ui) && token.eq_ignore_ascii_case(FONT_ROBOTO_MONO))
+}
 
 fn first_installed(
     names: &[&'static str],

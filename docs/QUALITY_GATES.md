@@ -12,6 +12,8 @@
 | cargo-deny | 拒绝已知漏洞、不允许的许可证和依赖策略违规 |
 | Python/Shell 政策门 | 检查安装清单、自动化安全、模块边界和测试布局 |
 | rustfmt / clippy / production-config | 格式、warning-free 编译与不带 test-support 的生产配置 |
+| Bevy 光学能力声明门 | 把 `COMPLETE` 声明绑定到实时 `RenderAdapterInfo`、生产 WESL 证明与新鲜 receipt，禁止 palette 常量冒充证据 |
+| 公共资源单源门（ADR-063） | standard `nextest-logic` 与 CI `test` job 阻塞：文案侧 `only_the_owner_holds_the_message_layer` 零容忍第二字典/`Language`/语言字面表，`no_frontend_paints_chinese_copy_the_catalog_does_not_own` 零容忍未入库中文，`t` 字面量/动态键/键对称门零容忍悬空 key，`hard_copied_widget_copy_stays_within_its_audited_census` 五端全 0；主题与字型侧（`typography_authority_gate_test`）`no_frontend_spells_a_font_family_name`/`no_frontend_spells_a_hardcoded_type_size`/`no_frontend_spells_a_hardcoded_font_weight`/`no_frontend_reimplements_a_theme_axis_codec` 四门零容忍，`the_bundled_font_collection_is_the_asset_table` 与 `the_public_axis_codecs_round_trip_and_match_the_wire_tokens` 焊死字节表与 token 词汇；每个扫描门都配阴性对照自证非空，新增绘制/字号入口须同变更登记 |
 | release build | 验证四端独立前端产品发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
 | package stage simulation | 验证 Linux 安装树、权限和 polkit 路径 |
 | workspace nextest | 行为和平台无关契约 |
@@ -154,21 +156,25 @@ runtime 残留。正式 RC7 本地收口必须以 `TM_CAPTURE_ISOLATION_GATE=1 b
 重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形 runner 只能报告环境性 SKIP，
 不能把它记为隔离 PASS。
 
-Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 bevy 投影）由机械发现驱动：脚本先对 lib 目标做
-nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
-存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
-marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
+发布指针除 `latest` 软链与 UUID 外还写结构化 `latest.json`，绑定 run、采集时刻与该 run 的
+`source_manifest_sha256`；`scripts/evidence_status.py` 对当前树重算同一份前端作用域清单并比对，给出
+`CURRENT`/`STALE`/`UNANCHORED` 的机械判定与差异文件清单，`--require-fresh` 可作门禁。参考态与候选态分离：
+`scripts/evidence_promote.py` 把指定帧显式提升进 `target/<root>/reference/` 并拒绝静默覆盖。live 主机与编译
+fixture 是两种数据制度，各占独立证据根（`screenshot-evidence` / `screenshot-evidence-demo`），跨前端对比必须在同一制度内进行。
+
+Bevy 交互矩阵（统一矩阵 `scripts/parity/cross_frontend_matrix.tsv` 的 bevy 投影）由机械发现驱动：脚本先对 lib 目标做 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
+
+### 7.2 Bevy 光学玻璃证明
+
+Bevy 生产材质桥在 `src/glass/optical/capability.rs` 声明能力上限；实际 capability 只由实时 `RenderAdapterInfo` 推导，无 adapter 时报告 `UNSUPPORTED`，主题立即返回 typed `Painted` 回退。quick 的 `bevy-optical-capability` 静态核对声明、门禁接线和 receipt 新鲜度；standard 的 `bevy-optical-gpu` 用 nextest discovery 确认被忽略的 `production_shader_renders_optical_effects_and_tracks_the_backdrop` 仍存在，再强制运行它，把 blur、refraction、dispersion、specular、grain、opacity、rounded clipping 和 lower-scene tracking 的通过结果写入 `target/optical-gpu-evidence/receipt.json`；`bevy-optical-capability-receipt` 复核同一源码摘要。测试打印 adapter 身份和操作清单，receipt 区分 `PROVEN`、`SOFTWARE_ADAPTER`、`NO_ADAPTER`、`SKIPPED`、`REGRESSION`；无 adapter 或软件 adapter 明确记录 `PAINTED`，不标记为光学证明，`TM_OPTICAL_GPU_GATE=1` 在二者下 fail-closed。receipt 的 `max_nested_layers=1` 与 `nesting_layers_proven=false` 是硬事实：当前只证明单层 lower composite，嵌套玻璃仍由主题 typed fallback 拒绝，不得重新贴标签。
+
 UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按真实渲染消费面路由：合同测试树、声明模块与 dev-only 前端测试树只要求 headless 交互矩阵，不索取像素回执；被真实渲染消费的合同输入模块与产品前端才在 `--require-capture` 下按消费端要求新鲜回执，未列出的 `ui-contract` 路径保持四端 fail-closed。`locales/*` 不再只按路径粗判：`scripts/quality/locale_keyset_classifier.py` 读取目录**内容**——仅当整键增删、无存活键值变更、目录文件集与跨目录键关系不变时才判为 key-set-only（只走 headless）；任一已存键值改变、形状/对称变化、目录不可解析、缺失一侧，或改动集含非目录路径，都 fail-closed 到四端。路径分类表与内容分类器均由 `scripts/quality/ui_evidence_route_guard.py` 机械钉住（quick）。
 
-真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与 worktree clean/dirty 三元组；捕获期间
-工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，dirty 状态下三元组不变即通过：捕获必须单跑并等待安静的稳定
-窗口，失败后在同一稳定状态重跑，不修改 validator。
+真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与 worktree clean/dirty 三元组；捕获期间工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，dirty 状态下三元组不变即通过：捕获必须单跑并等待安静的稳定窗口，失败后在同一稳定状态重跑，不修改 validator。
 
-### 7.1 弹性布局收口协议
+### 7.3 弹性布局收口协议
 
-所有响应式、密集详情、图表分组或固定 viewport 改动必须先遵循
-[ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)：先从根预算推导完整 slot footprint，再按
-mandatory/elastic/optional 分配；lower band 只能整组准入、摘要或隐藏，底部安全带和右侧 label/value bounds 必须有
+所有响应式、密集详情、图表分组或固定 viewport 改动必须先遵循 [ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)：先从根预算推导完整 slot footprint，再按 mandatory/elastic/optional 分配；lower band 只能整组准入、摘要或隐藏，底部安全带和右侧 label/value bounds 必须有
 headless 断言。完成后必须运行当前构建的真实 capture 并通过独立 validator，且逐页检查最小、正常、tall、wide-short、
 窄宽和长文本状态；单张截图、fixture 或编译通过不得替代这套证据。
 

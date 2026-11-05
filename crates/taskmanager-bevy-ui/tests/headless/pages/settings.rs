@@ -461,8 +461,10 @@ fn settings_page_projects_the_live_authorities_into_rows() {
         .collect::<Vec<String>>();
     for (en, zh) in [
         ("Settings", "设置"),
-        ("Theme", "主题"),
+        ("Mode", "模式"),
         ("Language", "语言"),
+        ("High contrast", "高对比度"),
+        ("Interface size", "界面大小"),
         ("Refresh interval", "刷新间隔"),
         ("History capacity", "历史容量"),
         ("Telemetry updates", "遥测更新"),
@@ -470,6 +472,14 @@ fn settings_page_projects_the_live_authorities_into_rows() {
         assert!(
             texts.iter().any(|text| text == en || text == zh),
             "the {en}/{zh} row renders: {texts:?}"
+        );
+    }
+    // The switch state words are catalog-owned too: a row reports the shared
+    // Enabled/Disabled/LIVE vocabulary rather than a frontend-private casing.
+    for (en, zh) in [("Disabled", "已禁用"), ("LIVE", "实时")] {
+        assert!(
+            texts.iter().any(|text| text == en || text == zh),
+            "the {en}/{zh} state renders: {texts:?}"
         );
     }
     assert!(

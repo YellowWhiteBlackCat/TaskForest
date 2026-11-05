@@ -27,6 +27,9 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
     let placeholder_visible = query.is_empty();
     let width = space_24() * 10.0;
     let radius = palette.control_radius_px;
+    // The seed size is the palette's body rung; the role observer stamps the
+    // final metrics. No scene spells a type number (ADR-063).
+    let body_size = palette.body.font_size;
     bsn! {
         Node {
             width: px(width),
@@ -39,7 +42,7 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         ServicesSearchInput
         SearchEditor({ text })
         TextInput
-        TextFont { font_size: FontSize::Rem(1.0) }
+        TextFont { font_size: body_size }
         TextColor(ink)
         TextRole(Role::Body)
         TextLayout { linebreak: LineBreak::NoWrap }

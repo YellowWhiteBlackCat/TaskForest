@@ -65,6 +65,10 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [058](058-cargo-build-warnings-gate.md) | Warning threshold moves to Cargo build.warnings | The warning threshold is `build.warnings = "deny"`; CI keeps the mold-carrying `RUSTFLAGS`, so both hosts stay equally strict. | Build |
 | [059](059-blueprint-disposition-ledger.md) | Blueprint disposition ledger | `FeatureId` is the typed delivery registry; a separate public 225-slot census records every blueprint slot as adopted by a typed feature or explicitly unsupported, so no roadmap item is hidden without a 225-variant enum. | Feature coverage, Product scope |
 | [060](060-taskforest-publish-namespace-and-semver-baseline.md) | Publisher namespace cutover and the semver baseline | Published library crates take the reserved `taskforest-*` namespace in one atomic cutover, and the API-compatibility gate keeps a git-revision baseline until each crate's first release becomes its baseline. | Build, Release, Layering |
+| [061](061-frosted-glass-material-system.md) | Frosted-glass and optical capability system | The theme owns painted glass tiers and a separate REM-authored optical contract; renderers report explicit capabilities and fall back with typed reasons, while TUI stays outside the material. | UI, Frontend |
+| [062](062-backdrop-sampled-optical-glass.md) | Backdrop-sampled optical glass is capability-gated | Optical glass requires real backdrop sampling plus blur/refraction/dispersion/specular/grain; renderer reports are explicit, fallbacks are typed, and vendor/fork/patch workarounds are forbidden. | UI, Frontend |
+| [063](063-public-resource-single-authority.md) | Public UI resources have one authority and no frontend fork | Copy/language, theme tokens and icon semantics each have one owner; frontends bind, never fork, and mechanical gates reject a second dictionary or new hard-coded copy while ratcheting the legacy census down. | Layering, UI, Frontend |
+| [064](064-presentation-resolution-layer.md) | Presentation resolution layer | Layout vocabulary/folds, control roles and hit targets, motion roles/curves and the cross-shape parity grid are shared; each frontend writes one resolver binding and registers deliberate differences. | UI, Frontend, Layering |
 
 ## Decision chains
 
@@ -99,6 +103,15 @@ existing ADRs: cross-references and history depend on stable numbers.
   four audited unsafe trust roots of ADR-022/024/025/031 as the only lint
   exceptions and registers the one test-time `unsafe` site. ADR-057 and ADR-058
   pin dependency resolution and the warning threshold at the workspace level.
+- ADR-062 extends ADR-061: the frosted `GlassLayer` remains the painted
+  fallback, while optical glass is a separate capability-gated renderer path.
+- ADR-063 applies ADR-026's toolkit-neutral theme law and ADR-017/051's owned
+  component law to the message layer: it retires the Iced dictionary hard-cut
+  and makes the single-authority rule gate-enforced for every future frontend.
+- ADR-064 extends ADR-063's single-authority law from resources to
+  measurement and motion: the roles/folds/verdicts are shared, the numbers
+  stay in `taskmanager-theme`, and every deliberate per-shape difference is a
+  registered, gate-checked row rather than a parity comment.
 
 ## Find by topic
 
@@ -110,7 +123,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | History & refresh | 014, 036 |
 | Privilege & escalation | 023, 035, 048 |
 | Audited unsafe boundaries | 022, 024, 025, 031, 056 |
-| Frontend & UI | 017, 020, 026, 027, 028, 029, 032, 037, 038, 039, 040, 041, 042, 046, 050, 051, 052 |
+| Frontend & UI | 017, 020, 026, 027, 028, 029, 032, 037, 038, 039, 040, 041, 042, 046, 050, 051, 052, 061, 062, 063 |
 | Accessibility & semantic output | 054 |
 | Build & dependency policy | 056, 057, 058, 060 |
 | Runtime scheduling | 008, 033 |

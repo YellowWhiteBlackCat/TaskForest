@@ -264,10 +264,6 @@ pub fn embedded_fonts() -> Vec<Cow<'static, [u8]>> {
         .collect()
 }
 
-/// The family names registered by [`embedded_fonts`], as loaded from the
-/// fonts' name tables.
-pub const EMBEDDED_FONT_FAMILIES: &[&str] = &["MiSans VF", "Roboto Mono"];
-
 pub fn all_asset_paths() -> impl Iterator<Item = &'static str> {
     UI_ICON_PATHS.iter().chain(TASKMANAGER_ICON_PATHS).copied()
 }
@@ -396,6 +392,10 @@ const UI_ICON_RGBA: &[(&str, &[u8])] = &[
         icon_path::REMOTE,
         include_bytes!("../assets/icons-rgba/icons-globe.rgba"),
     ),
+    (
+        "icons/panel-left.svg",
+        include_bytes!("../assets/icons-rgba/icons-panel-left.rgba"),
+    ),
 ];
 
 /// Every bitmap key, for registry tests that keep the table and the SVG set
@@ -427,6 +427,7 @@ pub const UI_ICON_RGBA_PATHS: &[&str] = &[
     icon_path::PODMAN,
     icon_path::LOCK,
     icon_path::REMOTE,
+    "icons/panel-left.svg",
 ];
 
 /// Return the decoded RGBA bytes for a known icon asset path. Bitmaps are
@@ -438,4 +439,17 @@ pub fn ui_icon_rgba(path: &str) -> Option<&'static [u8]> {
         .iter()
         .find(|(key, _)| *key == path)
         .map(|(_, bytes)| *bytes)
+}
+
+/// Edge length of the seamless subtle-noise plate used by the Bevy glass
+/// material. The tile is intentionally small; `NodeImageMode::Tiled`
+/// repeats it across every glass surface at no extra asset cost.
+pub const GLASS_NOISE_RGBA_SIZE: u32 = 64;
+
+/// Seamless neutral grain for the frosted-glass material. Each pixel is a
+/// near-white luminance sample with an alpha ramp; the renderer tints it by
+/// the tier strength. Derived only by `packaging/regenerate-glass-noise.sh`.
+#[must_use]
+pub fn glass_noise_rgba() -> &'static [u8] {
+    include_bytes!("../assets/glass/noise-64.rgba")
 }

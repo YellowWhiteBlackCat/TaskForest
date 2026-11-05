@@ -453,6 +453,7 @@ pub(super) fn append_body_cells(
     // (focus/hitboxes) by the global id, and `uniform_list` rows that share a
     // constant id collide — the rows then lose their state and stop rendering.
     let menu_id = ElementId::Name(format!("proc-row-menu:{row_idx}").into());
+    let capture_entity = entity.clone();
     line.context_menu(menu_id, palette, {
         let ent = entity.clone();
         move |_state: PopupMenuState, cx: &mut App| {
@@ -464,6 +465,18 @@ pub(super) fn append_body_cells(
             });
             PopupMenuState::new(root::build_proc_menu(ent.clone(), identity), cx)
         }
+    })
+    .on_open_change(move |open, cx| {
+        capture_entity.update(cx, |view, cx| {
+            if open {
+                if view.note_context_menu_open_for_capture() {
+                    cx.notify();
+                }
+            } else {
+                view.note_context_menu_closed_for_capture();
+                cx.notify();
+            }
+        });
     })
     .into_any_element()
 }

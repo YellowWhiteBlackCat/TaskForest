@@ -54,15 +54,15 @@ pub(super) struct StartupColumns {
 pub(super) fn startup_columns() -> StartupColumns {
     StartupColumns {
         status: TableColumn::text(
-            "Status",
+            "status",
             InfoSortCol::Status.label(),
             ColumnWidth::Fixed(90.0),
         ),
-        name: TableColumn::text("Name", InfoSortCol::Name.label(), ColumnWidth::Fixed(190.0)),
-        impact: TableColumn::text("Impact", "startup.impact", ColumnWidth::Fixed(130.0)),
-        source: TableColumn::text("Source", "startup.source", ColumnWidth::Fixed(170.0)),
-        control: TableColumn::text("Control", "startup.control", ColumnWidth::Fixed(120.0)),
-        command: TableColumn::text("Command", "startup.command", ColumnWidth::Fill),
+        name: TableColumn::text("name", InfoSortCol::Name.label(), ColumnWidth::Fixed(190.0)),
+        impact: TableColumn::text("impact", "startup.impact", ColumnWidth::Fixed(130.0)),
+        source: TableColumn::text("source", "startup.source", ColumnWidth::Fixed(170.0)),
+        control: TableColumn::text("control", "startup.control", ColumnWidth::Fixed(120.0)),
+        command: TableColumn::text("command", "startup.command", ColumnWidth::Fill),
     }
 }
 

@@ -24,7 +24,7 @@ fn sync_chrome(
         return;
     };
     let compact = computed.size().y * computed.inverse_scale_factor()
-        < palette.inner.control_height_px() * 8.0;
+        < palette.inner.control_height_px() * 10.0;
     let gap = px(if compact { space_4() } else { space_8() });
     if page.row_gap != gap {
         page.row_gap = gap;
@@ -75,9 +75,9 @@ pub(crate) fn register(app: &mut App) {
         PostUpdate,
         (
             (sync_chrome, sync_rows).after(UiSystems::Layout),
-            // The cell ellipsis runs on the laid-out frame: it needs the
-            // measured slot and the shaped paragraph of every cell.
-            crate::widgets::table::ellipsis::ellipsize_overflowing_cells.after(UiSystems::Layout),
+            // Bounded table cells and sidebar captions are ellipsized by the
+            // single app-level system in window.rs; registering it here would
+            // run the measured cut twice on the same laid-out frame.
             crate::widgets::table::figures::apply_tabular_figures,
             crate::widgets::table::selection::paint_cell_selection,
         ),

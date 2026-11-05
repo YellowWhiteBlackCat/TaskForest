@@ -84,6 +84,8 @@ pub(crate) const PLATE_ICONS: &[IconId] = &[
     // The read-only mark: a read-only mount wears the padlock, never the
     // caution triangle.
     IconId::Lock,
+    IconId::Sidebar,
+    IconId::Process,
 ];
 
 /// The embedded bitmap bytes for one semantic icon, through the single
@@ -196,9 +198,10 @@ pub(crate) fn stamp_icon_plate(
     }
     let ink = inks.get(entity).map(|ink| ink.0).unwrap_or_default();
     let icon = marks.get(entity).ok().map(|mark| mark.0);
-    let image = icon
-        .and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)))
-        .unwrap_or_default();
+    let Some(image) = icon.and_then(|icon| plates.as_ref().and_then(|plates| plates.handle(icon)))
+    else {
+        return;
+    };
     // The plate scene is applied through a SILENCED queue: the icon observer
     // fires on the plate's own spawn, and a surface that rebuilds in the same
     // frame can despawn the plate before the command lands — the raw

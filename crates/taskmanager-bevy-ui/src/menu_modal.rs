@@ -411,6 +411,13 @@ pub(crate) fn register<Ctx: ActionMenuContext>(app: &mut bevy::app::App) {
 /// column is where the verbs belong, so the menu opens where the reference
 /// surface opens its row menus. The second placement flips the menu above
 /// the trigger when the window edge leaves no room below.
+///
+/// The full process verb set (13 entries) is taller than the vertical room
+/// around a table that already spans the content region. A below/above
+/// placement therefore either clips the first verbs or lands half off-window;
+/// the trailing-side placement is tried FIRST because a menu beside the table
+/// has no vertical edge to fight, and the below/above candidates stay as the
+/// fallback for short inventories.
 fn menu_popover_scene<Ctx: ActionMenuContext>(
     session: &MenuSession<Ctx>,
     palette: &crate::palette::UiPalette,
@@ -429,6 +436,8 @@ fn menu_popover_scene<Ctx: ActionMenuContext>(
         MenuModalPopover
         Popover {
             positions: { vec![
+                PopoverPlacement { side: PopoverSide::Right, align: PopoverAlign::Start, gap: 4.0 },
+                PopoverPlacement { side: PopoverSide::Left, align: PopoverAlign::Start, gap: 4.0 },
                 PopoverPlacement { side: PopoverSide::Bottom, align: PopoverAlign::End, gap: 4.0 },
                 PopoverPlacement { side: PopoverSide::Top, align: PopoverAlign::End, gap: 4.0 },
             ] },

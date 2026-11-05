@@ -5,6 +5,7 @@ use crate::capture::{capture_page_name, capture_perf_device_target, capture_scen
 use crate::confirmation::ConfirmationCapture;
 use crate::focus_visible::FocusCapture;
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
+use crate::menu_modal::MenuModalChanged;
 use crate::navigation::{NavigationState, NavigationStrip, RAIL_WIDTH};
 use crate::pages::history::control::{
     HistoryCommand, PerformanceHistoryProjectionResource, PerformancePresentation,
@@ -16,6 +17,7 @@ use crate::pages::performance::{
     DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
 };
 use crate::pages::process_tree::ProcessTreeRowMarker;
+use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::processes::{ProcessRowsRoot, ProcessScrollIntent, ProcessScrollState};
 use crate::pages::system::dashboard::SystemDashboardCurve;
@@ -23,7 +25,8 @@ use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::table::ZeroValueCell;
-use crate::window::WindowPalette;
+use crate::window::capture_marker_interactive::InteractiveCaptureAccess;
+use crate::window::{FeedbackLine, WindowPalette};
 use crate::window_surface::{ModalBody, WindowSurface, WindowSurfaceState};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
@@ -64,6 +67,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     state: ResMut<'w, CaptureMarkerState>,
     pages: Query<'w, 's, &'static PageContent>,
     text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
+    feedback_lines: Query<'w, 's, (&'static Text, &'static ComputedNode), With<FeedbackLine>>,
     focus: FocusCapture<'w, 's>,
     confirmation: ConfirmationCapture<'w, 's>,
     properties: PropertiesCapture<'w, 's>,
@@ -138,7 +142,54 @@ pub(super) struct CaptureAccess<'w, 's> {
     performance: Res<'w, PerformancePresentation>,
     performance_history: Res<'w, PerformanceHistoryProjectionResource>,
     application_history: Res<'w, HistoryProjectionResource>,
+    interactive: InteractiveCaptureAccess<'w, 's>,
+    process_menu: Option<ResMut<'w, ProcessMenuModal>>,
     commands: Commands<'w, 's>,
+}
+
+/// The apps-zero-gray scenario waits for the scrolled zero row to be painted
+/// in the calibrated muted ink before it admits the frame's data.
+fn apps_zero_gray_ready(access: &mut CaptureAccess) -> bool {
+    let Some(scroll) = access
+        .process_scroll
+        .as_ref()
+        .filter(|scroll| scroll.viewport_rows > 0)
+    else {
+        return false;
+    };
+    let desired = access
+        .track
+        .shell
+        .visible_processes()
+        .len()
+        .saturating_sub(scroll.viewport_rows);
+    if scroll.top != desired {
+        if let Ok(root) = access.process_roots.single() {
+            access.commands.trigger(ProcessScrollIntent {
+                entity: root,
+                rows: isize::MAX,
+            });
+        }
+        return false;
+    }
+    let muted = crate::widgets::table::contrast::calibrate_muted_ink(
+        access.palette.inner.dim_color,
+        access.palette.inner.body_color,
+        &[
+            access.palette.inner.content_bg,
+            access.palette.inner.nav_active_bg,
+        ],
+    );
+    if !access.zero_cells.iter().any(|(zero, text, node, color)| {
+        zero.0 && text.0 == "0.0%" && node.size().x > 0.0 && node.size().y > 0.0 && color.0 == muted
+    }) {
+        return false;
+    }
+    if !access.state.data_presented {
+        access.state.data_presented = true;
+        return false;
+    }
+    true
 }
 
 pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
@@ -196,58 +247,8 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
-        Some("apps-zero-gray") => {
-            let Some(scroll) = access
-                .process_scroll
-                .as_ref()
-                .filter(|scroll| scroll.viewport_rows > 0)
-            else {
-                return;
-            };
-            let desired = access
-                .track
-                .shell
-                .visible_processes()
-                .len()
-                .saturating_sub(scroll.viewport_rows);
-            if scroll.top != desired {
-                if let Ok(root) = access.process_roots.single() {
-                    access.commands.trigger(ProcessScrollIntent {
-                        entity: root,
-                        rows: isize::MAX,
-                    });
-                }
-                return;
-            }
-            // The dimmed zero wears the CALIBRATED muted ink, not the raw
-            // dim token: the table paints zeros with
-            // `calibrate_muted_ink(...)` so a dim value stays readable on
-            // every surface it can sit on. The capture criterion therefore
-            // asks for the same ink the painter uses — comparing against the
-            // raw token would fail on every skin whose dim ink needs the
-            // calibration.
-            let muted = crate::widgets::table::contrast::calibrate_muted_ink(
-                access.palette.inner.dim_color,
-                access.palette.inner.body_color,
-                &[
-                    access.palette.inner.content_bg,
-                    access.palette.inner.nav_active_bg,
-                ],
-            );
-            if !access.zero_cells.iter().any(|(zero, text, node, color)| {
-                zero.0
-                    && text.0 == "0.0%"
-                    && node.size().x > 0.0
-                    && node.size().y > 0.0
-                    && color.0 == muted
-            }) {
-                return;
-            }
-            if !access.state.data_presented {
-                access.state.data_presented = true;
-                return;
-            }
-        }
+        Some("apps-zero-gray") if !apps_zero_gray_ready(&mut access) => return,
+        Some("apps-zero-gray") => {}
 
         Some("apps-group-expanded") => {
             let projection = access.track.shell.projection();
@@ -308,6 +309,96 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 center.y - size.y / 2.0 >= position.translation.y - body.size().y / 2.0 - 0.5
                     && center.y + size.y / 2.0 <= position.translation.y + body.size().y / 2.0 + 0.5
             }) {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("apps-container-group") => {
+            let projection = access.track.shell.projection();
+            let rows = crate::pages::process_tree::project_items(
+                projection.processes_slice(),
+                &access.track.process_tree_expansion,
+                projection.processes_observed_at_ms,
+            );
+            if rows.iter().filter(|row| row.item.is_some()).count() < 7
+                || rows.iter().any(|row| row.has_children && !row.expanded)
+            {
+                return;
+            }
+            let container = rows.iter().find(|row| {
+                row.key.is_none()
+                    && row.depth == 0
+                    && row.item.is_none()
+                    && row.expanded
+                    && row.semantic_key.starts_with("container:")
+            });
+            if container.is_none() {
+                return;
+            }
+            let members = rows.iter().filter(|row| {
+                row.depth == 1
+                    && row
+                        .item
+                        .is_some_and(|item| (90_001..=90_003).contains(&item.pid))
+            });
+            if members.clone().count() != 3 || members.clone().any(|row| row.item.is_none()) {
+                return;
+            }
+            if !access.state.container_members_presented {
+                access.state.container_members_presented = true;
+                return;
+            }
+        }
+        Some("process-context-menu") => {
+            // The Applications inventory must be mounted before the anchored
+            // menu can float against it; its own measured card is the
+            // readiness anchor, so a frame is emitted only after the real
+            // glass popover has been laid out (never a prepared-but-unpainted
+            // menu).
+            if access.process_roots.single().is_err() {
+                return;
+            }
+            if !access.state.menu_open_requested {
+                let Some(menu) = access.process_menu.as_mut() else {
+                    return;
+                };
+                if !open_for_selected(menu, &access.track.shell) {
+                    return;
+                }
+                access.commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
+                    true,
+                    std::marker::PhantomData,
+                ));
+                access.state.menu_open_requested = true;
+                return;
+            }
+            if !super::capture_marker_interactive::process_menu_mounted(&mut access.interactive) {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("feedback-overlay") => {
+            let Some(notice) = access.track.shell.feedback_notice() else {
+                return;
+            };
+            if !access.feedback_lines.iter().any(|(text, node)| {
+                text.0 == notice.text() && node.size().x > 0.0 && node.size().y > 0.0
+            }) {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("tooltip-overlay") => {
+            if !super::capture_marker_interactive::tooltip_mounted(&mut access.interactive) {
                 return;
             }
             if !access.state.data_presented {
@@ -569,6 +660,7 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 | "process-gpu-details"
                 | "process-resource-limits"
                 | "process-isolation"
+                | "feedback-overlay"
         )
     ) && !access.state.data_presented
     {

@@ -18,6 +18,7 @@
 
 use iced::widget::canvas;
 use iced::{Color, Pixels, Point, Rectangle, Size};
+use taskmanager_theme::tokens;
 
 /// The half-device-pixel offset that places a stroke's center line on a
 /// device-pixel center: a one-device-pixel-wide stroke then covers exactly
@@ -202,7 +203,7 @@ pub(crate) fn draw_y_axis_ticks(
             content: format_value(value),
             position: Point::new(3.0, y),
             color,
-            size: Pixels(9.0),
+            size: Pixels(f32::from(tokens::FONT_9)),
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
         });

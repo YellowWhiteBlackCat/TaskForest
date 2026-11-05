@@ -15,6 +15,7 @@ use super::{
     ProcessPropertiesSection, ProcessPropertiesTab, register,
 };
 use crate::app::FrontendTrack;
+use crate::glass::{GlassNoiseLayer, OpticalGlassCard};
 use crate::icons::IconPlate;
 use crate::input::PendingEffects;
 use crate::palette::ui_palette;
@@ -47,6 +48,7 @@ use taskmanager_application::{
     AppAction, AppPage, ProcessInsightFacet, ProcessInsightFacetState, i18n::t,
 };
 use taskmanager_shell::{ShellApp, fixture};
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_ui_contract::IconId;
@@ -283,22 +285,16 @@ fn the_footer_actions_keep_a_measured_sixteen_pixel_bottom_safe_band() {
 }
 
 #[test]
-fn the_modal_backdrop_declares_a_frost_over_a_translucent_viewport() {
+fn the_modal_backdrop_is_an_honest_painted_fallback() {
     let mut app = properties_app(1280, 720);
     let world = app.world_mut();
     let backdrop = world
         .query_filtered::<Entity, With<ModalBackdrop>>()
         .single(world)
-        .expect("the frosted viewport");
-    let radius = world
-        .get::<ModalBackdrop>(backdrop)
-        .expect("the backdrop contract")
-        .blur_radius_px;
-    assert!(
-        radius >= 8.0,
-        "the frosted viewport must declare a real gaussian radius, got {radius}"
-    );
-    let layers = world.get::<Children>(backdrop).expect("the frost layers");
+        .expect("the painted backdrop fallback");
+    let layers = world
+        .get::<Children>(backdrop)
+        .expect("the painted fallback layers");
     let mut translucent = 0;
     for layer in layers.iter() {
         let Some(color) = world.get::<BackgroundColor>(*layer) else {
@@ -307,22 +303,56 @@ fn the_modal_backdrop_declares_a_frost_over_a_translucent_viewport() {
         let alpha = color.0.alpha();
         assert!(
             alpha > 0.0 && alpha < 1.0,
-            "a frost layer stays translucent so the viewport shows through, got {alpha}"
+            "a painted fallback layer stays translucent so the viewport shows through, got {alpha}"
         );
         translucent += 1;
     }
     assert_eq!(
         translucent, 2,
-        "the frost is a dim layer plus a diffusion layer"
+        "the fallback is a dim layer plus a painted diffusion layer; it makes no optical-blur claim"
     );
     let panel = world
         .query_filtered::<Entity, With<ProcessPropertiesPanel>>()
         .single(world)
         .expect("the properties panel");
     let panel_ink = world.get::<BackgroundColor>(panel).expect("the panel fill");
+    assert_eq!(
+        panel_ink.0,
+        world
+            .resource::<WindowPalette>()
+            .inner
+            .glass_fill(GlassTier::Modal),
+        "the foreground panel wears the modal glass tier — the theme's modal material pre-composited over the page canvas, so it reads as a panel above the fallback instead of a hole in it (BEVY-183)"
+    );
     assert!(
         panel_ink.0.alpha() >= 1.0,
-        "the foreground panel stays opaque above the frosted viewport"
+        "a composited modal is the most opaque surface in the frame, above every translucent fallback layer"
+    );
+    let card = world
+        .get::<OpticalGlassCard>(panel)
+        .expect("the optical card marker");
+    assert!(
+        card.enabled,
+        "the properties panel is an optical glass candidate"
+    );
+    let children = world
+        .get::<Children>(panel)
+        .expect("the modal panel owns its content");
+    let grain = *children
+        .iter()
+        .find(|child| world.get::<GlassNoiseLayer>(**child).is_some())
+        .expect("the modal panel carries the grain overlay");
+    let grain_node = world.get::<Node>(grain).expect("the grain node");
+    assert_eq!(
+        grain_node.position_type,
+        bevy::ui::PositionType::Absolute,
+        "grain is out of flow and cannot move modal content"
+    );
+    assert_eq!(grain_node.width, bevy::ui::Val::Percent(100.0));
+    assert_eq!(grain_node.height, bevy::ui::Val::Percent(100.0));
+    assert!(
+        children.iter().any(|child| *child != grain),
+        "the modal still owns its title/content after the grain layer"
     );
 }
 

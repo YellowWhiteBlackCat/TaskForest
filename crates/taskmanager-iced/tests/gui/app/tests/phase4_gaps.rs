@@ -173,11 +173,7 @@ fn test_thermal_heatmap_and_sensor_badges() {
     });
     snapshot.gpu = vec![gpu];
 
-    let panel = crate::ui::health::sensors_and_thermal_panel(
-        &snapshot,
-        app.theme(),
-        crate::i18n::Language::En,
-    );
+    let panel = crate::ui::health::sensors_and_thermal_panel(&snapshot, app.theme());
     assert!(
         panel.is_some(),
         "Sensors and thermal heatmap panel must render when temperatures exist"

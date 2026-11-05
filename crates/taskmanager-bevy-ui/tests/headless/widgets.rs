@@ -13,6 +13,7 @@ use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::Has;
 use bevy::image::Image;
 use bevy::picking::Pickable;
+use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::text::{InlineBox, InlineBoxKind};
@@ -27,7 +28,7 @@ use super::menu::{MenuItem, MenuSpec, MenuState, menu_scene_at};
 use super::table::{SortProjection, header_scene, row_scene};
 use crate::icons::{IconPlates, inline_icon_scene, stamp_inline_icon};
 use crate::palette::{space_12, ui_palette};
-use crate::widgets::controls::{ControlTone, ControlVisual, pill_scene};
+use crate::widgets::controls::{ControlTone, ControlVisual, control_background, pill_scene};
 use crate::widgets::table::visible_columns;
 
 fn headless_scene_app() -> App {
@@ -222,4 +223,49 @@ fn pill_scene_keeps_token_padding_and_interaction_markers_on_one_root() {
         "the pill carries the shared visual-state marker"
     );
     assert!(world.despawn(root));
+}
+
+#[test]
+fn table_rows_read_through_the_canvas_and_alternate_the_theme_zebra() {
+    // The reference surface's row contract: an even unselected row is open
+    // (the page canvas reads through it), an odd one wears the theme's zebra
+    // tint, selection and hover own the two interaction tints. A row is never
+    // a solid control panel — that flattens the whole table into one block.
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let idle = PickingInteraction::None;
+    let open = control_background(
+        &ControlVisual(ControlTone::Row { zebra: false }, false),
+        idle,
+        false,
+        &palette,
+    );
+    let striped = control_background(
+        &ControlVisual(ControlTone::Row { zebra: true }, false),
+        idle,
+        false,
+        &palette,
+    );
+    assert_eq!(open, bevy::color::Color::NONE, "an even row stays open");
+    assert_eq!(striped, palette.zebra_bg, "an odd row carries the stripe");
+    assert!(
+        striped.to_srgba().alpha >= 1.0,
+        "the stripe is pre-composited, not a second translucent veil"
+    );
+    let selected = control_background(
+        &ControlVisual(ControlTone::Row { zebra: true }, true),
+        idle,
+        false,
+        &palette,
+    );
+    assert_eq!(
+        selected, palette.selection_bg,
+        "selection wins over the stripe"
+    );
+    let hovered = control_background(
+        &ControlVisual(ControlTone::Row { zebra: false }, false),
+        PickingInteraction::Hovered,
+        false,
+        &palette,
+    );
+    assert_eq!(hovered, palette.hover_bg, "hover wins over the stripe");
 }

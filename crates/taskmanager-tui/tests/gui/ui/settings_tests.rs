@@ -103,10 +103,16 @@ fn form_tokens_match_the_config_vocabulary() {
     assert_eq!(form.mode_token(), "System");
     form.mode = 0;
     assert_eq!(form.mode_token(), "Light");
+    // The bundled segment persists each role's own face, so one product's
+    // config names the family the next product paints.
     form.ui_font = 1;
     assert_eq!(form.ui_font_token(), "MiSans VF");
-    form.mono_font = 2;
+    form.mono_font = 1;
     assert_eq!(form.mono_font_token(), "Roboto Mono");
+    form.ui_font = 0;
+    form.mono_font = 0;
+    assert_eq!(form.ui_font_token(), "system");
+    assert_eq!(form.mono_font_token(), "system");
     form.density = 1;
     assert_eq!(form.density_token(), "Compact");
 }
@@ -117,7 +123,7 @@ fn form_seeds_from_opaque_config_tokens_with_unknown_fallbacks() {
         "KDE",
         "System",
         true,
-        "",
+        "system",
         "Roboto Mono",
         "Compact",
         (true, Some((22 * 60, 7 * 60))),
@@ -125,16 +131,43 @@ fn form_seeds_from_opaque_config_tokens_with_unknown_fallbacks() {
     assert_eq!(form.skin, 1);
     assert_eq!(form.mode, 3);
     assert!(form.hc);
-    assert_eq!(form.ui_font, 0);
-    assert_eq!(form.mono_font, 2);
+    assert_eq!(form.ui_font, 0, "the explicit system token is segment 0");
+    assert_eq!(
+        form.mono_font, 1,
+        "a bundled mono face is the bundled segment"
+    );
     assert_eq!(form.density, 1);
     assert!(form.notify_enabled);
     assert_eq!(form.quiet_start, 22);
     assert_eq!(form.quiet_end, 7);
 
-    let defaults =
-        SettingsForm::from_config_tokens("", "", false, "unknown", "unknown", "", (false, None));
+    // Nothing recorded is the shipped default: bundled faces, follow-native
+    // mode, GNOME skin, comfortable rows.
+    let defaults = SettingsForm::from_config_tokens("", "", false, "", "", "", (false, None));
     assert_eq!(defaults, SettingsForm::default());
+
+    // A family the terminal never observed cannot become a primary choice: the
+    // row fails closed to the host segment, exactly as the desktop products do.
+    let unknown = SettingsForm::from_config_tokens(
+        "unknown",
+        "unknown",
+        false,
+        "Made Up",
+        "Made Up",
+        "unknown",
+        (false, None),
+    );
+    assert_eq!(
+        (unknown.skin, unknown.mode, unknown.density),
+        (0, 3, 0),
+        "unknown skin/mode/density tokens keep the product defaults"
+    );
+    assert_eq!(
+        (unknown.ui_font, unknown.mono_font),
+        (0, 0),
+        "an unobserved family resolves to the host segment"
+    );
+    assert_eq!(unknown.ui_font_token(), "system");
 }
 
 /// G-22: every language index round-trips through its persisted token,

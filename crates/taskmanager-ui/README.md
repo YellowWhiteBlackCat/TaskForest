@@ -55,6 +55,8 @@ src/overlays.rs                   overlay components
 │   ├── context_menu.rs  dialog.rs  dropdown_menu.rs
 │   ├── popup.rs  layer_stack.rs  toast.rs
 src/layout.rs  layout/adaptive_grid.rs    page viewport/scaffold and grid
+src/presentation_binding.rs      ADR-064: theme-value lift and control/motion
+                                 resolution into GPUI window rem and animations
 src/focus.rs                      modal focus trap/restore
 src/styled.rs                     palette-driven style helpers
 src/icons_binding.rs  theme_binding.rs    icon and theme integration

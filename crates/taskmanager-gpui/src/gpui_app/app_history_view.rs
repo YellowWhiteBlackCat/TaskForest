@@ -34,11 +34,12 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget};
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
+use taskmanager_ui_contract::presentation::vocabulary::LayoutProfile;
 
 const TREND_W: f32 = 160.0;
 const PROCESS_PEAK_W: f32 = 104.0;

@@ -57,7 +57,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::text::{FontSize, TextBackgroundColor, TextColor, TextFont, TextSpan};
+use bevy::text::{TextBackgroundColor, TextColor, TextFont, TextSpan};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     PositionType, UiRect, Val, percent, px, rem,

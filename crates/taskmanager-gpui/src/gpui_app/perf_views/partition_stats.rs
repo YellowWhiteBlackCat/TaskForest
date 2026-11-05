@@ -18,7 +18,7 @@ use taskforest_core::core::metrics::DiskPartition;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_shell::presentation::device_status_i18n_key;
-use taskmanager_theme::Theme;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::primitives::tooltip::{Tooltip, TooltipHost};
 
@@ -37,9 +37,9 @@ pub(super) fn partition_panel(
     units: UnitPreferences,
 ) -> Div {
     let mut panel = CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_10)
-        .radius(tokens::control_radius(theme))
+        .radius(tokens::card_radius(theme))
         .bordered(true)
         .child(
             div()
@@ -169,6 +169,7 @@ fn partition_row(
                 .top_0()
                 .bottom_0()
                 .w(relative(fraction))
+                .rounded_full()
                 .bg(fill(theme.disk)),
             index,
             "fill",

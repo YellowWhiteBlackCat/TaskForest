@@ -1,16 +1,17 @@
 use super::{
-    DEFAULT_APP_ID, FontAvailability, font_pref_from_config, mode_from_token, page_from_token,
-    page_token, resolve_app_id, resolve_startup_page, skin_from_token, startup_page_from_token,
-    text_rendering_from_token, text_rendering_mode_from_token,
-};
-use super::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, LightDark, Skin, TEXT_RENDERING_PLATFORM_DEFAULT,
-    color_scheme_from_token,
+    DEFAULT_APP_ID, apply_cfg_to_theme, page_from_token, page_token, resolve_app_id,
+    resolve_startup_page, startup_page_from_token, text_rendering_from_token,
+    text_rendering_mode_from_token,
 };
 use crate::gpui_app::root::navigation::TopPage;
 use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
+    TEXT_RENDERING_PLATFORM_DEFAULT,
+};
+use taskmanager_theme::{
+    FONT_MISANS_VF, FONT_ROBOTO_MONO, FONT_TOKEN_SYSTEM, FontAvailability, FontChoice,
+    FontPreference, HighContrast, LightDark, ModePreference, ResolvedFonts, Skin, Theme,
 };
 
 fn availability() -> FontAvailability {
@@ -55,32 +56,91 @@ fn unknown_or_empty_page_token_falls_back_to_performance() {
     );
 }
 
+/// The axis codec is the theme owner's (ADR-063); these are the resolutions
+/// GPUI applies to a stored config, asserted here because the launch path depends
+/// on them.
 #[test]
 fn skin_and_mode_tokens_are_trimmed_case_insensitive_with_aliases() {
-    assert_eq!(skin_from_token(" KDE "), Some(Skin::Kde));
-    assert_eq!(skin_from_token("windows"), Some(Skin::Windows));
-    assert_eq!(skin_from_token("win"), Some(Skin::Windows));
-    assert_eq!(skin_from_token("mac"), Some(Skin::Macos));
-    assert_eq!(skin_from_token(""), None);
-    assert_eq!(skin_from_token("plasma"), None);
-    assert_eq!(mode_from_token("LIGHT"), Some(LightDark::Light));
-    assert_eq!(mode_from_token("dark"), Some(LightDark::Dark));
-    assert_eq!(mode_from_token("Eye-Forest"), Some(LightDark::EyeForest));
-    assert_eq!(mode_from_token("auto"), None);
+    assert_eq!(Skin::from_config_token(" KDE "), Some(Skin::Kde));
+    assert_eq!(Skin::from_config_token("windows"), Some(Skin::Windows));
+    assert_eq!(Skin::from_config_token("win"), Some(Skin::Windows));
+    assert_eq!(Skin::from_config_token("mac"), Some(Skin::Macos));
+    assert_eq!(Skin::from_config_token(""), None);
+    assert_eq!(Skin::from_config_token("plasma"), None);
+    assert_eq!(
+        ModePreference::from_config_token("LIGHT").explicit(),
+        Some(LightDark::Light)
+    );
+    assert_eq!(
+        ModePreference::from_config_token("dark").explicit(),
+        Some(LightDark::Dark)
+    );
+    assert_eq!(
+        ModePreference::from_config_token("Eye-Forest").explicit(),
+        Some(LightDark::EyeForest)
+    );
+    assert_eq!(ModePreference::from_config_token("auto").explicit(), None);
+}
+
+/// An unrecorded or unknown token must never displace the detected theme: the
+/// launch path keeps the appearance it resolved from the desktop.
+#[test]
+fn apply_cfg_preserves_detected_axes_for_unrecorded_tokens() {
+    let detected = Theme::build(
+        Skin::Windows,
+        LightDark::EyeForest,
+        HighContrast::Off,
+        ResolvedFonts::system_for(Skin::Windows),
+    );
+
+    let mut untouched = detected;
+    apply_cfg_to_theme(&mut untouched, &Config::default());
+    assert_eq!(untouched.skin, Skin::Windows, "empty skin keeps detection");
+    assert_eq!(untouched.mode, LightDark::EyeForest);
+    assert!(!untouched.hc);
+
+    let mut recorded = detected;
+    let cfg = Config {
+        skin: "KDE".to_string(),
+        mode: COLOR_SCHEME_LIGHT.to_string(),
+        hc: true,
+        ..Config::default()
+    };
+    apply_cfg_to_theme(&mut recorded, &cfg);
+    assert_eq!(
+        (recorded.skin, recorded.mode, recorded.hc),
+        (Skin::Kde, LightDark::Light, true)
+    );
+
+    let mut hostile = detected;
+    let cfg = Config {
+        skin: "cinnamon".to_string(),
+        mode: "sepia".to_string(),
+        ..Config::default()
+    };
+    apply_cfg_to_theme(&mut hostile, &cfg);
+    assert_eq!(
+        hostile.skin,
+        Skin::Windows,
+        "an unknown skin is not a palette"
+    );
+    assert_eq!(hostile.mode, LightDark::EyeForest);
 }
 
 #[test]
 fn color_scheme_tokens_preserve_system_and_legacy_modes() {
-    assert_eq!(color_scheme_from_token("system"), COLOR_SCHEME_SYSTEM);
-    assert_eq!(color_scheme_from_token("SYSTEM"), COLOR_SCHEME_SYSTEM);
-    assert_eq!(color_scheme_from_token("light"), COLOR_SCHEME_LIGHT);
-    assert_eq!(color_scheme_from_token("Dark"), COLOR_SCHEME_DARK);
+    let resolve = |token: &str| ModePreference::from_config_token(token).config_token();
+    assert_eq!(resolve("system"), COLOR_SCHEME_SYSTEM);
+    assert_eq!(resolve("SYSTEM"), COLOR_SCHEME_SYSTEM);
+    assert_eq!(resolve("light"), COLOR_SCHEME_LIGHT);
+    assert_eq!(resolve("Dark"), COLOR_SCHEME_DARK);
+    assert_eq!(resolve("eye-forest"), COLOR_SCHEME_EYEFOREST);
+    assert_eq!(resolve(""), COLOR_SCHEME_SYSTEM);
     assert_eq!(
-        color_scheme_from_token("eye-forest"),
-        COLOR_SCHEME_EYEFOREST
+        resolve("future"),
+        COLOR_SCHEME_SYSTEM,
+        "a newer config cannot force a palette"
     );
-    assert_eq!(color_scheme_from_token(""), COLOR_SCHEME_SYSTEM);
-    assert_eq!(color_scheme_from_token("future"), COLOR_SCHEME_SYSTEM);
 }
 
 #[test]
@@ -185,7 +245,8 @@ fn bundled_font_tokens_resolve_to_bundled_choice() {
         mono_font: FONT_ROBOTO_MONO.to_string(),
         ..Config::default()
     };
-    let pref = font_pref_from_config(&bundled, &availability());
+    let pref =
+        FontPreference::from_config_tokens(&bundled.ui_font, &bundled.mono_font, &availability());
     assert_eq!(pref.ui, FontChoice::Bundled);
     assert_eq!(pref.mono, FontChoice::Bundled);
 
@@ -196,7 +257,8 @@ fn bundled_font_tokens_resolve_to_bundled_choice() {
         mono_font: FONT_MISANS_VF.to_string(),
         ..Config::default()
     };
-    let pref = font_pref_from_config(&legacy, &availability());
+    let pref =
+        FontPreference::from_config_tokens(&legacy.ui_font, &legacy.mono_font, &availability());
     assert_eq!(pref.ui, FontChoice::Bundled);
     assert_eq!(pref.mono, FontChoice::System);
 }
@@ -208,16 +270,21 @@ fn bundled_font_tokens_resolve_to_bundled_choice() {
 #[test]
 fn an_absent_font_token_is_the_bundled_product_default() {
     let absent = Config::default();
-    let pref = font_pref_from_config(&absent, &availability());
+    let pref =
+        FontPreference::from_config_tokens(&absent.ui_font, &absent.mono_font, &availability());
     assert_eq!(pref.ui, FontChoice::Bundled);
     assert_eq!(pref.mono, FontChoice::Bundled);
 
     let explicit_system = Config {
-        ui_font: super::FONT_TOKEN_SYSTEM.to_string(),
-        mono_font: super::FONT_TOKEN_SYSTEM.to_string(),
+        ui_font: FONT_TOKEN_SYSTEM.to_string(),
+        mono_font: FONT_TOKEN_SYSTEM.to_string(),
         ..Config::default()
     };
-    let pref = font_pref_from_config(&explicit_system, &availability());
+    let pref = FontPreference::from_config_tokens(
+        &explicit_system.ui_font,
+        &explicit_system.mono_font,
+        &availability(),
+    );
     assert_eq!(pref.ui, FontChoice::System);
     assert_eq!(pref.mono, FontChoice::System);
 }
@@ -229,7 +296,7 @@ fn unknown_font_tokens_fall_back_to_system() {
         mono_font: "Comic Sans".to_string(),
         ..Config::default()
     };
-    let pref = font_pref_from_config(&cfg, &availability());
+    let pref = FontPreference::from_config_tokens(&cfg.ui_font, &cfg.mono_font, &availability());
     assert_eq!(pref.ui, FontChoice::System);
     assert_eq!(pref.mono, FontChoice::System);
 }
@@ -243,7 +310,7 @@ fn an_observed_system_family_round_trips_as_a_custom_choice() {
         mono_font: FONT_ROBOTO_MONO.to_string(),
         ..Config::default()
     };
-    let pref = font_pref_from_config(&cfg, &availability);
+    let pref = FontPreference::from_config_tokens(&cfg.ui_font, &cfg.mono_font, &availability);
     assert_eq!(pref.ui, FontChoice::Custom("Fira Code"));
     assert_eq!(pref.mono, FontChoice::Bundled);
 }

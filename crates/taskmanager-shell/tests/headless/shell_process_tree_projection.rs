@@ -186,6 +186,10 @@ fn semantic_adapter_appends_typed_rows_in_canonical_order() {
         &rows,
         |index| visible.get(index).copied(),
         |row, process| match row {
+            ProcessTreeRow::Container { metadata, .. } => metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
             ProcessTreeRow::Category { category, .. } => format!("{category:?}"),
             ProcessTreeRow::Application { .. } => process
                 .map(|process| process.name.clone())
@@ -343,6 +347,10 @@ fn missing_application_identity_gets_unique_projection_local_non_actionable_ids(
         &rows,
         |index| visible.get(index).copied(),
         |row, process| match row {
+            ProcessTreeRow::Container { metadata, .. } => metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
             ProcessTreeRow::Category { category, .. } => format!("{category:?}"),
             ProcessTreeRow::Application { .. } => process
                 .map(|process| process.name.clone())

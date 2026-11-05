@@ -9,6 +9,7 @@ use iced::widget::{column, text};
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
 use taskmanager_shell::presentation::about::metadata;
+use taskmanager_theme::tokens;
 
 pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
     let metadata = metadata(
@@ -18,11 +19,16 @@ pub(super) fn render(app: &crate::IcedApp) -> IcedElement<'_> {
     );
     let body = styled_scrollable(
         column![
-            text(metadata.name).size(22),
+            // The GPUI About surface paints its product name on the public
+            // type scale at the header weight; this is the same rung, not a
+            // per-frontend number (ADR-063).
+            text(metadata.name).size(f32::from(tokens::FONT_18)).font(
+                crate::theme_binding::ui_font_weight(app.theme(), tokens::FONT_WEIGHT_HEADER,)
+            ),
             text(metadata.description),
             text(metadata.details_text())
         ]
-        .spacing(12)
+        .spacing(f32::from(tokens::SPACE_12))
         .width(Length::Fill),
     )
     .height(Length::Fill)

@@ -36,6 +36,7 @@ use bevy::ui::{
 };
 use bevy::ui_widgets::{Activate, Button};
 
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::icons::icon_scene;
 use crate::pages::performance::metrics::{
     MountAlert, NvmeGauge, PartitionDonut, SmartHealthBadge, SmartToolGuidance, WearBand,
@@ -497,19 +498,31 @@ pub(crate) fn storage_surface_scene(
         children.push(guidance_scene(&guidance, palette));
     }
     let id = disk.device_id.clone();
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows: _,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     Box::new(bsn! {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+            padding: UiRect::all(Val::Rem(
+                palette.panel_content_inset_rem().max(palette.rem_ratio(space_8()))
+            )),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
             overflow: Overflow::clip_y(),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        bevy::ui::BorderColor::all(edge)
         StorageSurface { disk: { id }, signature: { signature } }
         StorageExpand { progress: { progress } }
-        Children [ { children } ]
+        Children [ @{ grain } -- { children } ]
     })
 }
 

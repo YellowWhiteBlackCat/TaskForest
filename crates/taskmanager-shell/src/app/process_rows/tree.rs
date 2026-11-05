@@ -9,21 +9,35 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
-use taskforest_core::core::process::aggregate::AggregateMetric;
-use taskforest_core::core::process::aggregate::aggregate_u32_widened;
+use taskforest_core::core::FailureKind;
+use taskforest_core::core::process::aggregate::{AggregateMetric, aggregate_u32_widened};
 use taskforest_core::core::process::{
-    ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode, build_process_tree, process_category,
+    ContainerMetadata, ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode,
+    build_process_tree, process_category,
 };
 use taskmanager_application::process_category_projection::{
     category_buckets, category_expansion_key, process_memory_observation_for_display,
 };
 use taskmanager_application::process_sort::compare_processes;
 
-use super::ProcessRowId;
+use super::{ProcessRowId, container_group_rows};
 use crate::app::{SortCol, SortDir, sort_axis};
 
 /// Expansion-key prefix for an application-root row.
 pub const APP_TREE_EXPANSION_KEY_PREFIX: &str = "app-tree:";
+
+/// Expansion-key prefix for one observed container bucket.
+pub const CONTAINER_EXPANSION_KEY_PREFIX: &str = "container:";
+
+/// Build the locale-neutral expansion key of one container bucket.
+#[must_use]
+pub fn container_expansion_key(metadata: &ContainerMetadata) -> String {
+    format!(
+        "{CONTAINER_EXPANSION_KEY_PREFIX}{}:{}",
+        metadata.runtime.display_label(),
+        metadata.container_id,
+    )
+}
 
 /// The two aggregate facts shared by every group header.
 #[derive(Clone, Debug, PartialEq)]
@@ -40,6 +54,31 @@ pub struct ProcessRowAggregate {
 }
 
 impl ProcessRowAggregate {
+    /// Build the subset of aggregate facts a container bucket observes.
+    ///
+    /// Container grouping owns CPU and resident memory only. Every other
+    /// metric stays absent rather than borrowing a member's value or
+    /// fabricating a zero.
+    #[must_use]
+    pub fn container(cpu: AggregateMetric<f32>, memory: AggregateMetric<u64>) -> Self {
+        let failure = cpu
+            .availability()
+            .failure()
+            .unwrap_or(FailureKind::Unsupported);
+        let unavailable_u64 = || AggregateMetric::<u64>::unavailable(failure);
+        Self {
+            cpu,
+            memory,
+            memory_pss: unavailable_u64(),
+            swap: unavailable_u64(),
+            disk_read: unavailable_u64(),
+            disk_write: unavailable_u64(),
+            cpu_time: unavailable_u64(),
+            threads: unavailable_u64(),
+            fds: unavailable_u64(),
+        }
+    }
+
     /// Availability-bearing CPU total.
     #[must_use]
     pub const fn cpu(&self) -> &AggregateMetric<f32> {
@@ -105,6 +144,15 @@ impl ProcessRowAggregate {
 /// but cannot become an exact control target.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcessTreeRow {
+    /// One observed container bucket. Its header is structural and owns no
+    /// process target; the member live keys are exact when available.
+    Container {
+        metadata: ContainerMetadata,
+        expansion_key: String,
+        expanded: bool,
+        member_count: usize,
+        aggregate: ProcessRowAggregate,
+    },
     /// One non-empty process category. It is structural and never actionable.
     Category {
         category: ProcessCategory,
@@ -142,7 +190,7 @@ impl ProcessTreeRow {
     #[must_use]
     pub const fn visible_index(&self) -> Option<usize> {
         match self {
-            Self::Category { .. } => None,
+            Self::Category { .. } | Self::Container { .. } => None,
             Self::Application { visible_index, .. } | Self::Process { visible_index, .. } => {
                 Some(*visible_index)
             }
@@ -153,7 +201,7 @@ impl ProcessTreeRow {
     #[must_use]
     pub const fn row_key(&self) -> Option<ProcessRowId> {
         match self {
-            Self::Category { .. } => None,
+            Self::Category { .. } | Self::Container { .. } => None,
             Self::Application { row_key, .. } | Self::Process { row_key, .. } => *row_key,
         }
     }
@@ -164,7 +212,7 @@ impl ProcessTreeRow {
     #[must_use]
     pub const fn parent_key(&self) -> Option<ProcessRowId> {
         match self {
-            Self::Category { .. } => None,
+            Self::Category { .. } | Self::Container { .. } => None,
             Self::Application { parent_key, .. } => Some(*parent_key),
             Self::Process { parent_key, .. } => *parent_key,
         }
@@ -174,7 +222,7 @@ impl ProcessTreeRow {
     #[must_use]
     pub const fn depth(&self) -> usize {
         match self {
-            Self::Category { .. } => 0,
+            Self::Category { .. } | Self::Container { .. } => 0,
             Self::Application { .. } => 1,
             Self::Process { depth, .. } => *depth,
         }
@@ -183,7 +231,10 @@ impl ProcessTreeRow {
     /// Whether this row is a group header rather than an individual process.
     #[must_use]
     pub const fn is_group(&self) -> bool {
-        matches!(self, Self::Category { .. } | Self::Application { .. })
+        matches!(
+            self,
+            Self::Category { .. } | Self::Container { .. } | Self::Application { .. }
+        )
     }
 
     /// Expansion token for a category or application header.
@@ -193,6 +244,7 @@ impl ProcessTreeRow {
             Self::Category { expansion_key, .. } | Self::Application { expansion_key, .. } => {
                 Some(expansion_key)
             }
+            Self::Container { expansion_key, .. } => Some(expansion_key),
             Self::Process { .. } => None,
         }
     }
@@ -201,9 +253,9 @@ impl ProcessTreeRow {
     #[must_use]
     pub const fn aggregate(&self) -> Option<&ProcessRowAggregate> {
         match self {
-            Self::Category { aggregate, .. } | Self::Application { aggregate, .. } => {
-                Some(aggregate)
-            }
+            Self::Category { aggregate, .. }
+            | Self::Container { aggregate, .. }
+            | Self::Application { aggregate, .. } => Some(aggregate),
             Self::Process { .. } => None,
         }
     }
@@ -229,6 +281,37 @@ pub fn project_process_tree_rows(
         .map(|(index, process)| (process.pid, index))
         .collect();
     let mut rows = Vec::new();
+
+    for group in container_group_rows(processes, observed_at_ms) {
+        let expansion_key = container_expansion_key(group.metadata());
+        let expanded = expanded_groups.contains(&expansion_key);
+        rows.push(ProcessTreeRow::Container {
+            metadata: group.metadata().clone(),
+            expansion_key,
+            expanded,
+            member_count: group.member_count(),
+            aggregate: ProcessRowAggregate::container(group.cpu().clone(), group.memory().clone()),
+        });
+        if !expanded {
+            continue;
+        }
+        for identity in group.member_live_keys() {
+            let Some(visible_index) = processes
+                .iter()
+                .position(|process| ProcessLiveKey::from_process(process) == Some(*identity))
+            else {
+                continue;
+            };
+            rows.push(ProcessTreeRow::Process {
+                visible_index,
+                row_key: Some(ProcessRowId::Process(*identity)),
+                parent_key: None,
+                depth: 1,
+                has_children: false,
+                collapsed: false,
+            });
+        }
+    }
 
     for bucket in category_buckets(processes, |process| process_category(process)) {
         let category = bucket.category();

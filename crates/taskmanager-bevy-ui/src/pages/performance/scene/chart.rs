@@ -6,101 +6,49 @@
 
 use super::hover::CurveSeries;
 use super::*;
+use crate::glass::{GlassPanelMaterial, OpticalBackdropSource, OpticalGlassCard, card_material};
 use crate::widgets::chart::canvas::{CANVAS_FILL_ALPHA, CanvasFill, CanvasGrid};
 use crate::widgets::chart::{
     ChartCanvas, ChartContent, ChartHoverLabel, ChartPaintState, ChartPointer, ChartStyle,
     ChartSurface,
 };
-use taskforest_core::core::alerts::AlertMetric;
+use crate::window::CustomTextInk;
+use bevy::picking::Pickable;
+use bevy::text::TextColor;
 use taskmanager_shell::presentation::bytes;
+use taskmanager_theme::GlassTier;
 
-/// The calibration line's thickness in px — a hairline is a real chart
-/// geometry contract, not a layout length.
-const THRESHOLD_LINE_PX: f32 = 1.0;
-/// The calibration label's offset from the line, in px.
-const THRESHOLD_LABEL_OFFSET_PX: f32 = 2.0;
+/// The value badge's edge inset and padding, matching the GPUI chart.
+const CURVE_BADGE_INSET_PX: f32 = 2.0;
+const CURVE_BADGE_PAD_X_PX: f32 = 4.0;
+const CURVE_BADGE_PAD_Y_PX: f32 = 1.5;
+const CURVE_BADGE_WASH_ALPHA: f32 = 0.18;
 /// The grid rule's thickness in px — the same hairline contract as the
-/// calibration line: a grid rule is chart geometry, not a layout length.
+/// curve: a grid rule is chart geometry, not a layout length.
 const GRID_LINE_PX: f32 = 1.0;
 
-/// Marker for the chart's alert calibration line.
-#[derive(bevy::ecs::component::Component, Clone, Copy, Debug, Default)]
-pub(crate) struct ThresholdCalibration;
-
-/// The percentage ceiling a percent curve is projected against. The
-/// calibration line rides the same scale as the polyline, so the line and
-/// the curve can never disagree about where a value sits.
+/// The percentage ceiling a percent curve is projected against.
 const PERCENT_CEILING: f32 = 100.0;
 
 /// The grid's division count, matching the reference surface.
 const GRID_DIVISIONS: usize = 5;
 
+/// The wash's peak alpha under the curve: the reference surface's gradient
+/// starts at the series ink's own 35% right below the curve and fades to
+/// nothing at the floor. The measured reference pixels resolve to ~0.37 at
+/// the curve's edge, so the shared canvas constant IS the curve's value.
+const CURVE_FILL_ALPHA: f32 = CANVAS_FILL_ALPHA;
+
 /// The emphasized quarter rules the reference surface draws under the curve.
 const GRID_REFERENCE: &[f32] = &[0.25, 0.5, 0.75];
 
-/// The alert metric a curve's threshold rule calibrates. Only the percent
-/// curves carry an alert rule; the throughput curve has no percentage
-/// threshold to mark.
-fn curve_alert_metric(curve: SystemCurve) -> Option<AlertMetric> {
-    match curve {
-        SystemCurve::Cpu => Some(AlertMetric::CpuUsagePercent),
-        SystemCurve::Memory => Some(AlertMetric::MemoryUsagePercent),
-        SystemCurve::Network | SystemCurve::Gpu | SystemCurve::Npu => None,
-    }
-}
-
-/// The enabled alert rule whose threshold calibrates a curve, with the
-/// threshold value. A disabled rule calibrates nothing: its threshold is
-/// not armed, so drawing its line would claim a bound that is not watched.
-pub(crate) fn curve_threshold(shell: &ShellApp, curve: SystemCurve) -> Option<f32> {
-    let metric = curve_alert_metric(curve)?;
-    shell
-        .projection()
-        .alert_center
-        .managed_rules()
-        .iter()
-        .find(|managed| managed.rule.metric == metric && managed.enabled)
-        .map(|managed| managed.rule.threshold)
-}
-
-/// The vertical offset of the calibration line inside the strip. The line
-/// rides the curve's own scale: the same ceiling, the same strip height.
-pub(crate) fn threshold_line_top(strip_height_px: f32, threshold: f32) -> f32 {
-    let ratio = (threshold / PERCENT_CEILING).clamp(0.0, 1.0);
-    strip_height_px * (1.0 - ratio)
-}
-
-/// The calibration line: the rule's threshold marked across the curve. The
-/// ink is the theme's critical severity color — the same token the alert
-/// banner paints, never a frontend literal.
-fn threshold_line_scene(top: f32, palette: &UiPalette) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: px(THRESHOLD_LINE_PX),
-            position_type: PositionType::Absolute,
-            left: px(0.0),
-            top: px(top),
-        }
-        BackgroundColor({ palette.danger_color })
-        ThresholdCalibration
-    })
-}
-
-/// The calibration line's label: the threshold value, on the line's own
-/// surface so it stays legible where the curve crosses it.
-fn threshold_label_scene(top: f32, label: String, palette: &UiPalette) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            position_type: PositionType::Absolute,
-            right: px(0.0),
-            top: px(top + THRESHOLD_LABEL_OFFSET_PX),
-            padding: UiRect::horizontal(px(THRESHOLD_LABEL_OFFSET_PX)),
-        }
-        BackgroundColor({ palette.panel_fill })
-        Children [ Text(label) TextRole(Role::Caption) ]
-    })
-}
+/// The summary pill's insets and bound. The reference surface pins the
+/// latest/avg/peak readout to the card's BOTTOM-LEFT corner inside a real
+/// safety band — it never rides the rounded border, and it never stacks a row
+/// under the plot that would steal the curve's vertical budget.
+const SUMMARY_BOTTOM_INSET_PX: f32 = 6.0;
+const SUMMARY_LEFT_INSET_PX: f32 = 8.0;
+const SUMMARY_MAX_WIDTH_PX: f32 = 320.0;
 
 /// The ceiling a curve is projected against: the percentage scale for the
 /// utilization curves, the measured peak for the throughput curve.
@@ -120,12 +68,12 @@ pub(crate) fn curve_ceiling(curve: SystemCurve, samples: &[f32]) -> f32 {
     }
 }
 
-/// The percent readout the scale ruler and the value pill print.
+/// The percent readout the hover pill and value badge print.
 fn percent_readout(value: f32) -> String {
     format!("{value:.0}%")
 }
 
-/// The throughput readout the scale ruler and the value pill print.
+/// The throughput readout the hover pill and value badge print.
 fn throughput_readout(value: f32) -> String {
     format!("{}/s", bytes(value.max(0.0) as u64))
 }
@@ -147,7 +95,7 @@ fn curve_style(curve: SystemCurve, palette: &UiPalette) -> ChartStyle {
         thickness: crate::widgets::chart::geometry::CHART_LINE_THICKNESS_PX,
         fill: Some(CanvasFill {
             color,
-            alpha: CANVAS_FILL_ALPHA,
+            alpha: CURVE_FILL_ALPHA,
         }),
         flow: None,
         grid: Some(CanvasGrid {
@@ -162,7 +110,7 @@ fn curve_style(curve: SystemCurve, palette: &UiPalette) -> ChartStyle {
     }
 }
 
-/// The value pill: the hovered sample's readout, riding on the canvas.
+/// The hovered sample's readout, riding on the canvas.
 fn hover_pill_scene(palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node {
@@ -180,10 +128,17 @@ fn hover_pill_scene(palette: &UiPalette) -> Box<dyn Scene> {
 }
 
 /// The strip's canvas: the continuous curve, its wash, and the grid.
+///
+/// The canvas carries the window's **slot capacity**: the frame represents
+/// that many samples, so a window holding fewer samples grows from the right
+/// edge instead of claiming the whole frame. The capacity is the shell's own
+/// history window — the same `graph_data_points` preference the other
+/// frontends read — so every frontend paints the same span.
 fn curve_canvas_scene(
     curve: SystemCurve,
     samples: Vec<f32>,
     ceiling: f32,
+    capacity: usize,
     style: ChartStyle,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
@@ -191,6 +146,7 @@ fn curve_canvas_scene(
     let content = ChartContent::Samples {
         values: samples,
         ceiling,
+        capacity,
     };
     bsn! {
         Node {
@@ -206,44 +162,99 @@ fn curve_canvas_scene(
         ChartSurface({ points })
         ChartPointer
         ChartPaintState
+        OpticalBackdropSource {
+            enabled: {curve == SystemCurve::default()},
+            grid: {style.grid},
+        }
         CurveSeries(curve)
         Children [ @{ hover_pill_scene(palette) } ]
     }
 }
 
-/// The scale ruler's labels: the curve's own scale, read top to bottom.
-pub(crate) fn ruler_labels(curve: SystemCurve, ceiling: f32) -> Vec<String> {
-    let readout = curve_readout(curve);
-    [1.0_f32, 0.75, 0.5, 0.25, 0.0]
-        .iter()
-        .map(|fraction| readout(ceiling * fraction))
-        .collect()
+/// The newest sample's pill: the GPUI chart's always-on readout. It stays
+/// absent until a finite observation exists, so gaps never become values.
+fn curve_badge_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
+    let ink = curve.color(palette);
+    let wash = ink.with_alpha(CURVE_BADGE_WASH_ALPHA);
+    let latest = curve_badge_text(shell, curve);
+    let display = if latest.is_some() {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    let text = latest.unwrap_or_default();
+    Box::new(bsn! {
+        Node {
+            position_type: PositionType::Absolute,
+            right: px(CURVE_BADGE_INSET_PX),
+            top: px(CURVE_BADGE_INSET_PX),
+            display: display,
+            padding: UiRect::axes(
+                px(CURVE_BADGE_PAD_X_PX),
+                px(CURVE_BADGE_PAD_Y_PX),
+            ),
+            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+        }
+        CurveBadge({ curve })
+        BackgroundColor({ wash })
+        Children [
+            Text(text)
+            TextRole(Role::Caption)
+            TextColor({ ink })
+            CustomTextInk
+            TextLayout { linebreak: LineBreak::NoWrap }
+            DynText(DynField::CurveBadge({ curve }))
+        ]
+    })
 }
 
-/// The scale ruler beside the strip: the percentages (or rates) the curve's
-/// own scale marks.
-fn ruler_scene(curve: SystemCurve, ceiling: f32, palette: &UiPalette) -> impl Scene + use<> {
-    let labels: Vec<Box<dyn Scene>> = ruler_labels(curve, ceiling)
-        .into_iter()
-        .map(|label| {
-            Box::new(bsn! {
-                Text(label)
-                TextRole(Role::Caption)
-                TextLayout { linebreak: LineBreak::NoWrap }
-            }) as Box<dyn Scene>
-        })
-        .collect();
-    bsn! {
+/// The chart's latest/avg/peak readout, overlaid on the card's bottom-left
+/// corner. It is a glass pill in its own right — the card material gives it
+/// the same edge and radius contract the reference surface uses — so it reads
+/// as a surface, not as loose text floating over the grid, and it occludes the
+/// plot behind it instead of competing with it.
+fn summary_pill_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows: _,
+        edge_width_rem,
+        radius_rem: _,
+        grain: _,
+    } = card_material(palette);
+    let items = [
+        SummaryItem::Latest,
+        SummaryItem::Average,
+        SummaryItem::Maximum,
+    ]
+    .into_iter()
+    .map(|item| {
+        let caption = super::super::metrics::curve_caption_item(shell, curve, item);
+        Box::new(bsn! {
+            Text(caption)
+            TextRole(Role::Caption)
+            TextLayout { linebreak: LineBreak::NoWrap }
+            DynText(DynField::CurveCaptionItem(curve, item))
+        }) as Box<dyn Scene>
+    })
+    .collect::<Vec<_>>();
+    Box::new(bsn! {
         Node {
-            width: rem(palette.control_height_rem * 3.0),
-            height: percent(100),
-            flex_shrink: 0.0,
-            flex_direction: FlexDirection::Column,
-            justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::FlexEnd,
+            position_type: PositionType::Absolute,
+            bottom: px(SUMMARY_BOTTOM_INSET_PX),
+            left: px(SUMMARY_LEFT_INSET_PX),
+            max_width: px(SUMMARY_MAX_WIDTH_PX),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(space_12()),
+            padding: UiRect::axes(px(space_8()), px(space_2())),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
         }
-        Children [ { labels } ]
-    }
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        Pickable::IGNORE
+        Children [{ items }]
+    })
 }
 
 pub(crate) fn curve_card_scene(
@@ -251,16 +262,18 @@ pub(crate) fn curve_card_scene(
     shell: &ShellApp,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let title = curve.title();
     let caption = curve_caption(shell, curve);
     // The strip budget rides the rem axis: the scene declares the rem ratio
     // and the curve resolves the same budget in px against the live rem size,
     // so the chart and its geometry can never disagree.
-    let strip_height_rem = palette.control_height_rem * 3.0;
-    let strip_height_px = strip_height_rem * palette.rem_px;
+    let strip_height_rem = palette.control_height_rem * 10.0;
     let samples = curve_samples(shell, curve);
     let warm = curve_warm(&samples);
     let ceiling = curve_ceiling(curve, &samples);
+    // The frame's slot capacity: the shell's own history window, which the
+    // persisted `graph_data_points` preference sets. Every frontend reads the
+    // same window, so every frontend paints the same span.
+    let capacity = shell.history.capacity();
     let style = curve_style(curve, palette);
     // GPUI's compact performance surface keeps one selected hero graph in
     // view. The selector swaps this card in place; hidden cards retain their
@@ -280,67 +293,52 @@ pub(crate) fn curve_card_scene(
     } else {
         None
     };
-    // The alert threshold calibrates the curve: an enabled rule for the
-    // curve's metric marks its bound across the strip, on the curve's own
-    // scale.
-    let threshold = curve_threshold(shell, curve);
-    let calibration: Vec<Box<dyn Scene>> = match threshold {
-        Some(threshold) => {
-            let top = threshold_line_top(strip_height_px, threshold);
-            vec![
-                threshold_line_scene(top, palette),
-                threshold_label_scene(top, format!("≥{threshold:.0}%"), palette),
-            ]
-        }
-        None => Vec::new(),
-    };
+    let badge = curve_badge_scene(curve, shell, palette);
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows: _,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             flex_grow: 1.0,
             min_width: rem(palette.control_height_rem * 6.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_2()),
-            padding: UiRect::all(Val::Px(space_2())),
+            padding: UiRect::all(Val::Rem(palette.panel_content_inset_rem())),
             display: display,
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        OpticalGlassCard {
+            tier: {GlassTier::Card},
+            enabled: {curve == SystemCurve::default()},
+        }
         CurveCard(curve)
         CurveGate(curve)
         Children [
-             Text(title) TextRole(Role::Caption) --
-
+             @{ grain } --
                 Node {
                     width: percent(100),
-                    height: rem(strip_height_rem),
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(space_2()),
+                    flex_grow: 1.0,
+                    flex_basis: px(0.0),
+                    min_height: rem(strip_height_rem),
                     position_type: PositionType::Relative,
-                    overflow: Overflow::clip_x(),
+                    overflow: Overflow::clip(),
                 }
                 Children [
-                     Node {
-                         flex_grow: 1.0,
-                         min_width: px(0.0),
-                         height: percent(100),
-                         position_type: PositionType::Relative,
-                         overflow: Overflow::clip_x(),
-                     }
-                     Children [
-                          @{ curve_canvas_scene(curve, samples, ceiling, style, palette) } --
-                          { calibration } --
-                          @{ overlay }
-                     ]
-                 --
-                     @{ ruler_scene(curve, ceiling, palette) }
+                     @{ curve_canvas_scene(curve, samples, ceiling, capacity, style, palette) } --
+                     @{ badge } --
+                     @{ overlay }
                 ]
             --
             @{ power } --
-
-                Text(caption)
-                TextRole(Role::Caption)
-                DynText(DynField::CurveCaption(curve))
-
+            @{ summary_pill_scene(curve, shell, palette) }
         ]
     }
 }

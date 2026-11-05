@@ -1,8 +1,7 @@
 use super::*;
 use taskforest_core::core::metrics::CpuFrequencySource;
 use taskmanager_application::i18n::Language::En;
-use taskmanager_application::i18n::set_language;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{Language, set_language, t, with_language};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
@@ -15,14 +14,14 @@ fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
     let mut bogomips_only = snapshot.clone();
     bogomips_only.cpu.frequency_source = CpuFrequencySource::BogoMips;
 
-    let rows = health_rows(&bogomips_only, Language::En);
+    let rows = health_rows(&bogomips_only);
     // A BogoMIPS-only host must read the BogoMIPS readout, never "MHz".
     let cpu = rows.iter().find(|row| row.label == "CPU").expect("CPU row");
     assert!(cpu.value.contains("BogoMIPS"));
     assert!(!cpu.value.contains("MHz"));
 
     // The untouched native fixture stays an MHz clock.
-    let native = health_rows(snapshot, Language::En);
+    let native = health_rows(snapshot);
     let native_cpu = native
         .iter()
         .find(|row| row.label == "CPU")
@@ -137,7 +136,7 @@ fn health_rows_cover_every_domain_with_fixture_values() {
     set_language(En);
     let shell = demo_app();
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
-    let rows = health_rows(snapshot, Language::En);
+    let rows = health_rows(snapshot);
 
     assert_eq!(rows.len(), 8);
     let row = |label: &str| rows.iter().find(|row| row.label == label).expect(label);
@@ -156,7 +155,7 @@ fn health_rows_cover_every_domain_with_fixture_values() {
 #[test]
 fn health_rows_stay_honest_when_domains_are_absent() {
     let snapshot = SystemSnapshot::default();
-    let rows = health_rows(&snapshot, Language::En);
+    let rows = health_rows(&snapshot);
     assert_eq!(rows.len(), 7);
     for row in &rows {
         assert!(!row.healthy, "{} must not claim health", row.label);
@@ -186,7 +185,7 @@ fn health_rows_resolve_labels_and_values_in_both_locales() {
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
 
     let labels = |language: Language| {
-        health_rows(snapshot, language)
+        with_language(language, || health_rows(snapshot))
             .into_iter()
             .map(|row| row.label)
             .collect::<Vec<_>>()
@@ -212,7 +211,7 @@ fn health_rows_resolve_labels_and_values_in_both_locales() {
     );
 
     let value = |language: Language, label: &str| {
-        health_rows(snapshot, language)
+        with_language(language, || health_rows(snapshot))
             .into_iter()
             .find(|row| row.label == label)
             .expect(label)
@@ -236,93 +235,64 @@ fn health_rows_resolve_labels_and_values_in_both_locales() {
 }
 
 /// The modal chrome (subtitle), status cells, thermal badge tags, and the two
-/// sensor-panel headings resolve in both locales. The status cells reuse the
-/// shared verdict/absence vocabulary the TUI health overlay already renders.
+/// sensor-panel headings resolve in both locales through the shared catalog.
+/// The status cells reuse the shared verdict/absence vocabulary the TUI health
+/// overlay already renders.
 #[test]
 fn health_modal_chrome_resolves_in_both_locales() {
     for (key, en, zh) in [
         (
-            Key::HealthObservedHint,
-            "Observed samples only · Esc closes",
-            "仅显示已观测样本 · Esc 关闭",
+            "health.observed_hint",
+            "Observed samples only \u{b7} Esc closes",
+            "仅显示已观测样本 \u{b7} Esc 关闭",
         ),
         (
-            Key::HealthThermalHeatmap,
+            "health.thermal_heatmap",
             "Thermal Heatmap & Sensors",
             "温度热图与传感器",
         ),
         (
-            Key::HealthSensorsThermal,
+            "health.sensors_thermal",
             "Sensors & Thermal Health",
             "传感器与温度健康",
         ),
-        (Key::HealthVerdictOk, "ok", "正常"),
-        (Key::HealthUnavailable, "Unavailable", "不可用"),
-        (Key::HealthThermalCool, "Cool", "凉爽"),
-        (Key::HealthThermalNormal, "Normal", "正常"),
-        (Key::HealthThermalWarm, "Warm", "偏热"),
-        (Key::HealthThermalHot, "Hot", "过热"),
+        ("health.verdict_ok", "ok", "正常"),
+        ("health.unavailable", "Unavailable", "不可用"),
+        ("health.thermal_cool", "Cool", "凉爽"),
+        ("health.thermal_normal", "Normal", "正常"),
+        ("health.thermal_warm", "Warm", "偏热"),
+        ("health.thermal_hot", "Hot", "过热"),
     ] {
-        assert_eq!(i18n::t(Language::En, key), en, "{key:?} en");
-        assert_eq!(i18n::t(Language::Zh, key), zh, "{key:?} zh");
+        assert_eq!(with_language(Language::En, || t(key)), en, "{key} en");
+        assert_eq!(with_language(Language::Zh, || t(key)), zh, "{key} zh");
     }
 }
 
-/// One expectation per shared product term the iced summary renders: the iced
-/// key, the shared catalog code it mirrors, and the string both dictionaries
-/// must resolve in each locale. `health_dictionary_resolves_the_shared_terms`
-/// checks the iced side and `health_shared_catalog_carries_the_same_terms`
-/// checks the shared side against the same table, so either dictionary
-/// drifting fails one of the two.
-const HEALTH_SHARED_TERMS: [(Key, &str, &str, &str); 10] = [
-    (Key::Cpu, "common.cpu", "CPU", "CPU"),
-    (Key::Memory, "common.memory", "Memory", "内存"),
-    (Key::Swap, "mem.swap", "Swap", "交换空间"),
-    (Key::Disk, "common.disk", "Disk", "磁盘"),
-    (Key::Network, "common.network", "Network", "网络"),
-    (Key::Gpu, "common.gpu", "GPU", "GPU"),
-    (Key::SystemDomain, "system.title", "System", "系统"),
-    (Key::HealthScore, "system.health_score", "Health", "健康度"),
-    (
-        Key::HealthUnavailable,
-        "health.unavailable",
-        "Unavailable",
-        "不可用",
-    ),
-    (Key::HealthVerdictOk, "health.verdict_ok", "ok", "正常"),
+/// One expectation per shared product term the iced summary renders: the
+/// catalog key plus the string it must resolve to in each locale. The iced
+/// surface and every other frontend read this same catalog, so a term cannot
+/// drift into a frontend-private wording.
+const HEALTH_SHARED_TERMS: [(&str, &str, &str); 10] = [
+    ("common.cpu", "CPU", "CPU"),
+    ("common.memory", "Memory", "内存"),
+    ("mem.swap", "Swap", "交换空间"),
+    ("common.disk", "Disk", "磁盘"),
+    ("common.network", "Network", "网络"),
+    ("common.gpu", "GPU", "GPU"),
+    ("system.title", "System", "系统"),
+    ("system.health_score", "Health", "健康度"),
+    ("health.unavailable", "Unavailable", "不可用"),
+    ("health.verdict_ok", "ok", "正常"),
 ];
 
-/// The iced side of [`HEALTH_SHARED_TERMS`]: every shared product term this
-/// frontend renders names the catalog key it mirrors and resolves to the term
-/// both dictionaries agree on.
+/// Every shared product term this frontend renders resolves from the one
+/// catalog in both locales.
 #[test]
-fn health_dictionary_resolves_the_shared_terms() {
-    for (key, code, en, zh) in HEALTH_SHARED_TERMS {
-        assert_eq!(key.code(), code, "{key:?} must name the shared catalog key");
-        assert_eq!(i18n::t(Language::En, key), en, "{key:?} en");
-        assert_eq!(i18n::t(Language::Zh, key), zh, "{key:?} zh");
+fn health_catalog_resolves_the_shared_terms() {
+    for (code, en, zh) in HEALTH_SHARED_TERMS {
+        assert_eq!(with_language(Language::En, || t(code)), en, "{code} en");
+        assert_eq!(with_language(Language::Zh, || t(code)), zh, "{code} zh");
     }
-}
-
-/// The shared-catalog side of [`HEALTH_SHARED_TERMS`]. The explicit imports
-/// shadow this test tree's glob-imported iced `Language`/`t` for the body of
-/// this function only, so the two dictionaries never share one scope — which
-/// is what would otherwise force an alias (forbidden) or a qualified path
-/// (also forbidden).
-#[test]
-fn health_shared_catalog_carries_the_same_terms() {
-    use taskmanager_application::i18n::{Language, current_language, set_language, t};
-
-    let prior = current_language();
-    set_language(Language::En);
-    for (_, code, en, _) in HEALTH_SHARED_TERMS {
-        assert_eq!(t(code), en, "{code} en");
-    }
-    set_language(Language::Zh);
-    for (_, code, _, zh) in HEALTH_SHARED_TERMS {
-        assert_eq!(t(code), zh, "{code} zh");
-    }
-    set_language(prior);
 }
 
 /// The synthesized CPU/GPU thermal-pill labels resolve through the active
@@ -354,7 +324,7 @@ fn thermal_reading_labels_resolve_in_both_locales() {
     };
 
     let labels = |language: Language| {
-        projection::thermal_readings(&snapshot, language)
+        with_language(language, || projection::thermal_readings(&snapshot))
             .into_iter()
             .map(|(label, _)| label)
             .collect::<Vec<_>>()
@@ -496,7 +466,7 @@ mod thermal_zone_tests {
             .as_ref()
             .expect("seeded sensor projection");
         assert!(
-            thermal_zone_sensor_panel(projected, app.theme(), Language::En).is_some(),
+            thermal_zone_sensor_panel(projected, app.theme()).is_some(),
             "a temperature channel must produce the thermal-zone panel"
         );
         let _view = render(&app);
@@ -506,7 +476,7 @@ mod thermal_zone_tests {
             ..Default::default()
         };
         assert!(
-            thermal_zone_sensor_panel(&fan_only, app.theme(), Language::En).is_none(),
+            thermal_zone_sensor_panel(&fan_only, app.theme()).is_none(),
             "a snapshot without a temperature channel has no thermal-zone surface"
         );
     }
@@ -568,26 +538,27 @@ mod thermal_zone_tests {
     }
 
     /// The zone heading is a localized system surface label, not the shared
-    /// device-temperature quantity word: the iced dictionary resolves the
-    /// `common.thermal_zones` key, and the shared catalog side of the same
-    /// expectation is asserted in
-    /// [`thermal_zone_surface_key_differs_from_the_quantity`].
+    /// device-temperature quantity word: this frontend resolves the
+    /// `common.thermal_zones` catalog key, and
+    /// [`thermal_zone_surface_key_differs_from_the_quantity`] keeps that key
+    /// distinct from the quantity word in both locales.
     #[test]
     fn thermal_zone_heading_resolves_the_shared_zone_key() {
         assert_eq!(
-            Key::ThermalZones.code(),
-            "common.thermal_zones",
-            "the iced key must spell the shared catalog key"
+            with_language(Language::En, || t("common.thermal_zones")),
+            "Thermal zones"
         );
-        assert_eq!(i18n::t(Language::En, Key::ThermalZones), "Thermal zones");
-        assert_eq!(i18n::t(Language::Zh, Key::ThermalZones), "温度区");
+        assert_eq!(
+            with_language(Language::Zh, || t("common.thermal_zones")),
+            "温度区"
+        );
     }
 }
 
 /// The shared-catalog side of the zone-heading expectation: the surface key and
 /// the device-temperature quantity word are distinct terms in both locales.
-/// The explicit import shadows this tree's glob-imported iced `t` for the body
-/// of this function only (see `health_shared_catalog_carries_the_same_terms`).
+/// The explicit import shadows this tree's glob-imported helpers for the body
+/// of this function only.
 #[test]
 fn thermal_zone_surface_key_differs_from_the_quantity() {
     use taskmanager_application::i18n::{Language, current_language, set_language, t};
@@ -634,7 +605,7 @@ fn health_rows_render_the_memory_full_stall_deduction_bill() {
         ..Default::default()
     };
 
-    let rows = health_rows(&snapshot, Language::En);
+    let rows = health_rows(&snapshot);
     let health = rows
         .iter()
         .find(|row| row.label == t("system.health_score"))

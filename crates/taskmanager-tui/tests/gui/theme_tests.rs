@@ -1,6 +1,6 @@
 use super::*;
 use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
+use taskmanager_theme::{AppearanceOverride, HighContrast, LightDark, ResolvedFonts, Skin};
 
 /// Every skin × mode resolves a valid terminal palette with the semantic
 /// distinctions the renderer relies on (accents distinct, fills usable).
@@ -137,17 +137,19 @@ fn tm_skin_override_resolves_the_demo_appearance() {
         "the demo default must stay GNOME dark"
     );
     assert_eq!(
-        forced_theme_params(None, false),
+        AppearanceOverride::parse("", false).map(ThemeParams::from),
         None,
-        "unset is not an override"
+        "an empty override is not an override"
     );
     assert_eq!(
-        forced_theme_params(Some("plasma-dark"), false),
+        AppearanceOverride::parse("plasma-dark", false).map(ThemeParams::from),
         None,
         "an unknown skin is not an override"
     );
 
-    let light = forced_theme_params(Some("gnome-light"), false).expect("gnome-light override");
+    let light = AppearanceOverride::parse("gnome-light", false)
+        .map(ThemeParams::from)
+        .expect("gnome-light override");
     assert_eq!(
         light,
         ThemeParams {
@@ -163,7 +165,9 @@ fn tm_skin_override_resolves_the_demo_appearance() {
         "gnome-light must repaint the demo backdrop"
     );
 
-    let contrast = forced_theme_params(Some("KDE-DARK"), true).expect("case-insensitive override");
+    let contrast = AppearanceOverride::parse("KDE-DARK", true)
+        .map(ThemeParams::from)
+        .expect("case-insensitive override");
     assert_eq!(
         contrast,
         ThemeParams {

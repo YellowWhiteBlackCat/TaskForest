@@ -153,6 +153,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         hidden_columns: Rc::new(app.process_presentation.hidden_columns.clone()),
         column_widths,
         open_menu_identity: app.process_menu_identity(),
+        tooltip_capture_marker: app.tooltip_capture_marker(),
     };
     let row_height = application_row_height(row_context.compact);
     let (scroll_y, viewport_height) = app.applications_virtual_scroll();
@@ -177,7 +178,8 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             .into()
     } else {
         let key = applications_virtual_table_key(projection_generation, &row_context, window);
-        let open_menu = row_context.open_menu_identity.is_some();
+        let open_menu = row_context.open_menu_identity.is_some()
+            || row_context.tooltip_capture_marker.is_some();
         let model = ApplicationsTableModel {
             projection: Rc::clone(&projection),
             render: row_context,

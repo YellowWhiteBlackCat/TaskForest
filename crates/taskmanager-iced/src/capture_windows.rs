@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex};
 
 use taskmanager_assets::product;
 use taskmanager_iced::theme_binding::font_weight;
-use taskmanager_theme::color::Weight;
 use taskmanager_theme::platform::WeightCompensationAxis;
+use taskmanager_theme::tokens;
 use windows_capture::capture::{Context, GraphicsCaptureApiHandler};
 use windows_capture::frame::{Frame, ImageFormat};
 use windows_capture::graphics_capture_api::InternalCaptureControl;
@@ -93,7 +93,9 @@ pub(super) fn run(out: &Path) -> Result<(), String> {
 
     let frame = capture_one_frame(target, out)?;
     let weight_axis = WeightCompensationAxis::target();
-    let weight_450 = font_weight(Weight(450.0));
+    // The receipt records how the toolkit ladder realizes the product's BODY
+    // weight; the number comes from the theme's public scale, not a literal.
+    let weight_450 = font_weight(tokens::FONT_WEIGHT_BODY);
     let weight_name = format!("{weight_450:?}");
     let weight_value = iced_weight_value(&weight_name)?;
     let axis_name = match weight_axis {

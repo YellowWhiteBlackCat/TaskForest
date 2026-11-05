@@ -442,3 +442,32 @@ fn test_process_menu_mouse_activation_retires_the_anchored_popover() {
             .is_none()
     );
 }
+
+/// The `process-context-menu` capture scenario depends on the demo fixture
+/// leaving a real process row selected: the menu freezes that row's live
+/// identity at open time, so a scenario that selected nothing would fail
+/// closed and paint no glass popover at all. This locks the fixture's
+/// selection contract without touching the renderer.
+#[test]
+fn the_context_menu_capture_fixture_selects_a_live_row_the_menu_can_freeze() {
+    use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
+
+    let mut shell = demo_shell();
+    seed_capture_confirmation_scenario(&mut shell, "process-context-menu");
+
+    assert_eq!(
+        shell.page(),
+        AppPage::Applications,
+        "the scenario routes to Applications so the table is the anchored surface"
+    );
+    assert!(
+        shell.visible_process_at(shell.selected).is_some(),
+        "the fixture leaves a real visible row under the shell cursor"
+    );
+
+    let mut modal = ProcessMenuModal::default();
+    assert!(
+        open_for_selected(&mut modal, &shell),
+        "the seeded selection freezes into an open action menu"
+    );
+}

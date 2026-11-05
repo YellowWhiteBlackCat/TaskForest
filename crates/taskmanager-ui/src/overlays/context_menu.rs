@@ -46,6 +46,8 @@ pub struct ContextMenuState {
     dismiss_subscription: Option<Subscription>,
     /// Window activation observer owned by this stable element state.
     _activation_subscription: Subscription,
+    /// Capture-only observation of the host's actual open state.
+    open_observer: Option<OpenObserver>,
 }
 
 /// A wrapper element that opens a popup menu at the right-click position.
@@ -54,7 +56,10 @@ pub struct ContextMenu<E> {
     element: Option<E>,
     builder: MenuBuilder,
     palette: Palette,
+    open_observer: Option<OpenObserver>,
 }
+
+type OpenObserver = Rc<dyn Fn(bool, &mut App)>;
 
 impl<E: ParentElement + Styled + Sized + IntoElement + InteractiveElement + 'static>
     ContextMenu<E>
@@ -71,7 +76,17 @@ impl<E: ParentElement + Styled + Sized + IntoElement + InteractiveElement + 'sta
             element: Some(element),
             builder: Rc::new(builder),
             palette,
+            open_observer: None,
         }
+    }
+
+    /// Observe the host's real open/closed transition. Capture coordination
+    /// uses this to certify that the production right-click listener mounted
+    /// the popup; ordinary product callers leave it unset.
+    #[must_use]
+    pub fn on_open_change(mut self, observer: impl Fn(bool, &mut App) + 'static) -> Self {
+        self.open_observer = Some(Rc::new(observer));
+        self
     }
 }
 
@@ -116,6 +131,9 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
                     state.open = false;
                     state.menu = None;
                     state.dismiss_subscription = None;
+                    if let Some(observer) = state.open_observer.clone() {
+                        observer(false, cx);
+                    }
                     cx.notify();
                 });
             ContextMenuState {
@@ -125,6 +143,7 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
                 focus_handle: cx.focus_handle().tab_stop(true),
                 dismiss_subscription: None,
                 _activation_subscription: activation_subscription,
+                open_observer: None,
             }
         });
         let (open, menu) = state.read_with(cx, |state, _| (state.open, state.menu.clone()));
@@ -140,6 +159,10 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
         // mounts the entity as a child element).
         let builder = self.builder.clone();
         let palette = self.palette;
+        let open_observer = self.open_observer.clone();
+        state.update(cx, |state, _| {
+            state.open_observer = open_observer.clone();
+        });
         let state_for_click = state.clone();
         let element = self.element.take().expect("element must be set");
         let element = element.on_mouse_down(
@@ -148,6 +171,8 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
                 // Read the focus anchor before opening so the host state is
                 // not borrowed across the menu-entity construction.
                 let anchor = state_for_click.read_with(cx, |state, _| state.focus_handle.clone());
+                let open_observer =
+                    state_for_click.read_with(cx, |state, _| state.open_observer.clone());
                 let menu = PopupMenuState::open(
                     |state, cx| builder(state, cx),
                     Some(anchor),
@@ -162,9 +187,15 @@ impl<E: ParentElement + Styled + Sized + Element + InteractiveElement + 'static>
                         Some(cx.subscribe(&menu, |state, _menu, _: &DismissEvent, cx| {
                             state.open = false;
                             state.menu = None;
+                            if let Some(observer) = state.open_observer.clone() {
+                                observer(false, cx);
+                            }
                             cx.notify();
                         }));
                     state.menu = Some(menu);
+                    if let Some(observer) = open_observer {
+                        observer(true, cx);
+                    }
                 });
                 window.refresh();
             },

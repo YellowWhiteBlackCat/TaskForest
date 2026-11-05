@@ -22,19 +22,18 @@ use gpui::{
 use taskmanager_shell::command_help;
 use taskmanager_shell::page_help;
 use taskmanager_shell::shell_local_bindings;
-use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rem_length;
 
 use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration, FrontendShape};
 
 use crate::gpui_app::elements;
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_application::i18n;
-use taskmanager_theme::Theme;
-use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, Theme, tokens};
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 use taskmanager_ui::primitives::section_header::SectionHeader;
 
@@ -187,6 +186,7 @@ fn command_row(t: &Theme, label: &str, description: &str, shortcut: &str) -> Div
 /// breakpoints, same contract as `settings_view` groups).
 fn row(t: &Theme, shortcut: &str, label: &str, description: Option<&str>, selector: &str) -> Div {
     let selector = selector.to_string();
+    let layer = t.glass_card();
     let mut el = div()
         .debug_selector(move || selector.clone())
         .flex()
@@ -195,10 +195,10 @@ fn row(t: &Theme, shortcut: &str, label: &str, description: Option<&str>, select
         .gap(definite_length(tokens::SPACE_8))
         .px(definite_length(tokens::SPACE_8))
         .py(definite_length(tokens::SPACE_6))
-        .rounded(absolute(tokens::small_radius(t)))
-        .border_1()
-        .border_color(hsla(t.border))
-        .bg(fill(t.card_bg))
+        .rounded(rem_length(tokens::small_radius(t)))
+        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(layer.edge))
+        .bg(glass_fill(t, GlassTier::Card))
         .child(
             div()
                 .w(px(88.0))

@@ -1,7 +1,7 @@
 //! Typed demo/capture appearance resolution.
 
 use taskmanager_theme::tokens::UiSize;
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::{AppearanceOverride, HighContrast, LightDark, Skin, Theme};
 
 /// The light reference skin the capture gate has always rendered, and the
 /// fallback whenever no appearance override is present.
@@ -10,60 +10,41 @@ fn reference_demo_theme() -> Theme {
         Skin::Gnome,
         LightDark::Light,
         HighContrast::Off,
-        ResolvedFonts::system_for(Skin::Gnome),
+        crate::pages::settings::embedded_fonts_for(Skin::Gnome),
     )
 }
 
-/// Parse the shared testing/developer appearance override GPUI owns
-/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
-/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
-/// `None` for an unset or syntactically invalid value. This is the SAME
-/// vocabulary (and env name) GPUI's
-/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
-/// vocabulary would let the capture harness and the frontends drift.
-fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
-    let (skin_token, mode_token) = value.split_once('-')?;
-    let skin = match skin_token.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match mode_token.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
-}
-
-/// Resolve the demo/capture theme. The override is a FALLBACK: an explicit
-/// appearance preference (the persisted config, in production) always wins and
-/// the demo path has none, so `TM_SKIN` is the only input here. An unset or
-/// invalid value resolves the unchanged light reference skin.
-pub(super) fn resolve_demo_theme(value: Option<&str>, high_contrast: bool) -> Theme {
-    let Some((skin, mode)) = value.and_then(parse_tm_skin) else {
-        return reference_demo_theme();
-    };
+/// Project one forced appearance onto the reference skin's theme snapshot. The
+/// font faces are this renderer's embedded-only resolution, so the snapshot
+/// names nothing this product cannot paint.
+fn theme_from_override(forced: AppearanceOverride) -> Theme {
     Theme::build(
-        skin,
-        mode,
-        if high_contrast {
+        forced.skin,
+        forced.mode,
+        if forced.high_contrast {
             HighContrast::On
         } else {
             HighContrast::Off
         },
-        ResolvedFonts::system_for(skin),
+        crate::pages::settings::embedded_fonts_for(forced.skin),
     )
+}
+
+/// Resolve the demo/capture theme from a forced appearance. The override is a
+/// FALLBACK: an explicit appearance preference (the persisted config, in
+/// production) always wins and the demo path has none, so `TM_SKIN` is the only
+/// input here. `None` — unset, invalid, or unknown — resolves the unchanged
+/// light reference skin. Parsing is the theme owner's job
+/// ([`AppearanceOverride::parse`]), never this frontend's.
+pub(super) fn resolve_demo_theme(forced: Option<AppearanceOverride>) -> Theme {
+    forced
+        .map(theme_from_override)
+        .unwrap_or_else(reference_demo_theme)
 }
 
 /// Read the shared `TM_SKIN`/`TM_SKIN_HC` override for the demo/capture boot.
 pub(super) fn demo_theme_from_env() -> Theme {
-    let value = std::env::var("TM_SKIN").ok();
-    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
-    resolve_demo_theme(value.as_deref(), high_contrast)
+    resolve_demo_theme(AppearanceOverride::from_env())
 }
 
 /// Read the shared `TM_UI_SIZE` capture override (`Small`/`Standard`/`Large`,

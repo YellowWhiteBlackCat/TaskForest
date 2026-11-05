@@ -2,6 +2,235 @@ use super::*;
 use crate::color::contrast_ratio;
 use crate::fonts::{FONT_MISANS_VF, FONT_ROBOTO_MONO};
 
+// ── GLASS-01: frosted-glass material tokens ────────────────────────────────
+
+#[test]
+fn glass_tiers_keep_their_blur_and_noise_contract() {
+    assert_eq!(GlassTier::Sidebar.blur_radius_rem(), 24.0 / 14.0);
+    assert_eq!(GlassTier::Card.blur_radius_rem(), 20.0 / 14.0);
+    assert_eq!(GlassTier::Modal.blur_radius_rem(), 30.0 / 14.0);
+    assert_eq!(GlassTier::Scrim.blur_radius_rem(), 0.0);
+    assert_eq!(GlassTier::Sidebar.noise_strength(), 0.04);
+    assert_eq!(GlassTier::Card.noise_strength(), 0.06);
+    assert_eq!(GlassTier::Modal.noise_strength(), 0.08);
+    assert_eq!(GlassTier::Scrim.noise_strength(), 0.0);
+    for tier in [GlassTier::Sidebar, GlassTier::Card, GlassTier::Modal] {
+        assert!(
+            tier.noise_strength() > 0.0 && tier.noise_strength() <= 0.1,
+            "noise stays a subtle texture, never a visible wash"
+        );
+    }
+}
+
+#[test]
+fn glass_edges_and_shadows_are_authored_on_the_rem_axis() {
+    assert_eq!(GlassTier::Card.edge_width_rem() * 14.0, 1.0);
+    assert_eq!(
+        GlassTier::Card.ambient_shadow_rem(),
+        (3.0 / 14.0, 12.0 / 14.0)
+    );
+    assert_eq!(
+        GlassTier::Card.contact_shadow_rem(),
+        (1.0 / 14.0, 4.0 / 14.0)
+    );
+    assert_eq!(
+        GlassTier::Modal.ambient_shadow_rem(),
+        (8.0 / 14.0, 30.0 / 14.0)
+    );
+    assert_eq!(
+        GlassTier::Modal.contact_shadow_rem(),
+        (2.0 / 14.0, 6.0 / 14.0)
+    );
+    assert_eq!(GlassTier::Scrim.edge_width_rem(), 0.0);
+    assert_eq!(GlassTier::Scrim.ambient_shadow_rem(), (0.0, 0.0));
+    assert_eq!(GlassTier::Scrim.contact_shadow_rem(), (0.0, 0.0));
+
+    let theme = Theme::dark().with_root_rem_size(18.0);
+    assert_eq!(theme.root_rem_size, 18.0);
+    let resolved_edge = theme.root_rem_size * GlassTier::Card.edge_width_rem();
+    assert!(
+        (resolved_edge - 18.0 / 14.0).abs() < 1e-6,
+        "REM values are scaled at the renderer boundary: {resolved_edge}"
+    );
+}
+
+#[test]
+fn glass_layers_stay_translucent_with_specular_edges_and_shadow() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let t = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let previous =
+                [GlassTier::Card, GlassTier::Modal].map(|tier| t.glass_layer(tier).fill.a);
+            assert!(
+                previous[1] >= previous[0],
+                "{skin:?}/{mode:?}: stronger elevation reads through a fuller fill"
+            );
+            for tier in [GlassTier::Sidebar, GlassTier::Card, GlassTier::Modal] {
+                let layer = t.glass_layer(tier);
+                assert!(
+                    layer.fill.a > 0.7 && layer.fill.a < 1.0,
+                    "{skin:?}/{mode:?}/{tier:?}: the glass is frosted, not a solid panel"
+                );
+                assert!(
+                    layer.edge.a > 0.0 && layer.edge.a < 1.0,
+                    "{skin:?}/{mode:?}/{tier:?}: the specular hairline stays translucent"
+                );
+                assert_eq!(
+                    layer.shadow,
+                    t.card_shadow(),
+                    "{skin:?}/{mode:?}/{tier:?}: glass shadows reuse the theme ink"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn glass_outlines_follow_the_visible_border_and_high_contrast() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let t = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let edge = t.glass_layer(GlassTier::Card).edge;
+            if t.dark {
+                assert_eq!(
+                    edge.r, t.fg.r,
+                    "{skin:?}/{mode:?}: dark edge rides the fg token"
+                );
+            } else {
+                assert_eq!(
+                    (edge.r, edge.g, edge.b),
+                    (t.border.r, t.border.g, t.border.b),
+                    "{skin:?}/{mode:?}: the light outline must contrast with the surface"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn glass_sheen_and_outline_are_visible_after_compositing() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let [top, bottom] = theme.glass_gradient(GlassTier::Card);
+            let blend =
+                |background: Color, foreground: Color| mix(background, foreground, foreground.a);
+            let backdrop = theme.window_bg;
+            let top = blend(backdrop, top);
+            let bottom = blend(backdrop, bottom);
+            let outline = blend(bottom, theme.glass_card().edge);
+            assert!(
+                contrast_ratio(top, bottom) > 1.03,
+                "{skin:?}/{mode:?}: the highlight must remain visible on the backdrop"
+            );
+            assert!(
+                contrast_ratio(bottom, backdrop) > 1.05,
+                "{skin:?}/{mode:?}: the panel must stand apart from the backdrop"
+            );
+            assert!(
+                contrast_ratio(outline, bottom) > 1.04,
+                "{skin:?}/{mode:?}: the outline must remain visible on the panel"
+            );
+            assert!(contrast_ratio(theme.fg, top) >= 4.5);
+            assert!(contrast_ratio(theme.fg, bottom) >= 4.5);
+            assert!(theme.glass_sheen(GlassTier::Card).a > 0.0);
+        }
+    }
+}
+
+#[test]
+fn glass_fills_use_the_skin_surface_for_each_panel_role() {
+    // The glass must stay on-hue: cards/modals use the skin's card surface,
+    // while persistent chrome uses the sidebar's own surface.
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let t = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let card = t.glass_layer(GlassTier::Card);
+            assert_eq!(
+                (card.fill.r, card.fill.g, card.fill.b),
+                (t.card_surface().r, t.card_surface().g, t.card_surface().b),
+                "{skin:?}/{mode:?}: the card glass fill never invents a new hue"
+            );
+            let chrome = t.glass_layer(GlassTier::Sidebar);
+            assert_eq!(
+                (chrome.fill.r, chrome.fill.g, chrome.fill.b),
+                (t.sidebar_bg.r, t.sidebar_bg.g, t.sidebar_bg.b),
+                "{skin:?}/{mode:?}: persistent chrome keeps the sidebar hue"
+            );
+        }
+    }
+}
+
+#[test]
+fn scrim_uses_the_theme_depth_wash_without_panel_geometry() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            for hc in [HighContrast::Off, HighContrast::On] {
+                let t = Theme::build(skin, mode, hc, ResolvedFonts::system_for(skin));
+                let scrim = t.glass_scrim();
+                assert_eq!(
+                    scrim.fill, t.scrim,
+                    "{skin:?}/{mode:?}/{hc:?}: scrim is the skin's depth token"
+                );
+                assert_eq!(scrim.edge, Color::TRANSPARENT);
+                assert_eq!(scrim.shadow, Color::TRANSPARENT);
+            }
+        }
+    }
+}
+
+#[test]
+fn high_contrast_degrades_every_panel_glass_tier_to_opaque() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let t = Theme::build(
+                skin,
+                mode,
+                HighContrast::On,
+                ResolvedFonts::system_for(skin),
+            );
+            for tier in [GlassTier::Sidebar, GlassTier::Card, GlassTier::Modal] {
+                let layer = t.glass_layer(tier);
+                assert_eq!(
+                    layer.fill.a, 1.0,
+                    "{skin:?}/{mode:?}/{tier:?}: HC must force the opaque fallback"
+                );
+                assert_eq!(
+                    layer.edge.a, 1.0,
+                    "{skin:?}/{mode:?}/{tier:?}: HC edges are solid"
+                );
+                assert_eq!(layer.edge, t.border);
+                assert_eq!(t.glass_gradient(tier), [layer.fill, layer.fill]);
+                assert_eq!(t.glass_sheen(tier), Color::TRANSPARENT);
+            }
+            assert!(
+                t.glass_scrim().fill.a > 0.0 && t.glass_scrim().fill.a < 1.0,
+                "{skin:?}/{mode:?}: the modal depth wash stays a translucent overlay"
+            );
+        }
+    }
+}
+
 #[test]
 fn theme_build_applies_resolved_fonts_and_setters_preserve_them() {
     let fonts = ResolvedFonts {
@@ -35,7 +264,7 @@ fn window_transparency_survives_recompose_and_defaults_off() {
     t.toggle_mode();
     t.set_high_contrast(true);
     assert!(t.window_transparent, "recompose lost window transparency");
-    assert_eq!(t.window_radius, 8.0);
+    assert_eq!(t.window_radius, 19.0);
 }
 
 #[test]
@@ -136,8 +365,8 @@ fn window_corner_radius_is_zero_off_transparent_or_under_suppressed_state() {
     // Transparent CSD + floating: the per-skin radius everywhere.
     let mut csd = Theme::dark();
     csd.window_transparent = true;
-    assert_eq!(csd.window_corner_radius(WindowCorner::TopLeft), 12.0);
-    assert_eq!(csd.window_corner_radius(WindowCorner::BottomRight), 12.0);
+    assert_eq!(csd.window_corner_radius(WindowCorner::TopLeft), 22.0);
+    assert_eq!(csd.window_corner_radius(WindowCorner::BottomRight), 22.0);
 
     // Transparent CSD + maximized: no radius anywhere.
     csd.window_state = WindowChromeState {
@@ -161,8 +390,8 @@ fn window_corner_radius_is_zero_off_transparent_or_under_suppressed_state() {
     };
     assert_eq!(csd.window_corner_radius(WindowCorner::TopLeft), 0.0);
     assert_eq!(csd.window_corner_radius(WindowCorner::BottomLeft), 0.0);
-    assert_eq!(csd.window_corner_radius(WindowCorner::TopRight), 12.0);
-    assert_eq!(csd.window_corner_radius(WindowCorner::BottomRight), 12.0);
+    assert_eq!(csd.window_corner_radius(WindowCorner::TopRight), 22.0);
+    assert_eq!(csd.window_corner_radius(WindowCorner::BottomRight), 22.0);
 }
 
 #[test]
@@ -199,15 +428,15 @@ fn radius_scale_tiers_are_strictly_increasing_and_compat_fields_track_them() {
 }
 
 #[test]
-fn window_corner_radius_keeps_legacy_per_skin_values() {
+fn window_corner_radius_uses_the_skin_window_tier() {
     // The CSD behavior is pinned: a transparent floating window resolves
-    // to the skin's window radius (gnome 12, kde 6, win 8, mac 10), now
+    // to the skin's window radius (gnome 22, kde 18, win 19, mac 20), now
     // served by the XLarge tier of the radius scale.
     let expected = |skin: Skin| match skin {
-        Skin::Gnome => 12.0,
-        Skin::Kde => 6.0,
-        Skin::Windows => 8.0,
-        Skin::Macos => 10.0,
+        Skin::Gnome => 22.0,
+        Skin::Kde => 18.0,
+        Skin::Windows => 19.0,
+        Skin::Macos => 20.0,
     };
     for skin in Skin::ALL {
         let mut t = Theme::build(
@@ -220,7 +449,7 @@ fn window_corner_radius_keeps_legacy_per_skin_values() {
         assert_eq!(
             t.window_corner_radius(WindowCorner::TopLeft),
             expected(skin),
-            "{} window corner radius drifted from its legacy value",
+            "{} window corner radius drifted from its skin tier",
             skin.label(),
         );
     }
@@ -383,8 +612,8 @@ fn selection_tint_stays_gentle_and_above_hover() {
 }
 
 /// The card-shadow ink is locked per mode for all 8 variants: dark skins
-/// cast pure translucent BLACK (alpha 0.45), light skins a 55%-darkened
-/// `shade` at alpha 0.40 — always translucent, never the border hue.
+/// cast pure translucent BLACK (alpha 0.18), light skins a 55%-darkened
+/// `shade` at alpha 0.16 — always translucent, never the border hue.
 #[test]
 fn card_shadow_ink_is_mode_locked_and_never_opaque() {
     for skin in Skin::ALL {
@@ -404,7 +633,7 @@ fn card_shadow_ink_is_mode_locked_and_never_opaque() {
                 shadow.a,
             );
             if mode.is_dark() {
-                // Dark: locked black ink at 45%.
+                // Dark: locked black ink at 18%.
                 assert_eq!(
                     (shadow.r, shadow.g, shadow.b),
                     (0.0, 0.0, 0.0),
@@ -412,18 +641,18 @@ fn card_shadow_ink_is_mode_locked_and_never_opaque() {
                     skin.label(),
                 );
                 assert!(
-                    (shadow.a - 0.45).abs() < 1e-4,
-                    "{} dark card shadow alpha must be locked at 0.45",
+                    (shadow.a - 0.18).abs() < 1e-4,
+                    "{} dark card shadow alpha must be locked at 0.18",
                     skin.label(),
                 );
             } else {
-                // Light: shade darkened 55% toward black, locked 40% alpha —
+                // Light: shade darkened 55% toward black, locked 16% alpha —
                 // channel-exact, so the grey ink cannot drift toward the
                 // border hue or pure black.
                 let darken = 0.55;
                 assert!(
-                    (shadow.a - 0.4).abs() < 1e-4,
-                    "{} light card shadow alpha must be locked at 0.4",
+                    (shadow.a - 0.16).abs() < 1e-4,
+                    "{} light card shadow alpha must be locked at 0.16",
                     skin.label(),
                 );
                 for (channel, shade_channel) in [

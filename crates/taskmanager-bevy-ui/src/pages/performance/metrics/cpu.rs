@@ -2,6 +2,7 @@
 
 use super::*;
 use taskforest_core::core::hardware::CpuType;
+use taskmanager_application::i18n::format_duration;
 use taskmanager_shell::presentation::cpu_idle_state_summary;
 use taskmanager_shell::presentation::cpu_interrupt_summary;
 use taskmanager_shell::presentation::cpu_power_limits_summary;
@@ -21,6 +22,9 @@ pub(crate) enum CpuField {
     Power,
     Pressure,
     Load,
+    Processes,
+    Threads,
+    UpTime,
     Topology,
     IdleStates,
     PowerLimits,
@@ -74,6 +78,28 @@ pub(crate) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
     if let CpuField::ThermalStatus = field {
         return msr_thermal_status_summary(shell.msr_readout_state()).unwrap_or_else(missing_value);
     }
+    if let CpuField::Processes = field {
+        return shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .map_or_else(missing_value, |s| s.processes.to_string());
+    }
+    if let CpuField::Threads = field {
+        return shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .and_then(|s| s.threads)
+            .map_or_else(missing_value, |t| t.to_string());
+    }
+    if let CpuField::UpTime = field {
+        return shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .map_or_else(missing_value, |s| format_duration(s.uptime_secs));
+    }
     let Some(cpu) = cpu_metrics(shell) else {
         return missing_value();
     };
@@ -121,6 +147,7 @@ pub(crate) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
         // `telemetry.cpu.msr` lane is handled before the snapshot gate above.
         CpuField::ThermalStatus => missing_value(),
         CpuField::Load => missing_value(),
+        CpuField::Processes | CpuField::Threads | CpuField::UpTime => missing_value(),
         CpuField::Core(index) => {
             let usage = observed_percentage(core_usage_pct(shell, index));
             let freq = cpu.current_core_frequency_mhz(index).map(|mhz| {

@@ -55,13 +55,16 @@ use crate::trend_strip::finite_peak;
 const SECONDARY_TINT_LIFT: f32 = 0.32;
 /// The legend swatch size and the legend label font size.
 const LEGEND_SWATCH: f32 = 8.0;
-const LEGEND_FONT_SIZE: f32 = 10.0;
+/// The legend's text size on the public type scale (the shared caption tier).
+fn legend_font_size() -> f32 {
+    f32::from(tokens::FONT_10)
+}
 
 /// The shaped width of one device-chart legend label, using the same text
 /// metrics as the canvas renderer rather than a per-character estimate.
 #[must_use]
 pub(crate) fn legend_label_width(label: &str) -> f32 {
-    measured_text_width(label, LEGEND_FONT_SIZE)
+    measured_text_width(label, legend_font_size())
 }
 
 /// The (primary, secondary) series color pair for one device family: the
@@ -439,7 +442,7 @@ fn draw_chart_legend(
             content: label.to_string(),
             position: Point::new(x + LEGEND_SWATCH + swatch_gap, 5.0 + LEGEND_SWATCH / 2.0),
             color: text_color,
-            size: iced::Pixels(LEGEND_FONT_SIZE),
+            size: iced::Pixels(legend_font_size()),
             align_y: iced::alignment::Vertical::Center,
             ..canvas::Text::default()
         });

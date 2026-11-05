@@ -19,6 +19,7 @@
 //! despawns from one authority.
 
 use crate::first_run_modal::{FirstRunCommand, SetupState};
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 use crate::pages::system::diagnostic_modal::DiagnosticCommand;
 use crate::system_information_modal::SystemInformationCommand;
 use bevy::ecs::component::Component;
@@ -29,10 +30,11 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::BorderColor;
 use bevy::ui::ComputedNode;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FixedNode, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FixedNode, FlexDirection, JustifyContent,
+    Node, Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -42,6 +44,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::process_batch_action_label;
+use taskmanager_theme::GlassTier;
 
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
@@ -470,7 +473,7 @@ fn on_dismiss_activated(
 /// The armed component's field value is set positionally by the bsn! macro.
 fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scene + use<> {
     let panel = panel_scene(view, palette);
-    let scrim = palette.scrim;
+    let scrim = palette.glass_scrim_fill;
     let armed = view.clone();
     bsn! {
         Node {
@@ -499,24 +502,40 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
     let body = view.body.clone();
     let confirm = view.confirm_label.clone();
     let cancel = view.cancel_label.clone();
-    let radius = palette.panel_radius_px;
+    let radius = palette.panel_radius_rem();
+    let panel_gap_rem = palette.rem_ratio(space_8());
+    let panel_padding_rem = palette.rem_ratio(space_24());
+    let footer_gap_rem = palette.rem_ratio(space_16());
+    let footer_margin_rem = palette.rem_ratio(space_8());
+    let shadow = palette.glass_shadow(GlassTier::Modal);
+    let fill = palette.glass_modal_fill;
+    let edge = palette.glass_modal_edge;
     // The frozen collateral list rides under the echoed body: the danger
     // confirmation shows WHICH processes the action reaches, in the
     // hierarchy that was frozen at arming time. A plain selection batch has
     // no hierarchy, so the list is absent and the flat echo stays.
     let collateral: Option<Box<dyn Scene>> =
         (!view.collateral.is_empty()).then(|| collateral_list_scene(&view.collateral, palette));
+    let grain = Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius)) as Box<dyn Scene>;
     bsn! {
         Node {
             width: rem(MODAL_PANEL_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_24())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
+            row_gap: Val::Rem(panel_gap_rem),
+            padding: UiRect::all(Val::Rem(panel_padding_rem)),
+            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
+            border_radius: BorderRadius::all(Val::Rem(radius)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadow })
+        OpticalGlassCard {
+            tier: GlassTier::Modal,
+            enabled: true,
+        }
         Children [
+             @{ grain } --
              Text(title) TextRole(Role::Heading) --
              Text(body) TextRole(Role::Body) --
              @{ collateral } --
@@ -526,8 +545,8 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
                     height: Val::Auto,
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::End,
-                    column_gap: Val::Px(space_16()),
-                    margin: UiRect::top(Val::Px(space_8())),
+                    column_gap: Val::Rem(footer_gap_rem),
+                    margin: UiRect::top(Val::Rem(footer_margin_rem)),
                 }
                 Children [
 

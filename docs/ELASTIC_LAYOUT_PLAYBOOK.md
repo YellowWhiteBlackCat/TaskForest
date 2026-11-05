@@ -20,6 +20,11 @@
   槽内换行或截断，不能让 intrinsic text 挤出标签、边框或窗口。
 - 可见数据先经过 typed availability 和来源优先级；某个字段缺失不能错误地把同义可用来源
   判成空，也不能用零值伪造可用性。
+- 布局词汇、band 登记、slot 预算折、控件尺寸/字号阶梯和动效类的唯一权威是
+  `taskmanager-ui-contract::presentation`（ADR-064，见
+  [PRESENTATION](../crates/taskmanager-ui-contract/docs/PRESENTATION.md)）；四端只在
+  `presentation_binding.rs` 注入 theme 数值并承担单位换算，不在页面重写折或阶梯。
+  跨端差异必须登记为 `presentation::thresholds` 的理由行，并由 parity 探头复核。
 
 ## 设计顺序
 
@@ -60,3 +65,5 @@
 - [ ] 长值已拆行、换行或在自己的槽内截断；没有复合字符串撑栏。
 - [ ] typed data fallback、权限前后状态和真实来源均有验证。
 - [ ] headless 矩阵、真实截图和独立 validator 都有当前构建证据。
+- [ ] capture 证据中的 `presentation_resolution` 记录经共享 verifier 反推一致
+      （尺寸/字号/间距不再是目检项）。

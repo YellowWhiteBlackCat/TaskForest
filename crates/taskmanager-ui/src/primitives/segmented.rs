@@ -151,13 +151,9 @@ impl RenderOnce for Segmented {
             .id(self.id)
             .flex()
             .flex_row()
-            // The container owns the one border + radius + surface fill; the
-            // segments sit flush inside it (no per-segment border/radius/gap),
-            // so the track reads as one connected control instead of N loose
-            // capsules. overflow_hidden clips the active/hovered segment fills
-            // to the rounded outer corners (the focus ring is an outset shadow
-            // on the track itself, NOT clipped by overflow).
-            .rounded(crate::theme_binding::absolute(palette.control_radius))
+            // The track stays connected while active and hovered segments
+            // have their own rounded outline inside the clipped surface.
+            .rounded(crate::theme_binding::rem_length(palette.control_radius))
             .border_1()
             .border_color(crate::theme_binding::hsla(palette.border))
             .bg(crate::theme_binding::fill(palette.surface))
@@ -212,7 +208,7 @@ impl RenderOnce for Segmented {
                 cx.stop_propagation();
             });
 
-        for (i, seg) in self.segments.into_iter().enumerate() {
+        for seg in self.segments {
             let on_click = seg.on_click.clone();
             let on_hover = seg.on_hover.clone();
             let active = seg.active;
@@ -227,6 +223,7 @@ impl RenderOnce for Segmented {
                 .id(seg.id)
                 .px(crate::theme_binding::definite_length(tokens::SPACE_10))
                 .h(px(24.0))
+                .rounded(crate::theme_binding::rem_length(palette.control_radius))
                 .flex()
                 .items_center()
                 .justify_center()
@@ -234,12 +231,6 @@ impl RenderOnce for Segmented {
                 .cursor_pointer()
                 .on_click(move |_ev, win, cx| on_click(win, cx))
                 .on_hover(move |hov, win, cx| on_hover(hov, win, cx));
-            // Hairline divider between adjacent segments (skip the first).
-            if i > 0 {
-                cell = cell
-                    .border_l_1()
-                    .border_color(crate::theme_binding::hsla(palette.border));
-            }
             cell = match fill {
                 SegmentFill::Active => cell
                     .bg(crate::theme_binding::fill(palette.accent))

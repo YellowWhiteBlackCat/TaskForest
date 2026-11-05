@@ -48,7 +48,6 @@ use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::perf_views::{
     ChartSpec, HEADLINE_COMPANION_FLOOR, HeadlineSurface, PerfPageProps, perf_page,
 };
-use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
 pub(crate) use per_core::CpuHistoryCache;
 pub(crate) use per_core::per_core_cell_label;
 use stats::CpuLiveStats;
@@ -62,6 +61,8 @@ use taskmanager_application::i18n;
 use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CpuChartLayout {

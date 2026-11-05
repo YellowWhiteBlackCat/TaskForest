@@ -9,6 +9,7 @@ use super::*;
 use taskmanager_application::ConfigPublication;
 use taskmanager_application::ConfigRecovery;
 use taskmanager_application::ConfigStoreErrorKind;
+use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ConfigBootstrap, ConfigBootstrapFallback, ConfigDrain, ConfigPublicationOutcome,
     ConfigRecoveryNotice, ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
@@ -148,7 +149,7 @@ impl IcedApp {
         let language = config
             .language
             .as_deref()
-            .and_then(crate::i18n::Language::from_token)
+            .and_then(Language::from_code)
             .unwrap_or_else(|| self.configuration.language());
         let (preferences, theme) = self.resolve_preferences_and_theme(config);
         self.configuration
@@ -156,7 +157,7 @@ impl IcedApp {
         if !startup && history_preference_changed {
             self.request_history_frontend(config.history_persistence);
         }
-        crate::i18n::sync_shared_language(language);
+        set_language(language);
         self.configuration
             .set_focus_visible(self.input.modality.shows_focus_ring());
         self.shell

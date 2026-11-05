@@ -8,17 +8,25 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
+use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
+use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::query::With;
+use bevy::math::UVec2;
+use bevy::picking::DefaultPickingPlugins;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
-use bevy::ui::prelude::{Display, Node};
+use bevy::transform::TransformPlugin;
+use bevy::ui::prelude::{Display, Node, Val};
 use bevy::ui::widget::Text;
+use bevy::ui::{ComputedNode, UiPlugin};
+use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskforest_core::core::SystemSnapshot;
 use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, ScalarObservation,
 };
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::fixture::edit_snapshot;
+use taskmanager_shell::fixture::{demo_app, edit_snapshot};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
@@ -26,8 +34,14 @@ use super::replay::{PerformanceHistoryEntry, PerformanceLiveBody, PerformanceRep
 use super::scene::content;
 use super::tests::{block_keys, dyn_text_value, headless_perf_app, route_to_performance};
 use super::{DynField, Section, section_keys};
-use crate::app::PageContext;
+use super::{DynText, PerformanceDeviceTarget};
+use crate::app::{FrontendTrack, PageContext};
 use crate::palette::ui_palette;
+use crate::widgets::bounded_text::{BoundedText, ELLIPSIS};
+use crate::window::FrontendWindowPlugin;
+use crate::window::tests::HeadlessFrontendPlugins;
+use bevy::image::TextureAtlasLayout;
+use bevy::text::TextPlugin;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::effective_smart_status;
@@ -398,7 +412,7 @@ fn performance_history_mount_starts_live_without_inventing_replay_availability()
 #[test]
 fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
     use super::tests::{GIB, memory_metrics};
-    use crate::pages::performance::scene::blocks::segment_bar_layout;
+    use crate::pages::performance::scene::blocks::memory::segment_bar_layout;
     use taskforest_core::core::metrics::MemoryMetrics;
     use taskmanager_shell::memory::memory_segments;
 
@@ -421,6 +435,31 @@ fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
     // Nothing measured yet: an empty layout, never NaN widths.
     let zero = MemoryMetrics::default();
     assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
+}
+
+#[test]
+fn composition_bar_rounds_only_its_outer_nonzero_segments() {
+    use super::tests::{GIB, memory_metrics};
+    use crate::pages::performance::scene::blocks::segment_bar_scene;
+
+    let memory = memory_metrics(1, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let mut app = headless_scene_app();
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(segment_bar_scene(&memory, &palette))
+        .expect("composition bar mounts")
+        .id();
+    let segments = world.get::<Children>(root).expect("bar has segments");
+    assert!(segments.len() >= 2);
+    let first = world.get::<Node>(segments[0]).expect("first segment");
+    let last = world
+        .get::<Node>(segments[segments.len() - 1])
+        .expect("last segment");
+    assert!(matches!(first.border_radius.top_left.x, Val::Rem(r) if r > 0.0));
+    assert_eq!(first.border_radius.top_right.x, Val::Px(0.0));
+    assert_eq!(last.border_radius.bottom_left.x, Val::Px(0.0));
+    assert!(matches!(last.border_radius.bottom_right.x, Val::Rem(r) if r > 0.0));
 }
 
 // ---- SMART self-test request ----------------------------------------------
@@ -469,5 +508,133 @@ fn the_partition_capacity_appears_once_in_the_disk_card() {
     assert!(
         readouts.is_empty(),
         "the disk block no longer repeats the partition the storage surface already states: {readouts:?}"
+    );
+}
+
+// ---- the sidebar's bounded lines -----------------------------------------
+
+/// The windowed headless composition: the real window plugin over a capture
+/// frame, so the UI layout and the text pipeline run exactly as they do when
+/// the frontend paints a window.
+fn layout_shell_app() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(HeadlessFrontendPlugins);
+    app.add_plugins(FrontendWindowPlugin {
+        runtime: crate::runtime::demo_platform_runtime(),
+        palette: ui_palette(&Theme::dark(), UiSize::Standard),
+    });
+    app.init_resource::<Assets<Font>>();
+    app.add_plugins((
+        WindowPlugin {
+            primary_window: None,
+            exit_condition: ExitCondition::DontExit,
+            ..Default::default()
+        },
+        DefaultPickingPlugins,
+        TransformPlugin,
+        TextPlugin,
+        UiPlugin,
+    ));
+    app.init_resource::<Assets<TextureAtlasLayout>>();
+    let size = UVec2::new(1280, 720);
+    app.world_mut().spawn((
+        Window {
+            resolution: (1280, 720).into(),
+            decorations: false,
+            ..Default::default()
+        },
+        PrimaryWindow,
+    ));
+    app.world_mut().spawn((
+        Camera2d,
+        Camera {
+            computed: ComputedCameraValues {
+                target_info: Some(RenderTargetInfo {
+                    physical_size: size,
+                    scale_factor: 1.0,
+                }),
+                ..Default::default()
+            },
+            viewport: Some(Viewport {
+                physical_size: size,
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    ));
+    app
+}
+
+/// The page mounted on a real frame: a bounded line is truncated against its
+/// own SHAPED width, so the test needs the layout and the text pipeline, not
+/// a character count.
+fn layout_perf_app() -> App {
+    let mut app = layout_shell_app();
+    app.world_mut().non_send_mut::<FrontendTrack>().shell = demo_app();
+    route_to_performance(&mut app);
+    // The ellipsis converges over two passes: the first measures the whole
+    // value, the second measures the ellipsis it just painted.
+    for _ in 0..6 {
+        app.update();
+    }
+    app
+}
+
+/// The slot a bounded line must fit: its parent's content box, in logical
+/// pixels.
+/// The slot a bounded line must fit: its parent's content box, in logical
+/// pixels.
+fn slot_width(node: &ComputedNode) -> f32 {
+    node.content_box().width() * node.inverse_scale_factor
+}
+
+/// The shaped width of one bounded line, in logical pixels.
+fn line_width(node: &ComputedNode) -> f32 {
+    node.size().x * node.inverse_scale_factor
+}
+
+#[test]
+fn no_bounded_sidebar_line_overflows_its_slot() {
+    let mut app = layout_perf_app();
+    let world = app.world_mut();
+    let mut lines = world.query_filtered::<(&Text, &ComputedNode, &ChildOf), With<BoundedText>>();
+    let mut slots = world.query::<&ComputedNode>();
+    let mut bounded = 0;
+    for (text, node, child_of) in lines.iter(world) {
+        let parent = slots
+            .get(world, child_of.parent())
+            .expect("a bounded line belongs to a measured slot");
+        let slot = slot_width(parent);
+        let width = line_width(node);
+        assert!(
+            slot <= 0.0 || width <= slot + 1.0,
+            "the bounded line {text:?} is measured to {width} px inside a {slot} px slot",
+        );
+        bounded += 1;
+    }
+    assert!(
+        bounded > 8,
+        "the sidebar's identity lines and captions are bounded slots: {bounded}"
+    );
+}
+
+#[test]
+fn a_brand_line_wider_than_the_sidebar_ends_with_an_ellipsis() {
+    let mut app = layout_perf_app();
+    let world = app.world_mut();
+    let brand = world
+        .query::<(&DynText, &Text)>()
+        .iter(world)
+        .find(|(marker, _)| marker.0 == DynField::SidebarCaption1(PerformanceDeviceTarget::Cpu))
+        .map(|(_, text)| text.0.clone())
+        .expect("the CPU row mounts its brand line");
+    assert!(
+        brand.ends_with(ELLIPSIS),
+        "the demo brand is wider than the sidebar, so it ends in an ellipsis instead of a hard cut: {brand:?}"
+    );
+    assert!(
+        brand.chars().count() < "Intel(R) Core(TM) Ultra 7 358H".chars().count(),
+        "the value was shortened, not merely decorated: {brand:?}"
     );
 }

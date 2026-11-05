@@ -1,66 +1,27 @@
 //! Performance sidebar, CPU header, and responsive rail scenes.
 
 use super::*;
-use crate::pages::performance::metrics::{
-    battery_caption, battery_sidebar_title, fan_caption, fans,
-};
-use crate::pages::performance::sidebar_editor::SidebarState;
-use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
+use crate::pages::performance::metrics::{battery_sidebar_title, fans};
+use crate::pages::performance::metrics::{disk_sidebar_title, gpu_block_title};
+use crate::pages::performance::sidebar_editor::{SidebarAction, SidebarState};
+use crate::pages::performance::sidebar_network::network_category_label;
+use crate::widgets::chart::{MAX_CHART_POINTS, line_segments_in, polyline_scene};
 
 pub(crate) mod cores;
 pub(super) mod cpu;
+pub(super) mod device_stats;
+pub(super) mod device_stats_more;
+pub(super) mod headers;
 
-use super::blocks::gpu_block_title;
 use super::chart::chart_grid_scene;
+use crate::glass::{GlassPanelMaterial, card_material};
+use bevy::picking::Pickable;
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui_widgets::ScrollArea;
 use cpu::device_button_scene;
 use taskmanager_ui_contract::IconId;
 
-/// The fact row's floor width, in rem: the narrowest the label/value pair
-/// may take before the row would clip its own value. The row lives in the
-/// device sidebar, so the floor rides the rem axis with the sidebar.
-const FACT_ROW_MIN_WIDTH_REM: f32 = 13.75;
-
-/// The CPU metric label slot's width, in rem: the widest caption the metric
-/// rows carry, so every metric's label starts at the same column.
-const CPU_METRIC_LABEL_SLOT_WIDTH_REM: f32 = 6.0;
-
-/// One label→value line; the value is the rewritable fact. Both columns are
-/// strictly single-line: a long value clips at the rail edge instead of
-/// wrapping the row into an unreadable stack.
-fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            min_width: rem(FACT_ROW_MIN_WIDTH_REM),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::SpaceBetween,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::vertical(Val::Px(space_2())),
-        }
-        Children [
-
-                Node {
-                    flex_shrink: 1.0,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
-            --
-
-                Node {
-                    flex_shrink: 0.0,
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::FlexEnd,
-                }
-                Children [  Text(value) TextRole(Role::Mono) DynText(field) TextLayout { linebreak: LineBreak::NoWrap }  ]
-
-        ]
-    }
-}
-
-fn marked_text_scene(value: String, role: Role, field: DynField) -> Box<dyn Scene> {
+pub(super) fn marked_text_scene(value: String, role: Role, field: DynField) -> Box<dyn Scene> {
     Box::new(bsn! {
         Text(value)
         TextRole(role)
@@ -113,74 +74,6 @@ fn cpu_metric_cell_scene(
     }
 }
 
-/// One bounded full-width diagnostic line used for composite CPU facts. The
-/// value owns the shrinkable slot and wraps within it. Its measured height
-/// contributes to the row, preserving long provider values without letting
-/// them overlap the neighboring fact.
-fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_shrink: 0.0,
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            overflow: Overflow::clip_x(),
-        }
-        Children [
-
-                Node {
-                    width: rem(CPU_METRIC_LABEL_SLOT_WIDTH_REM),
-                    flex_shrink: 0.0,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
-            --
-
-                Node {
-                    flex_grow: 1.0,
-                    flex_shrink: 1.0,
-                    min_width: px(0.0),
-                    overflow: Overflow::clip_x(),
-                }
-                Children [
-
-                        Text(value)
-                        TextRole(Role::Mono)
-                        DynText(DynField::Cpu(field))
-
-                ]
-
-        ]
-    }
-}
-
-fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_2()),
-            overflow: Overflow::clip_x(),
-        }
-        Children [
-
-                Text(cpu_field_text(shell, CpuField::Usage))
-                TextRole(Role::Mono)
-                DynText(DynField::Cpu(CpuField::Usage))
-                TextLayout { linebreak: LineBreak::NoWrap }
-            --
-             Text(" · ") TextRole(Role::Caption) --
-
-                Text(cpu_field_text(shell, CpuField::Frequency))
-                TextRole(Role::Mono)
-                DynText(DynField::Cpu(CpuField::Frequency))
-                TextLayout { linebreak: LineBreak::NoWrap }
-
-        ]
-    })
-}
-
 /// A bounded history graph shared by device rows and per-core cells. It is a
 /// product accessory, not a second chart authority: samples come from the
 /// same shell history window as the hero graph, projected through the SAME
@@ -195,6 +88,7 @@ fn activity_graph_scene(
     samples: &[f32],
     color: bevy::color::Color,
     height_rem: f32,
+    capacity: usize,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     // The graph budget rides the rem axis: the node declares the rem ratio
@@ -202,8 +96,11 @@ fn activity_graph_scene(
     // rem size, so the graph and its segments can never disagree.
     let height_rem = height_rem.max(MIN_GRAPH_HEIGHT_REM);
     let height_px = height_rem * palette.rem_px;
-    let width_px = palette.control_height_px() * 2.0;
-    let segments = line_segments(samples, width_px, height_px, MAX_CHART_POINTS);
+    let width_px = palette.control_height_px() * 1.6;
+    // The strip is a capacity-wide frame too: a window holding fewer samples
+    // grows from the right edge instead of claiming the whole strip, the same
+    // rule the hero chart and the other frontends' sparklines follow.
+    let segments = line_segments_in(samples, width_px, height_px, MAX_CHART_POINTS, capacity);
     Box::new(bsn! {
         Node {
             width: percent(100),
@@ -242,12 +139,14 @@ fn sidebar_activity_scene(
     icon: IconId,
     samples: &[f32],
     color: bevy::color::Color,
+    capacity: usize,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     sidebar_activity_with_icon_scene(
         crate::icons::icon_scene(icon, palette, palette.dim_color),
         samples,
         color,
+        capacity,
         palette,
     )
 }
@@ -261,24 +160,26 @@ fn sidebar_activity_with_icon_scene(
     icon: Box<dyn Scene>,
     samples: &[f32],
     color: bevy::color::Color,
+    capacity: usize,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let height_rem = palette.control_height_rem * 1.35;
-    let graph = activity_graph_scene(samples, color, height_rem, palette);
+    let graph = activity_graph_scene(samples, color, height_rem, capacity, palette);
     Box::new(bsn! {
         Node {
-            width: rem(palette.control_height_rem * 3.0),
+            flex_shrink: 0.0,
             height: rem(height_rem),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
-            column_gap: Val::Px(space_2()),
+            column_gap: Val::Px(space_4()),
         }
         Children [
              @{ icon } --
 
                 Node {
-                    width: rem(palette.control_height_rem * 2.0),
+                    width: rem(palette.control_height_rem * 1.6),
                     height: rem(height_rem),
+                    flex_shrink: 0.0,
                 }
                 Children [
                      @{ graph }
@@ -298,18 +199,9 @@ fn sidebar_curve_scene(
         icon,
         &curve_samples(shell, curve),
         curve.color(palette),
+        shell.history.capacity(),
         palette,
     )
-}
-
-fn disk_sidebar_title(disk: &DiskMetrics) -> String {
-    if !disk.model.is_empty() {
-        disk.model.clone()
-    } else if !disk.name.is_empty() {
-        disk.name.clone()
-    } else {
-        disk.device_id.clone()
-    }
 }
 
 pub(super) fn device_sidebar_scene(
@@ -317,6 +209,9 @@ pub(super) fn device_sidebar_scene(
     palette: &UiPalette,
     preferences: &SidebarState,
 ) -> impl Scene + use<> {
+    // The strip's frame represents this many samples: the shell's own history
+    // window, the same `graph_data_points` preference the other frontends read.
+    let capacity = shell.history.capacity();
     let mut rows: Vec<(PerformanceDeviceTarget, Box<dyn Scene>)> = vec![(
         PerformanceDeviceTarget::Cpu,
         Box::new(device_button_scene(
@@ -324,7 +219,7 @@ pub(super) fn device_sidebar_scene(
             Box::new(device_row_with_accessory_scene(
                 t("common.cpu").to_owned(),
                 sidebar_curve_scene(IconId::Cpu, SystemCurve::Cpu, shell, palette),
-                cpu_device_caption_scene(shell),
+                headers::cpu_caption_scene(shell),
                 true,
                 palette,
             )),
@@ -337,11 +232,7 @@ pub(super) fn device_sidebar_scene(
             Box::new(device_row_with_accessory_scene(
                 t("common.memory").to_owned(),
                 sidebar_curve_scene(IconId::Memory, SystemCurve::Memory, shell, palette),
-                marked_text_scene(
-                    summary_value(shell, SummaryField::Memory),
-                    Role::Caption,
-                    DynField::Summary(SummaryField::Memory),
-                ),
+                headers::memory_device_caption_scene(shell),
                 false,
                 palette,
             )),
@@ -363,8 +254,14 @@ pub(super) fn device_sidebar_scene(
                     PerformanceDeviceTarget::Disk(disk.device_id.clone()),
                     Box::new(device_row_with_accessory_scene(
                         disk_sidebar_title(disk),
-                        sidebar_activity_scene(IconId::Disk, &samples, palette.accent, palette),
-                        super::disk_caption_scene(disk, palette),
+                        sidebar_activity_scene(
+                            IconId::Disk,
+                            &samples,
+                            palette.accent,
+                            capacity,
+                            palette,
+                        ),
+                        headers::device_disk_caption_scene(disk),
                         false,
                         palette,
                     )),
@@ -383,20 +280,19 @@ pub(super) fn device_sidebar_scene(
                 Box::new(device_button_scene(
                     PerformanceDeviceTarget::Network(key.clone()),
                     Box::new(device_row_with_accessory_scene(
-                        if nic.interface_name.is_empty() {
-                            key.clone()
-                        } else {
-                            (*nic.interface_name).to_owned()
-                        },
-                        sidebar_activity_scene(IconId::Network, &samples, palette.accent, palette),
-                        marked_text_scene(
-                            nic_fact_line(nic),
-                            Role::Mono,
-                            DynField::Device {
-                                section: Section::Network,
-                                device: key,
-                            },
+                        format!(
+                            "{} ({})",
+                            network_category_label(nic.adapter_type()),
+                            nic.interface_name
                         ),
+                        sidebar_activity_scene(
+                            IconId::Network,
+                            &samples,
+                            palette.accent,
+                            capacity,
+                            palette,
+                        ),
+                        headers::device_network_caption_scene(nic),
                         false,
                         palette,
                     )),
@@ -416,15 +312,14 @@ pub(super) fn device_sidebar_scene(
                     PerformanceDeviceTarget::Gpu(key.clone()),
                     Box::new(device_row_with_accessory_scene(
                         gpu_block_title(gpu),
-                        sidebar_activity_scene(IconId::Gpu, &samples, palette.accent, palette),
-                        marked_text_scene(
-                            gpu_fact_line(gpu),
-                            Role::Mono,
-                            DynField::Device {
-                                section: Section::Gpu,
-                                device: key,
-                            },
+                        sidebar_activity_scene(
+                            IconId::Gpu,
+                            &samples,
+                            palette.accent,
+                            capacity,
+                            palette,
                         ),
+                        headers::device_gpu_caption_scene(gpu),
                         false,
                         palette,
                     )),
@@ -436,7 +331,6 @@ pub(super) fn device_sidebar_scene(
         for (index, battery) in power.batteries.iter().enumerate() {
             let key = battery.id.clone();
             let title = battery_sidebar_title(battery, index);
-            let caption = battery_caption(battery);
             rows.push((
                 PerformanceDeviceTarget::Battery(key.clone()),
                 Box::new(device_button_scene(
@@ -454,9 +348,10 @@ pub(super) fn device_sidebar_scene(
                             ),
                             &[],
                             palette.accent,
+                            capacity,
                             palette,
                         ),
-                        marked_text_scene(caption, Role::Mono, DynField::BatteryCaption(key)),
+                        headers::device_battery_caption_scene(battery),
                         false,
                         palette,
                     )),
@@ -472,7 +367,6 @@ pub(super) fn device_sidebar_scene(
             } else {
                 fan.label().trim().to_owned()
             };
-            let caption = fan_caption(fan);
             let samples = shell.history.fan_rpm_for(fan.id());
             rows.push((
                 PerformanceDeviceTarget::Fan(key.clone()),
@@ -484,9 +378,10 @@ pub(super) fn device_sidebar_scene(
                             IconId::Performance,
                             &samples,
                             palette.accent,
+                            capacity,
                             palette,
                         ),
-                        marked_text_scene(caption, Role::Mono, DynField::FanCaption(key)),
+                        headers::device_fan_caption_scene(fan),
                         false,
                         palette,
                     )),
@@ -494,9 +389,33 @@ pub(super) fn device_sidebar_scene(
             ));
         }
     }
+    let edit_btn = crate::pages::performance::sidebar_editor::icon_button(
+        IconId::Settings,
+        SidebarAction::Open,
+        palette,
+    );
     let mut panel_children: Vec<Box<dyn Scene>> = vec![Box::new(bsn! {
-        Text(t("sidebar.devices"))
-        TextRole(Role::Caption)
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::SpaceBetween,
+            padding: UiRect::bottom(px(crate::palette::space_4())),
+        }
+        Children [
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(crate::palette::space_4()),
+                min_width: px(0.0),
+            }
+            Children [
+                @{ crate::icons::icon_scene(IconId::System, palette, palette.dim_color) }
+                Pickable::IGNORE --
+                Text(t("sidebar.devices")) TextRole(Role::Caption)
+            ] --
+            @{ edit_btn }
+        ]
     }) as Box<dyn Scene>];
     let targets: Vec<_> = rows.iter().map(|(target, _)| target.clone()).collect();
     let mut rows: Vec<_> = rows
@@ -513,13 +432,20 @@ pub(super) fn device_sidebar_scene(
     let panel = surface_scene(SurfaceTone::Content, panel_children, palette);
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
     let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
+    // The mount value is the persisted preference bounded by the shared
+    // sidebar range; the root budget re-resolves it against the live window
+    // every layout pass, so the scene never carries a private width constant.
+    let sidebar_width = preferences.0.sidebar_width.clamp(
+        PERFORMANCE_SIDEBAR_MIN_WIDTH_PX,
+        PERFORMANCE_SIDEBAR_MAX_WIDTH_PX,
+    );
     bsn! {
         // The viewport wrapper owns the scroll area AND the floating rail:
         // the rail is a sibling of the scroll area, so it never scrolls with
         // the content and never takes layout space away from it.
         Node {
-            width: px(WIDE_DEVICE_SIDEBAR_WIDTH_PX),
-            min_width: px(WIDE_DEVICE_SIDEBAR_WIDTH_PX),
+            width: px(sidebar_width),
+            min_width: px(sidebar_width),
             height: percent(100),
             flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
@@ -544,64 +470,166 @@ pub(super) fn device_sidebar_scene(
 }
 
 pub(super) fn stats_rail_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let mut rows = summary_rows(shell);
-    for (label, field) in [
-        (t("cpu.frequency"), CpuField::Frequency),
-        (t("common.temperature"), CpuField::Temperature),
-        (t("common.power"), CpuField::Power),
-    ] {
-        rows.push(Box::new(stat_row_scene(
-            label.to_owned(),
-            marked_text_scene(
-                cpu_field_text(shell, field),
-                Role::Mono,
-                DynField::Cpu(field),
-            ),
-            palette,
-        )));
-    }
-    if let Some(cpu) = cpu_metrics(shell) {
-        for (label, value) in [
-            (
-                t("system_about.cores"),
-                cpu.physical_cores.map(|cores| cores.to_string()),
-            ),
-            (
-                t("common.logical_cores"),
-                cpu.logical_cores.map(|cores| cores.to_string()),
-            ),
-        ] {
-            let display_value = value.unwrap_or_else(missing_value);
-            rows.push(Box::new(stat_row_scene(
-                label.to_owned(),
-                Box::new(bsn! {
-                    Text(display_value)
-                    TextRole(Role::Mono)
-                }),
-                palette,
-            )));
+    let cpu_panel = device_stats::cpu_stats_card(shell, palette);
+    let memory_panel = device_stats::memory_stats_card(shell, palette);
+    let disk_panel = device_stats::disk_stats_card(shell, palette);
+    let network_panel = device_stats::network_stats_card(shell, palette);
+    let gpu_panel = device_stats::gpu_stats_card(shell, palette);
+    let battery_panel = device_stats::battery_stats_card(shell, palette);
+    let fan_panel = device_stats::fan_stats_card(shell, palette);
+
+    let cpu_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::Flex,
         }
-    }
-    // Rail contents end at the measured facts. The former "window"/"source"
-    // filler rows were hardcoded English constants — fabricated captions,
-    // not facts — and are gone with this cleanup pass.
-    let panel = summary_card_scene(rows, palette);
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Cpu)
+        Children [
+            @{ cpu_panel }
+        ]
+    };
+    let memory_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Memory)
+        Children [
+            @{ memory_panel }
+        ]
+    };
+    let disk_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Disk(String::new()))
+        Children [
+            @{ disk_panel }
+        ]
+    };
+    let network_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Network(String::new()))
+        Children [
+            @{ network_panel }
+        ]
+    };
+    let gpu_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Gpu(String::new()))
+        Children [
+            @{ gpu_panel }
+        ]
+    };
+    let battery_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Battery(String::new()))
+        Children [
+            @{ battery_panel }
+        ]
+    };
+    let fan_stats = bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            min_height: px(0.0),
+            display: Display::None,
+        }
+        PerformanceStatsRailTarget(PerformanceDeviceTarget::Fan(String::new()))
+        Children [
+            @{ fan_panel }
+        ]
+    };
+
+    let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::default());
     bsn! {
         Node {
             width: px(WIDE_STATS_WIDTH_PX),
             min_width: px(WIDE_STATS_WIDTH_PX),
             height: percent(100),
+            min_height: px(0.0),
+            max_height: percent(100),
             flex_shrink: 0.0,
+            position_type: PositionType::Relative,
         }
         PerformanceStatsRail
         Children [
-             @{ panel }
+            Node {
+                width: percent(100),
+                height: percent(100),
+                min_height: px(0.0),
+                flex_shrink: 0.0,
+                overflow: Overflow::scroll_y(),
+                padding: { lane },
+            }
+            ScrollArea
+            Children [
+                @{ cpu_stats } --
+                @{ memory_stats } --
+                @{ disk_stats } --
+                @{ network_stats } --
+                @{ gpu_stats } --
+                @{ battery_stats } --
+                @{ fan_stats }
+            ]
+            --
+            @{ rail }
         ]
     }
 }
 
-fn summary_card_scene(rows: Vec<Box<dyn Scene>>, palette: &UiPalette) -> impl Scene + use<> {
-    surface_scene(SurfaceTone::Elevated, rows, palette)
+pub(super) fn summary_card_scene(
+    rows: Vec<Box<dyn Scene>>,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows: _,
+        edge_width_rem,
+        radius_rem,
+        grain: _,
+    } = card_material(palette);
+    bsn! {
+        Node {
+            width: percent(100),
+            max_height: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_2()),
+            padding: UiRect::axes(Val::Px(space_12()), Val::Px(space_4())),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
+            overflow: Overflow::clip_y(),
+        }
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        Children [
+            { rows }
+        ]
+    }
 }
 
 fn metric_selector_button_scene(curve: SystemCurve, palette: &UiPalette) -> impl Scene + use<> {
@@ -621,6 +649,7 @@ fn metric_selector_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + 
     bsn! {
         Node {
             width: percent(100),
+            display: Display::None,
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_2()),
@@ -632,24 +661,4 @@ fn metric_selector_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + 
             { buttons }
         ]
     }
-}
-
-fn summary_rows(shell: &ShellApp) -> Vec<Box<dyn Scene>> {
-    [
-        (t("common.cpu"), SummaryField::Cpu),
-        (t("common.cores"), SummaryField::Cores),
-        (t("common.memory"), SummaryField::Memory),
-        (t("mem.swap"), SummaryField::Swap),
-        (t("net.receive"), SummaryField::NetReceive),
-        (t("net.send"), SummaryField::NetSend),
-    ]
-    .into_iter()
-    .map(|(label, field)| {
-        Box::new(fact_row(
-            label.to_owned(),
-            summary_value(shell, field),
-            DynField::Summary(field),
-        )) as Box<dyn Scene>
-    })
-    .collect()
 }

@@ -16,9 +16,10 @@ use bevy::ecs::system::Query;
 use bevy::ecs::{component::Component, entity::Entity, hierarchy::Children};
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
+use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap,
-    JustifyContent, Node, Overflow, PositionType, ScrollPosition, UiRect, percent, px, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, ComputedNode, FlexDirection, FlexWrap,
+    JustifyContent, Node, Overflow, PositionType, ScrollPosition, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Button, ScrollArea, Tab, TabList};
@@ -27,12 +28,14 @@ use taskmanager_application::{
     ProcessInsightFacet, i18n::t, process_details_vm::ProcessDetailsField,
 };
 use taskmanager_shell::presentation::process_insight_facet_label;
+use taskmanager_theme::GlassTier;
 
 use super::backdrop::backdrop_scene;
 use super::gpu::gpu_panel_scene;
 use super::memory::memory_panel_scene;
 use super::quota::quota_panel_scene;
 use super::tabs::{IndicatorPlacement, TAB_INDICATOR_HEIGHT_PX, TabIndicator};
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 
 /// The properties panel's maximum width, in rem: the widest the inspection
 /// body may grow before it starts scrolling its own columns. The bound rides
@@ -194,6 +197,14 @@ pub(super) fn properties_modal_scene(
         Button ProcessPropertiesDismissButton ControlVisual(ControlTone::Surface, true) on(on_properties_dismiss_activated)
         Children [ Text({t("common.close").to_owned()}) TextRole(Role::Body) ] }));
     let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(px(space_8())));
+    let grain = Box::new(noise_overlay_scene(
+        GlassTier::Modal,
+        palette,
+        palette.panel_radius_rem(),
+    )) as Box<dyn Scene>;
+    let modal_fill = palette.glass_modal_fill;
+    let modal_edge = palette.glass_modal_edge;
+    let modal_shadow = palette.glass_shadow(GlassTier::Modal);
     bsn! {
         Node { width: percent(100), height: percent(100), position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
@@ -203,9 +214,17 @@ pub(super) fn properties_modal_scene(
             Node { width: percent(92), max_width: rem(PROPERTIES_PANEL_MAX_WIDTH_REM), height: percent(92), min_height: px(0.0), min_width: px(0.0),
                 flex_direction: FlexDirection::Column, row_gap: px(space_8()),
                 padding: UiRect::px(space_12(), space_12(), space_12(), space_16()),
-                border_radius: BorderRadius::all(px(palette.panel_radius_px)) }
-            BackgroundColor({palette.panel_fill}) ProcessPropertiesPanel
+                border_radius: BorderRadius::all(px(palette.panel_radius_px)),
+                border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())) }
+            BackgroundColor({ modal_fill }) ProcessPropertiesPanel
+            BorderColor::all(modal_edge)
+            BoxShadow({ modal_shadow })
+            OpticalGlassCard {
+                tier: GlassTier::Modal,
+                enabled: true,
+            }
             Children [
+                @{ grain } --
                 Text(title) TextRole(Role::Heading) TextLayout { linebreak: LineBreak::WordBoundary }
                     Node { width: percent(100), min_width: px(0.0), max_height: rem(PROPERTIES_TITLE_MAX_HEIGHT_REM), flex_shrink: 0.0, overflow: Overflow::clip() } --
                 Text(subtitle) TextRole(Role::Caption) Node { flex_shrink: 0.0 } --

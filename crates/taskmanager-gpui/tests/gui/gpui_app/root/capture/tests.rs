@@ -76,6 +76,10 @@ fn scenario_tokens_parse_strictly() {
         Some(CaptureScenario::ProcessSelection)
     );
     assert_eq!(
+        CaptureScenario::parse("process-context-menu"),
+        Some(CaptureScenario::ProcessContextMenu)
+    );
+    assert_eq!(
         CaptureScenario::parse("process-memory-pss-swap"),
         Some(CaptureScenario::ProcessMemoryPssSwap)
     );
@@ -92,6 +96,7 @@ fn scenario_tokens_parse_strictly() {
             "users-session-confirmation",
             CaptureScenario::UsersSessionConfirmation,
         ),
+        ("process-context-menu", CaptureScenario::ProcessContextMenu),
         ("startup-impact", CaptureScenario::StartupImpact),
         (
             "startup-failure-evidence",
@@ -222,6 +227,24 @@ fn process_selection_capture_targets_the_visible_application_aggregate() {
         ))
     );
     assert!(evidence.scenario_ready());
+}
+
+#[test]
+fn process_context_menu_capture_requires_the_real_host_to_open_and_present() {
+    let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::ProcessContextMenu));
+    assert!(!evidence.process_context_menu_requested());
+    evidence.mark_test_telemetry_ready();
+    evidence.mark_test_ui_data_ready();
+    assert!(evidence.process_context_menu_requested());
+    assert!(evidence.begin_process_context_menu_capture());
+    assert!(evidence.process_context_menu_pointer_requested());
+    assert!(evidence.arm_context_menu_pointer(gpui::point(gpui::px(200.0), gpui::px(120.0))));
+    assert!(evidence.note_context_menu_open());
+    assert!(evidence.note_context_menu_presentation_armed());
+    evidence.mark_context_menu_presented(true);
+    assert!(evidence.scenario_ready());
+    evidence.note_context_menu_closed();
+    assert!(!evidence.process_context_menu_is_open());
 }
 
 #[test]

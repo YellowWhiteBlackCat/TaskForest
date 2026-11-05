@@ -7,16 +7,132 @@
 //! generation is a separate stale-geometry guard and must not be confused with
 //! either the process start token or a dangerous frozen control identity.
 
-use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
+use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskforest_core::core::process::group_aggregate::aggregate_by_container_typed;
+use taskforest_core::core::process::{
+    ContainerMetadata, ContainerRuntime, ProcessCategory, ProcessItem, ProcessLiveKey,
+};
 
 mod semantic;
 mod tree;
 
 pub use semantic::append_process_semantic_rows;
 pub use tree::{
-    APP_TREE_EXPANSION_KEY_PREFIX, ProcessRowAggregate, ProcessTreeRow, app_tree_expansion_key,
-    app_tree_expansion_key_for_identity, project_process_tree_rows,
+    APP_TREE_EXPANSION_KEY_PREFIX, CONTAINER_EXPANSION_KEY_PREFIX, ProcessRowAggregate,
+    ProcessTreeRow, app_tree_expansion_key, app_tree_expansion_key_for_identity,
+    container_expansion_key, project_process_tree_rows,
 };
+
+/// One container group in the shared process fold.
+///
+/// The shell owns only the typed facts a renderer needs: the observed
+/// container identity and the member live keys. Labels, icons, and the
+/// expansion key remain frontend concerns. A member without a current live
+/// key is still counted; it simply cannot be addressed as an exact target.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContainerGroupRow {
+    metadata: ContainerMetadata,
+    member_live_keys: Vec<ProcessLiveKey>,
+    cpu: AggregateMetric<f32>,
+    memory: AggregateMetric<u64>,
+    member_count: usize,
+}
+
+impl ContainerGroupRow {
+    /// The observed container identity (runtime, id, optional name).
+    #[must_use]
+    pub const fn metadata(&self) -> &ContainerMetadata {
+        &self.metadata
+    }
+
+    /// Exact live identities for members whose provider tokens are available,
+    /// in deterministic PID order. A missing token is omitted from this list
+    /// while the count stays honest.
+    #[must_use]
+    pub fn member_live_keys(&self) -> &[ProcessLiveKey] {
+        &self.member_live_keys
+    }
+
+    /// Availability-bearing CPU aggregate for the bucket members.
+    #[must_use]
+    pub const fn cpu(&self) -> &AggregateMetric<f32> {
+        &self.cpu
+    }
+
+    /// Availability-bearing resident-memory aggregate for the bucket members.
+    #[must_use]
+    pub const fn memory(&self) -> &AggregateMetric<u64> {
+        &self.memory
+    }
+
+    /// Number of process members, including members without a current token.
+    #[must_use]
+    pub const fn member_count(&self) -> usize {
+        self.member_count
+    }
+}
+
+/// Group the visible processes by their currently observed container.
+///
+/// Host processes (no current container observation) never enter a bucket:
+/// the caller renders them under the host role instead of a fabricated
+/// runtime identity. Bucket order follows the first-seen member order, so a
+/// renderer never has to re-sort to keep rows stable across refreshes.
+#[must_use]
+pub fn container_group_rows(
+    processes: &[&ProcessItem],
+    observed_at_ms: u64,
+) -> Vec<ContainerGroupRow> {
+    use std::collections::HashMap;
+
+    let mut aggregates_by_key = HashMap::new();
+    for aggregate in aggregate_by_container_typed(processes, observed_at_ms) {
+        aggregates_by_key.insert(
+            (aggregate.runtime(), aggregate.container_id().to_owned()),
+            aggregate,
+        );
+    }
+
+    let mut member_live_keys_by_container =
+        HashMap::<(ContainerRuntime, String), Vec<ProcessLiveKey>>::new();
+    let mut order: Vec<(ContainerRuntime, String)> = Vec::new();
+    for process in processes.iter().copied() {
+        let Some(metadata) = process.current_container_metadata() else {
+            continue;
+        };
+        let key = (metadata.runtime, metadata.container_id.clone());
+        if !member_live_keys_by_container.contains_key(&key) {
+            order.push(key.clone());
+        }
+        let member_live_keys = member_live_keys_by_container.entry(key).or_default();
+        if let Some(identity) = ProcessLiveKey::from_process(process)
+            && !member_live_keys.contains(&identity)
+        {
+            member_live_keys.push(identity);
+        }
+    }
+    order
+        .into_iter()
+        .filter_map(|key| {
+            let aggregate = aggregates_by_key.remove(&key)?;
+            let mut member_live_keys = member_live_keys_by_container
+                .remove(&key)
+                .unwrap_or_default();
+            member_live_keys.sort_unstable();
+            Some(ContainerGroupRow {
+                metadata: ContainerMetadata {
+                    runtime: aggregate.runtime(),
+                    container_id: aggregate.container_id().to_owned(),
+                    name: aggregate.name().map(str::to_owned),
+                },
+                member_live_keys,
+                cpu: aggregate.cpu().clone(),
+                memory: aggregate.memory().clone(),
+                member_count: aggregate.process_count(),
+            })
+        })
+        .collect()
+}
 
 /// Stable identity of a row in the canonical Applications hierarchy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

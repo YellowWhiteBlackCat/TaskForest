@@ -20,7 +20,7 @@ use crate::widgets::chart::canvas::{
 use crate::widgets::chart::geometry::{
     ChartRun, ChartScale, ChartVertex, chart_runs, line_segments,
 };
-use crate::widgets::chart::hover::{hover_position, hover_slot, hover_text};
+use crate::widgets::chart::hover::{hover_position, hover_slot_in, hover_text};
 use crate::widgets::chart::painter::slide_offset;
 use bevy::color::Color;
 use bevy::math::Vec2;
@@ -67,6 +67,36 @@ fn spec(width: u32, height: u32, runs: Vec<ChartRun>, thickness: f32) -> CanvasS
         crosshair: None,
         flow: None,
     }
+}
+
+#[test]
+fn curve_raster_respects_the_line_color_alpha() {
+    let runs = vec![ChartRun {
+        vertices: vec![
+            ChartVertex { x: 5.0, y: 20.0 },
+            ChartVertex { x: 55.0, y: 20.0 },
+        ],
+    }];
+    let mut input = spec(60, 40, runs, 4.0);
+    input.line = Color::NONE;
+    let transparent = rasterize(&input);
+    assert!(
+        transparent
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| pixel[3] == 0),
+        "a transparent curve leaves the entire canvas transparent"
+    );
+
+    input.line = Color::srgba(1.0, 0.0, 0.0, 0.5);
+    let translucent = rasterize(&input);
+    let alpha = alpha_at(&translucent, 30, 20);
+    assert!(
+        (alpha - 0.5).abs() < 0.01,
+        "a fully covered pixel preserves the line alpha, got {alpha}"
+    );
 }
 
 #[test]
@@ -212,11 +242,11 @@ fn a_fresh_sample_slides_in_one_slot_instead_of_jumping() {
 fn the_pointer_resolves_the_sample_it_is_over() {
     // The newest sample owns the right edge, so the slot is resolved from
     // the right: a sparse window can never report a value from the far side.
-    assert_eq!(hover_slot(10, 100.0, 100.0), Some(9));
-    assert_eq!(hover_slot(10, 100.0, 0.0), Some(0));
-    assert_eq!(hover_slot(10, 100.0, 95.0), Some(9));
-    assert_eq!(hover_slot(10, 100.0, 4.0), Some(0));
-    assert_eq!(hover_slot(0, 100.0, 10.0), None);
+    assert_eq!(hover_slot_in(10, 10, 100.0, 100.0), Some(9));
+    assert_eq!(hover_slot_in(10, 10, 100.0, 0.0), Some(0));
+    assert_eq!(hover_slot_in(10, 10, 100.0, 95.0), Some(9));
+    assert_eq!(hover_slot_in(10, 10, 100.0, 4.0), Some(0));
+    assert_eq!(hover_slot_in(0, 10, 100.0, 10.0), None);
 
     // The picker's normalized hit maps onto the canvas's own box.
     let center = hover_position(Some(Vec2::new(0.0, 0.0)), Vec2::new(100.0, 40.0));
@@ -267,17 +297,19 @@ fn the_grid_carries_its_quarter_rules() {
 }
 
 #[test]
-fn the_scale_ruler_names_the_curve_own_scale() {
-    // The ruler reads the curve's own scale: percentages for the utilization
-    // curves, the measured rate for the throughput curve.
-    let percent = ruler_labels(SystemCurve::Cpu, 100.0);
-    assert_eq!(percent.first().map(String::as_str), Some("100%"));
-    assert_eq!(percent.get(1).map(String::as_str), Some("75%"));
-    assert_eq!(percent.last().map(String::as_str), Some("0%"));
+fn the_curve_chart_leaves_the_scale_to_the_value_badge() {
+    // GPUI's performance chart carries no right-hand ruler. The canvas owns
+    // the full strip width; the newest-value pill names the scale.
+    let curve = SystemCurve::default();
+    let shell = ShellApp::new();
+    let badge = curve_badge_text(&shell, curve);
 
-    let rate = ruler_labels(SystemCurve::Network, 2_048.0);
-    assert_eq!(rate.first().map(String::as_str), Some("2.0 KiB/s"));
-    assert_eq!(rate.last().map(String::as_str), Some("0 B/s"));
+    if let Some(badge) = badge {
+        assert!(
+            badge.ends_with('%'),
+            "the utilization badge names its percent scale, not {badge}"
+        );
+    }
 }
 
 #[test]

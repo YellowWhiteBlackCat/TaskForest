@@ -6,14 +6,15 @@ against real test discovery.
 
 - `cross_frontend_manifest.tsv` — the declaration list. One row per
   `(subject_kind, subject_id, frontend)`.
-- `scene_registry.tsv` — the 55 audited scenes in audit order, one evidence
+- `scene_registry.tsv` — the 56 audited scenes in audit order, one evidence
   anchor per frontend: `test:<nextest name>` (resolved against that
   frontend's live discovery) or `capture:<scenario>` (resolved against its
   capture matrix), with `-` only for `Unsupported`/`Pending` cells.
   `scripts/quality/scene_registry_guard.py` enforces the exact scene
   set/order and resolves every anchor against the owning frontend; the
-  current registry carries 219 behavior-test anchors and one explicit
-  absent cell (TUI `sidebar-hidden`, an owner-declared Unsupported scene).
+  current registry carries 219 behavior-test anchors and two explicit
+  absent cells (TUI `sidebar-hidden` and `tooltip-overlay`, both
+  owner-declared Unsupported scenes).
 - `feature_evidence.tsv` — the P5 feature-level evidence table (G2 closure).
   One row per `(feature_id, frontend)`: the hand-declared nextest anchor that
   backs that shape's delivery claim, or an explicit `pending` gap. It is the

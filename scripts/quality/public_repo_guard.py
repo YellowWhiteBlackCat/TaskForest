@@ -48,6 +48,19 @@ ALLOWED_EMAILS = {
 }
 ALLOWED_EMAIL_SUFFIX = "@users.noreply.github.com"
 NON_EMAIL_SUFFIXES = (".service", ".socket", ".target")
+# Reviewed non-UTF-8 binary assets that contain no NUL byte and therefore
+# cannot use the guard's "NUL means binary" exemption. Each entry is a
+# conscious, reviewed registration, not a blanket rule: the credential and
+# host-path byte scans still run on it, and only the UTF-8 review step (and
+# the decoded-text email scan it gates) is waived.
+REVIEWED_BINARY_ASSETS = {
+    # 64x64 seamless glass grain: luminance-only bytes 244-255, so it holds no
+    # NUL and never decodes as UTF-8. `packaging/regenerate-glass-noise.sh`
+    # rebuilds it deterministically and
+    # `crates/taskmanager-assets/docs/ASSET_RULES.md` owns its rules.
+    "crates/taskmanager-assets/assets/glass/noise-64.rgba",
+}
+
 # Composed at runtime so this guard never ships a scannable email literal.
 SAMPLE_EMAIL = "stranger" + chr(64) + "example.com"
 FORBIDDEN_PREFIXES = (
@@ -142,6 +155,8 @@ def content_violations(root: Path, files: list[Path]) -> list[str]:
                 break
         if PRIVATE_PATH_PATTERN.search(data):
             findings.append(f"host-specific path in tracked file: {name}")
+        if name in REVIEWED_BINARY_ASSETS:
+            continue
         try:
             text = data.decode("utf-8")
         except UnicodeDecodeError:
@@ -226,6 +241,25 @@ def self_test() -> None:
         unit = root / "device@.service"
         unit.write_text("after=network.target\n", encoding="utf-8")
         assert content_violations(root, [unit]) == []
+        # A non-UTF-8, NUL-free binary that is NOT reviewed still fails.
+        noise_name = "crates/taskmanager-assets/assets/glass/noise-64.rgba"
+        unreviewed = root / "assets/glass/noise-64.rgba"
+        unreviewed.parent.mkdir(parents=True)
+        unreviewed.write_bytes(bytes(range(244, 256)) * 1024)
+        assert any(
+            "non-UTF-8" in finding for finding in content_violations(root, [unreviewed])
+        ), "an unreviewed binary must still be reported"
+        reviewed = root / noise_name
+        reviewed.parent.mkdir(parents=True)
+        reviewed.write_bytes(unreviewed.read_bytes())
+        assert content_violations(root, [reviewed]) == [], (
+            "the reviewed asset path must stay exempt from the UTF-8 review step"
+        )
+        smuggled = root / noise_name
+        smuggled.write_bytes(bytes(range(244, 256)) * 1020 + b"-----BEGIN " + b"PRIVATE KEY-----")
+        assert any(
+            "credential-like" in finding for finding in content_violations(root, [smuggled])
+        ), "the reviewed exemption must not waive the credential scan"
     with tempfile.TemporaryDirectory(prefix="public-repo-history-guard-") as directory:
         root = Path(directory)
 

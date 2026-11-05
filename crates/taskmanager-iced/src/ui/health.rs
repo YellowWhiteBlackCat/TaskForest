@@ -8,10 +8,10 @@ use iced::{Element, Length};
 use taskforest_core::core::alerts::AlertMetric;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
-use crate::i18n::{self, Key, Language};
 use crate::theme;
 use crate::ui::components::styled_scrollable;
 
@@ -52,19 +52,18 @@ pub(crate) fn bound_body_to_end() -> iced::Task<Message> {
 pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let appear = app.modal_appear_progress();
     let theme_snapshot = app.theme();
-    let language = app.language();
     let shell = &app.shell;
 
     let summary_panel: Element<'_, Message, iced::Theme, iced::Renderer> =
         match shell.projection().snapshot.as_ref() {
             Some(snapshot) => {
-                let rows = health_rows(snapshot, language);
+                let rows = health_rows(snapshot);
                 panel(
                     theme_snapshot,
-                    i18n::t(language, Key::DeviceSummary),
+                    t("health.device_summary"),
                     column(
                         rows.into_iter()
-                            .map(|row| health_row(theme_snapshot, row, language))
+                            .map(|row| health_row(theme_snapshot, row))
                             .collect::<Vec<_>>(),
                     )
                     .spacing(1)
@@ -73,8 +72,8 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             }
             None => panel(
                 theme_snapshot,
-                i18n::t(language, Key::DeviceSummary),
-                text(i18n::t(language, Key::HealthWaiting))
+                t("health.device_summary"),
+                text(t("health.waiting"))
                     .size(f32::from(tokens::FONT_14))
                     .into(),
             ),
@@ -82,7 +81,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
     let alert_panel = panel(
         theme_snapshot,
-        i18n::t(language, Key::AlertRules),
+        t("alerts.manage"),
         column(
             AlertMetric::ALL
                 .into_iter()
@@ -96,12 +95,12 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let mut modal_panels: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> =
         vec![summary_panel];
     if let Some(snapshot) = shell.projection().snapshot.as_ref()
-        && let Some(sensor_panel) = sensors_and_thermal_panel(snapshot, theme_snapshot, language)
+        && let Some(sensor_panel) = sensors_and_thermal_panel(snapshot, theme_snapshot)
     {
         modal_panels.push(sensor_panel);
     }
     if let Some(sensors) = shell.projection().sensors.as_ref()
-        && let Some(zone_panel) = thermal_zone_sensor_panel(sensors, theme_snapshot, language)
+        && let Some(zone_panel) = thermal_zone_sensor_panel(sensors, theme_snapshot)
     {
         modal_panels.push(zone_panel);
     }
@@ -116,8 +115,8 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     // UI charter states for pinned rails).
     modal_overlay(
         theme_snapshot,
-        i18n::t(language, Key::Health),
-        i18n::t(language, Key::HealthObservedHint),
+        t("health.title"),
+        t("health.observed_hint"),
         styled_scrollable(column(modal_panels).spacing(12))
             .id(BODY_SCROLL_ID)
             .height(Length::Fixed(430.0))
@@ -139,17 +138,17 @@ pub(super) struct HealthRow {
 
 /// Build the per-domain device summary from one snapshot. A domain with no
 /// current reading is honest `Partial`/unhealthy rather than a fabricated
-/// zero. Every label and composed value resolves through the active
-/// [`Language`] so the iced summary reads in the same tongue as the rest of
-/// the modal.
+/// zero. Every label and composed value resolves through the shared locale
+/// catalog, so the iced summary reads in the same tongue as the rest of the
+/// modal.
 #[must_use]
-pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<HealthRow> {
+pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let observed = projection::HealthObservation::from(snapshot);
     let mut rows = Vec::new();
 
     if let Some(score) = health_score_for_snapshot(snapshot) {
         rows.push(HealthRow {
-            label: i18n::t(language, Key::HealthScore).to_owned(),
+            label: t("system.health_score").to_owned(),
             value: health_score_summary(&score),
             healthy: score.score >= 80,
         });
@@ -169,7 +168,7 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
     };
     let cpu_temp_text = cpu_temp.map_or_else(missing_value, |temp| format!("{temp:.0} °C"));
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Cpu).to_owned(),
+        label: t("common.cpu").to_owned(),
         value: format!("{cpu_text} · {cpu_temp_text}"),
         healthy: cpu_usage.is_some(),
     });
@@ -189,12 +188,12 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
     let memory_healthy = memory.is_some();
     let swap_healthy = swap.is_some();
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Memory).to_owned(),
+        label: t("common.memory").to_owned(),
         value: memory.unwrap_or_else(missing_value),
         healthy: memory_healthy,
     });
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Swap).to_owned(),
+        label: t("mem.swap").to_owned(),
         value: swap.unwrap_or_else(missing_value),
         healthy: swap_healthy,
     });
@@ -203,15 +202,14 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
         missing_value()
     } else {
         count_value(
-            language,
-            Key::HealthDeviceCountOne,
-            Key::HealthDeviceCountMany,
+            "health.device_count_one",
+            "health.device_count_many",
             snapshot.disks.len(),
             &snapshot.disks[0].model,
         )
     };
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Disk).to_owned(),
+        label: t("common.disk").to_owned(),
         value: disk_text,
         healthy: !snapshot.disks.is_empty(),
     });
@@ -220,15 +218,14 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
         missing_value()
     } else {
         count_value(
-            language,
-            Key::HealthInterfaceCountOne,
-            Key::HealthInterfaceCountMany,
+            "health.interface_count_one",
+            "health.interface_count_many",
             snapshot.networks.len(),
             &snapshot.networks[0].interface_name,
         )
     };
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Network).to_owned(),
+        label: t("common.network").to_owned(),
         value: network_text,
         healthy: !snapshot.networks.is_empty(),
     });
@@ -237,22 +234,21 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
         missing_value()
     } else {
         count_value(
-            language,
-            Key::HealthGpuCountOne,
-            Key::HealthGpuCountMany,
+            "health.gpu_count_one",
+            "health.gpu_count_many",
             snapshot.gpu.len(),
             &snapshot.gpu[0].brand,
         )
     };
     rows.push(HealthRow {
-        label: i18n::t(language, Key::Gpu).to_owned(),
+        label: t("common.gpu").to_owned(),
         value: gpu_text,
         healthy: !snapshot.gpu.is_empty(),
     });
 
     rows.push(HealthRow {
-        label: i18n::t(language, Key::SystemDomain).to_owned(),
-        value: i18n::t(language, Key::HealthSystemValue)
+        label: t("system.title").to_owned(),
+        value: t("health.system_value")
             .replace("{uptime}", &duration(snapshot.uptime_secs))
             .replace("{processes}", &snapshot.processes.to_string())
             .replace(
@@ -271,9 +267,8 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot, language: Language) -> Vec<
 /// singular/plural template for the active locale, then substitute the shared
 /// named placeholders. Chinese uses the same template for both counts (no
 /// plural inflection), so only the selected key differs.
-fn count_value(language: Language, one: Key, many: Key, count: usize, model: &str) -> String {
-    let key = if count == 1 { one } else { many };
-    i18n::t(language, key)
+fn count_value(one: &'static str, many: &'static str, count: usize, model: &str) -> String {
+    t(if count == 1 { one } else { many })
         .replace("{count}", &count.to_string())
         .replace("{model}", model)
 }
@@ -281,15 +276,14 @@ fn count_value(language: Language, one: Key, many: Key, count: usize, model: &st
 fn health_row<'a>(
     theme_snapshot: &Theme,
     row: HealthRow,
-    language: Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
         text(row.label.clone()).width(Length::Fixed(150.0)),
         text(row.value.clone()).width(Length::Fill),
         text(if row.healthy {
-            i18n::t(language, Key::HealthVerdictOk)
+            t("health.verdict_ok")
         } else {
-            i18n::t(language, Key::HealthUnavailable)
+            t("health.unavailable")
         })
         .size(f32::from(tokens::FONT_12))
         .color(theme::status_color(theme_snapshot, row.healthy))
@@ -341,12 +335,11 @@ fn panel<'a>(
 pub(crate) fn sensors_and_thermal_panel<'a>(
     snapshot: &SystemSnapshot,
     theme_snapshot: &'a Theme,
-    language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let mut items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
 
     // 1. Thermal readings
-    let temps = projection::thermal_readings(snapshot, language);
+    let temps = projection::thermal_readings(snapshot);
 
     if !temps.is_empty() {
         let mut temp_pills: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
@@ -354,22 +347,22 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
             let (bg_color, tag) = if temp < 45.0 {
                 (
                     crate::theme_binding::color(theme_snapshot.network),
-                    i18n::t(language, Key::HealthThermalCool),
+                    t("health.thermal_cool"),
                 )
             } else if temp < 70.0 {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().accent),
-                    i18n::t(language, Key::HealthThermalNormal),
+                    t("health.thermal_normal"),
                 )
             } else if temp < 85.0 {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().warning),
-                    i18n::t(language, Key::HealthThermalWarm),
+                    t("health.thermal_warm"),
                 )
             } else {
                 (
                     crate::theme_binding::color(theme_snapshot.palette().danger),
-                    i18n::t(language, Key::HealthThermalHot),
+                    t("health.thermal_hot"),
                 )
             };
 
@@ -409,7 +402,7 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
 
         items.push(
             column![
-                text(i18n::t(language, Key::HealthThermalHeatmap))
+                text(t("health.thermal_heatmap"))
                     .size(f32::from(tokens::FONT_12))
                     .style(move |_| text::Style {
                         color: Some(theme::muted_text_color(theme_snapshot)),
@@ -426,7 +419,7 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
     } else {
         Some(panel(
             theme_snapshot,
-            i18n::t(language, Key::HealthSensorsThermal),
+            t("health.sensors_thermal"),
             column(items).spacing(6).into(),
         ))
     }
@@ -440,7 +433,6 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
 pub(super) fn thermal_zone_sensor_panel<'a>(
     sensors: &SensorCenterSnapshot,
     theme_snapshot: &'a Theme,
-    language: Language,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let rows = projection::thermal_zone_rows(sensors);
     if rows.is_empty() {
@@ -448,7 +440,7 @@ pub(super) fn thermal_zone_sensor_panel<'a>(
     }
     Some(panel(
         theme_snapshot,
-        i18n::t(language, Key::ThermalZones),
+        t("common.thermal_zones"),
         column(
             rows.into_iter()
                 .map(|row| thermal_zone_row(theme_snapshot, row))

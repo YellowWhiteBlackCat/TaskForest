@@ -298,7 +298,7 @@ fn core_cell_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl 
                             flex_grow: 1.0,
                             min_width: px(0.0),
                             height: rem(core_bar_height_rem(palette)),
-                            border_radius: BorderRadius::all(Val::Px(space_2())),
+                            border_radius: BorderRadius::all(rem(core_bar_height_rem(palette) / 2.0)),
                             overflow: Overflow::clip_x(),
                         }
                         BackgroundColor({ palette.nav_active_bg })
@@ -307,7 +307,7 @@ fn core_cell_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl 
                                 Node {
                                     width: percent(fill_pct),
                                     height: percent(100.0),
-                                    border_radius: BorderRadius::all(Val::Px(space_2())),
+                                    border_radius: BorderRadius::all(rem(core_bar_height_rem(palette) / 2.0)),
                                 }
                                 BackgroundColor({ fill_ink })
                                 CoreBarFill(index)

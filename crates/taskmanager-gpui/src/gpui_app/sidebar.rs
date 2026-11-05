@@ -4,9 +4,9 @@
 //! views — Memory composition, Disk dual-graph, etc. — come in later milestones).
 
 use gpui::{
-    App, AppContext, Context, Div, DragMoveEvent, Empty, Entity, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, Pixels, Render, ScrollHandle, Stateful, StatefulInteractiveElement,
-    Styled, Window, div, px,
+    AccessibleAction, App, AppContext, Context, Div, DragMoveEvent, Empty, Entity, FocusHandle,
+    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement, Pixels, Render,
+    Role, ScrollHandle, Stateful, StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::rc::Rc;
 use taskforest_core::core::config::SidebarDeviceOverrideConfig;
@@ -17,8 +17,10 @@ use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui_contract::IconId;
+use taskmanager_ui::theme_binding::rem_length;
+use taskmanager_ui_contract::{COLUMN_WIDTH_KEYBOARD_STEP, IconId};
 
 use crate::gpui_app::formatting::{PerformanceSettings, gpu_identity_text};
 use crate::gpui_app::graph::GraphCacheHandle;
@@ -26,12 +28,13 @@ use crate::gpui_app::history_samples::{
     battery_capacity_samples, fan_rpm_samples, gpu_usage_samples, network_rate_samples,
     storage_activity_samples,
 };
-use crate::gpui_app::root::{Hover, RootView};
+use crate::gpui_app::root::{Hover, RootView, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH};
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
-use taskmanager_theme::Theme;
+use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::layout::scroll_region_with_overlay_rail;
 
 mod captions;
@@ -84,34 +87,80 @@ impl Render for SidebarResize {
     }
 }
 
-/// The right-edge drag handle for the devices sidebar. Its dedicated gutter
-/// sits beside, rather than underneath, the scrollbar rail and shows a 1px
-/// visible rule in the border color.
-/// `cursor_col_resize` + the typed `SidebarResize` drag drive
-/// `RootView::resize_sidebar` (clamped `[200, 460]`); `on_mouse_up_out` clears
-/// the drag anchor. Mirrors `processes_view::chrome::resize::proc_resize_handle`.
+fn resize_sidebar_step(entity: &Entity<RootView>, delta: f32, cx: &mut App) {
+    entity.update(cx, |view, cx| {
+        let width = view.presentation_snapshot().sidebar_width();
+        let next = (f32::from(width) + delta).clamp(SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH);
+        view.resize_sidebar(px(next), cx);
+    });
+}
+
+/// The dedicated gutter stays transparent until hover or keyboard focus, and
+/// remains separate from the scroll rail so both controls keep their hitboxes.
 fn sidebar_resize_handle(
     theme: &Theme,
     start_width: Pixels,
+    focus_handle: &FocusHandle,
     entity: &Entity<RootView>,
 ) -> Stateful<Div> {
     let ent_move = entity.clone();
     let ent_drag = entity.clone();
     let ent_up = entity.clone();
-    let border = theme.border;
+    let ent_key = entity.clone();
+    let ent_increase = entity.clone();
+    let ent_decrease = entity.clone();
+    let accent = theme.accent;
     div()
         .flex()
         .flex_row()
         .id("sidebar-resize")
         .debug_selector(|| "tm-sidebar-resize-handle".to_string())
+        .group("sidebar-resize")
+        .track_focus(focus_handle)
+        .role(Role::Splitter)
+        .aria_label(i18n::t("sidebar.resize"))
+        .aria_numeric_value(f64::from(f32::from(start_width)))
+        .aria_min_numeric_value(f64::from(SIDEBAR_MIN_WIDTH))
+        .aria_max_numeric_value(f64::from(SIDEBAR_MAX_WIDTH))
+        .aria_numeric_value_step(f64::from(COLUMN_WIDTH_KEYBOARD_STEP))
         .occlude()
         .cursor_col_resize()
         .h_full()
         .w(SIDEBAR_RESIZE_GUTTER)
         .flex_none()
-        .justify_end()
+        .justify_center()
         .items_center()
-        .child(div().h_full().justify_center().bg(fill(border)).w(px(1.0)))
+        .rounded_full()
+        .focus(move |style| style.bg(fill(accent.with_alpha(0.14))))
+        .child(
+            div()
+                .debug_selector(|| "tm-sidebar-resize-indicator".to_string())
+                .w(px(3.0))
+                .h(px(28.0))
+                .rounded_full()
+                .bg(fill(accent.with_alpha(0.0)))
+                .group_hover("sidebar-resize", move |style| {
+                    style.bg(fill(accent.with_alpha(0.55)))
+                }),
+        )
+        .on_key_down(move |event: &KeyDownEvent, _window, cx: &mut App| {
+            if event.keystroke.modifiers.modified() {
+                return;
+            }
+            let delta = match event.keystroke.key.as_str() {
+                "left" => -COLUMN_WIDTH_KEYBOARD_STEP,
+                "right" => COLUMN_WIDTH_KEYBOARD_STEP,
+                _ => return,
+            };
+            cx.stop_propagation();
+            resize_sidebar_step(&ent_key, delta, cx);
+        })
+        .on_a11y_action(AccessibleAction::Increment, move |_, _, cx| {
+            resize_sidebar_step(&ent_increase, COLUMN_WIDTH_KEYBOARD_STEP, cx);
+        })
+        .on_a11y_action(AccessibleAction::Decrement, move |_, _, cx| {
+            resize_sidebar_step(&ent_decrease, -COLUMN_WIDTH_KEYBOARD_STEP, cx);
+        })
         .on_drag_move(
             move |e: &DragMoveEvent<SidebarResize>, _win, cx: &mut App| {
                 let payload = *e.drag(cx);
@@ -156,6 +205,7 @@ fn sidebar_resize_handle(
 pub(crate) struct SidebarProps<'a> {
     pub theme: &'a Theme,
     pub scroll: &'a ScrollHandle,
+    pub resize_focus: &'a FocusHandle,
     pub width: Pixels,
     pub snap: &'a SystemSnapshot,
     pub telemetry: &'a TelemetryStore,
@@ -190,6 +240,7 @@ pub(crate) fn render_sidebar(
     let SidebarProps {
         theme,
         scroll,
+        resize_focus,
         width,
         snap,
         telemetry,
@@ -574,18 +625,15 @@ pub(crate) fn render_sidebar(
     .min_w(content_width)
     .max_w(content_width)
     .h_full()
-    .bg(fill(theme.sidebar_bg))
-    // Round the sidebar's BOTTOM-LEFT corner: it spans the full window
-    // height beside the content area and would otherwise paint a square
-    // pixel into the transparent CSD corner (its top-left sits under the
-    // titlebar, inside the window). 0 when tiled at left/bottom,
-    // maximized, or fullscreen (and on non-transparent macOS/Windows),
-    // AND when the compositor granted Server decorations (corner_factor=0)
-    // — under SSD the system frame owns the outline, so the app must paint
-    // a square corner flush into it, never a second app-drawn arc.
-    .rounded_bl(px(
-        theme.window_corner_radius(WindowCorner::BottomLeft) * corner_factor
-    ));
+    .bg(glass_fill(theme, GlassTier::Sidebar))
+    .rounded(rem_length(tokens::card_radius(theme)))
+    // The panel corner must also clear a larger transparent CSD corner.
+    .rounded_bl(px((f32::from(tokens::card_radius(theme))
+        * theme.root_rem_size
+        / STANDARD_ROOT_REM_SIZE)
+        .max(
+            theme.window_corner_radius(WindowCorner::BottomLeft) * corner_factor,
+        )));
 
     // The outer slot remains the sole width authority. Its final gutter is
     // reserved for resizing; the scroll viewport and rail end before it.
@@ -602,9 +650,13 @@ pub(crate) fn render_sidebar(
         .min_w(width)
         .max_w(width)
         .flex_none()
-        .bg(fill(theme.sidebar_bg))
         .child(col)
-        .child(sidebar_resize_handle(theme, width, &cx.entity()))
+        .child(sidebar_resize_handle(
+            theme,
+            width,
+            resize_focus,
+            &cx.entity(),
+        ))
 }
 
 #[cfg(test)]

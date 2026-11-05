@@ -50,14 +50,11 @@ pub(crate) use demo::init_demo;
 
 mod config_tokens;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
-pub(super) use config_tokens::{
-    FONT_TOKEN_SYSTEM, color_scheme_from_token, font_pref_from_config, page_token,
-    skin_preference_from_config, text_rendering_mode_from_token,
-};
 use config_tokens::{
     apply_cfg_to_theme, resolve_app_id, resolve_startup_page, startup_page_from_token,
     text_rendering_from_token,
 };
+pub(super) use config_tokens::{page_token, text_rendering_mode_from_token};
 
 mod config_sync;
 use config_sync::{
@@ -458,8 +455,9 @@ pub fn init<E>(
     // RootView re-resolves against it on every skin/font change.
     let font_availability = detect_font_availability(cx);
     report_font_fallback(&font_availability);
-    let font_pref = font_pref_from_config(&cfg, &font_availability);
-    let skin_preference = skin_preference_from_config(&cfg).or_else(forced_skin_from_env);
+    let font_pref =
+        FontPreference::from_config_tokens(&cfg.ui_font, &cfg.mono_font, &font_availability);
+    let skin_preference = Skin::from_config_token(&cfg.skin).or_else(forced_skin_from_env);
     theme = Theme::build(
         theme.skin,
         theme.mode,

@@ -8,8 +8,12 @@ cross-frontend keybinding coverage matrix, the CORE-04 product-intent matrix,
 and the component/surface capability parity registry (CORE-08:
 `taskmanager-ui` is the reference shape - GPUI-05; every deliberate frontend
 difference is a reasoned, gate-checked registry entry, never prose parity
-claims). Defines explicit, toolkit-neutral semantic specifications and the
-first-class divergence quality baselines under "求同存异" standards governance.
+claims), and the `presentation` layer (ADR-064): the one layout vocabulary
+and budget fold, the per-shape threshold registry, the control-role
+measurement matrix with a 44px hit-target floor, the motion-role/curve
+contract, and the cross-shape probe grid that computes parity instead of
+asserting it. Defines explicit, toolkit-neutral semantic specifications and
+the first-class divergence quality baselines under "求同存异" standards governance.
 
 ## Boundary
 
@@ -54,6 +58,9 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
                                  with its bidirectional slot gate (ADR-059)
 src/accessibility/               neutral accessibility model and snapshots
 src/conformance.rs               conformance suite contracts and test helpers
+src/presentation.rs              ADR-064: vocabulary → thresholds → budget →
+                                 parity; sizes/motion/resolution in
+                                 src/presentation/
 ```
 
 ## Docs
@@ -62,5 +69,9 @@ src/conformance.rs               conformance suite contracts and test helpers
   navigation vocabulary and the feature-coverage ledger.
 - [`docs/ACCESSIBILITY_PROCESS_ROWS.md`](docs/ACCESSIBILITY_PROCESS_ROWS.md) — typed process
   observations, aggregate coverage, and tree action identity.
+- [`docs/PRESENTATION.md`](docs/PRESENTATION.md) — presentation resolution charter:
+  shared folds, the theme-value lift, divergence registry and capture evidence.
 - [`UI_COMPONENT_ARCHITECTURE`](../../docs/UI_COMPONENT_ARCHITECTURE.md) and
   [ADR-046](../../adr/046-bevy-fourth-shared-contract-shape.md) — shared contract shape.
+- [ADR-064](../../adr/064-presentation-resolution-layer.md) — presentation
+  resolution layer and the capture-resolution evidence gate.

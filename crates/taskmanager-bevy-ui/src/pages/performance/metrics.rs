@@ -2,31 +2,50 @@
 
 use super::*;
 use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::metrics::NetworkAdapterType;
 use taskforest_core::core::metrics::SmartAvailability;
 use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::trend::window;
+use taskmanager_shell::presentation::wifi_signal_quality_percent;
 
 pub(super) mod battery;
 pub(super) mod cpu;
+mod cpu_caption;
 pub(super) mod disk;
 mod fan;
 mod gpu;
 mod npu_power;
+pub(super) mod sidebar_captions;
 mod smart;
+mod stat_rows;
+pub(super) mod stat_value;
 pub(super) use battery::{battery_charge_pct, battery_fact_line};
+pub(super) use cpu_caption::cpu_sidebar_caption;
 pub(super) use disk::{
     MountAlert, NvmeGauge, PartitionDonut, SmartHealthBadge, SmartToolGuidance, WearBand,
     mount_alerts, nvme_gauge_model, partition_donut_models, smart_health_badge, smart_health_label,
     smart_tool_guidance,
 };
-pub(super) use fan::{fan_caption, fan_fact_line, fans};
+pub(super) use fan::{fan_fact_line, fans};
 pub(super) use gpu::gpu_fact_line;
 pub(super) use npu_power::{npu_power_fact, npu_power_samples};
+pub(super) use sidebar_captions::{
+    battery_sidebar_caption, device_sidebar_caption, disk_sidebar_caption, fan_sidebar_caption,
+    gpu_sidebar_caption, memory_sidebar_caption, network_sidebar_caption,
+};
 pub(super) use smart::{smart_source_guidance, smart_source_status};
+pub(super) use stat_rows::{
+    battery_header_view_model, battery_stat_rows, disk_header_view_model, disk_sidebar_title,
+    disk_stat_rows, fan_header_view_model, fan_stat_rows, gpu_block_title, gpu_header_view_model,
+    gpu_stat_rows, memory_header_view_model, memory_section_summary, memory_segments_total,
+    network_header_view_model, network_stat_rows, swap_bar_fractions,
+};
 
 /// Percent readout. There is no shared percent formatter in
 /// `shell::presentation` (the TUI keeps its own in `ui/units.rs`), so this
@@ -345,17 +364,6 @@ pub(super) fn battery_sidebar_title(battery: &BatteryInfo, index: usize) -> Stri
     }
 }
 
-pub(super) fn battery_caption(battery: &BatteryInfo) -> String {
-    let charge = battery
-        .current_capacity_pct()
-        .map_or_else(missing_value, |pct| format!("{pct}%"));
-    let watts = battery
-        .current_power_w()
-        .filter(|w| w.is_finite())
-        .map_or(String::new(), |w| format!(" · {w:.1} W"));
-    format!("{charge}{watts}")
-}
-
 /// Per-core usages, one readout per projected core with honest dashes for
 /// per-core gaps; no cores observed at all renders the plain dash.
 pub(super) fn core_summary(shell: &ShellApp) -> String {
@@ -447,6 +455,17 @@ pub(super) fn curve_warm(samples: &[f32]) -> bool {
     samples.len() >= 2
 }
 
+/// The curve's newest finite sample, formatted for the always-on GPUI badge.
+/// An absent, all-gap window returns `None`; a hidden gap never fabricates a
+/// value.
+pub(super) fn curve_badge_text(shell: &ShellApp, curve: SystemCurve) -> Option<String> {
+    let samples = curve_samples(shell, curve);
+    graph_summary(&samples).map(|summary| curve.format_value(summary.latest))
+}
+
+/// The chart caption while the window is still warming: one honest
+/// "collecting samples" line. A warm window prints its summary as three
+/// bounded row items instead (see [`curve_caption_item`]).
 pub(crate) fn curve_caption(shell: &ShellApp, curve: SystemCurve) -> String {
     let samples = curve_samples(shell, curve);
     if !curve_warm(&samples) {
@@ -463,6 +482,37 @@ pub(crate) fn curve_caption(shell: &ShellApp, curve: SystemCurve) -> String {
             curve.format_value(summary.maximum),
         )
     })
+}
+
+/// One item of the chart's latest/avg/peak row. The reference surface prints
+/// three separate nowrap items with a SPACE_12 gap, so each item owns its own
+/// text node and its own bounded width instead of one wide joined string.
+pub(crate) fn curve_caption_item(
+    shell: &ShellApp,
+    curve: SystemCurve,
+    item: SummaryItem,
+) -> String {
+    let samples = curve_samples(shell, curve);
+    if !curve_warm(&samples) {
+        return if item == SummaryItem::Latest {
+            t("perf.collecting_samples").to_owned()
+        } else {
+            String::new()
+        };
+    }
+    let Some(summary) = graph_summary(&samples) else {
+        return if item == SummaryItem::Latest {
+            missing_value()
+        } else {
+            String::new()
+        };
+    };
+    let (label, value) = match item {
+        SummaryItem::Latest => (t("common.latest"), summary.latest),
+        SummaryItem::Average => (t("common.avg"), summary.average),
+        SummaryItem::Maximum => (t("common.peak"), summary.maximum),
+    };
+    format!("{} {}", label, curve.format_value(value))
 }
 
 pub(super) fn curve_wanted(shell: &ShellApp, curve: SystemCurve) -> bool {
@@ -639,6 +689,18 @@ pub(crate) fn segment_value(shell: &ShellApp, kind: MemSegmentKind) -> String {
         })
 }
 
+/// The byte count alone for a composition legend column: the share prints in
+/// its own column, so the value column must not repeat it.
+pub(crate) fn segment_bytes_value(shell: &ShellApp, kind: MemSegmentKind) -> String {
+    let Some(memory) = memory_metrics(shell) else {
+        return missing_value();
+    };
+    memory_segments(memory)
+        .iter()
+        .find(|segment| segment.kind == kind)
+        .map_or_else(missing_value, |segment| bytes(segment.bytes))
+}
+
 /// One composition legend row: byte count plus its clamped share of a known
 /// positive total (the segment math itself — which categories exist and
 /// their saturating byte sums — is owned by `taskmanager_shell::memory`).
@@ -656,13 +718,10 @@ pub(super) fn segment_line(segment: &MemSegment, total: Option<u64>) -> String {
 pub(super) fn dyn_field_text(shell: &ShellApp, field: &DynField) -> String {
     match field {
         DynField::Summary(field) => summary_value(shell, *field),
-        DynField::CurveCaption(curve) => curve_caption(shell, *curve),
-        DynField::BatteryCaption(device) => batteries(shell)
-            .and_then(|rows| rows.iter().find(|battery| &battery.id == device))
-            .map_or_else(missing_value, battery_caption),
-        DynField::FanCaption(device) => fans(shell)
-            .and_then(|rows| rows.into_iter().find(|fan| fan.id() == device))
-            .map_or_else(missing_value, fan_caption),
+        DynField::CurveCaptionItem(curve, item) => curve_caption_item(shell, *curve, *item),
+        DynField::CurveBadge(curve) => curve_badge_text(shell, *curve).unwrap_or_default(),
+        DynField::SidebarCaption1(target) => device_sidebar_caption(shell, target).0,
+        DynField::SidebarCaption2(target) => device_sidebar_caption(shell, target).1,
         DynField::GpuMetricLabel(_) => t(shell.gpu_chart_metric_selected().label_key()).to_owned(),
         DynField::Cpu(field) => cpu_field_text(shell, *field),
         DynField::SmartStatus(device) => disks(shell)

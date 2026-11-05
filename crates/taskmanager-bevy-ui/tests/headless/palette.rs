@@ -7,13 +7,13 @@
 //! token weights, token radius). A mutation that hardcodes a bevy default or
 //! reinterprets the token scale fails here without any window.
 
-use bevy::color::Srgba;
+use bevy::color::{Luminance, Srgba};
 use bevy::scene::WorldSceneExt;
 use bevy::text::{FontSize, RemSize};
 use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
-use super::{UiPalette, theme_color, ui_palette};
+use super::{UiPalette, composite_over, theme_color, ui_palette};
 use taskmanager_theme::Color;
 
 /// The light-mode counterpart of `Theme::dark()`'s construction: same skin,
@@ -69,12 +69,51 @@ fn ui_palette_derives_every_metric_from_tokens() {
     let theme = Theme::dark();
     let palette: UiPalette = ui_palette(&theme, UiSize::Standard);
     assert_same_color(palette.window_clear, theme.window_bg);
-    assert_same_color(palette.panel_fill, theme.card_surface());
+    assert_same_color(palette.canvas, theme.window_bg);
+    // The glass ladder is pre-composited over the page canvas in the theme's
+    // own sRGB space, so what the palette names is exactly what the frame
+    // paints — in every blend space (BEVY-183).
+    let card_expect = composite_over(palette.canvas, theme_color(theme.glass_card().fill));
+    let chrome_expect = composite_over(palette.canvas, theme_color(theme.glass_chrome().fill));
+    let modal_expect = composite_over(palette.canvas, theme_color(theme.glass_modal().fill));
+    assert_eq!(
+        palette.panel_fill.to_srgba(),
+        card_expect.to_srgba(),
+        "the card fill is the theme's card glass over the page canvas"
+    );
+    assert_eq!(
+        palette.nav_bg.to_srgba(),
+        chrome_expect.to_srgba(),
+        "the nav rail is the theme's chrome glass over the page canvas"
+    );
+    assert_eq!(
+        palette.glass_modal_fill.to_srgba(),
+        modal_expect.to_srgba(),
+        "the modal is the theme's modal glass over the page canvas"
+    );
+    for surface in [
+        palette.panel_fill,
+        palette.nav_bg,
+        palette.glass_modal_fill,
+        palette.glass_card_edge,
+        palette.glass_sidebar_edge,
+        palette.glass_modal_edge,
+    ] {
+        assert!(
+            surface.to_srgba().alpha >= 1.0,
+            "a composited glass surface carries no residual alpha: {:?}",
+            surface.to_srgba()
+        );
+    }
+    assert!(
+        palette.panel_fill.luminance() > palette.canvas.luminance() + 0.01,
+        "a card must read as elevated above the canvas it sits on"
+    );
     assert_same_color(palette.content_bg, theme.view_bg);
-    assert_same_color(palette.nav_bg, theme.sidebar_bg);
     assert_same_color(palette.nav_active_bg, theme.sidebar_card_bg);
     assert_same_color(palette.hover_bg, theme.hover_bg());
     assert_same_color(palette.selection_bg, theme.selection_bg());
+    assert_same_color(palette.glass_scrim_fill, theme.glass_scrim().fill);
     assert_same_color(palette.accent, theme.accent);
     assert_same_color(palette.heading_color, theme.fg);
     assert_same_color(palette.body_color, theme.fg);
@@ -130,6 +169,13 @@ fn ui_size_axis_rescales_the_rem_ladder() {
     assert_eq!(small.rem_px, 14.0);
     assert_eq!(standard.rem_px, 16.0);
     assert_eq!(large.rem_px, 18.0);
+    assert_eq!(small.panel_radius_rem(), standard.panel_radius_rem());
+    assert_eq!(standard.panel_radius_rem(), large.panel_radius_rem());
+    assert_eq!(small.control_radius_rem(), large.control_radius_rem());
+    assert_eq!(
+        small.panel_content_inset_rem(),
+        large.panel_content_inset_rem()
+    );
     // The control height keeps resolving to the density table's px per step.
     assert_eq!(small.control_height_px(), 32.0);
     assert_eq!(standard.control_height_px(), 38.0);

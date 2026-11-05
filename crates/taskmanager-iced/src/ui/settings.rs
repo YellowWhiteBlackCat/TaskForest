@@ -16,13 +16,11 @@
 
 use iced::widget::{column, text};
 use iced::{Element, Length};
-use taskmanager_theme::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontRole, Theme, tokens,
-};
+use taskmanager_theme::{FontAvailability, FontChoice, FontRole, Theme, tokens};
 
 use crate::app::{DeviceKind, FocusTarget, Message, PresentationPreferences, SettingsChange};
-use crate::i18n::{self, Key, Language};
 use crate::ui::components::styled_scrollable;
+use taskmanager_application::i18n::Language;
 
 use super::components::IcedElement;
 use super::components::{segmented, select, slider, switch};
@@ -36,17 +34,6 @@ mod shortcuts;
 use controls::*;
 use privilege_center::privileges_group;
 use shortcuts::shortcut_section;
-
-fn is_system_font_token(token: &str) -> bool {
-    token.eq_ignore_ascii_case("system")
-}
-
-fn is_bundled_font_token(token: &str, bundled_family: &str) -> bool {
-    token.is_empty()
-        || token.eq_ignore_ascii_case(bundled_family)
-        || (bundled_family.eq_ignore_ascii_case(FONT_MISANS_VF)
-            && token.eq_ignore_ascii_case(FONT_ROBOTO_MONO))
-}
 
 /// The focus stop for one settings control; each control is a single stop,
 /// so every section name maps to one stable operation id
@@ -67,11 +54,11 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let mut groups: Vec<IcedElement<'_>> = vec![
         privileges_group(app),
         general_group(theme_snapshot, language, prefs),
-        appearance_group(theme_snapshot, language, app, prefs),
-        fonts_group(theme_snapshot, language, app, prefs),
-        system_group(theme_snapshot, language, prefs),
+        appearance_group(theme_snapshot, app, prefs),
+        fonts_group(theme_snapshot, app, prefs),
+        system_group(theme_snapshot, prefs),
         notifications_group(theme_snapshot, prefs),
-        units_group(theme_snapshot, language, prefs),
+        units_group(theme_snapshot, prefs),
     ];
 
     if app.first_run.view().info.is_some() {
@@ -98,7 +85,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
     modal_overlay(
         theme_snapshot,
-        i18n::t(language, Key::Settings),
+        t("chrome.settings"),
         t("settings.persist_hint"),
         styled_scrollable(column(groups).spacing(f32::from(tokens::SPACE_12)))
             .height(Length::Fill)
@@ -143,7 +130,7 @@ fn general_group<'a>(
                         target("language"),
                         language_choices,
                         language_choices.iter().find(|choice| choice.0 == language),
-                        i18n::t(language, Key::Language),
+                        t("settings.language"),
                         |choice: &LanguageChoice| {
                             Message::SettingsChanged(SettingsChange::Language(choice.0))
                         },
@@ -175,7 +162,6 @@ fn general_group<'a>(
 /// Appearance: interface size, density, skin, mode, high contrast, motion.
 fn appearance_group<'a>(
     theme_snapshot: &'a Theme,
-    language: Language,
     app: &crate::IcedApp,
     prefs: &PresentationPreferences,
 ) -> IcedElement<'a> {
@@ -197,17 +183,17 @@ fn appearance_group<'a>(
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::Density),
+                t("settings.density"),
                 segmented(
                     theme_snapshot,
                     target("density"),
-                    &density_choices(language),
-                    density_value(prefs.density.eq_ignore_ascii_case("Compact")),
+                    &density_choices(),
+                    density_value(&prefs.density),
                     |value| Message::SettingsChanged(SettingsChange::CompactDensity(value == 1)),
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::Skin),
+                t("settings.skin"),
                 segmented(
                     theme_snapshot,
                     target("skin"),
@@ -217,17 +203,17 @@ fn appearance_group<'a>(
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::Mode),
+                t("settings.mode"),
                 segmented(
                     theme_snapshot,
                     target("mode"),
-                    &mode_choices(language),
+                    &mode_choices(),
                     mode_value(&prefs.mode),
                     |value| Message::SettingsChanged(SettingsChange::Mode(mode_for_value(value))),
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::HighContrast),
+                t("settings.high_contrast"),
                 switch(*theme_snapshot, target("hc"), prefs.hc, false, |on| {
                     Message::SettingsChanged(SettingsChange::HighContrast(on))
                 }),
@@ -254,7 +240,6 @@ fn appearance_group<'a>(
 /// not toggled).
 fn fonts_group<'a>(
     theme_snapshot: &'a Theme,
-    language: Language,
     app: &'a crate::IcedApp,
     prefs: &PresentationPreferences,
 ) -> IcedElement<'a> {
@@ -268,11 +253,8 @@ fn fonts_group<'a>(
                 segmented(
                     theme_snapshot,
                     target("ui-font"),
-                    &font_choice_choices(language),
-                    font_choice_value(
-                        is_system_font_token(&prefs.ui_font),
-                        is_bundled_font_token(&prefs.ui_font, FONT_MISANS_VF),
-                    ),
+                    &font_choice_choices(),
+                    font_choice_value(&prefs.ui_font, FontRole::Ui, availability),
                     |value| {
                         Message::SettingsChanged(SettingsChange::UiFont(font_choice_for_value(
                             value,
@@ -281,17 +263,10 @@ fn fonts_group<'a>(
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::FontFamily),
+                t("settings.font_family"),
                 boxed(
                     260.0,
-                    family_select(
-                        theme_snapshot,
-                        FontRole::Ui,
-                        &prefs.ui_font,
-                        FONT_MISANS_VF,
-                        availability,
-                        language,
-                    ),
+                    family_select(theme_snapshot, FontRole::Ui, &prefs.ui_font, availability),
                 ),
             ),
             setting_row(
@@ -299,11 +274,8 @@ fn fonts_group<'a>(
                 segmented(
                     theme_snapshot,
                     target("mono-font"),
-                    &font_choice_choices(language),
-                    font_choice_value(
-                        is_system_font_token(&prefs.mono_font),
-                        is_bundled_font_token(&prefs.mono_font, FONT_ROBOTO_MONO),
-                    ),
+                    &font_choice_choices(),
+                    font_choice_value(&prefs.mono_font, FontRole::Mono, availability),
                     |value| {
                         Message::SettingsChanged(SettingsChange::MonoFont(font_choice_for_value(
                             value,
@@ -312,16 +284,14 @@ fn fonts_group<'a>(
                 ),
             ),
             setting_row(
-                i18n::t(language, Key::FontFamily),
+                t("settings.font_family"),
                 boxed(
                     260.0,
                     family_select(
                         theme_snapshot,
                         FontRole::Mono,
                         &prefs.mono_font,
-                        FONT_ROBOTO_MONO,
                         availability,
-                        language,
                     ),
                 ),
             ),
@@ -347,25 +317,16 @@ fn family_select<'a>(
     theme_snapshot: &'a Theme,
     role: FontRole,
     token: &str,
-    bundled_family: &'static str,
     availability: &'a FontAvailability,
-    language: Language,
 ) -> IcedElement<'a> {
     let options = availability.custom_families();
-    // The selected option is borrowed from the app-owned catalog slice (the
-    // control needs it for the element's lifetime); `choice_for` canonicalizes
-    // the persisted token onto the same catalog spelling, so the join by
-    // equality cannot miss a real custom family.
-    let selected = if is_system_font_token(token) || is_bundled_font_token(token, bundled_family) {
-        None
-    } else {
-        availability
-            .choice_for(token)
-            .and_then(|choice| match choice {
-                FontChoice::Custom(family) => Some(family),
-                FontChoice::System | FontChoice::Bundled => None,
-            })
-            .and_then(|family| options.iter().find(|option| **option == family))
+    // The theme owner's codec decides what a persisted token means, so the
+    // segment row and this select share one resolution instead of two
+    // hand-maintained string tests. `choice_for` canonicalizes the token onto
+    // the catalog spelling, so the join by equality cannot miss a family.
+    let selected = match FontChoice::from_config_token(token, role, availability) {
+        FontChoice::Custom(family) => options.iter().find(|option| **option == family),
+        FontChoice::System | FontChoice::Bundled => None,
     };
     let section = match role {
         FontRole::Ui => "ui-font-family",
@@ -376,7 +337,7 @@ fn family_select<'a>(
         target(section),
         options,
         selected,
-        i18n::t(language, Key::FontChoose),
+        t("settings.font_choose"),
         move |family: &&'static str| {
             let choice = FontChoice::Custom(family);
             Message::SettingsChanged(match role {
@@ -405,11 +366,7 @@ fn device_label_key(kind: DeviceKind) -> &'static str {
 
 /// System: device visibility switches, refresh slider, graph options,
 /// zero-value graying, continuous history.
-fn system_group<'a>(
-    theme_snapshot: &'a Theme,
-    _language: Language,
-    prefs: &PresentationPreferences,
-) -> IcedElement<'a> {
+fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) -> IcedElement<'a> {
     let mut rows: Vec<IcedElement<'a>> = Vec::new();
     rows.push(section_caption(theme_snapshot, t("settings.devices")));
     for kind in DeviceKind::ALL {
@@ -573,11 +530,7 @@ type UnitSurfaceRow = (
 
 /// Units: per-surface (memory / drive / network) Bytes-vs-Bits and
 /// Base-2-vs-Base-10 segment pairs.
-fn units_group<'a>(
-    theme_snapshot: &'a Theme,
-    language: Language,
-    prefs: &PresentationPreferences,
-) -> IcedElement<'a> {
+fn units_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) -> IcedElement<'a> {
     let mut rows: Vec<IcedElement<'a>> = Vec::new();
     let surfaces: [UnitSurfaceRow; 3] = [
         (
@@ -628,7 +581,7 @@ fn units_group<'a>(
             segmented(
                 theme_snapshot,
                 target(unit_section),
-                &unit_bytes_choices(language),
+                &unit_bytes_choices(),
                 unit_toggle_value(use_bytes),
                 move |value| Message::SettingsChanged(bytes_change(value == 0)),
             ),

@@ -86,6 +86,7 @@ pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64
         // closing it must rebuild the lazy body exactly like any other visual
         // invalidation.
         .field(render.open_menu_identity)
+        .field(render.tooltip_capture_marker.is_some())
         .field(selected)
         .field(hidden)
         .field(widths)

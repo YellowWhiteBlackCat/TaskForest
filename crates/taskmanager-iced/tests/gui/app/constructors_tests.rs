@@ -1,4 +1,4 @@
-use super::super::capture_state::capture_device_from_name;
+use super::super::capture_state::{CaptureDataTarget, capture_device_from_name};
 use super::{IcedApp, apply_capture_target, capture_page_from_name};
 use crate::app::DetailsSection;
 use crate::app::PerfDevice;
@@ -15,7 +15,7 @@ use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_theme::FontAvailability;
-use taskmanager_theme::{LightDark, Skin};
+use taskmanager_theme::{AppearanceOverride, LightDark, Skin};
 
 #[test]
 fn demo_feedback_is_english_before_the_shared_fixture_is_constructed() {
@@ -77,14 +77,14 @@ fn tm_skin_vocabulary_matches_the_shared_contract() {
         ("GNOME-DARK", (Skin::Gnome, LightDark::Dark)),
     ] {
         assert_eq!(
-            crate::app::settings::parse_skin_override(input),
+            AppearanceOverride::parse(input, false).map(|forced| (forced.skin, forced.mode)),
             Some(expected),
             "input {input}"
         );
     }
     for invalid in ["plasma-dark", "kde-vibes", "kde", "kde-dark-extra", ""] {
         assert_eq!(
-            crate::app::settings::parse_skin_override(invalid),
+            AppearanceOverride::parse(invalid, false),
             None,
             "input {invalid}"
         );
@@ -489,6 +489,11 @@ fn additional_capture_targets_open_expected_surfaces_part2() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "apps-identity-matrix");
     assert_eq!(app.shell.page(), AppPage::Applications);
+
+    let mut app = IcedApp::demo();
+    apply_capture_target(&mut app, "tooltip-overlay");
+    assert_eq!(app.shell.page(), AppPage::Applications);
+    assert_eq!(app.capture.data_target, CaptureDataTarget::TooltipOverlay);
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "saved-view-presets");

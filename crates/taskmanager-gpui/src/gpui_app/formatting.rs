@@ -25,7 +25,7 @@ use crate::gpui_app::graph::GraphSettings;
 use taskforest_core::core::metrics::GpuMetrics;
 use taskforest_core::core::units::{self, QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n::t;
-use taskmanager_shell::presentation::gpu_display_identity;
+use taskmanager_shell::presentation::{gigahertz, gpu_display_identity};
 
 const MIB_BYTES: u64 = 1024 * 1024;
 
@@ -44,14 +44,14 @@ pub fn missing_value() -> String {
 /// captions, and properties panels.
 #[must_use]
 pub fn format_ghz(mhz: u64) -> String {
-    format!("{:.2} GHz", mhz as f64 / 1000.0)
+    gigahertz(mhz as f64)
 }
 
 /// `{:.2} GHz` from a megahertz-valued graph sample (the frequency history
 /// series stores MHz as `f32`).
 #[must_use]
 pub fn format_ghz_sample(megahertz: f32) -> String {
-    format!("{:.2} GHz", f64::from(megahertz) / 1000.0)
+    gigahertz(f64::from(megahertz))
 }
 
 /// Optional megahertz → `"{:.2} GHz"`, with the shared dash for `None` —

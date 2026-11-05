@@ -21,8 +21,8 @@ use std::time::Duration;
 
 use super::capture::schedule_controlled_presentation;
 use super::{
-    Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label, i18n,
-    init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
+    Hover, InputModality, RootView, SelectedDevice, TopPage, WindowCorner, alert_ui, device_label,
+    i18n, init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
 use crate::gpui_app::dashboard;
 
@@ -34,10 +34,11 @@ use gpui::{
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
 use taskforest_core::core::SystemSnapshot;
-use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::window_chrome_state;
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
+mod context_menu_capture;
 mod overlays;
 mod pages;
 mod surfaces;
@@ -168,6 +169,10 @@ fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Co
 
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.capture_evidence.feedback_overlay_active() {
+            self.page = TopPage::Performance;
+            self.selected = SelectedDevice::Cpu;
+        }
         if self.window_surface_kind() == Some(super::WindowSurfaceKind::SystemAbout)
             && self.capture_evidence.schedule_system_about_presentation()
         {
@@ -218,6 +223,8 @@ impl Render for RootView {
         self.poll_diagnostic_bundle_result();
         schedule_system_inventory_capture(self, window, cx);
         schedule_window_capture(self, window, cx);
+        context_menu_capture::schedule_process_context_menu_capture(self, window, cx);
+        context_menu_capture::schedule_process_context_menu_presentation(self, window, cx);
         if self.capture_evidence.keyboard_focus_requested() {
             // The capture token represents a keyboard-initiated focus state even
             // though the deterministic harness performs the final focus call.
@@ -338,7 +345,7 @@ impl Render for RootView {
         // call receives this same value, without keeping duplicate state in
         // individual controls. The window state (maximized/fullscreen/tiling)
         // drives per-corner CSD rounding; reading it once per frame is cheap.
-        let mut t = self.theme;
+        let mut t = self.theme.with_root_rem_size(ui_size.body_font_size().0);
         t.window_state = window_chrome_state(window);
         // Decoration negotiation: the app asks for `WindowDecorations::Server`
         // (a native titlebar) and reacts to what the compositor actually grants.
@@ -398,7 +405,21 @@ impl Render for RootView {
                 cx,
             );
             let root = surfaces::compose_active_surface(self, root, &t, window, cx);
-            return transients::compose(self, root, &t, false, None, window, cx);
+            let viewport_width = f32::from(window.viewport_size().width);
+            return transients::compose(
+                self,
+                root,
+                &t,
+                transients::TransientFrame {
+                    viewport_width,
+                    server_decorations: false,
+                    nav_orientation: NavOrientation::Horizontal,
+                    navigation_width: 0.0,
+                },
+                None,
+                window,
+                cx,
+            );
         }
 
         // Push frame-level state (focus ring) into gpui-component's global
@@ -418,6 +439,39 @@ impl Render for RootView {
             .and_then(ProcessRowId::process_identity);
         // Snapshot the hover slot once: `.as_ref()` for synchronous helpers (titlebar,
         // sidebar, settings), `.clone()` for the uniform_list row builders (Apps/Services).
+        if self.capture_evidence.tooltip_overlay_active() {
+            // Deterministic tooltip evidence: publish the SAME hover slot the
+            // production pointer listeners write, so the ordinary
+            // `tooltip_overlay` below paints a real Card-tier glass hint —
+            // there is no fixture-only tooltip widget. The readiness marker is
+            // emitted by the overlay's own composition (see
+            // `transients::compose`), so a frame is never certified unless the
+            // hint actually entered the render tree.
+            self.hovered = Some(Hover::Static("tooltip.apps"));
+        }
+        if self.capture_evidence.feedback_overlay_active() && self.shell.feedback_notice().is_none()
+        {
+            // GLASS-02 evidence uses the production `report_notice` entry, not
+            // a fixture card: the long receipt is the same text a real window
+            // capture writes, so the frame proves the shipped overlay's width
+            // clamp, wrapping, and corner anchoring. Certification happens in
+            // `transients::compose_shell_feedback` once the card is in the tree.
+            let destination = format!(
+                "/run/media/{}/very-long-workspace/target/capture/runs/{}/capture.png",
+                "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9",
+            );
+            let receipt = i18n::t("window_capture.success")
+                .replacen("{}", &destination, 1)
+                .replacen("{}", "1180", 1)
+                .replacen("{}", "780", 1);
+            self.shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Success,
+                FeedbackLifecycle::UntilReplaced,
+                receipt,
+            );
+            cx.notify();
+        }
         let hovered = self.hovered.clone();
         // U7-1 tooltip: extended info for the hovered process/service (truncated
         // names / long descriptions get a cursor-following tooltip). Derived from
@@ -466,6 +520,7 @@ impl Render for RootView {
                 !self.active_alerts().is_empty(),
             ),
         );
+        let viewport_width = f32::from(viewport.width);
         let layout = frame_budget.page_layout();
         // CSD titlebar (drag + title + controls): rendered ONLY in the CSD
         // fallback. The nav strip below is app content and renders in BOTH modes.
@@ -638,7 +693,20 @@ impl Render for RootView {
         };
 
         let root = surfaces::compose_active_surface(self, root, &t, window, cx);
-        transients::compose(self, root, &t, server_decorations, tooltip_text, window, cx)
+        transients::compose(
+            self,
+            root,
+            &t,
+            transients::TransientFrame {
+                viewport_width,
+                server_decorations,
+                nav_orientation: self.nav_orientation,
+                navigation_width: frame_budget.navigation_width,
+            },
+            tooltip_text,
+            window,
+            cx,
+        )
     }
 }
 

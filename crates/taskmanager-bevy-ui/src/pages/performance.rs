@@ -31,15 +31,14 @@
 
 use crate::navigation::{NavigationState, RAIL_WIDTH};
 use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::{With, Without};
+use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::ecs::system::{ParamSet, Query, Res, ResMut};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent, px,
     rem,
@@ -65,32 +64,31 @@ use taskmanager_shell::presentation::{
 };
 
 use crate::app::{PageContext, ShellTrack};
-use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2};
-use crate::widgets::chart::{ChartCanvas, ChartContent, ChartSurface};
-use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
+use crate::widgets::layout::{
+    PerformanceLayoutMode, cpu_core_grid_visible, performance_sidebar_width,
+};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod device_curves;
-use device_curves::storage::{ExpandTarget, StorageExpand};
 mod gpu_metric;
 pub(crate) mod replay;
 pub(crate) mod scene;
 mod selection;
+pub(crate) mod sidebar_network;
+pub(crate) use selection::{PerformanceHeaderTarget, PerformanceStatsRailTarget};
 pub(crate) mod sidebar_editor;
 
-mod metrics;
+pub(crate) mod metrics;
+mod refresh;
 
 use crate::pages::history::control::PerformancePresentation;
 
-use crate::scene_attach::attach_child;
 pub(crate) use metrics::cpu::{CpuField, cpu_field_text};
 use metrics::{
-    core_usage_fill_pct, cpu_metrics, curve_caption, curve_samples, curve_wanted, curve_warm,
-    disk_spare_warning_for, dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics,
-    network_devices, nic_fact_line, section_keys, segment_key, segment_value, summary_value,
+    curve_badge_text, curve_caption, curve_samples, curve_wanted, curve_warm, gpu_devices,
+    gpu_fact_line, memory_metrics, network_devices, nic_fact_line, section_keys, segment_key,
 };
-use scene::blocks::block_scene;
 
 // ---- marker components (this page's private dynamic-state vocabulary) ----
 //
@@ -270,6 +268,11 @@ pub(crate) struct DynBar(pub(crate) CpuField);
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct SparkStrip(pub(crate) SystemCurve);
 
+/// One curve card's newest-value pill. The refresh observer rewrites its
+/// text from the same finite sample window that drives the curve.
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct CurveBadge(pub(crate) SystemCurve);
+
 /// One container that owns a keyed dynamic block list (device sections, the
 /// memory-composition rows).
 #[derive(Component, Clone, Copy, Default)]
@@ -304,6 +307,7 @@ pub(crate) enum Section {
     Fan,
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum SummaryField {
     #[default]
@@ -315,16 +319,25 @@ pub(crate) enum SummaryField {
     NetSend,
 }
 
+/// One item of a chart's latest/avg/peak summary row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SummaryItem {
+    Latest,
+    Average,
+    Maximum,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum DynField {
     Summary(SummaryField),
-    CurveCaption(SystemCurve),
-    BatteryCaption(String),
-    FanCaption(String),
+    CurveCaptionItem(SystemCurve, SummaryItem),
+    CurveBadge(SystemCurve),
     GpuMetricLabel(String),
     SmartStatus(String),
     SmartGuidance(String),
     Cpu(CpuField),
+    SidebarCaption1(PerformanceDeviceTarget),
+    SidebarCaption2(PerformanceDeviceTarget),
     /// One device block's joined fact line, keyed by the stable device id.
     Device {
         section: Section,
@@ -365,17 +378,6 @@ impl SystemCurve {
         }
     }
 
-    fn title(self) -> String {
-        match self {
-            Self::Cpu => t("common.cpu"),
-            Self::Memory => t("common.memory"),
-            Self::Network => t("perf.system_network_throughput"),
-            Self::Gpu => t("perf.system_gpu_utilization"),
-            Self::Npu => "NPU",
-        }
-        .to_owned()
-    }
-
     /// Value spelling inside the curve caption: percent curves read like the
     /// TUI graphs; the throughput curve reuses the shared byte formatter.
     fn format_value(self, value: f32) -> String {
@@ -388,9 +390,10 @@ impl SystemCurve {
     /// Bar ink per curve, from the palette only (never a literal).
     fn color(self, palette: &UiPalette) -> bevy::color::Color {
         match self {
-            Self::Cpu | Self::Gpu | Self::Npu => palette.accent,
-            Self::Memory => palette.body_color,
-            Self::Network => palette.dim_color,
+            Self::Cpu => palette.cpu,
+            Self::Memory => palette.memory,
+            Self::Network => palette.network,
+            Self::Gpu | Self::Npu => palette.accent,
         }
     }
 }
@@ -440,7 +443,7 @@ pub(crate) fn request_smart_self_test(
 pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<PerformanceFocus>();
     app.init_resource::<PerformanceDeviceFocus>();
-    app.add_observer(refresh_on_fold);
+    app.add_observer(refresh::refresh_on_fold);
     gpu_metric::register(app);
     selection::register(app);
     device_curves::register(app);
@@ -545,6 +548,7 @@ pub(crate) fn sync_performance_layout(
     navigation: Option<Res<NavigationState>>,
     sidebar: Option<Res<PerformanceSidebarVisible>>,
     replay: Option<Res<PerformancePresentation>>,
+    preferences: Option<Res<crate::pages::performance::sidebar_editor::SidebarState>>,
     mut state: ResMut<PerformanceLayoutState>,
     mut rails: ParamSet<(
         DeviceRailQuery<'_, '_>,
@@ -575,8 +579,21 @@ pub(crate) fn sync_performance_layout(
         PerformanceLayoutMode::Wide if sidebar_on => Display::Flex,
         _ => Display::None,
     };
+    // The sidebar claims only the surplus the budget leaves after the main
+    // column and the statistics rail keep their floors.
+    let sidebar_width = performance_sidebar_width(
+        preferences.as_ref().map_or(0.0, |p| p.0.sidebar_width),
+        width,
+    );
     for mut node in &mut rails.p0() {
         node.display = display;
+        let wanted = px(sidebar_width);
+        if node.width != wanted {
+            node.width = wanted;
+        }
+        if node.min_width != wanted {
+            node.min_width = wanted;
+        }
     }
     for mut node in &mut rails.p1() {
         node.display = display;
@@ -613,218 +630,6 @@ pub(crate) fn sync_performance_layout(
 /// Grouped so the observer's parameter list stays its dependency list: the
 /// marker queries name the mounted page's nodes, while `nodes`/`transforms`
 /// are the shared node/transform queries the strip and gate adapters reuse.
-#[derive(SystemParam)]
-struct PerformanceRefreshQueries<'w, 's> {
-    /// Marked numeric texts.
-    texts: Query<'w, 's, (&'static DynText, &'static mut Text)>,
-    /// Marked core-fill bars.
-    bars: Query<'w, 's, (&'static DynBar, &'static mut Node), Without<DynText>>,
-    /// Marked disk-spare alerts.
-    disk_alerts: Query<'w, 's, (&'static DynDiskSpareAlert, &'static mut Node), Without<DynBar>>,
-    /// Curve strips with their canvas and chart surface.
-    strips: Query<
-        'w,
-        's,
-        (
-            &'static SparkStrip,
-            &'static mut ChartCanvas,
-            &'static mut ChartSurface,
-        ),
-    >,
-    /// Curve gate markers.
-    gates: Query<'w, 's, (Entity, &'static CurveGate)>,
-    /// Card section markers.
-    sections: Query<'w, 's, (Entity, &'static DynSection)>,
-    /// Device block markers.
-    blocks: Query<'w, 's, (Entity, &'static DynBlock)>,
-    /// The expand motion of the device list items: a storage device slides
-    /// shut before it leaves the projection.
-    expands: Query<'w, 's, &'static mut StorageExpand, With<DynBlock>>,
-    /// Bare node query shared by the strip and gate adapters.
-    nodes: Query<'w, 's, &'static mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
-}
-
-/// The pages' data-refresh trigger consumer (see [`crate::drain`]): re-read
-/// the folded shell and push new facts into the mounted tree. Runs only when
-/// the drain folded batches — an idle frame never reaches this observer, and
-/// a frame with the page unmounted finds no markers and does nothing.
-fn refresh_on_fold(
-    _fold: On<ShellProjectionFolded>,
-    track: ShellTrack,
-    palette: Res<WindowPalette>,
-    focus: Res<PerformanceFocus>,
-    device_focus: Res<PerformanceDeviceFocus>,
-    mut surface: PerformanceRefreshQueries,
-    mut commands: Commands,
-) {
-    let shell = track.shell();
-    rewrite_texts(shell, &mut surface.texts);
-    rewrite_core_bars(shell, &mut surface.bars);
-    sync_disk_spare_alerts(shell, &mut surface.disk_alerts);
-    sync_strips(shell, &mut surface.strips);
-    sync_card_gates(
-        shell,
-        focus.0,
-        device_focus.0.curve().is_some(),
-        &surface.gates,
-        &mut surface.nodes,
-    );
-    sync_blocks(
-        shell,
-        &palette.inner,
-        &surface.sections,
-        &surface.blocks,
-        &mut surface.expands,
-        &mut commands,
-    );
-}
-
-fn sync_disk_spare_alerts(
-    shell: &ShellApp,
-    alerts: &mut Query<(&DynDiskSpareAlert, &mut Node), Without<DynBar>>,
-) {
-    for (alert, mut node) in alerts.iter_mut() {
-        let wanted = if disk_spare_warning_for(shell, &alert.0) {
-            Display::Flex
-        } else {
-            Display::None
-        };
-        if node.display != wanted {
-            node.display = wanted;
-        }
-    }
-}
-
-/// Rewrite every marked text from the current projection, skipping values
-/// that did not change (no change detection on identical facts).
-fn rewrite_texts(shell: &ShellApp, texts: &mut Query<(&DynText, &mut Text)>) {
-    for (field, mut text) in texts.iter_mut() {
-        let wanted = dyn_field_text(shell, &field.0);
-        if text.0 != wanted {
-            text.0 = wanted;
-        }
-    }
-}
-
-/// Rewrite each bar's fill width from the same folded observation its row's
-/// numeric text renders. An unavailable observation collapses the fill to
-/// zero — a missing fact is never painted as progress.
-fn rewrite_core_bars(shell: &ShellApp, bars: &mut Query<(&DynBar, &mut Node), Without<DynText>>) {
-    for (field, mut node) in bars.iter_mut() {
-        let pct = match &field.0 {
-            CpuField::Core(index) => core_usage_fill_pct(shell, *index),
-            _ => 0.0,
-        };
-        let wanted = Val::Percent(pct);
-        if node.width != wanted {
-            node.width = wanted;
-        }
-    }
-}
-
-/// Publish the current window into each curve's canvas.
-///
-/// The strip's width is NOT a design constant: the canvas measures the slot
-/// the layout gave the chart and projects the window against that
-/// measurement, so the curve fills the card whatever the window does. Gaps
-/// stay gaps — a missing observation is never joined across.
-fn sync_strips(
-    shell: &ShellApp,
-    strips: &mut Query<(&SparkStrip, &mut ChartCanvas, &mut ChartSurface)>,
-) {
-    for (strip, mut canvas, mut chart) in strips.iter_mut() {
-        let values = curve_samples(shell, strip.0);
-        let ceiling = scene::chart::curve_ceiling(strip.0, &values);
-        chart.0 = values.len();
-        canvas.content = ChartContent::Samples { values, ceiling };
-    }
-}
-
-/// Flip each card's gate with its curve's data existence (only the GPU card
-/// can close), touching only nodes whose display actually changes.
-fn sync_card_gates(
-    shell: &ShellApp,
-    focus: SystemCurve,
-    show: bool,
-    gates: &Query<(Entity, &CurveGate)>,
-    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
-) {
-    let active = if curve_wanted(shell, focus) {
-        focus
-    } else {
-        SystemCurve::default()
-    };
-    for (entity, gate) in gates.iter() {
-        let wanted = if show && curve_wanted(shell, gate.0) && gate.0 == active {
-            Display::Flex
-        } else {
-            Display::None
-        };
-        if let Ok(mut node) = nodes.get_mut(entity)
-            && node.display != wanted
-        {
-            node.display = wanted;
-        }
-    }
-}
-
-/// Reconcile each section's blocks with the projection's key list: despawn
-/// keys that left, spawn keys that arrived. The projection is the only
-/// memory of which devices exist — the page keeps no cache.
-///
-/// A storage device rides the SAME typed motion the storage surface owns:
-/// the list item slides shut before it leaves and slides open when it
-/// arrives, so a hot-plugged disk is never a jump.
-fn sync_blocks(
-    shell: &ShellApp,
-    palette: &UiPalette,
-    sections: &Query<(Entity, &DynSection)>,
-    blocks: &Query<(Entity, &DynBlock)>,
-    expands: &mut Query<&mut StorageExpand, With<DynBlock>>,
-    commands: &mut Commands,
-) {
-    for (section_entity, section) in sections.iter() {
-        let desired = section_keys(shell, section.0);
-        for (block_entity, block) in blocks.iter() {
-            if block.0 != section.0 {
-                continue;
-            }
-            let wanted = desired.iter().any(|key| key == &block.1);
-            if wanted {
-                // A device that came back while it was sliding shut slides
-                // open again.
-                if let Ok(mut expand) = expands.get_mut(block_entity)
-                    && expand.target == ExpandTarget::Collapsing
-                {
-                    expand.target = ExpandTarget::Expanding;
-                }
-                continue;
-            }
-            // The list item slides shut; the motion system retires it once
-            // the slide reaches its end.
-            if let Ok(mut expand) = expands.get_mut(block_entity) {
-                if expand.target != ExpandTarget::Collapsing {
-                    expand.target = ExpandTarget::Collapsing;
-                }
-                continue;
-            }
-            commands.entity(block_entity).despawn();
-        }
-        for key in desired {
-            if blocks
-                .iter()
-                .any(|(_, block)| block.0 == section.0 && block.1 == key)
-            {
-                continue;
-            }
-            if let Some(scene) = block_scene(section.0, &key, shell, palette) {
-                let child = commands.spawn_scene(scene).id();
-                attach_child(commands, section_entity, child);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance.rs"]
 mod tests;
@@ -848,3 +653,7 @@ mod selection_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_device_history.rs"]
 mod device_history_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_optical.rs"]
+mod optical_tests;

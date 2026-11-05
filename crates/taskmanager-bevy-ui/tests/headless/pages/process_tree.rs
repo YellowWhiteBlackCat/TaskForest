@@ -333,3 +333,100 @@ fn native_expand_and_collapse_preserve_all_live_tree_identities_and_selection() 
         );
     }
 }
+
+/// A currently observed container forms its own group section above the
+/// canonical category tree: the header carries the observed name (never
+/// invented from the id), toggling its key expands exactly its members, and
+/// host processes stay outside every container bucket.
+#[test]
+fn container_groups_project_above_the_category_tree() {
+    use taskforest_core::core::process::ProcessOwner;
+    use taskforest_core::core::process::{
+        ContainerMetadata, ContainerRuntime, ProcessMetadataObservations,
+    };
+
+    let container_process = |pid: u32, name: &str, metadata: ContainerMetadata| {
+        let mut item = tokened(pid, name, None);
+        item.apply_metadata_observations(ProcessMetadataObservations::current_with_container(
+            ProcessOwner::opaque("tester"),
+            None,
+            Some(metadata),
+            SNAPSHOT_MS,
+        ));
+        item
+    };
+
+    let web = container_process(
+        40,
+        "nginx",
+        ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6").with_name("web-prod"),
+    );
+    let web_worker = container_process(
+        41,
+        "nginx-worker",
+        ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6").with_name("web-prod"),
+    );
+    let host = tokened(20, "daemon", None)
+        .with_application_identity_observation(ProcessMetadataObservation::absent(SNAPSHOT_MS));
+    let items = vec![web, web_worker, host];
+
+    // Collapsed: only the header, above the category rows.
+    let collapsed = project_items(&items, &ProcessTreeExpansion::default(), SNAPSHOT_MS);
+    let header = collapsed
+        .iter()
+        .find(|row| {
+            row.expansion_key
+                .as_deref()
+                .is_some_and(|key| key.starts_with("container:"))
+        })
+        .expect("the observed container mounts one group header");
+    assert_eq!(header.label, "web-prod", "the observed name is the label");
+    assert_eq!(
+        header.container_badge.as_deref(),
+        Some("Docker"),
+        "the header names the runtime that owns the group"
+    );
+    assert_eq!(header.member_count, 2);
+    assert!(!header.expanded);
+
+    // Expanded: the two member rows follow the header at depth 1.
+    let mut expansion = ProcessTreeExpansion::default();
+    let key = header
+        .expansion_key
+        .clone()
+        .expect("header carries its key");
+    expansion.toggle_group_key(key);
+    let expanded_rows = project_items(&items, &expansion, SNAPSHOT_MS);
+    let index = expanded_rows
+        .iter()
+        .position(|row| row.expansion_key.as_deref() == header.expansion_key.as_deref())
+        .expect("the header stays mounted");
+    let members: Vec<_> = expanded_rows[index + 1..]
+        .iter()
+        .take_while(|row| row.depth == 1 && row.item.is_some())
+        .collect();
+    assert_eq!(members.len(), 2, "both container members are revealed");
+    assert!(
+        members.iter().all(|row| row.container_badge.is_none()),
+        "member rows do not repeat the container runtime chip"
+    );
+    assert!(
+        members.iter().all(|row| {
+            row.item
+                .is_some_and(|item| item.current_container_metadata().is_some())
+        }),
+        "only container members sit under the container header"
+    );
+
+    // The host process is never inside a container bucket.
+    assert!(
+        expanded_rows
+            .iter()
+            .filter(|row| row
+                .expansion_key
+                .as_deref()
+                .is_some_and(|key| key.starts_with("container:")))
+            .all(|row| row.member_count == 2),
+        "the host process does not inflate any container bucket"
+    );
+}

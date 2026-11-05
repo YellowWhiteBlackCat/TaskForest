@@ -38,7 +38,7 @@ use taskmanager_theme::{Theme, tokens};
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_runs};
 use crate::theme;
-use crate::ui::components::styled_scrollable;
+use crate::ui::components::{chart_inset, chart_surface, styled_scrollable};
 use taskforest_core::core::hardware::CpuType;
 
 /// Cells per row in the grid.
@@ -218,7 +218,11 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
                         theme_snapshot.shade,
                     ))),
                     border: iced::Border {
-                        radius: 3.0.into(),
+                        radius: theme::scaled_radius(
+                            theme_snapshot,
+                            theme_snapshot.palette().small_radius,
+                        )
+                        .into(),
                         width: 1.0,
                         color: crate::theme_binding::color(theme_snapshot.palette().border),
                     },
@@ -239,7 +243,13 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
                 .into(),
             column(rows).spacing(8).into(),
         ]))
-        .style(move |_| theme::panel_style(theme_snapshot)),
+        .padding(
+            iced::Padding::ZERO
+                .left(chart_inset(theme_snapshot))
+                .right(chart_inset(theme_snapshot))
+                .bottom(chart_inset(theme_snapshot)),
+        )
+        .style(move |_| chart_surface(theme_snapshot)),
     )
     .id(CORE_GRID_SCROLL_ID)
     .height(Length::Fill)

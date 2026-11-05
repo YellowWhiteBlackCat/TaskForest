@@ -14,8 +14,20 @@
 
 use taskmanager_theme::color::{Color, Weight};
 use taskmanager_theme::fonts::FONT_MISANS_VF;
+use taskmanager_theme::optical_glass::OpticalGlassCapability;
 use taskmanager_theme::platform::{WeightCompensationAxis, effective_weight};
 use taskmanager_theme::theme::Theme;
+
+/// The optical-glass capability of the locked Iced renderer.
+///
+/// `iced_wgpu 0.14.0` cannot expose the already-composited backdrop to a
+/// custom primitive, so the production renderer reports no optical capability.
+/// This remains [`OpticalGlassCapability::UNSUPPORTED`] until upstream
+/// publishes a sampleable lower composite with stable painter order.
+#[must_use]
+pub fn optical_glass_capability() -> OpticalGlassCapability {
+    OpticalGlassCapability::UNSUPPORTED
+}
 
 /// Map one neutral sRGB token onto an iced color (alpha preserved — iced
 /// paints with alpha).

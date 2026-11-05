@@ -1,4 +1,6 @@
-use super::{MenuEntry, MenuItem, PopupMenuState, SelectionDirection};
+use super::{
+    MenuEntry, MenuItem, PopupMenuState, SelectionDirection, menu_panel_shadow, menu_panel_tier,
+};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AppContext, Context, DismissEvent, Entity, FocusHandle, Focusable, InteractiveElement,
@@ -7,7 +9,36 @@ use gpui::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use taskmanager_theme::Theme;
+use taskmanager_theme::{GlassTier, Theme};
+
+/// GLASS-01: the menu panel is a floating card. It must read the theme's Card
+/// glass tier (fill/edge/shadow) — the same material Iced's menus and Bevy's
+/// `menu_scene` paint — rather than the opaque page surface plus a hardcoded
+/// `shadow_md` pair that ignored the skin ink and the user's reading size.
+#[test]
+fn menu_panel_wears_the_card_glass_tier() {
+    let theme = Theme::dark();
+    assert_eq!(menu_panel_tier(), GlassTier::Card);
+
+    let shadow = menu_panel_shadow(&theme);
+    assert_eq!(shadow.len(), 2, "the glass shadow keeps its two layers");
+    let ink = crate::theme_binding::hsla(theme.glass_card().shadow);
+    assert_eq!(shadow[1].color, ink, "the contact layer carries the ink");
+    let ambient: gpui::Hsla = crate::theme_binding::hsla(
+        theme
+            .glass_card()
+            .shadow
+            .with_alpha(theme.glass_card().shadow.a * 0.6),
+    );
+    assert_eq!(shadow[0].color, ambient, "the ambient layer is 60% ink");
+    // The old `shadow_md` pair was a fixed black wash; the glass ink is the
+    // skin's own shadow token, so a dark skin must not resolve to plain black.
+    assert_ne!(
+        shadow[1].color,
+        gpui::hsla(0.0, 0.0, 0.0, 0.1),
+        "the panel depth must be token ink, not the toolkit default"
+    );
+}
 /// Selection skips disabled items and separators, wrapping around.
 #[gpui::test]
 async fn selection_skips_disabled_and_wraps(cx: &mut TestAppContext) {

@@ -37,7 +37,7 @@ fn window_capture_message_routes_to_request_current_window_capture() {
 #[test]
 fn current_window_capture_button_renders_in_header_strip() {
     let app = IcedApp::demo();
-    let _btn = current_window_capture_btn(app.theme(), app.language());
+    let _btn = current_window_capture_btn(app.theme());
     let _view = view(&app);
 }
 

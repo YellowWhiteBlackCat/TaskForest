@@ -18,12 +18,14 @@ use bevy::ecs::hierarchy::ChildOf;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
-use taskmanager_theme::Theme;
+use bevy::ui::{BorderRadius, Node, Val};
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{GlassTier, Theme};
 
 use crate::palette::ui_palette;
 use crate::widgets::menu::{
-    MenuInput, MenuItem, MenuOutcome, MenuSpec, MenuState, menu_row_background, menu_scene_at,
+    MenuInput, MenuItem, MenuOutcome, MenuScrollBody, MenuSpec, MenuState, menu_row_background,
+    menu_scene_at,
 };
 
 fn headless_scene_app() -> App {
@@ -123,6 +125,47 @@ fn menu_cancel_is_always_available_and_empty_lists_are_inert() {
 
 // ---- menu render adapter ----
 
+/// GLASS-01: a menu is a floating card, so the panel must wear the Card glass
+/// tier (fill + edge + shadow) — the same layer the GPUI menu panel and Iced's
+/// `panel_style` use — not the stronger Modal layer it used before.
+#[test]
+fn menu_panel_wears_the_card_glass_tier() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let spec = two_row_spec();
+
+    let mut app = headless_scene_app();
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(menu_scene_at(&spec, &MenuState::default(), &palette))
+        .expect("the menu scene resolves without assets")
+        .id();
+
+    assert_eq!(
+        world.get::<bevy::ui::BackgroundColor>(root).map(|f| f.0),
+        Some(palette.glass_fill(GlassTier::Card)),
+        "the menu panel paints the Card glass fill"
+    );
+    assert_eq!(
+        world.get::<bevy::ui::BorderColor>(root).map(|c| c.top),
+        Some(palette.glass_edge(GlassTier::Card)),
+        "the menu panel paints the Card specular edge"
+    );
+    assert_eq!(
+        world.get::<Node>(root).map(|node| node.border_radius),
+        Some(BorderRadius::all(Val::Rem(palette.panel_radius_rem()))),
+        "the menu panel uses the card radius on the same rem axis"
+    );
+    let shadow = world
+        .get::<bevy::ui::BoxShadow>(root)
+        .expect("the menu panel paints the theme's glass shadow");
+    assert_eq!(shadow.0, palette.glass_shadow(GlassTier::Card));
+    assert_ne!(
+        shadow.0,
+        palette.glass_shadow(GlassTier::Modal),
+        "the menu must not borrow the modal's stronger elevation"
+    );
+}
+
 #[test]
 fn menu_scene_fills_only_the_cursor_row_and_keeps_the_text_census_stable() {
     let palette = ui_palette(&Theme::dark(), UiSize::Standard);
@@ -191,6 +234,46 @@ fn menu_scene_fills_only_the_cursor_row_and_keeps_the_text_census_stable() {
         "no marker-glyph text appears for any cursor position"
     );
     assert!(world.despawn(root));
+}
+
+/// The Applications menu carries 13 verbs — taller than a compact window's
+/// whole content region. GPUI bounds the same list at 360 px and scrolls it;
+/// an uncapped Bevy card instead flips above its anchor and clips its first
+/// verbs off the top edge (a real capture caught exactly that). The card
+/// therefore caps its scroll body by viewport share, and the overflow lives
+/// on the list rather than on the window.
+#[test]
+fn menu_scene_bounds_the_verb_list_by_a_viewport_share_and_scrolls_it() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let spec = MenuSpec {
+        title: "Process actions".to_owned(),
+        items: (0..13)
+            .map(|index| item(&format!("verb {index}"), true))
+            .collect(),
+    };
+
+    let mut app = headless_scene_app();
+    let world = app.world_mut();
+    world
+        .spawn_scene(menu_scene_at(&spec, &MenuState::default(), &palette))
+        .expect("the menu scene resolves without assets");
+
+    let mut bodies =
+        world.query_filtered::<&bevy::ui::Node, bevy::ecs::query::With<MenuScrollBody>>();
+    let body = bodies
+        .iter(world)
+        .next()
+        .expect("the menu has a scroll body");
+    assert!(
+        matches!(body.max_height, bevy::ui::Val::Vh(share) if share > 0.0 && share < 100.0),
+        "the verb list is capped by a viewport share, got {:?}",
+        body.max_height
+    );
+    assert_eq!(
+        body.overflow.y,
+        bevy::ui::OverflowAxis::Scroll,
+        "the verb list scrolls rather than clipping unreachable rows"
+    );
 }
 
 /// A table row is always exactly one line tall: a value wider than its

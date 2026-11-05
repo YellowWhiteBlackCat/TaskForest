@@ -1,5 +1,6 @@
 //! Strict capture scenario tokens and readiness-marker gates.
 
+mod context_menu;
 mod runtime;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaptureScenario {
@@ -10,6 +11,7 @@ pub enum CaptureScenario {
     IntelGpuTelemetry,
     ProcessForceKill,
     ProcessSelection,
+    ProcessContextMenu,
     ProcessMemoryPssSwap,
     ProcessPropertiesPerformance,
     ProcessTreeConfirm,
@@ -49,6 +51,8 @@ pub enum CaptureScenario {
     ServicesSearchHighlight,
     AppsZeroGray,
     AppsGroupExpanded,
+    TooltipOverlay,
+    FeedbackOverlay,
     AppsIdentityMatrix,
     SidebarHidden,
     SidebarEdit,
@@ -70,6 +74,7 @@ impl CaptureScenario {
             "intel-gpu-telemetry" => Some(Self::IntelGpuTelemetry),
             "process-force-kill" => Some(Self::ProcessForceKill),
             "process-selection" => Some(Self::ProcessSelection),
+            "process-context-menu" => Some(Self::ProcessContextMenu),
             "process-memory-pss-swap" => Some(Self::ProcessMemoryPssSwap),
             "process-properties-performance" => Some(Self::ProcessPropertiesPerformance),
             "process-tree-confirm" => Some(Self::ProcessTreeConfirm),
@@ -109,6 +114,8 @@ impl CaptureScenario {
             "services-search-highlight" => Some(Self::ServicesSearchHighlight),
             "apps-zero-gray" => Some(Self::AppsZeroGray),
             "apps-group-expanded" => Some(Self::AppsGroupExpanded),
+            "tooltip-overlay" => Some(Self::TooltipOverlay),
+            "feedback-overlay" => Some(Self::FeedbackOverlay),
             "apps-identity-matrix" => Some(Self::AppsIdentityMatrix),
             "sidebar-hidden" => Some(Self::SidebarHidden),
             "sidebar-edit" => Some(Self::SidebarEdit),
@@ -131,6 +138,7 @@ impl CaptureScenario {
             Self::IntelGpuTelemetry => "intel-gpu-telemetry",
             Self::ProcessForceKill => "process-force-kill",
             Self::ProcessSelection => "process-selection",
+            Self::ProcessContextMenu => "process-context-menu",
             Self::ProcessMemoryPssSwap => "process-memory-pss-swap",
             Self::ProcessPropertiesPerformance => "process-properties-performance",
             Self::ProcessTreeConfirm => "process-tree-confirm",
@@ -170,6 +178,8 @@ impl CaptureScenario {
             Self::ServicesSearchHighlight => "services-search-highlight",
             Self::AppsZeroGray => "apps-zero-gray",
             Self::AppsGroupExpanded => "apps-group-expanded",
+            Self::TooltipOverlay => "tooltip-overlay",
+            Self::FeedbackOverlay => "feedback-overlay",
             Self::AppsIdentityMatrix => "apps-identity-matrix",
             Self::SidebarHidden => "sidebar-hidden",
             Self::SidebarEdit => "sidebar-edit",

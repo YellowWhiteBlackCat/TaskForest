@@ -3,7 +3,7 @@
 use crate::app::capture_state::{CaptureDataTarget, CapturePresentationFrame};
 use crate::ui::perf_layout::PERFORMANCE_STATS_RAIL_SCROLL_ID;
 use crate::ui::process_projection::ProjectedRow;
-use crate::ui::responsive::PerformancePageBudget;
+use crate::ui::responsive::performance_frame_for_perf_frame;
 use crate::ui::system_table::bound_system_body_to_end;
 use iced::Task;
 use iced::advanced::widget::Id;
@@ -151,11 +151,18 @@ impl IcedApp {
                     } else if self.capture.data_target == CaptureDataTarget::ProcessContextMenu {
                         self.shell.page() == AppPage::Applications
                             && self.process_menu_identity().is_some()
+                    } else if self.capture.data_target == CaptureDataTarget::FeedbackOverlay {
+                        self.shell.page() == AppPage::Applications
+                            && self.shell.feedback_notice().is_some()
                     } else if self.capture.data_target == CaptureDataTarget::CpuFacts {
                         self.shell.page() == AppPage::Performance
                             && self.performance.selected_device == PerfDevice::Cpu
                             && cpu_facts_capture_ready(self)
-                    } else if self.capture.data_target == CaptureDataTarget::ApplicationsAggregate {
+                    } else if matches!(
+                        self.capture.data_target,
+                        CaptureDataTarget::ApplicationsAggregate
+                            | CaptureDataTarget::TooltipOverlay
+                    ) {
                         self.shell.page() == AppPage::Applications
                             && self.projected_rows().rows().iter().any(|row| {
                                 matches!(
@@ -312,21 +319,29 @@ impl IcedApp {
                         if self.is_demo() && self.shell.page() == AppPage::Performance {
                             let viewport = self.viewport_size();
                             let page_viewport = self.page_viewport_size();
-                            let budget = PerformancePageBudget::for_perf_frame(
+                            let frame = performance_frame_for_perf_frame(
                                 page_viewport,
                                 self.performance.sidebar_visible,
                             );
+                            let budget = frame.budget;
                             let target =
                                 std::env::var("TM_ICED_CAPTURE_DEVICE").unwrap_or_else(|_| {
                                     crate::capture::device_name(self.performance.selected_device)
                                         .to_owned()
                                 });
+                            let resolution =
+                                crate::presentation_binding::presentation_resolution_marker(
+                                    &frame,
+                                    self.ui_size(),
+                                    self.density(),
+                                );
                             crate::capture::append_performance_viewport_marker(
                                 path,
                                 &target,
                                 viewport,
                                 page_viewport,
                                 budget,
+                                resolution.as_deref(),
                             );
                         }
                         crate::capture::append_marker(

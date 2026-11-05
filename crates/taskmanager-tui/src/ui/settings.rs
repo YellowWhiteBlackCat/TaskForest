@@ -9,10 +9,16 @@
 //! saving writes the token and applies it to the process-global i18n bundle,
 //! and the composition-edge restore re-applies it at startup.
 //!
-//! The persisted tokens are the same opaque strings the GPUI frontend reads
-//! (`Skin::label`, `"Light"`/`"Dark"`/`"EyeForest"`/`"System"`, `""`/`"MiSans VF"`/
-//! `"Roboto Mono"`, `"Comfortable"`/`"Compact"`), so a preference set in
-//! the terminal applies to the graphical frontend too.
+//! The persisted tokens are the theme owner's public vocabulary
+//! ([`Skin::config_token`], [`ModePreference::config_token`],
+//! [`FontChoice::config_token`], [`RowDensity::config_token`]) — the same
+//! strings the other three products write — so a preference set in the terminal
+//! applies to the graphical frontends unchanged. The form spells none of them.
+//!
+//! [`Skin::config_token`]: taskmanager_theme::Skin::config_token
+//! [`ModePreference::config_token`]: taskmanager_theme::ModePreference::config_token
+//! [`FontChoice::config_token`]: taskmanager_theme::FontChoice::config_token
+//! [`RowDensity::config_token`]: taskmanager_theme::RowDensity::config_token
 
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -21,7 +27,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use taskforest_core::core::config::Config;
 use taskmanager_application::i18n::t;
-use taskmanager_theme::Skin;
+use taskmanager_theme::tokens::RowDensity;
+use taskmanager_theme::{FontAvailability, FontChoice, FontRole, LightDark, ModePreference, Skin};
 use taskmanager_ui_contract::IconId;
 
 use crate::ThemeParams;
@@ -71,16 +78,54 @@ pub const REFRESH_LABELS: [&str; 4] = ["0.5 s", "1 s", "2 s", "5 s"];
 pub const GRAPH_POINTS: [usize; 4] = [60, 120, 300, 600];
 pub const GRAPH_LABELS: [&str; 4] = ["60", "120", "300", "600"];
 
-const FONT_SYSTEM: &str = "";
-const FONT_MISANS: &str = "MiSans VF";
-const FONT_ROBOTO_MONO: &str = "Roboto Mono";
-const FONT_LABELS: [&str; 3] = ["System", "MiSans VF", "Roboto Mono"];
-const DENSITY_TOKENS: [&str; 2] = ["Comfortable", "Compact"];
-const MODE_TOKENS: [&str; 4] = ["Light", "Dark", "EyeForest", "System"];
 /// The persisted `Config::language` token for each language index (G-22).
 /// Parallel to [`LANGUAGE_TOKENS`] and driven by the same index so the form
 /// choice and the persisted token can never drift apart.
 const LANGUAGE_TOKENS: [&str; 2] = ["en", "zh"];
+
+/// The TUI paints no glyphs of its own — the terminal emulator owns the face.
+/// Its two font rows therefore persist the shared tokens for the desktop
+/// products to read, and resolve them through an EMPTY host catalog: no family
+/// the terminal did not observe can become primary here, and a custom name can
+/// only ever fail closed to the skin default.
+#[must_use]
+fn terminal_font_availability() -> FontAvailability {
+    FontAvailability::from_installed_families([])
+}
+
+/// The index of one typed axis member in the public ladder the form walks, so
+/// a settings row and a config file never disagree about what index 2 means.
+#[must_use]
+fn skin_index(skin: Skin) -> usize {
+    Skin::ALL
+        .into_iter()
+        .position(|candidate| candidate == skin)
+        .unwrap_or(0)
+}
+
+#[must_use]
+fn mode_index(preference: ModePreference) -> usize {
+    ModePreference::CHOICES
+        .into_iter()
+        .position(|candidate| candidate == preference)
+        .unwrap_or(0)
+}
+
+#[must_use]
+fn density_index(density: RowDensity) -> usize {
+    RowDensity::ALL
+        .into_iter()
+        .position(|candidate| candidate == density)
+        .unwrap_or(0)
+}
+
+#[must_use]
+fn font_index(choice: FontChoice) -> usize {
+    FontChoice::PICKER_LADDER
+        .iter()
+        .position(|candidate| *candidate == choice)
+        .unwrap_or(0)
+}
 
 /// Keyboard-navigable settings form state. Field indices are stable:
 /// 0 skin, 1 mode, 2 high contrast, 3 UI font, 4 mono font, 5 density,
@@ -91,14 +136,15 @@ pub struct SettingsForm {
     pub field: usize,
     /// Index into [`Skin::ALL`].
     pub skin: usize,
-    /// Index into the product-first mode choices (Light / Dark / EyeForest),
-    /// with System retained as the secondary native-chrome option.
+    /// Index into [`ModePreference::CHOICES`] (Light / Dark / EyeForest, then
+    /// follow-native) — the picker ladder the theme owner publishes.
     pub mode: usize,
     pub hc: bool,
-    /// Index into the UI font choices.
+    /// Index into [`FontChoice::PICKER_LADDER`] for the UI role.
     pub ui_font: usize,
+    /// Index into [`FontChoice::PICKER_LADDER`] for the monospace role.
     pub mono_font: usize,
-    /// Index into the density choices.
+    /// Index into [`RowDensity::ALL`].
     pub density: usize,
     /// Index into the language choices (parallel to the `LANGUAGE_TOKENS`
     /// table). Persisted through `Config::language` and re-applied at the
@@ -132,12 +178,14 @@ impl Default for SettingsForm {
     fn default() -> Self {
         Self {
             field: 0,
-            skin: 0,
-            mode: 1,
+            skin: skin_index(Skin::Gnome),
+            mode: mode_index(ModePreference::default()),
             hc: false,
-            ui_font: 0,
-            mono_font: 0,
-            density: 0,
+            // An unrecorded preference is the shipped product default: the
+            // bundled faces, follow-native mode, comfortable rows.
+            ui_font: font_index(FontChoice::default()),
+            mono_font: font_index(FontChoice::default()),
+            density: density_index(RowDensity::default()),
             language: 0,
             refresh: 1,
             show: [true; 10],
@@ -169,29 +217,20 @@ impl SettingsForm {
         density: &str,
         notifications: (bool, Option<(u16, u16)>),
     ) -> Self {
-        let skin = Skin::ALL
-            .into_iter()
-            .position(|candidate| candidate.label().eq_ignore_ascii_case(skin))
-            .unwrap_or(0);
-        let mode = match mode {
-            "Light" => 0,
-            "Dark" => 1,
-            "EyeForest" => 2,
-            "System" => 3,
-            _ => 1,
-        };
-        let ui_font = FONT_LABELS
-            .iter()
-            .position(|label| font_token_for(label) == ui_font)
-            .unwrap_or(0);
-        let mono_font = FONT_LABELS
-            .iter()
-            .position(|label| font_token_for(label) == mono_font)
-            .unwrap_or(0);
-        let density = DENSITY_TOKENS
-            .iter()
-            .position(|label| *label == density)
-            .unwrap_or(0);
+        let skin = skin_index(Skin::from_config_token(skin).unwrap_or(Skin::Gnome));
+        let mode = mode_index(ModePreference::from_config_token(mode));
+        let availability = terminal_font_availability();
+        let ui_font = font_index(FontChoice::from_config_token(
+            ui_font,
+            FontRole::Ui,
+            &availability,
+        ));
+        let mono_font = font_index(FontChoice::from_config_token(
+            mono_font,
+            FontRole::Mono,
+            &availability,
+        ));
+        let density = density_index(RowDensity::from_config_token(density).unwrap_or_default());
         let (notify_enabled, notify_quiet_hours) = notifications;
         let (quiet_start, quiet_end) = notify_quiet_hours
             .map(|(start, end)| {
@@ -282,11 +321,11 @@ impl SettingsForm {
         };
         match self.field {
             0 => self.skin = wrap(self.skin, delta, Skin::ALL.len()),
-            1 => self.mode = wrap(self.mode, delta, MODE_TOKENS.len()),
+            1 => self.mode = wrap(self.mode, delta, ModePreference::CHOICES.len()),
             2 => self.hc = !self.hc,
-            3 => self.ui_font = wrap(self.ui_font, delta, FONT_LABELS.len()),
-            4 => self.mono_font = wrap(self.mono_font, delta, FONT_LABELS.len()),
-            5 => self.density = wrap(self.density, delta, DENSITY_TOKENS.len()),
+            3 => self.ui_font = wrap(self.ui_font, delta, FontChoice::PICKER_LADDER.len()),
+            4 => self.mono_font = wrap(self.mono_font, delta, FontChoice::PICKER_LADDER.len()),
+            5 => self.density = wrap(self.density, delta, RowDensity::ALL.len()),
             6 => self.language = wrap(self.language, delta, LANGUAGE_TOKENS.len()),
             7 => self.refresh = clamp(self.refresh, delta, REFRESH_MS.len()),
             8..=17 => {
@@ -322,31 +361,31 @@ impl SettingsForm {
     /// The persisted skin token for the current selection.
     #[must_use]
     pub fn skin_token(&self) -> &'static str {
-        Skin::ALL[self.skin].label()
+        Skin::ALL[self.skin].config_token()
     }
 
     /// The persisted mode token for the current selection.
     #[must_use]
     pub fn mode_token(&self) -> &'static str {
-        MODE_TOKENS[self.mode]
+        ModePreference::CHOICES[self.mode].config_token()
     }
 
     /// The persisted UI-font token for the current selection.
     #[must_use]
     pub fn ui_font_token(&self) -> &'static str {
-        font_token_for(FONT_LABELS[self.ui_font])
+        FontChoice::PICKER_LADDER[self.ui_font].config_token(FontRole::Ui)
     }
 
     /// The persisted mono-font token for the current selection.
     #[must_use]
     pub fn mono_font_token(&self) -> &'static str {
-        font_token_for(FONT_LABELS[self.mono_font])
+        FontChoice::PICKER_LADDER[self.mono_font].config_token(FontRole::Mono)
     }
 
     /// The persisted density token for the current selection.
     #[must_use]
     pub const fn density_token(&self) -> &'static str {
-        DENSITY_TOKENS[self.density]
+        RowDensity::ALL[self.density].config_token()
     }
 
     /// The persisted language token for the current selection (`"en"`/`"zh"`,
@@ -377,14 +416,6 @@ impl SettingsForm {
             1 => Language::Zh,
             _ => Language::En,
         })
-    }
-}
-
-fn font_token_for(label: &str) -> &'static str {
-    match label {
-        "MiSans VF" => FONT_MISANS,
-        "Roboto Mono" => FONT_ROBOTO_MONO,
-        _ => FONT_SYSTEM,
     }
 }
 
@@ -517,26 +548,41 @@ pub(super) fn render_settings_overlay_at(
 }
 
 fn mode_display_label(index: usize) -> &'static str {
-    match MODE_TOKENS.get(index).copied().unwrap_or("Dark") {
-        "Light" => t("settings.light"),
-        "EyeForest" => t("settings.eyeforest"),
-        "System" => t("settings.system"),
-        _ => t("settings.dark"),
+    match ModePreference::CHOICES
+        .get(index)
+        .copied()
+        .unwrap_or_default()
+    {
+        ModePreference::Explicit(LightDark::Light) => t("settings.light"),
+        ModePreference::Explicit(LightDark::EyeForest) => t("settings.eyeforest"),
+        ModePreference::FollowNative => t("settings.system"),
+        ModePreference::Explicit(LightDark::Dark) => t("settings.dark"),
     }
 }
 
-fn font_display_label(index: usize) -> &'static str {
-    match FONT_LABELS.get(index).copied().unwrap_or("System") {
-        "MiSans VF" => FONT_MISANS,
-        "Roboto Mono" => FONT_ROBOTO_MONO,
-        _ => t("settings.font_system"),
+/// The painted label of one font row. The bundled segment shows the face it
+/// persists (a family name is data, not copy), and the host segment is catalog
+/// text shared with the desktop frontends.
+fn font_display_label(role: FontRole, index: usize) -> &'static str {
+    match FontChoice::PICKER_LADDER
+        .get(index)
+        .copied()
+        .unwrap_or(FontChoice::Bundled)
+    {
+        FontChoice::System => t("settings.font_system"),
+        FontChoice::Bundled => role.bundled_family(),
+        FontChoice::Custom(family) => family,
     }
 }
 
 fn density_display_label(index: usize) -> &'static str {
-    match DENSITY_TOKENS.get(index).copied().unwrap_or("Comfortable") {
-        "Compact" => t("settings.density_compact"),
-        _ => t("settings.density_comfortable"),
+    match RowDensity::ALL
+        .get(index)
+        .copied()
+        .unwrap_or(RowDensity::Comfortable)
+    {
+        RowDensity::Compact => t("settings.density_compact"),
+        RowDensity::Comfortable => t("settings.density_comfortable"),
     }
 }
 

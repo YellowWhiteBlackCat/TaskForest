@@ -1,0 +1,10 @@
+name	skin	page	device	settings	scenario	window_size	capture_size
+perf-cpu-normal	gnome-light	performance	cpu	0	standard	1280x720	1280x720
+perf-memory-normal	gnome-light	performance	memory	0	standard	1280x720	1280x720
+perf-nic-normal	gnome-light	performance	nic	0	standard	1280x720	1280x720
+perf-gpu-normal	gnome-light	performance	gpu	0	standard	1280x720	1280x720
+perf-battery-normal	gnome-light	performance	battery	0	standard	1280x720	1280x720
+perf-fan-normal	gnome-light	performance	fan	0	standard	1280x720	1280x720
+perf-memory-compact	gnome-light	performance	memory	0	standard	720x760	720x760
+perf-memory-tall	gnome-light	performance	memory	0	standard	1180x1200	1180x1200
+perf-memory-narrow	gnome-light	performance	memory	0	standard	720x1000	720x1000

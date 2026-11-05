@@ -3,7 +3,11 @@ use gpui::DefiniteLength;
 use std::time::Duration;
 use taskmanager_theme::tokens::FONT_BODY;
 use taskmanager_theme::tokens::{DURATION_HOVER, MotionPolicy};
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin};
+use taskmanager_theme::{
+    GlassTier, HighContrast, LightDark, OpticalGlassCapability, OpticalGlassContext,
+    OpticalGlassDecision, OpticalGlassFallback, OpticalGlassFeature, OpticalGlassUnavailableReason,
+    ResolvedFonts, Skin,
+};
 
 fn color() -> Color {
     Color::from_hex(0x3584e4)
@@ -22,6 +26,25 @@ fn color_maps_onto_gpui_color_types() {
 
     let fill_value = fill(color());
     assert!(fill_value.color().is_some());
+}
+
+#[test]
+fn gpui_reports_no_optical_glass_without_a_sampleable_backdrop() {
+    let capability = optical_glass_capability();
+    assert_eq!(capability, OpticalGlassCapability::UNSUPPORTED);
+    assert_eq!(
+        Theme::dark().optical_glass_decision(
+            GlassTier::Card,
+            capability,
+            OpticalGlassContext::new(14.0, 1.0),
+        ),
+        OpticalGlassDecision::Fallback {
+            material: OpticalGlassFallback::Painted,
+            reason: OpticalGlassUnavailableReason::MissingFeature(
+                OpticalGlassFeature::BackdropSampling
+            ),
+        }
+    );
 }
 
 #[test]
@@ -48,6 +71,16 @@ fn length_maps_onto_gpui_length_types() {
 #[test]
 fn ratio_maps_to_relative_definite_length() {
     assert_eq!(fraction(Ratio(1.4)), DefiniteLength::Fraction(1.4));
+}
+
+/// A raw pixel value and the equivalent [`Length`] resolve to the same
+/// root-relative value, so the raw-literal helper cannot drift from the
+/// neutral token conversion.
+#[test]
+fn rem_value_matches_rem_length_at_the_standard_root() {
+    assert_eq!(rem_value(14.0), rem_length(Length(14.0)));
+    assert_eq!(rem_value(0.0), rem_length(Length(0.0)));
+    assert_eq!(rem_value(7.0).0, rem_length(Length(7.0)).0);
 }
 
 /// The authored font tokens resolve through the GPUI root rem: 14px is the

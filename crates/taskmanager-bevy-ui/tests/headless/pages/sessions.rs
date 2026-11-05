@@ -39,6 +39,7 @@ use taskmanager_application::{
 
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::Theme;
 
 use super::{
@@ -47,6 +48,7 @@ use super::{
     feedback_line_text, moved_row, selected_row, session_rows, session_seat_text, session_tty_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
+use crate::glass::OpticalGlassCard;
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use crate::window::FrontendWindowPlugin;
@@ -797,6 +799,20 @@ fn the_logout_verb_mounts_a_bubble_naming_the_frozen_session() {
         .iter(app.world())
         .collect();
     assert_eq!(bubbles.len(), 1, "exactly one bubble card is mounted");
+    let world = app.world_mut();
+    let mut stack = vec![bubbles[0]];
+    let mut card = None;
+    while let Some(entity) = stack.pop() {
+        if let Some(marker) = world.get::<OpticalGlassCard>(entity) {
+            card = Some(*marker);
+            break;
+        }
+        if let Some(children) = world.get::<bevy::ecs::hierarchy::Children>(entity) {
+            stack.extend(children.iter().copied());
+        }
+    }
+    let card = card.expect("the bubble card is an optical glass candidate");
+    assert!(card.enabled && card.tier == GlassTier::Card);
     let copy = texts_under(&mut app, bubbles[0]);
     assert!(
         copy.iter()

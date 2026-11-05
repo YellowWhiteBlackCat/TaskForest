@@ -13,6 +13,7 @@ use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
 use taskmanager_ui::layout::PageScaffold;
 use taskmanager_ui::primitives::button::ButtonState;
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 
 mod apps;
 mod inventory;
@@ -44,7 +45,7 @@ struct PageRenderContext<'a> {
     frame: responsive::FrameBudget,
     corner_radius_factor: f32,
     selected_identity: Option<ProcessLiveKey>,
-    layout: responsive::PageLayoutBudget,
+    layout: PageLayoutBudget,
     page_padding: f32,
     content_width: Pixels,
     presentation: PresentationSnapshot,

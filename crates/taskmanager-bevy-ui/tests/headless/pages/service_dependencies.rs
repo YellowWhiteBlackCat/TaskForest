@@ -11,6 +11,7 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
+use bevy::ecs::query::With;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
@@ -26,12 +27,14 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_test_support::pin_english;
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::tokens::UiSize;
 
 use super::dependencies_panel::{
     dependencies_fingerprint, service_dependencies_panel_scene_expanded,
 };
 use super::tests::{headless_services_app, push_services, route_to_services};
+use crate::glass::OpticalGlassCard;
 use crate::palette::UiPalette;
 use bevy::scene::Scene;
 use taskmanager_theme::Theme;
@@ -164,6 +167,11 @@ fn dependencies_panel_renders_relations_scene() {
         .spawn_scene(scene)
         .expect("the dependencies panel scene resolves without app resources")
         .id();
+    let card = world
+        .query_filtered::<&OpticalGlassCard, With<bevy::ui::Node>>()
+        .single(world)
+        .expect("the dependencies panel is an optical glass candidate");
+    assert!(card.enabled && card.tier == GlassTier::Card);
     let texts: Vec<String> = world
         .query::<&Text>()
         .iter(world)

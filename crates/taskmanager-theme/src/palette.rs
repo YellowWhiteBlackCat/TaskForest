@@ -110,7 +110,7 @@ pub fn severity_palette(t: &Theme) -> SeverityPalette {
 /// Resolved color contract handed to UI components. Every field is a concrete
 /// sRGB token; state-derived colors (hover/active/disabled) are derived by
 /// components from these, and focus rings always read [`Palette::ring`].
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Palette {
     /// Window backdrop. Transparent-capable: on a Linux CSD surface
     /// (`Theme::window_transparent`) the alpha is 0 so the chrome's own
@@ -158,7 +158,7 @@ pub struct Palette {
     pub gradient_to: Color,
     /// Panel / popup / dialog / menu corner radius — the skin's
     /// [`RadiusScale::Large`] tier. Components must round surfaces through
-    /// this token, never a hardcoded pixel (skins differ: Breeze 5, GNOME 10).
+    /// this token, never a hardcoded pixel.
     pub panel_radius: Length,
     /// Control (button / tooltip / select / input) corner radius — the skin's
     /// [`RadiusScale::Medium`] tier.
@@ -169,6 +169,10 @@ pub struct Palette {
     /// Tiny surface (track fill / legend dot) corner radius — the skin's
     /// [`RadiusScale::XSmall`] tier.
     pub xsmall_radius: Length,
+    /// GLASS-01: the theme that resolved this palette. Glass tiers read their
+    /// layers from the owning theme so the frosted-glass contract cannot drift
+    /// from the color contract it belongs to.
+    pub theme: Theme,
 }
 
 impl Theme {
@@ -208,6 +212,7 @@ impl Theme {
             control_radius: Length(self.radius(RadiusScale::Medium)),
             small_radius: Length(self.radius(RadiusScale::Small)),
             xsmall_radius: Length(self.radius(RadiusScale::XSmall)),
+            theme: self,
         }
     }
 

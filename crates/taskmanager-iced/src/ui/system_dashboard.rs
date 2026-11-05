@@ -26,7 +26,7 @@ use crate::focus;
 use crate::theme;
 use taskmanager_theme::tokens;
 
-use super::components::{IcedElement, titled_card};
+use super::components::{IcedElement, titled_card, titled_chart_card};
 use taskmanager_shell::presentation::missing_value;
 
 // The summary fold lives in the data layer (`super::system_dashboard_model`)
@@ -160,7 +160,7 @@ fn history_card<'a>(
         t("dashboard.peak"),
         readout(series, metric, TimelineStatistic::Peak)
     );
-    container(titled_card(
+    container(titled_chart_card(
         theme_snapshot,
         t(metric.label_key()),
         column![

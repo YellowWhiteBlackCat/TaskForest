@@ -12,7 +12,8 @@
 #              the CI/local command-parity and gate-wiring guards, and the
 #              private A/B capture-isolation check when a host Wayland/KWin
 #              session and writable user cgroup are available (or
-#              TM_CAPTURE_ISOLATION_GATE=1 forces it).
+#              TM_CAPTURE_ISOLATION_GATE=1 forces it), and the Bevy
+#              optical-capability claim guard (quick; proof in standard).
 #   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy +
 #              production-config (each frontend product compiled WITHOUT the
 #              dev-only `test-support`, under -D warnings — the native
@@ -73,6 +74,10 @@
 #                                 auto runs it only when Wayland/KWin and the
 #                                 writable user cgroup preflight are ready;
 #                                 1 fails closed when prerequisites are absent
+#   TM_OPTICAL_GPU_GATE=auto|0|1  standard-tier Bevy production optical-GPU
+#                                 proof: auto records NO_ADAPTER or a software
+#                                 adapter as explicit Painted degradation;
+#                                 1 fails closed unless hardware proves the WESL
 
 set -u
 
@@ -447,6 +452,12 @@ fi
 if maybe visual-capture-coverage; then
     run_stage visual-capture-coverage quick run_py scripts/quality/visual_capture_coverage.py --repo-root "$repo"
 fi
+if maybe bevy-optical-capability-self; then
+    run_stage bevy-optical-capability-self quick run_py scripts/quality/bevy_optical_capability_guard.py --self-test
+fi
+if maybe bevy-optical-capability; then
+    run_stage bevy-optical-capability quick run_py scripts/quality/bevy_optical_capability_guard.py --repo-root "$repo"
+fi
 if [[ "$skip_install_manager_smoke" == "1" ]]; then
     echo "SKIP install-manager-smoke (release helper build is owned by a later gate)"
     record install-manager-smoke quick SKIP 0
@@ -521,6 +532,23 @@ if maybe test-layout-enforce; then
             SCOPE_CRATE_ARGS+=(--crate "$pkg")
         done
         run_stage test-layout-enforce quick run_py scripts/quality/test_layout_guard.py --mode enforce "${SCOPE_CRATE_ARGS[@]}"
+    fi
+fi
+if maybe presentation-resolution-self; then
+    run_stage presentation-resolution-self quick run_py scripts/quality/presentation_resolution_guard.py --self-test
+fi
+if maybe presentation-resolution-verify; then
+    # Standard tier: when a capture run publishes receipts, every frontend's
+    # receipt must carry the shared presentation resolution (ADR-064). With no
+    # published receipts there is nothing to verify; capture publish's own
+    # self-test proves a fresh receipt satisfies this gate.
+    if [[ -d target/capture-receipts ]]; then
+        run_stage presentation-resolution-verify standard run_py \
+            scripts/quality/presentation_resolution_guard.py --verify \
+            --receipts target/capture-receipts
+    else
+        echo "SKIP presentation-resolution-verify (no published capture receipts)"
+        record presentation-resolution-verify standard SKIP 0
     fi
 fi
 if maybe source-inspection-self; then
@@ -747,6 +775,16 @@ if maybe module-map-self; then
 fi
 if maybe module-map; then
     run_stage module-map standard run_py scripts/quality/module_map_guard.py
+fi
+if maybe bevy-optical-gpu-self; then
+    run_stage bevy-optical-gpu-self standard bash scripts/quality/bevy-optical-gpu-gate.sh --self-test
+fi
+if maybe bevy-optical-gpu; then
+    run_stage bevy-optical-gpu standard bash scripts/quality/bevy-optical-gpu-gate.sh
+fi
+if maybe bevy-optical-capability-receipt; then
+    run_stage bevy-optical-capability-receipt standard run_py \
+        scripts/quality/bevy_optical_capability_guard.py --repo-root "$repo" --require-fresh
 fi
 if maybe ui-route; then
     # This diff-only route is intentionally first: a UI change without the

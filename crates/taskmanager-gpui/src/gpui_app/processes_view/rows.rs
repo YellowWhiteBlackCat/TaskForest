@@ -1,9 +1,10 @@
 //! Processes view table model: canonical category-tree projection, sortable
 //! columns, and the per-row element for the virtualized list.
 
-use crate::gpui_app::elements::{self};
-use crate::gpui_app::icons;
-use crate::gpui_app::root::{Hover, RootView};
+use crate::gpui_app::{
+    elements, icons,
+    root::{Hover, RootView},
+};
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement,
     Pixels, StatefulInteractiveElement, Styled, StyledImage, div, px,
@@ -11,19 +12,13 @@ use gpui::{
 use std::collections::{HashMap, HashSet};
 use taskmanager_application::i18n;
 use taskmanager_application::process_category_projection::category_expansion_key;
-use taskmanager_shell::ProcessRowId;
-use taskmanager_shell::app_tree_expansion_key_for_identity;
+use taskmanager_shell::{ProcessRowId, app_tree_expansion_key_for_identity};
 use taskmanager_theme::Color;
 use taskmanager_ui::icons_binding::icon;
-use taskmanager_ui::theme_binding::absolute;
-use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
-use taskmanager_ui::theme_binding::fraction;
-use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::pixels;
-use taskmanager_ui_contract::find;
-use taskmanager_ui_contract::{IconId, ProcessColumnSpec};
+use taskmanager_ui::theme_binding::{
+    absolute, definite_length, fill, fraction, hsla, length, pixels,
+};
+use taskmanager_ui_contract::{IconId, ProcessColumnSpec, find};
 
 pub(crate) mod aggregate_display;
 mod cells;
@@ -364,6 +359,13 @@ fn set_expansion(view: &mut RootView, toggle: &Toggle, expanded: bool) {
                 view.processes_state.expanded_apps.remove(&key);
             }
         }
+        Toggle::GroupUnknown(name) => {
+            if expanded {
+                view.processes_state.expanded_apps.insert(name.clone());
+            } else {
+                view.processes_state.expanded_apps.remove(name);
+            }
+        }
         Toggle::None => {}
     }
 }
@@ -399,6 +401,7 @@ fn toggle_expansion(view: &mut RootView, toggle: &Toggle) {
             .processes_state
             .expanded_apps
             .contains(&category_expansion_key(*category)),
+        Toggle::GroupUnknown(name) => view.processes_state.expanded_apps.contains(name),
         Toggle::None => return,
     };
     set_expansion(view, toggle, !expanded);
@@ -614,6 +617,18 @@ pub fn proc_row_with_layout(
                 .text_size(absolute(ui_size.caption_font_size()))
                 .text_color(hsla(theme.fg_dim))
                 .child(b.clone()),
+        );
+    }
+    if let Some(runtime) = &row.container_badge {
+        name_cell = name_cell.child(
+            div()
+                .ml(length(tokens::SPACE_8))
+                .px(definite_length(tokens::SPACE_4))
+                .rounded_sm()
+                .bg(hsla(theme.selection_bg()))
+                .text_size(absolute(ui_size.caption_font_size()))
+                .text_color(hsla(theme.fg_dim))
+                .child(runtime.clone()),
         );
     }
 

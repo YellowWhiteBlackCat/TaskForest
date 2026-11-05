@@ -1,15 +1,10 @@
-//! Capture-only shell seed for the deterministic demo window.
+//! Capture-only shell seeds for the deterministic demo window.
 //!
-//! The visual-contract capture needs a populated curve window, so the demo
-//! composition records a short adjacent telemetry sequence on top of the
-//! shared `demo_app()` fixture. This module is a pure data fixture: it owns
-//! no UI tree and paints nothing — it only feeds the shared shell the same
-//! typed observations a real collection frame would, which keeps it out of
-//! the renderer/fold boundary the display gate pins (ARCH.md §8.1).
-//!
-//! Production collection and the shared fixture's semantics are untouched:
-//! `demo_app` starts with one honest sample and the sequence below is
-//! appended only inside the capture composition.
+//! The warm graph history now belongs to the shared `demo_app()` fixture, so
+//! Bevy and GPUI capture the same accepted frames through the same correlated
+//! ingestor. This module owns only scenario-specific shell state (alerts,
+//! confirmations, service logs, dynamic device snapshots); it no longer
+//! appends a renderer-private telemetry sequence.
 
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
@@ -18,6 +13,7 @@ use taskmanager_shell::fixture::process_insights::{
 };
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskforest_core::core::DeviceGeneration;
 use taskforest_core::core::alerts::{
@@ -29,8 +25,8 @@ use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::identity::DeviceId;
 use taskforest_core::core::identity::ProviderId;
 use taskforest_core::core::metrics::{
-    CpuMetrics, DiskMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine,
-    GpuEngineKind, ScalarObservation, ScalarObservationGroup, SmartAvailability,
+    DiskMetrics, DiskPartition, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind,
+    ScalarObservation, SmartAvailability,
 };
 use taskforest_core::core::npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport,
@@ -39,6 +35,9 @@ use taskforest_core::core::power::{BatteryInfo, BatteryScalarObservations, Power
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::{AppAction, AppPage, InteractionEvent, PendingConfirmation};
 mod dynamic_history;
+use taskforest_core::core::process::{
+    ContainerMetadata, ContainerRuntime, ProcessMetadataObservations, ProcessOwner,
+};
 use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessItem,
 };
@@ -56,57 +55,13 @@ use taskforest_core::core::session::{
 use taskforest_core::core::smart::SmartSelfTestKind;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_shell::demo_app;
-use taskmanager_shell::fixture::{
-    ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
-};
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{ProcessRowId, ShellApp};
 
-/// Build the capture-only shell with a warm, deterministic graph window.
+/// Build the capture-only shell from the shared warm demo history.
 pub(crate) fn demo_shell() -> ShellApp {
-    let mut shell = demo_app();
-    if let Some(seed) = shell.projection().snapshot.clone() {
-        for offset in 1..=24_u64 {
-            let mut next = seed.clone();
-            next.timestamp_ms = next
-                .timestamp_ms
-                .saturating_add(offset.saturating_mul(1_000));
-            next.cpu = demo_cpu_frame(&next.cpu, next.timestamp_ms, offset);
-            record_demo_history_frame(&mut shell, &next, None, None);
-        }
-    }
-    shell
-}
-
-/// One adjacent CPU frame: the seed's identity and shape with a deterministic
-/// utilization sequence applied to the global and per-core observations.
-fn demo_cpu_frame(seed: &CpuMetrics, timestamp_ms: u64, offset: u64) -> CpuMetrics {
-    let usage = if offset == 24 {
-        37.4
-    } else {
-        24.0 + f32::from((offset.saturating_mul(7) % 26) as u8)
-    };
-    let mut observations = seed.scalar_observations().clone();
-    observations.global_usage_pct = ScalarObservation::available(usage, timestamp_ms);
-    let core_values = (0..seed.current_core_usage_len())
-        .map(|index| (usage + (index as f32 * 4.0) - (offset % 3) as f32 * 2.0).clamp(0.0, 100.0))
-        .collect();
-    observations.core_usage_group = ScalarObservationGroup::available(core_values, timestamp_ms);
-    let mut frame = CpuMetrics::from_observations(observations);
-    frame.brand = seed.brand.clone();
-    frame.frequency_source = seed.frequency_source;
-    frame.temperature_source = seed.temperature_source;
-    frame.physical_cores = seed.physical_cores;
-    frame.logical_cores = seed.logical_cores;
-    frame.l1d_cache_kb = seed.l1d_cache_kb;
-    frame.l1i_cache_kb = seed.l1i_cache_kb;
-    frame.l2_cache_kb = seed.l2_cache_kb;
-    frame.l3_cache_kb = seed.l3_cache_kb;
-    frame.performance_policy = seed.performance_policy.clone();
-    frame.packages = seed.packages.clone();
-    frame.idle_states = seed.idle_states.clone();
-    frame.interrupts = seed.interrupts.clone();
-    frame
+    demo_app()
 }
 
 pub(crate) fn seed_service_log_fixture(shell: &mut ShellApp) {
@@ -188,6 +143,32 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
             if let Some(process) = process {
                 shell.set_row_selection(ProcessRowId::from_process(&process), Some(&process));
             }
+        }
+        "process-context-menu" => {
+            // Anchor the action menu on a real selected row: the menu freezes
+            // that row's live identity at open time, so a capture without a
+            // selection would fail closed and paint nothing.
+            let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+            let process = shell
+                .projection()
+                .processes
+                .as_ref()
+                .and_then(|rows| rows.first())
+                .cloned();
+            if let Some(process) = process {
+                shell.set_row_selection(ProcessRowId::from_process(&process), Some(&process));
+            }
+        }
+        "feedback-overlay" => {
+            shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Success,
+                FeedbackLifecycle::UntilReplaced,
+                format!(
+                    "Current window saved: /run/media/{}/very-long-workspace/target/capture/runs/{}/capture.png (1180x780)",
+                    "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9",
+                ),
+            );
         }
         "process-force-kill" => {
             let process = shell
@@ -310,6 +291,41 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                     );
                 }
                 let _ = shell.apply_action(AppAction::OpenProperties);
+            }
+        }
+        "apps-container-group" | "apps-container-group-compact" => {
+            let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+            if let Some(root) = seed_shell_process_tree(shell) {
+                let _ = root;
+            }
+            let mut processes = shell
+                .projection()
+                .processes
+                .as_deref()
+                .cloned()
+                .unwrap_or_default();
+            let mut tagged = 0;
+            for process in processes
+                .iter_mut()
+                .filter(|process| (90_001..=90_003).contains(&process.pid))
+            {
+                let metadata = ContainerMetadata::new(
+                    ContainerRuntime::Docker,
+                    "a1b2c3d4e5f678901234567890abcdef",
+                )
+                .with_name("capture-web");
+                process.apply_metadata_observations(
+                    ProcessMetadataObservations::current_with_container(
+                        ProcessOwner::opaque("capture-user"),
+                        None,
+                        Some(metadata),
+                        1,
+                    ),
+                );
+                tagged += 1;
+            }
+            if tagged == 3 {
+                seed_projection_fact(shell, ProjectionSeedFact::Processes(Some(processes)));
             }
         }
         "services-search-highlight" => {

@@ -9,6 +9,7 @@ use iced::advanced::{Clipboard, Shell, Widget};
 use iced::keyboard::key::Named;
 use iced::keyboard::{self, Key};
 use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
+use std::path::PathBuf;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::{
     OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
@@ -23,6 +24,7 @@ struct State {
     pointer_suppressed: bool,
     focus_dismissed: bool,
     was_focused: bool,
+    capture_marker_emitted: bool,
 }
 
 /// What opens this tooltip: a pointer hover, or hover plus keyboard focus.
@@ -44,6 +46,7 @@ pub(crate) struct Tooltip<'a> {
     tooltip: Element<'a, Message, iced::Theme, iced::Renderer>,
     trigger: TooltipTrigger,
     gap: f32,
+    capture_open_marker: Option<PathBuf>,
 }
 
 impl<'a> Tooltip<'a> {
@@ -57,7 +60,15 @@ impl<'a> Tooltip<'a> {
             tooltip: tooltip.into(),
             trigger,
             gap: f32::from(tokens::SPACE_4),
+            capture_open_marker: None,
         }
+    }
+
+    /// Keep this tooltip open and emit one mounted-surface marker for real
+    /// capture. Ordinary production launches never install this path.
+    pub(crate) fn open_for_capture(mut self, marker: PathBuf) -> Self {
+        self.capture_open_marker = Some(marker);
+        self
     }
 }
 
@@ -88,7 +99,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
 
     fn state(&self) -> widget::tree::State {
         widget::tree::State::new(State {
-            open: self.trigger.follows_focus(),
+            open: self.trigger.follows_focus() || self.capture_open_marker.is_some(),
             was_focused: self.trigger.follows_focus(),
             ..State::default()
         })
@@ -100,10 +111,14 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
 
     fn diff(&self, tree: &mut Tree) {
         tree.diff_children(&[&self.content, &self.tooltip]);
+        let capture_open = self.capture_open_marker.is_some();
         sync_focus(
             tree.state.downcast_mut::<State>(),
             self.trigger.follows_focus(),
         );
+        if capture_open {
+            tree.state.downcast_mut::<State>().open = true;
+        }
     }
 
     fn size(&self) -> Size<Length> {
@@ -205,7 +220,16 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
-        let open = tree.state.downcast_ref::<State>().open;
+        let (open, capture_marker) = {
+            let state = tree.state.downcast_mut::<State>();
+            let marker = (state.open && !state.capture_marker_emitted)
+                .then(|| self.capture_open_marker.clone())
+                .flatten();
+            if marker.is_some() {
+                state.capture_marker_emitted = true;
+            }
+            (state.open, marker)
+        };
         let (content_tree, tooltip_tree) = tree.children.split_at_mut(1);
         let content = self.content.as_widget_mut().overlay(
             &mut content_tree[0],
@@ -222,6 +246,11 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
                 gap: self.gap,
             }))
         });
+        if tooltip.is_some()
+            && let Some(marker) = capture_marker.as_deref()
+        {
+            crate::capture::append_tooltip_overlay_marker(marker);
+        }
         if content.is_some() || tooltip.is_some() {
             Some(
                 overlay::Group::with_children(content.into_iter().chain(tooltip).collect())

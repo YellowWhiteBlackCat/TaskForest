@@ -348,7 +348,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_8())),
         }
-        BackgroundColor({ context.palette.content_bg })
+        BackgroundColor({ context.palette.canvas })
         Children [
              Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) --
              Text(summary) TextRole(Role::Caption) --

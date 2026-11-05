@@ -14,13 +14,22 @@ use gpui::{
     AnyElement, App, Context, ElementId, FocusHandle, FocusOutEvent, InteractiveElement,
     IntoElement, KeyDownEvent, ParentElement, Pixels, Point, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Subscription, Task, Window, anchored, deferred, div, point,
-    px,
+    px, rems,
 };
-use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassLayer, GlassTier, Palette, Theme};
 
 /// Delay before a hover shows the tooltip.
 pub const TOOLTIP_DELAY: Duration = Duration::from_millis(500);
+
+/// The tooltip hint's glass material (GLASS-01). A hint is a floating card, so
+/// it wears the theme's Card tier — the same layer as the menus and GPUI's
+/// `elements::tooltip` — instead of the opaque page surface it used to paint.
+/// Pure so the render path and the regression test read the same values.
+#[must_use]
+pub fn tooltip_glass(theme: &Theme) -> GlassLayer {
+    theme.glass_card()
+}
 
 /// Tooltip content: static text or a custom element builder.
 pub enum TooltipContent {
@@ -74,6 +83,10 @@ impl Tooltip {
 impl RenderOnce for Tooltip {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         let palette = self.palette;
+        // GLASS-01: the hint card is a floating card surface, so it reads the
+        // same glass tier as GPUI's other overlays (`elements::tooltip`, the
+        // toast, the menus) instead of the opaque page surface.
+        let layer = tooltip_glass(&palette.theme);
         div()
             .flex()
             .flex_row()
@@ -81,10 +94,17 @@ impl RenderOnce for Tooltip {
             .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .px(crate::theme_binding::definite_length(tokens::SPACE_10))
             .py(crate::theme_binding::definite_length(tokens::SPACE_5))
-            .rounded(crate::theme_binding::absolute(palette.control_radius))
-            .bg(crate::theme_binding::fill(palette.surface))
-            .border_1()
-            .border_color(crate::theme_binding::hsla(palette.border))
+            .rounded(crate::theme_binding::rem_length(palette.control_radius))
+            .bg(crate::theme_binding::glass_fill(
+                &palette.theme,
+                GlassTier::Card,
+            ))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(crate::theme_binding::hsla(layer.edge))
+            .shadow(crate::theme_binding::glass_shadow(
+                &palette.theme,
+                GlassTier::Card,
+            ))
             .text_sm()
             .text_color(crate::theme_binding::hsla(palette.fg))
             .child(match &self.content {

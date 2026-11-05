@@ -20,6 +20,19 @@ use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{HighContrast, LightDark, Skin};
 
+#[test]
+fn segmented_fills_round_only_the_visible_track_ends() {
+    let color = iced::Color::BLACK;
+    let left = segmented_fill_style(color, 5.0, true, false).border.radius;
+    let middle = segmented_fill_style(color, 5.0, false, false).border.radius;
+    let right = segmented_fill_style(color, 5.0, false, true).border.radius;
+    let single = segmented_fill_style(color, 5.0, true, true).border.radius;
+    assert_eq!((left.top_left, left.top_right), (5.0, 0.0));
+    assert_eq!((middle.bottom_left, middle.bottom_right), (0.0, 0.0));
+    assert_eq!((right.bottom_left, right.bottom_right), (0.0, 5.0));
+    assert_eq!((single.top_left, single.bottom_right), (5.0, 5.0));
+}
+
 fn theme_for(skin: Skin, mode: LightDark) -> Theme {
     Theme::build(
         skin,

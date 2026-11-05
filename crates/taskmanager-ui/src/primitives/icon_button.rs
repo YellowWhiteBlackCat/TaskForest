@@ -9,7 +9,7 @@ use gpui::{
     App, ClickEvent, Context, ElementId, Entity, FocusHandle, InteractiveElement, IntoElement,
     KeyDownEvent, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div, px,
 };
-use taskmanager_theme::Palette;
+use taskmanager_theme::{Palette, tokens};
 use taskmanager_ui_contract::IconId;
 
 use crate::styled::{active_fill, hover_fill};
@@ -74,7 +74,7 @@ impl IconButton {
             state,
             palette,
             icon_id,
-            size: 16.0,
+            size: f32::from(tokens::ICON_INLINE),
             on_activate: None,
         }
     }

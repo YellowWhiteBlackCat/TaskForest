@@ -40,6 +40,8 @@ boundaries are defined in `../../docs/ARCH.md` and
 
 ```text
 src/main.rs → surface.rs  terminal.rs        terminal host and surface authority
+src/presentation_binding.rs                  ADR-064: theme-value lift and TUI
+                                             cell / whole-frame repaint binding
 src/demo/capture.rs                           scene readiness and normal settings input
 src/runtime/                                  event loop runtime
 │   └── keys.rs  modals.rs  navigation.rs  semantic.rs  seam.rs

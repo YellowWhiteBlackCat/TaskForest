@@ -17,6 +17,8 @@ use taskmanager_test_support::fixture_start_token;
 mod aggregate_display;
 #[path = "tests/category.rs"]
 mod category;
+#[path = "tests/context_menu_capture.rs"]
+mod context_menu_capture;
 #[path = "tests/keyboard_tree_nav.rs"]
 mod keyboard_tree_nav;
 #[path = "tests/landscape.rs"]
@@ -720,6 +722,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                 parent_key: None,
                 badge: None,
                 toggle: Toggle::None,
+                container_badge: None,
             },
             entity: root,
         }
@@ -825,6 +828,7 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
                 parent_key: None,
                 badge: None,
                 toggle: Toggle::None,
+                container_badge: None,
             },
             entity: root,
         }
@@ -934,6 +938,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
         parent_key: None,
         badge: None,
         toggle: Toggle::None,
+        container_badge: None,
     };
 
     // Selected: rail present, 4px wide, flush with the row's left edge, and

@@ -57,15 +57,15 @@ pub(super) struct UsersColumns {
 pub(super) fn users_columns() -> UsersColumns {
     UsersColumns {
         session: TableColumn::text(
-            "Session",
+            "session",
             InfoSortCol::Session.label(),
             ColumnWidth::Fixed(120.0),
         ),
-        name: TableColumn::text("Name", InfoSortCol::Name.label(), ColumnWidth::Fixed(170.0)),
-        seat: TableColumn::text("Seat", InfoSortCol::Seat.label(), ColumnWidth::Fixed(100.0)),
-        tty: TableColumn::text("Tty", "users.tty", ColumnWidth::Fixed(100.0)),
-        family: TableColumn::text("Family", "users.family", ColumnWidth::Fixed(120.0)),
-        logon: TableColumn::text("Logon", "users.logon", ColumnWidth::Fill),
+        name: TableColumn::text("name", InfoSortCol::Name.label(), ColumnWidth::Fixed(170.0)),
+        seat: TableColumn::text("seat", InfoSortCol::Seat.label(), ColumnWidth::Fixed(100.0)),
+        tty: TableColumn::text("tty", "users.tty", ColumnWidth::Fixed(100.0)),
+        family: TableColumn::text("family", "users.family", ColumnWidth::Fixed(120.0)),
+        logon: TableColumn::text("logon", "users.logon", ColumnWidth::Fill),
     }
 }
 

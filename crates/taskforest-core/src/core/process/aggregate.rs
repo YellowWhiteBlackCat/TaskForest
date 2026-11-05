@@ -66,6 +66,23 @@ impl<T> AggregateMetric<T> {
     pub fn into_observation(self) -> ScalarObservation<T> {
         self.observation
     }
+
+    /// An aggregate that observed no member for this metric.
+    ///
+    /// Projections that own only a subset of a group's facts (a container
+    /// bucket owns CPU and memory only) resolve every other metric through
+    /// this constructor, so the dimension stays explicitly unavailable with
+    /// its reason instead of borrowing a member's value or fabricating a
+    /// zero. `T` is never observed, so the value type is the caller's choice.
+    #[must_use]
+    pub fn unavailable(failure: FailureKind) -> Self {
+        Self {
+            observation: ScalarObservation::unavailable(failure),
+            member_count: 0,
+            current_member_count: 0,
+            known_member_count: 0,
+        }
+    }
 }
 
 /// Fold current/stale/unavailable CPU observations in input order.

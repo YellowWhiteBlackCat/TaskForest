@@ -19,13 +19,10 @@ mod visual;
 
 pub use actions::{Pill, ToolBtn, pill, tool_btn};
 pub(crate) use graphs::mini_graph_cell;
-pub(crate) const CARD_SHADOW_AMBIENT_ALPHA: f32 = 0.35;
-pub(crate) const CARD_SHADOW_AMBIENT_DROP: f32 = 2.0;
-pub(crate) const CARD_SHADOW_AMBIENT_BLUR: f32 = 6.0;
 pub use graphs::{
-    GraphLegendEntry, card_shadow, graph_card, graph_card_with_dual_state, graph_card_with_state,
-    graph_legend,
+    GraphLegendEntry, graph_card, graph_card_with_dual_state, graph_card_with_state, graph_legend,
 };
+pub(crate) use overlays::graph_tooltip_overlay;
 pub use overlays::{
     dialog_overlay, dialog_overlay_width, more_rows_hint, more_rows_label, tooltip,
     tooltip_overlay, truncated_text,

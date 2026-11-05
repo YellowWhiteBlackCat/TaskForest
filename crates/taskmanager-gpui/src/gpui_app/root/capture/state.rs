@@ -3,6 +3,7 @@
 use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use gpui::{Pixels, Point};
 use taskforest_core::core::SmartSelfTestObservation;
 use taskforest_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskforest_core::core::startup::BootTimeline;
@@ -87,6 +88,37 @@ pub(crate) enum SurfacePresentation {
     Presented,
 }
 
+/// A real context menu cannot be opened by mutating view state: its only
+/// production entry is the row's right-click listener. This capture-only
+/// sequence injects the same pointer events a user would send, then certifies
+/// the menu only after the host has mounted its `PopupMenuState` and the popup
+/// has survived two rendered frames.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContextMenuCaptureProgress {
+    #[default]
+    AwaitingRow,
+    AwaitingPointer,
+    AwaitingMenu,
+    AwaitingPresentation,
+    Presented,
+}
+
+/// The host's real open/closed transition, as reported by the mounted
+/// `PopupMenuState`. Capture certification reads this typed state instead of a
+/// presence boolean.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContextMenuPresence {
+    #[default]
+    Closed,
+    Open,
+}
+
+impl ContextMenuPresence {
+    pub(crate) const fn is_open(self) -> bool {
+        matches!(self, Self::Open)
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CaptureMode {
     #[default]
@@ -169,6 +201,10 @@ pub(crate) struct CaptureEvidence {
     pub(super) system_about_presentation: SurfacePresentation,
     pub(super) process_properties_presentation: SurfacePresentation,
     pub(super) controlled_presentation: SurfacePresentation,
+    pub(super) context_menu_capture: ContextMenuCaptureProgress,
+    pub(super) context_menu_presentation_armed: bool,
+    pub(super) context_menu_anchor: Option<Point<Pixels>>,
+    pub(super) context_menu_presence: ContextMenuPresence,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.

@@ -12,9 +12,10 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
-    UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, JustifyContent, Node,
+    PositionType, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -27,6 +28,9 @@ use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_shell::presentation::service_diagnostics_rows;
+use taskmanager_theme::GlassTier;
+
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 
 /// The service details panel's width, in rem.
 ///
@@ -108,24 +112,43 @@ pub(crate) fn service_details_modal_scene(
         rows.push(fact_row_scene(&label, &value, palette));
     }
 
+    let modal_gap_rem = palette.rem_ratio(space_8());
+    let modal_padding_rem = palette.rem_ratio(space_24());
+    let row_gap_rem = palette.rem_ratio(space_4());
+    let row_margin_rem = palette.rem_ratio(space_8());
+    let footer_margin_rem = palette.rem_ratio(space_8());
+    let radius_rem = palette.panel_radius_rem();
+    let shadow = palette.glass_shadow(GlassTier::Modal);
+    let fill = palette.glass_modal_fill;
+    let edge = palette.glass_modal_edge;
+    let grain =
+        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
     let panel = Box::new(bsn! {
         Node {
             width: rem(SERVICE_DETAILS_PANEL_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_8()),
-            padding: UiRect::all(Val::Px(space_24())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            row_gap: Val::Rem(modal_gap_rem),
+            padding: UiRect::all(Val::Rem(modal_padding_rem)),
+            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadow })
+        OpticalGlassCard {
+            tier: GlassTier::Modal,
+            enabled: true,
+        }
         Children [
+             @{ grain } --
              Text(title) TextRole(Role::Heading) --
 
                 Node {
                     width: percent(100.0),
                     flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(space_4()),
-                    margin: UiRect::vertical(Val::Px(space_8())),
+                    row_gap: Val::Rem(row_gap_rem),
+                    margin: UiRect::vertical(Val::Rem(row_margin_rem)),
                 }
                 Children [
                     { rows }
@@ -136,7 +159,7 @@ pub(crate) fn service_details_modal_scene(
                     width: percent(100),
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::End,
-                    margin: UiRect::top(Val::Px(space_8())),
+                    margin: UiRect::top(Val::Rem(footer_margin_rem)),
                 }
                 Children [
 
@@ -152,7 +175,7 @@ pub(crate) fn service_details_modal_scene(
         ]
     }) as Box<dyn Scene>;
 
-    let scrim = palette.scrim;
+    let scrim = palette.glass_scrim_fill;
     Box::new(bsn! {
         Node {
             width: percent(100),

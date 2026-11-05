@@ -8,11 +8,12 @@ use bevy::scene::CommandsSceneExt;
 use bevy::ui::UiSystems;
 
 use super::*;
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::scene_attach::attach_child;
 use crate::widgets::history_controls::toolbar_scene;
 use crate::window::WindowPalette;
 use bevy::text::{LineBreak, TextLayout};
-use bevy::ui::prelude::{Display, FlexWrap, Overflow};
+use bevy::ui::prelude::{BorderRadius, Display, FlexWrap, Overflow, Val};
 use bevy::ui_widgets::ScrollArea;
 use taskmanager_application::history_decimation::lttb_gap_preserving;
 
@@ -202,10 +203,21 @@ fn history_row_scene(row: &HistoryRowModel, palette: &UiPalette) -> Box<dyn Scen
         t("history.application.peak_processes"),
         process_count_text(row.process_count_peak())
     );
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     Box::new(bsn! {
-        Node { width: percent(100), min_width: px(0.0), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) }
-        BackgroundColor({ palette.panel_fill })
+        Node { width: percent(100), min_width: px(0.0), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_8()), padding: UiRect::all(px(space_8())), border: UiRect::all(Val::Rem(edge_width_rem)), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
+        BackgroundColor({ fill })
+        bevy::ui::BorderColor::all(edge)
+        bevy::ui::BoxShadow({ shadows })
         Children [
+            @{ grain } --
             Node { width: percent(100), min_width: px(0.0) } Children [ Text(name) TextRole(Role::Body) TextLayout { linebreak: LineBreak::AnyCharacter } ] --
             Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_8()) } Children [
                 Text(cpu) TextRole(Role::Caption) -- Text(memory) TextRole(Role::Caption) -- Text(count) TextRole(Role::Caption)

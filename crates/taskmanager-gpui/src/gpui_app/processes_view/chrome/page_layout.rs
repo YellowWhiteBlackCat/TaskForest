@@ -4,9 +4,10 @@
 //! that global fact into page-specific presentation choices exactly once, so
 //! render code never reconstructs responsive policy from unrelated booleans.
 
-use crate::gpui_app::root::{LayoutProfile, PageLayoutBudget, VerticalSpace};
 use taskmanager_theme::Length;
 use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{LayoutProfile, VerticalSpace};
 
 /// Amount of process-page identity information kept in the overview band.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

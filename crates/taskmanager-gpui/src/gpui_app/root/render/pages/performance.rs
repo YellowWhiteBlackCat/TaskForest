@@ -10,6 +10,7 @@ use taskmanager_theme::tokens;
 use taskmanager_ui::layout::PageFrame;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui_contract::presentation::vocabulary::DeviceNavigationPresentation;
 
 use super::{PageRenderContext, RootView, SelectedDevice};
 use crate::gpui_app::root::{cpu_view, elements, perf_views, responsive, sidebar};
@@ -55,11 +56,26 @@ impl RootView {
                     - PERFORMANCE_REPLAY_ENTRY_HEIGHT)
                     .max(0.0));
         }
-        let performance_layout = responsive::PerformancePageBudget::from_frame(
+        let performance_layout = responsive::performance_budget_from_frame(
             performance_frame,
             self.sidebar_visible,
             f32::from(sidebar_preferences.width),
         );
+        if let Some(scenario) = self.capture_evidence.scenario() {
+            let frame = responsive::performance_frame_from_frame(
+                performance_frame,
+                self.sidebar_visible,
+                f32::from(sidebar_preferences.width),
+            );
+            let resolution = responsive::presentation_resolution_marker(
+                &frame,
+                self.presentation.appearance().ui_size,
+                self.presentation.appearance().density,
+                self.sidebar_visible,
+                Some(f32::from(sidebar_preferences.width)),
+            );
+            crate::gpui_app::root::capture::emit_resolution_marker(Some(scenario), &resolution);
+        }
         let main = if self.history_replay_visible() {
             // Read-only persisted review: the recorded
             // series replace the live graphs while the panel is open.
@@ -270,8 +286,7 @@ impl RootView {
         .debug_selector(|| "tm-performance-page-frame".to_string());
         let mut body = div().flex_1().min_h(px(0.0)).min_w(px(0.0)).w_full().flex();
         if !self.history_replay_visible()
-            && performance_layout.device_navigation
-                == responsive::DeviceNavigationPresentation::Strip
+            && performance_layout.device_navigation == DeviceNavigationPresentation::Strip
         {
             body = body.flex_col();
             // When the persistent sidebar is hidden, the strip becomes
@@ -306,6 +321,7 @@ impl RootView {
                 sidebar::SidebarProps {
                     theme: t,
                     scroll: &self.sidebar_scroll,
+                    resize_focus: &self.sidebar_resize_focus,
                     width: px(performance_layout.sidebar_width),
                     snap,
                     telemetry,

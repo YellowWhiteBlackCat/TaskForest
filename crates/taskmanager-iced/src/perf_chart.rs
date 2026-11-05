@@ -41,6 +41,7 @@ use iced::widget::canvas::{self, Cache, Geometry, Path, Stroke};
 use iced::{Color, Pixels, Point, Rectangle, Size};
 
 use taskmanager_application::i18n::t;
+use taskmanager_theme::tokens;
 
 use crate::app::Message;
 
@@ -669,7 +670,7 @@ pub(crate) fn draw_readout_pill(
     else {
         return;
     };
-    let font_size = 11.0;
+    let font_size = f32::from(tokens::FONT_11);
     let text_width = crate::text_metrics::measured_text_width(content, font_size);
     draw_value_pill(
         frame,
@@ -701,7 +702,7 @@ fn draw_latest_badge(
     let (Some(content), Some(anchor)) = (content, anchor) else {
         return;
     };
-    let text_width = crate::text_metrics::measured_text_width(content, 11.0);
+    let text_width = crate::text_metrics::measured_text_width(content, f32::from(tokens::FONT_11));
     let point = Point::new(
         snap_to_device_grid(
             sample_x(anchor.index, sample_count, size.width),
@@ -745,13 +746,16 @@ fn draw_value_pill(
             .with_width(1.0)
             .with_color(grid_color.scale_alpha(0.6)),
     );
-    let content =
-        crate::text_metrics::truncate_to_width(content, (bounds.width - 12.0).max(0.0), 11.0);
+    let content = crate::text_metrics::truncate_to_width(
+        content,
+        (bounds.width - 12.0).max(0.0),
+        f32::from(tokens::FONT_11),
+    );
     frame.fill_text(canvas::Text {
         content: content.to_string(),
         position: Point::new(bounds.center_x(), bounds.center_y()),
         color: readout.fg,
-        size: Pixels(11.0),
+        size: Pixels(f32::from(tokens::FONT_11)),
         align_x: iced::advanced::text::Alignment::Center,
         align_y: iced::alignment::Vertical::Center,
         ..canvas::Text::default()

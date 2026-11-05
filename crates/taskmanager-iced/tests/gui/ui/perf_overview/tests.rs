@@ -2,9 +2,7 @@ use super::*;
 use crate::app::{Message, PerfDevice};
 use crate::ui::core_grid::CORE_GRID_SCROLL_ID;
 use crate::ui::perf_layout::PERFORMANCE_STATS_RAIL_SCROLL_ID;
-use crate::ui::responsive::{
-    PerformanceChartInventory, PerformancePageBudget, PerformanceVerticalRunway,
-};
+use crate::ui::responsive::performance_budget_for_perf_frame;
 use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Scrollable;
@@ -29,6 +27,9 @@ use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 use taskmanager_shell::presentation::msr_thermal_status_segments;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_test_support::pin_english;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    PerformanceChartInventory, PerformanceVerticalRunway,
+};
 
 mod graph_summary_tests {
     use super::*;
@@ -377,15 +378,11 @@ mod cpu_frequency_source_tests {
     #[test]
     fn cpu_chart_layout_keeps_secondary_surfaces_out_of_compact_space() {
         assert_eq!(
-            projection::CpuChartLayout::for_inventory(
-                crate::ui::responsive::PerformanceChartInventory::Full
-            ),
+            projection::CpuChartLayout::for_inventory(PerformanceChartInventory::Full),
             projection::CpuChartLayout::AggregateWithPerCore
         );
         assert_eq!(
-            projection::CpuChartLayout::for_inventory(
-                crate::ui::responsive::PerformanceChartInventory::AggregateOnly
-            ),
+            projection::CpuChartLayout::for_inventory(PerformanceChartInventory::AggregateOnly),
             projection::CpuChartLayout::AggregateOnly
         );
     }
@@ -542,7 +539,7 @@ mod cpu_frequency_source_tests {
 
         let standard_size = Size::new(1180.0, 780.0);
         let _ = app.update(Message::WindowResized(standard_size));
-        let standard_budget = PerformancePageBudget::for_perf_frame(
+        let standard_budget = performance_budget_for_perf_frame(
             app.page_viewport_size(),
             app.performance.sidebar_visible,
         );
@@ -660,7 +657,7 @@ mod cpu_frequency_source_tests {
         }
         let compact_size = Size::new(720.0, 480.0);
         let _ = app.update(Message::WindowResized(compact_size));
-        let compact_budget = PerformancePageBudget::for_perf_frame(
+        let compact_budget = performance_budget_for_perf_frame(
             app.page_viewport_size(),
             app.performance.sidebar_visible,
         );
@@ -813,7 +810,7 @@ mod cpu_frequency_source_tests {
 
         let standard_size = Size::new(1180.0, 780.0);
         let _ = app.update(Message::WindowResized(standard_size));
-        let budget = PerformancePageBudget::for_perf_frame(
+        let budget = performance_budget_for_perf_frame(
             app.page_viewport_size(),
             app.performance.sidebar_visible,
         );

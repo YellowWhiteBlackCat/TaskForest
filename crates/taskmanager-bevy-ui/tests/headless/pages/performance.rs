@@ -56,12 +56,12 @@ use taskmanager_shell::presentation::{MISSING_VALUE, cpu_thermal_throttle_summar
 use taskmanager_shell::{ShellApp, demo_app};
 use taskmanager_theme::Theme;
 
+use super::metrics::summary_value;
 use super::scene::content;
 use super::{
     CpuField, CurveCard, CurveGate, DynBlock, DynField, DynText, PerformanceDeviceButton,
     PerformanceDeviceFocus, PerformanceDeviceTarget, PerformanceFocus, PerformanceFocusButton,
     Section, SparkStrip, SummaryField, SystemCurve, curve_caption, curve_wanted, section_keys,
-    summary_value,
 };
 use crate::app::{FrontendTrack, Page, PageContext, Route, RouteChanged};
 use crate::drain::ShellProjectionFolded;
@@ -843,7 +843,7 @@ fn folded_projection_rewrites_the_mounted_page() {
     route_to_performance(&mut app);
 
     // Cold mount: the CPU summary honestly renders the shared dash.
-    let cpu_field = DynField::Summary(SummaryField::Cpu);
+    let cpu_field = DynField::Cpu(CpuField::Usage);
     assert_eq!(
         dyn_text_value(app.world_mut(), &cpu_field).as_deref(),
         Some(MISSING_VALUE),
@@ -868,14 +868,14 @@ fn folded_projection_rewrites_the_mounted_page() {
         Some("42.5%"),
         "the folded CPU fact reached the mounted text through the observer"
     );
+    let eth0_field = DynField::Device {
+        section: Section::Network,
+        device: "eth0".to_owned(),
+    };
     assert_eq!(
-        dyn_text_value(
-            app.world_mut(),
-            &DynField::Summary(SummaryField::NetReceive)
-        )
-        .as_deref(),
-        Some("3.0 KiB/s"),
-        "the summed receive rate of both adapters rendered"
+        dyn_text_value(app.world_mut(), &eth0_field).as_deref(),
+        Some("1.0 KiB/s · 512 B/s · —"),
+        "the formatted network rate for eth0 rendered"
     );
     assert_eq!(
         block_keys(app.world_mut(), Section::Network),

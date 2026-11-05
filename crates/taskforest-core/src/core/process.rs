@@ -816,6 +816,10 @@ pub fn fuzzy_filter_processes(items: &[ProcessItem], query: &str) -> Vec<Process
 mod aggregate_by_type_tests;
 
 #[cfg(test)]
+#[path = "../../tests/headless/core_core_process_aggregate_by_container_tests.rs"]
+mod aggregate_by_container_tests;
+
+#[cfg(test)]
 #[path = "../../tests/headless/core_core_process_memory_tests.rs"]
 mod memory_tests;
 

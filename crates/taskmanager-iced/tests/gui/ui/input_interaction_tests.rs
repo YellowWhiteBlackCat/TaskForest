@@ -488,7 +488,7 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
     let renderer = renderer();
     let viewport = viewport();
     let mut app = crate::IcedApp::demo();
-    let mut element = system_group(app.theme(), app.language(), app.preferences());
+    let mut element = system_group(app.theme(), app.preferences());
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, viewport);
     let bounds = focus_bounds(
@@ -520,7 +520,7 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
         "the IcedApp consumer hides CPU after the pointer action"
     );
 
-    let mut element = system_group(app.theme(), app.language(), app.preferences());
+    let mut element = system_group(app.theme(), app.preferences());
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, viewport);
     let id = target(DeviceKind::Cpu.key());
@@ -587,7 +587,7 @@ fn drag_refresh_to(
     viewport: Rectangle,
     fraction: f32,
 ) -> Vec<Message> {
-    let mut element = system_group(app.theme(), app.language(), app.preferences());
+    let mut element = system_group(app.theme(), app.preferences());
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, renderer, viewport);
     let bounds = focus_bounds(&mut element, &mut tree, &node, renderer, target("refresh"));

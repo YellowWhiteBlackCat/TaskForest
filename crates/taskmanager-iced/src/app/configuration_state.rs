@@ -7,7 +7,7 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::MotionPolicy;
 
 use super::PresentationPreferences;
-use crate::i18n::Language;
+use taskmanager_application::i18n::Language;
 use taskmanager_theme::FontAvailability;
 
 pub(super) struct IcedConfiguration {
@@ -100,7 +100,7 @@ impl IcedConfiguration {
         language: Language,
         theme: Theme,
     ) {
-        self.motion_policy = super::motion::motion_policy_from_token(draft.motion.as_str());
+        self.motion_policy = MotionPolicy::from_config_token(&draft.motion);
         self.draft = draft;
         self.preferences = preferences;
         self.language = language;

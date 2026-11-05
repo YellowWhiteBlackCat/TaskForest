@@ -12,10 +12,10 @@
 
 use iced::Element;
 use iced::widget::{column, container, row, scrollable, text};
-// Shared locale catalog (the process-wide resolver). The renderer-local
-// `crate::i18n::t(language, key)` still backs the iced-owned modal chrome
-// (settings / about / health / containers); this `t` carries the shared-page
-// body strings (Performance / Applications) that were previously hard-coded.
+// Shared locale catalog (the process-wide resolver). Every iced surface — the
+// shared pages and the iced-owned modal chrome (settings / about / health /
+// containers) — resolves copy through this one `t`; the frontend owns no
+// dictionary of its own.
 use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{alert_severity_label, t};
@@ -25,7 +25,6 @@ use taskmanager_ui_contract::IconId;
 
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
-use crate::i18n::{self, Key};
 use crate::theme;
 use taskmanager_shell::FeedbackTone;
 use taskmanager_theme::Theme;
@@ -95,13 +94,12 @@ pub(crate) use performance::{UnitPrefs, chunked_rows, perf_device_label, perform
 /// The current-window capture trigger button in the top navigation strip.
 pub(crate) fn current_window_capture_btn<'a>(
     theme_snapshot: &'a Theme,
-    language: crate::i18n::Language,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     focus::ghost_button_with_icon(
         theme_snapshot,
         FocusTarget::WindowCapture,
         IconId::Export,
-        i18n::t(language, Key::WindowCapture),
+        t("window_capture.capture"),
         Message::RequestCurrentWindowCapture,
     )
 }

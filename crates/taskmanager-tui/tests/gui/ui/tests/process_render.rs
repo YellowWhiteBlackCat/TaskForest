@@ -462,7 +462,8 @@ fn settings_save_round_trips_through_the_config_store() {
     crate::ui::test_support::install_config_store(&mut app, config_path.clone());
 
     app.toggle_settings();
-    // Focus the skin field (already focused), step to KDE, apply.
+    // Field order is skin 0, mode 1: step the mode from the unrecorded
+    // follow-native rung to Light, then the skin from GNOME to KDE, and apply.
     app.settings_form.move_field(1);
     app.settings_form.step_value(1);
     app.settings_form.move_field(-1);
@@ -475,11 +476,15 @@ fn settings_save_round_trips_through_the_config_store() {
     let store = ConfigStore::new(&config_path);
     let config = store.load().expect("config must load");
     assert_eq!(config.skin, "KDE");
+    assert_eq!(
+        config.mode, "Light",
+        "the mode token is the theme ladder's own vocabulary"
+    );
 
     // …and the runtime theme parameters were rebuilt from it.
     assert_eq!(
         app.theme_params,
-        crate::ThemeParams::from_config_tokens("KDE", "EyeForest", false)
+        crate::ThemeParams::from_config_tokens("KDE", "Light", false)
     );
 
     // A fresh TUI instance seeded from the same path picks the change up.
@@ -689,13 +694,27 @@ fn performance_graph_renders_honest_empty_state_before_first_sample() {
 fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
     use taskmanager_telemetry_store::live_graph::MetricSeries;
     let mut app = crate::demo_app();
+    // The demo seeds its own history depth; measure it instead of pinning a
+    // frame count, so the assertion tracks "twelve driven ticks on top of
+    // whatever the demo seeded" instead of a fixture-internal constant.
+    let seeded_frames = app.history.series(MetricSeries::CpuUsagePercent).len();
+    // The driven ticks must land AFTER every seeded demo frame: the shared
+    // ingestor keeps one monotonic series, so a tick stamped inside the
+    // seeded range would be rejected as an out-of-order frame.
+    let tick_base_ms = app
+        .projection()
+        .snapshot
+        .as_ref()
+        .expect("demo snapshot")
+        .timestamp_ms
+        + (crate::demo::DEMO_HISTORY_FRAMES as u64 + 1) * 1_000;
     // Drive the same record path the shell fold drives on each telemetry
     // tick: `MetricHistory::record_snapshot` on the fresh snapshot (bumping
     // the timestamp each tick so a real cadence is modeled, and varying the
     // CPU reading so the line carries real distinct values).
     for tick in 1..=12u64 {
         let mut snapshot = app.projection().snapshot.clone().expect("demo snapshot");
-        snapshot.timestamp_ms = 1_785_292_800_000 + tick;
+        snapshot.timestamp_ms = tick_base_ms + tick * 1_000;
         let mut observations = snapshot.cpu.scalar_observations().clone();
         observations.global_usage_pct =
             ScalarObservation::available(30.0 + tick as f32, snapshot.timestamp_ms);
@@ -709,12 +728,11 @@ fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
     // The shared window holds exactly the twelve finite ticks we drove plus
     // the demo's seeded history depth, with the last CPU reading preserved —
     // proves real values reached the buffer, not a fabricated flat line.
-    // (CONSCIOUS UPDATE: the demo now seeds `DEMO_HISTORY_FRAMES` frames, not
-    // the single cold-start sample.)
     let cpu = app.history.series(MetricSeries::CpuUsagePercent);
+    let expected = (seeded_frames + 12).min(app.history.capacity());
     assert_eq!(
         cpu.len(),
-        crate::demo::DEMO_HISTORY_FRAMES + 12,
+        expected,
         "demo seeded history + twelve driven ticks"
     );
     assert_eq!(cpu.last(), Some(&42.0));

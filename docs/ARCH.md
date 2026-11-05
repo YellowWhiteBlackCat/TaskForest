@@ -1,15 +1,15 @@
 # TaskForest 当前架构
 
-本文定义公开、当前的系统边界。实现细节归各 crate README；窗口宿主与 standalone/
-layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。这里不记录历史
-过程、完成比例或主机回执。
+本文定义公开、当前的系统边界；实现细节归各 crate README，窗口宿主与 standalone/
+layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。不记录历史
+过程、比例或主机回执。
 
 ## 1. 系统目标
 
-TaskForest 是 Linux、Windows、macOS 三平台系统监视器。平台能力不同，但共享相同的
-领域语义：数据存在、真实零、缺失、暂时失败、权限不足和不支持必须可区分。
+TaskForest 是 Linux、Windows、macOS 三平台系统监视器；数据存在、真实零、缺失、
+暂时失败、权限不足和不支持必须可区分。
 
-显示服务器体系严格规范为：**Linux (Wayland) + Windows (Win32) + macOS (Cocoa/Metal)**。
+显示服务器体系：**Linux (Wayland) + Windows (Win32) + macOS (Cocoa/Metal)**。
 Linux 上三大图形前端（GPUI、Iced、Bevy-UI）一律仅支持 Wayland，不支持也不链接 X11，
 X11 crate 已被彻底排除在生产依赖闭包之外；纯文本终端产品 `taskforest-t`（Ratatui）
 作为跨全终端环境（含无头控制台、SSH、容器）的通用基石。
@@ -160,9 +160,14 @@ OS → platform adapter → runtime → application reducer → cached projectio
 
 ### 8.2 存异边界
 
-模型与投影不携带 toolkit 类型、颜色、布局或平台原生词汇；精度、密度、皮肤、布局预算、
-执行/游标模型（选中即游标或独立 visual cursor）及前端局部按键等表面差异属于渲染权。
-求同到语义为止；每个"异"须挂在共享语义上，无对应语义的新行为是分叉，不得落地。
+模型与投影不携带 toolkit 类型、颜色、布局或平台原生词汇。求同不止于数据语义，
+也覆盖**呈现意图**：布局词汇与分类折、控件角色与 hit-target 下限、动效角色/曲线/
+策略及禁止动画集合统一归 `taskmanager-ui-contract::presentation`；数字仍由
+`taskmanager-theme` 单源持有，跨 crate parity gate 焊接两张数值表（ADR-064）。
+各端只写一次 resolver binding（window rem / scaled px / scene rem / terminal cells）
+与一次动效引擎绑定，并按阈值 registry 登记差异。精度、密度、皮肤、真实 shell chrome、
+执行/游标模型与前端局部按键仍属渲染权；每个"异"必须进入 registry/debt census，
+无共享语义的新行为是分叉，不得落地。
 
 ### 8.3 防串扰律
 
@@ -182,17 +187,14 @@ OS → platform adapter → runtime → application reducer → cached projectio
 
 ## 9. 安装与发布边界
 
-Linux DEB、RPM 和系统包从同一 staged 安装树构造；Windows MSI 的文件清单由 WiX 定义。所有
-系统路径必须先进入
-[SYSTEM_INSTALL_MANIFEST.md](SYSTEM_INSTALL_MANIFEST.md) 的机器可读清单。
-
-正式版本 tag 发布必须同时成功生成 amd64/arm64 DEB、x86_64/aarch64 RPM、x64/arm64 MSI；
-任何必需架构失败都使发布失败。详见 [RELEASE.md](RELEASE.md)。
+Linux DEB/RPM/系统包从同一 staged 安装树构造，Windows MSI 清单由 WiX 定义；所有系统路径
+先进入 [SYSTEM_INSTALL_MANIFEST.md](SYSTEM_INSTALL_MANIFEST.md)。正式 tag 须同时生成
+amd64/arm64 DEB、x86_64/aarch64 RPM、x64/arm64 MSI；任一失败即发布失败，见
+[RELEASE.md](RELEASE.md)。
 
 ## 10. 验证原则
 
-最低成本的长期回归测试应靠近事实所有者。CI 检查格式、lint、依赖、行为、文档、安装树、
-公开内容边界和发布构造；目标平台或真实硬件结论只能由对应环境验证。
-
-真实主机截图、系统快照、日期回执、内部评分和 TODO 不属于公开架构证据，也不得进入
-公开 Git 历史。质量规则见 [QUALITY_GATES.md](QUALITY_GATES.md)。
+最低成本的长期回归靠近事实所有者。CI 检查格式、lint、依赖、行为、文档、安装树、
+公开内容边界和发布构造；目标平台或硬件结论只能由对应环境验证。真实主机截图、
+系统快照、日期回执、内部评分和 TODO 不属于公开证据，不得进入公开 Git 历史；
+质量规则见 [QUALITY_GATES.md](QUALITY_GATES.md)。

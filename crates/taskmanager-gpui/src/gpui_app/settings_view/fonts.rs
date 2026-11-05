@@ -37,27 +37,26 @@ fn font_choice_row(props: FontChoiceRowProps<'_>, cx: &mut Context<RootView>) ->
         availability,
         hovered,
     } = props;
-    let family_choices: Vec<(&'static str, SharedString)> = availability
-        .custom_families()
-        .iter()
-        .copied()
-        .map(|family| (family, SharedString::from(format!("family:{family}"))))
-        .collect();
-    let selected_value = match choice {
-        FontChoice::Bundled => SharedString::from("bundled"),
-        FontChoice::System => SharedString::from("system"),
-        FontChoice::Custom(family) => SharedString::from(format!("family:{family}")),
-    };
+    // Every option value IS the persisted token: the two ladder segments carry
+    // their `config_token` and an installed family carries its own name. The
+    // select therefore has no widget-private vocabulary, and a choice made here
+    // is written and read by the theme owner's codec like any other product's
+    // (ADR-063).
+    let selected_value = SharedString::from(choice.config_token(role));
     let mut options = vec![
-        SelectOption::new("bundled", bundled_label),
-        SelectOption::new("system", i18n::t("settings.font_system")),
+        SelectOption::new(FontChoice::Bundled.config_token(role), bundled_label),
+        SelectOption::new(
+            FontChoice::System.config_token(role),
+            i18n::t("settings.font_system"),
+        ),
     ];
     options.extend(
-        family_choices
+        availability
+            .custom_families()
             .iter()
-            .map(|(family, value)| SelectOption::new(value.clone(), *family)),
+            .map(|family| SelectOption::new(*family, *family)),
     );
-    let family_choices_for_change = family_choices.clone();
+    let availability_for_change = availability.clone();
     let select_id = match role {
         FontRole::Ui => "font-ui-family",
         FontRole::Mono => "font-mono-family",
@@ -112,16 +111,14 @@ fn font_choice_row(props: FontChoiceRowProps<'_>, cx: &mut Context<RootView>) ->
                     options,
                     theme.palette(),
                     move |value, _window, cx| {
-                        let choice = match value.as_ref() {
-                            "bundled" => FontChoice::Bundled,
-                            "system" => FontChoice::System,
-                            value => family_choices_for_change
-                                .iter()
-                                .find(|(_, candidate)| candidate.as_ref() == value)
-                                .map_or(FontChoice::System, |(family, _)| {
-                                    FontChoice::Custom(family)
-                                }),
-                        };
+                        // The option value IS the persisted token, so the select
+                        // resolves through the theme owner's codec and the widget
+                        // can never invent a second vocabulary.
+                        let choice = FontChoice::from_config_token(
+                            value.as_ref(),
+                            role,
+                            &availability_for_change,
+                        );
                         ent.update(cx, |view, cx| view.set_font_choice(role, choice, cx));
                     },
                 )),

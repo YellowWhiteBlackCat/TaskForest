@@ -15,13 +15,15 @@ use std::sync::OnceLock;
 use iced::Length;
 use iced::widget::{column, container, row, text};
 use taskmanager_theme::tokens::MotionPolicy;
+use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
-use taskmanager_theme::{FontChoice, Skin, Theme, tokens};
+use taskmanager_theme::{
+    FontAvailability, FontChoice, FontRole, LightDark, ModePreference, Skin, Theme, tokens,
+};
 
 use super::*;
-use crate::app::ModeChoice;
 use crate::ui::components::divider;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{Language, t, with_language};
 
 /// Label column width of one settings row (px contract): a stable left rail
 /// for labels inside the modal panel's fixed 680px body, controls take the
@@ -110,11 +112,15 @@ pub(super) fn skin_choices() -> Vec<(String, usize)> {
 }
 
 /// The active segment for a persisted skin token; unknown tokens name no
-/// segment (legacy pill parity: no pill lit).
+/// segment (legacy pill parity: no pill lit). The token resolves through the
+/// theme owner's codec, so an alias one product wrote still lights its pill.
 pub(super) fn skin_value(token: &str) -> usize {
-    Skin::ALL
-        .iter()
-        .position(|skin| token.eq_ignore_ascii_case(skin.label()))
+    Skin::from_config_token(token)
+        .and_then(|skin| {
+            Skin::ALL
+                .into_iter()
+                .position(|candidate| candidate == skin)
+        })
         .unwrap_or(SEGMENT_NONE)
 }
 
@@ -124,39 +130,42 @@ pub(super) fn skin_for_value(value: usize) -> Skin {
 
 // ── mode segmented (Light / Dark / EyeForest / System) ──────────────────────
 
-pub(super) fn mode_choices(language: Language) -> Vec<(String, usize)> {
-    [
-        i18n::t(language, Key::Light),
-        i18n::t(language, Key::Dark),
-        i18n::t(language, Key::EyeForest),
-        i18n::t(language, Key::System),
-    ]
-    .into_iter()
-    .enumerate()
-    .map(|(index, label)| (label.to_string(), index))
-    .collect()
+pub(super) fn mode_choices() -> Vec<(String, usize)> {
+    ModePreference::CHOICES
+        .into_iter()
+        .enumerate()
+        .map(|(index, choice)| (mode_label(choice).to_string(), index))
+        .collect()
+}
+
+/// The catalog label of one color-scheme preference segment.
+fn mode_label(choice: ModePreference) -> &'static str {
+    match choice {
+        ModePreference::Explicit(LightDark::Light) => t("settings.light"),
+        ModePreference::Explicit(LightDark::Dark) => t("settings.dark"),
+        ModePreference::Explicit(LightDark::EyeForest) => t("settings.eyeforest"),
+        ModePreference::FollowNative => t("settings.system"),
+    }
 }
 
 /// The active segment for a persisted mode token. The empty first-launch
-/// sentinel behaves like `System` (legacy pill parity); unknown tokens name
-/// no segment.
+/// sentinel behaves like follow-native (legacy pill parity); a token the axis
+/// cannot express names no segment.
 pub(super) fn mode_value(token: &str) -> usize {
-    match token.to_ascii_lowercase().as_str() {
-        "light" => 0,
-        "dark" => 1,
-        "eyeforest" | "eye-forest" => 2,
-        "" | "system" => 3,
-        _ => SEGMENT_NONE,
-    }
+    ModePreference::from_saved_token(token)
+        .and_then(|choice| {
+            ModePreference::CHOICES
+                .into_iter()
+                .position(|candidate| candidate == choice)
+        })
+        .unwrap_or(SEGMENT_NONE)
 }
 
-pub(super) fn mode_for_value(value: usize) -> ModeChoice {
-    match value {
-        0 => ModeChoice::Light,
-        1 => ModeChoice::Dark,
-        2 => ModeChoice::EyeForest,
-        _ => ModeChoice::System,
-    }
+pub(super) fn mode_for_value(value: usize) -> ModePreference {
+    ModePreference::CHOICES
+        .get(value)
+        .copied()
+        .unwrap_or_default()
 }
 
 // ── interface-size segmented (Small / Standard / Large) ─────────────────────
@@ -205,77 +214,92 @@ pub(super) fn motion_choices() -> Vec<(String, usize)> {
 /// actually installs for them — so the control shows what is really in
 /// effect, never a coerced-looking selection.
 pub(super) fn motion_value(token: &str) -> usize {
-    match token.trim().to_ascii_lowercase().as_str() {
-        "reduced" => 1,
-        "none" | "no-motion" => 2,
-        _ => 0,
-    }
+    let policy = MotionPolicy::from_config_token(token);
+    MotionPolicy::ALL
+        .iter()
+        .position(|candidate| *candidate == policy)
+        .unwrap_or(0)
 }
 
 pub(super) fn motion_for_value(value: usize) -> MotionPolicy {
-    match value {
-        1 => MotionPolicy::Reduced,
-        2 => MotionPolicy::NoMotion,
-        _ => MotionPolicy::Normal,
-    }
+    MotionPolicy::ALL.get(value).copied().unwrap_or_default()
 }
 
 // ── density segmented (Comfortable / Compact) ────────────────────────────────
 
-pub(super) fn density_choices(language: Language) -> Vec<(String, usize)> {
-    [
-        i18n::t(language, Key::Comfortable),
-        i18n::t(language, Key::Compact),
-    ]
-    .into_iter()
-    .enumerate()
-    .map(|(index, label)| (label.to_string(), index))
-    .collect()
+pub(super) fn density_choices() -> Vec<(String, usize)> {
+    RowDensity::ALL
+        .into_iter()
+        .enumerate()
+        .map(|(index, density)| (density_label(density).to_string(), index))
+        .collect()
 }
 
-/// `1` = the Compact segment (the persisted `"Compact"` token).
-pub(super) fn density_value(compact: bool) -> usize {
-    if compact { 1 } else { 0 }
+/// The catalog label of one row-density segment.
+fn density_label(density: RowDensity) -> &'static str {
+    match density {
+        RowDensity::Comfortable => t("settings.density_comfortable"),
+        RowDensity::Compact => t("settings.density_compact"),
+    }
+}
+
+/// The active segment for a persisted density token; an unknown token lights
+/// the comfortable segment, the geometry the renderer actually installs.
+pub(super) fn density_value(token: &str) -> usize {
+    RowDensity::from_config_token(token)
+        .and_then(|density| {
+            RowDensity::ALL
+                .into_iter()
+                .position(|candidate| candidate == density)
+        })
+        .unwrap_or(0)
 }
 
 // ── font-source segmented (System / Bundled) ────────────────────────────────
 
-pub(super) fn font_choice_choices(language: Language) -> Vec<(String, usize)> {
-    [
-        i18n::t(language, Key::System),
-        i18n::t(language, Key::Bundled),
-    ]
-    .into_iter()
-    .enumerate()
-    .map(|(index, label)| (label.to_string(), index))
-    .collect()
+pub(super) fn font_choice_choices() -> Vec<(String, usize)> {
+    FontChoice::PICKER_LADDER
+        .iter()
+        .enumerate()
+        .map(|(index, choice)| (font_choice_label(*choice).to_string(), index))
+        .collect()
 }
 
-/// The active segment for a persisted font token: system marker → 0,
-/// bundled/empty token → 1, a custom installed family names no segment
-/// (the family select below carries the real choice).
-pub(super) fn font_choice_value(is_system: bool, is_bundled: bool) -> usize {
-    if is_system {
-        0
-    } else if is_bundled {
-        1
-    } else {
-        SEGMENT_NONE
+/// The catalog label of one font-source segment.
+fn font_choice_label(choice: FontChoice) -> &'static str {
+    match choice {
+        FontChoice::System => t("settings.system"),
+        FontChoice::Bundled => t("settings.bundled"),
+        FontChoice::Custom(family) => family,
     }
+}
+
+/// The active segment for a persisted font token of one role: the system
+/// marker → 0, a bundled or absent token → 1, a custom installed family names
+/// no segment (the family select below carries the real choice).
+pub(super) fn font_choice_value(
+    token: &str,
+    role: FontRole,
+    availability: &FontAvailability,
+) -> usize {
+    let choice = FontChoice::from_config_token(token, role, availability);
+    FontChoice::PICKER_LADDER
+        .iter()
+        .position(|candidate| *candidate == choice)
+        .unwrap_or(SEGMENT_NONE)
 }
 
 pub(super) fn font_choice_for_value(value: usize) -> FontChoice {
-    if value == 0 {
-        FontChoice::System
-    } else {
-        FontChoice::Bundled
-    }
+    FontChoice::PICKER_LADDER
+        .get(value)
+        .copied()
+        .unwrap_or(FontChoice::Bundled)
 }
 
 // ── unit segmented pairs (Bytes / Bits · Base 2 / Base 10) ──────────────────
 
-pub(super) fn unit_bytes_choices(language: Language) -> Vec<(String, usize)> {
-    [i18n::t(language, Key::Bytes), i18n::t(language, Key::Bits)]
+pub(super) fn unit_bytes_choices() -> Vec<(String, usize)> {
+    [t("settings.bytes"), t("settings.bits")]
         .into_iter()
         .enumerate()
         .map(|(index, label)| (label.to_string(), index))
@@ -374,14 +398,15 @@ pub(super) struct LanguageChoice(pub Language);
 
 impl fmt::Display for LanguageChoice {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.0.label())
+        // Each language names itself through the owner's catalog key, so the
+        // picker label never translates and stays catalog-owned.
+        f.write_str(t(self.0.self_name_key()))
     }
 }
 
-pub(super) fn language_choices() -> &'static [LanguageChoice; 2] {
-    static CHOICES: [LanguageChoice; 2] =
-        [LanguageChoice(Language::En), LanguageChoice(Language::Zh)];
-    &CHOICES
+pub(super) fn language_choices() -> &'static [LanguageChoice] {
+    static CHOICES: OnceLock<Vec<LanguageChoice>> = OnceLock::new();
+    CHOICES.get_or_init(|| Language::ALL.iter().copied().map(LanguageChoice).collect())
 }
 
 // ── startup-page select options ─────────────────────────────────────────────
@@ -399,28 +424,30 @@ impl fmt::Display for StartupChoice {
     }
 }
 
-/// The three startup-page options for one language. Labels resolve through
-/// the pure `i18n::t(language, key)` table, so the per-language cache is
-/// deterministic and never stale; `select` needs options that outlive one
-/// render frame.
+/// The three startup-page options for one language. Labels resolve through the
+/// shared catalog under a scoped [`with_language`] override, so the
+/// per-language cache is deterministic and never stale; `select` needs options
+/// that outlive one render frame.
 pub(super) fn startup_choices(language: Language) -> &'static [StartupChoice] {
     static EN: OnceLock<Vec<StartupChoice>> = OnceLock::new();
     static ZH: OnceLock<Vec<StartupChoice>> = OnceLock::new();
     fn build(language: Language) -> Vec<StartupChoice> {
-        vec![
-            StartupChoice {
-                token: "",
-                label: i18n::t(language, Key::RememberLast),
-            },
-            StartupChoice {
-                token: "performance",
-                label: i18n::t(language, Key::Performance),
-            },
-            StartupChoice {
-                token: "apps",
-                label: i18n::t(language, Key::Applications),
-            },
-        ]
+        with_language(language, || {
+            vec![
+                StartupChoice {
+                    token: "",
+                    label: t("settings.startup_remember"),
+                },
+                StartupChoice {
+                    token: "performance",
+                    label: t("settings.startup_performance"),
+                },
+                StartupChoice {
+                    token: "apps",
+                    label: t("settings.startup_processes"),
+                },
+            ]
+        })
     }
     match language {
         Language::En => EN.get_or_init(|| build(Language::En)),

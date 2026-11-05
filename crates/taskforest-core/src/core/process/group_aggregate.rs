@@ -3,10 +3,15 @@
 use std::collections::{HashMap, HashSet};
 
 use super::aggregate::{AggregateMetric, aggregate_f32, aggregate_u64};
+use super::container::ContainerRuntime;
 use super::{
     ProcessApplicationIdentity, ProcessItem, ProcessLiveKey, application_group_name,
     classify_process_type, process_type_label,
 };
+
+/// One container bucket while grouping: the bucket's name authority (first
+/// observed, `None` when the provider never named it) and its member processes.
+type ContainerBucket<'a> = (Option<String>, Vec<&'a ProcessItem>);
 
 /// Availability-preserving aggregate for one non-empty process group.
 ///
@@ -259,6 +264,123 @@ pub fn aggregate_by_type_typed(
         })
         .collect();
     sort_typed_process_groups_default(&mut groups);
+    groups
+}
+
+/// The availability-preserving aggregate for one container bucket.
+///
+/// Host processes (no current container observation) are never fabricated
+/// into a container bucket: they stay out of this projection, so a caller
+/// can render them under the honest "host" role instead of inventing a
+/// fake runtime identity.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContainerProcessAggregate {
+    runtime: ContainerRuntime,
+    container_id: String,
+    name: Option<String>,
+    cpu: AggregateMetric<f32>,
+    memory: AggregateMetric<u64>,
+    process_count: usize,
+}
+
+impl ContainerProcessAggregate {
+    /// The observed container runtime.
+    #[must_use]
+    pub const fn runtime(&self) -> ContainerRuntime {
+        self.runtime
+    }
+
+    /// The observed container id (the cgroup signature's canonical short id).
+    #[must_use]
+    pub fn container_id(&self) -> &str {
+        &self.container_id
+    }
+
+    /// The observed container name, when the runtime exposes one. `None`
+    /// means the provider did not currently report a name; callers must not
+    /// fall back to the id as a name.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// The runtime's display label ("Docker", "Podman", "Flatpak", ...).
+    #[must_use]
+    pub const fn runtime_label(&self) -> &'static str {
+        self.runtime.display_label()
+    }
+
+    /// Availability-bearing CPU aggregate.
+    #[must_use]
+    pub const fn cpu(&self) -> &AggregateMetric<f32> {
+        &self.cpu
+    }
+
+    /// Availability-bearing resident-memory aggregate.
+    #[must_use]
+    pub const fn memory(&self) -> &AggregateMetric<u64> {
+        &self.memory
+    }
+
+    /// Number of process members, including members whose metric is not
+    /// currently available.
+    #[must_use]
+    pub const fn process_count(&self) -> usize {
+        self.process_count
+    }
+}
+
+/// Group the visible processes by their currently observed container.
+///
+/// Only processes with a *current*
+/// [`ContainerMetadata`](super::container::ContainerMetadata) observation join
+/// a bucket; host processes are intentionally omitted (never fabricated as a
+/// zero-value group). Bucket identity is the typed `(runtime, container_id)`
+/// pair, so two same-id runtimes can never merge across runtimes, and each
+/// bucket keeps the first-seen observation's name authority. Ordering follows
+/// the shared default: CPU% desc, then memory desc, then a stable
+/// `(runtime, container_id)` key so equal-metric buckets stay deterministic.
+#[must_use]
+pub fn aggregate_by_container_typed(
+    items: &[&ProcessItem],
+    observed_at_ms: u64,
+) -> Vec<ContainerProcessAggregate> {
+    let mut grouped: HashMap<(ContainerRuntime, String), ContainerBucket<'_>> = HashMap::new();
+    for item in items {
+        let Some(metadata) = item.current_container_metadata() else {
+            continue;
+        };
+        let bucket = grouped
+            .entry((metadata.runtime, metadata.container_id.clone()))
+            .or_default();
+        if bucket.0.is_none() {
+            bucket.0 = metadata.name.clone();
+        }
+        bucket.1.push(item);
+    }
+    let mut groups: Vec<_> = grouped
+        .into_iter()
+        .filter_map(|((runtime, container_id), (name, members))| {
+            let (cpu, memory) = aggregate_process_metrics(&members, observed_at_ms)?;
+            Some(ContainerProcessAggregate {
+                runtime,
+                container_id,
+                name,
+                cpu,
+                memory,
+                process_count: members.len(),
+            })
+        })
+        .collect();
+    groups.sort_by(|left, right| {
+        compare_current_f32(right.cpu(), left.cpu())
+            .then_with(|| compare_current_u64(right.memory(), left.memory()))
+            .then_with(|| {
+                (left.runtime as u8)
+                    .cmp(&(right.runtime as u8))
+                    .then_with(|| left.container_id.cmp(&right.container_id))
+            })
+    });
     groups
 }
 

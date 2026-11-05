@@ -54,6 +54,69 @@ fn project(
 }
 
 #[test]
+fn container_group_header_rides_above_the_category_tree() {
+    use taskforest_core::core::process::{
+        ContainerMetadata, ContainerRuntime, ProcessMetadataObservations, ProcessOwner,
+    };
+
+    pin_english();
+    let metadata =
+        ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6").with_name("capture-web");
+    let container_member = |pid: u32, name: &str| {
+        let mut process = proc(pid, name, None);
+        process.apply_metadata_observations(ProcessMetadataObservations::current_with_container(
+            ProcessOwner::opaque("capture-user"),
+            None,
+            Some(metadata.clone()),
+            1,
+        ));
+        process
+    };
+    let host = proc(90_000, "capture-app", None);
+    let items = [
+        container_member(90_001, "capture-worker-1"),
+        container_member(90_002, "capture-worker-2"),
+        host,
+    ];
+    let mut expanded = HashSet::new();
+    expanded.insert("container:Docker:a1b2c3d4e5f6".to_owned());
+    let projection = project(&items, &expanded, &HashSet::new());
+
+    let ProjectedRow::GroupHeader {
+        name,
+        row_key,
+        member_count,
+        expanded,
+        container_badge,
+        ..
+    } = &projection.rows()[0]
+    else {
+        panic!("the container header is the first row");
+    };
+    assert_eq!(name, "capture-web");
+    assert_eq!(*row_key, None);
+    assert_eq!(*member_count, 2);
+    assert!(*expanded);
+    assert_eq!(container_badge.as_deref(), Some("Docker"));
+    assert!(matches!(
+        projection.rows()[1],
+        ProjectedRow::Tree {
+            pid: 90_001,
+            depth: 1,
+            ..
+        }
+    ));
+    assert!(matches!(
+        projection.rows()[2],
+        ProjectedRow::Tree {
+            pid: 90_002,
+            depth: 1,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn category_projection_has_one_fixed_bucket_order() {
     use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 

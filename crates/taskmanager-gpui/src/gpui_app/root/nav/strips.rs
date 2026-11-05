@@ -7,13 +7,14 @@ use gpui::{
     Context, Div, InteractiveElement, ParentElement, StatefulInteractiveElement, Styled, div,
     prelude::FluentBuilder, px,
 };
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_ui::theme_binding::absolute;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::glass_fill;
+use taskmanager_ui::theme_binding::glass_shadow;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
@@ -181,12 +182,12 @@ pub fn nav_strip_horizontal(
                 .flex()
                 .flex_row()
                 .items_center()
-                .bg(fill(t.sidebar_bg))
-                .rounded(absolute(tokens::card_radius(t)))
-                .border_1()
-                .border_color(hsla(t.border))
-                .shadow_sm()
-                .px(definite_length(tokens::SPACE_6))
+                .bg(glass_fill(t, GlassTier::Sidebar))
+                .rounded(rem_length(tokens::card_radius(t)))
+                .border(gpui::rems(GlassTier::Sidebar.edge_width_rem()))
+                .border_color(hsla(t.glass_layer(GlassTier::Sidebar).edge))
+                .shadow(glass_shadow(t, GlassTier::Sidebar))
+                .px(rem_length(tokens::SPACE_6))
                 .child(tabs)
                 .child(div().w(length(tokens::SPACE_6)).flex_shrink_0())
                 .child({
@@ -359,12 +360,12 @@ pub fn nav_strip_vertical(
                 .flex_shrink_0()
                 .flex()
                 .flex_col()
-                .bg(fill(t.sidebar_bg))
-                .rounded(absolute(tokens::card_radius(t)))
-                .border_1()
-                .border_color(hsla(t.border))
-                .shadow_sm()
-                .p(definite_length(tokens::SPACE_6))
+                .bg(glass_fill(t, GlassTier::Sidebar))
+                .rounded(rem_length(tokens::card_radius(t)))
+                .border(gpui::rems(GlassTier::Sidebar.edge_width_rem()))
+                .border_color(hsla(t.glass_layer(GlassTier::Sidebar).edge))
+                .shadow(glass_shadow(t, GlassTier::Sidebar))
+                .p(rem_length(tokens::SPACE_6))
                 .child(tabs)
                 .child(
                     div()

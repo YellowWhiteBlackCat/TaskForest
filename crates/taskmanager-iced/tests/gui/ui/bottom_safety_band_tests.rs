@@ -20,7 +20,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_assets::embedded_fonts;
 
 use crate::app::Message;
-use crate::ui::responsive::BOTTOM_SAFETY_BAND;
+use taskmanager_ui_contract::presentation::vocabulary::BOTTOM_SAFETY_BAND;
 
 const EXTREME_VIEWPORT: Size = Size::new(720.0, 480.0);
 /// The wide profile the same band has to survive.

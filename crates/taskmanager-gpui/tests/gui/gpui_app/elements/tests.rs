@@ -1,6 +1,6 @@
 //! Inline test modules for the app-adaptation element helpers. Split out of
 //! `elements.rs` only to satisfy the source-line guard; the three groups pin
-//! the theme-token invariants behind `titlebar_border` / `card_shadow` and the
+//! the theme-token invariants behind `titlebar_border` / glass shadows and the
 //! shared search-highlight matcher parity (ADR-020). `super::` resolves back
 //! into the parent `elements` module where the helpers live.
 
@@ -62,11 +62,15 @@ mod titlebar_border_tests {
 
 #[cfg(test)]
 mod card_shadow_tests {
-    use super::card_shadow;
     use super::*;
-    use crate::gpui_app::elements::CARD_SHADOW_AMBIENT_ALPHA;
-    use gpui::Hsla;
+    use crate::gpui_app::graph::{GraphSettings, new_graph_cache};
+    use gpui::{Hsla, Styled, div};
+    use std::rc::Rc;
+    use taskmanager_theme::GlassTier;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+    use taskmanager_ui::theme_binding::glass_shadow;
+
+    const CARD_SHADOW_AMBIENT_ALPHA: f32 = 0.6;
 
     /// The card shadow helper returns the Mission Center two-layer pair in
     /// the theme's own ink: an ambient layer that is wider AND weaker than
@@ -82,7 +86,7 @@ mod card_shadow_tests {
                     HighContrast::Off,
                     ResolvedFonts::system_for(skin),
                 );
-                let shadow = card_shadow(&theme);
+                let shadow = glass_shadow(&theme, GlassTier::Card);
                 assert_eq!(
                     shadow.len(),
                     2,
@@ -93,8 +97,9 @@ mod card_shadow_tests {
                 let ink: Hsla = hsla(theme.card_shadow());
                 let ambient: Hsla = hsla(
                     theme
-                        .card_shadow()
-                        .with_alpha(theme.card_shadow().a * CARD_SHADOW_AMBIENT_ALPHA),
+                        .glass_card()
+                        .shadow
+                        .with_alpha(theme.glass_card().shadow.a * CARD_SHADOW_AMBIENT_ALPHA),
                 );
                 assert_eq!(
                     shadow[1].color,
@@ -126,10 +131,8 @@ mod card_shadow_tests {
         }
     }
 
-    /// 稳固效果 ceiling (2026-08 owner directive "很深的 blur 效果很糟糕"):
-    /// the ambient layer must stay a WHISPER of lift, not a halo. The
-    /// pre-change y4/blur16@60%-ink treatment is the ceiling this test keeps
-    /// from ever coming back — separation comes from the tone ladder.
+    /// GLASS-01 ceiling: the ambient layer is a soft lift, not a halo. It
+    /// rides the card tier's REM tokens and stays bounded at every root size.
     #[test]
     fn card_shadow_stays_under_the_flatten_policy_ceiling() {
         let theme = Theme::build(
@@ -138,19 +141,42 @@ mod card_shadow_tests {
             HighContrast::Off,
             ResolvedFonts::system_for(Skin::Gnome),
         );
-        let ambient = &card_shadow(&theme)[0];
+        let ambient = &glass_shadow(&theme, GlassTier::Card)[0];
         assert!(
-            f32::from(ambient.blur_radius) <= 8.0,
+            f32::from(ambient.blur_radius) <= 12.0,
             "ambient blur must stay subtle, got {}",
             ambient.blur_radius
         );
         assert!(f32::from(ambient.offset.y) <= 3.0);
-        let ink: Hsla = hsla(theme.card_shadow());
+        let ink: Hsla = hsla(theme.glass_card().shadow);
         let painted: Hsla = ambient.color;
         assert!(
-            painted.a <= ink.a * 0.4,
-            "ambient alpha must stay ≤ 40% of the ink"
+            painted.a <= ink.a * 0.6,
+            "ambient alpha must stay ≤ 60% of the ink"
         );
+    }
+
+    #[test]
+    fn inline_graphs_do_not_stack_shadows() {
+        let theme = Theme::dark();
+        let mut cell = mini_graph_cell(
+            &theme,
+            "core-test",
+            Rc::from([25.0_f32].as_slice()),
+            theme.cpu,
+            "Core",
+            GraphSettings::default(),
+            new_graph_cache(),
+        );
+        assert!(matches!(
+            &cell.style().box_shadow,
+            Some(shadows) if shadows.is_empty()
+        ));
+        let mut main = graph_card(&theme, div());
+        assert!(matches!(
+            &main.style().box_shadow,
+            Some(shadows) if shadows.is_empty()
+        ));
     }
 
     /// The shadow ink adapts to light/dark: dark skins cast pure translucent
@@ -171,13 +197,13 @@ mod card_shadow_tests {
             HighContrast::Off,
             ResolvedFonts::system_for(Skin::Windows),
         );
-        let dark_shadow = card_shadow(&dark);
-        let light_shadow = card_shadow(&light);
+        let dark_shadow = glass_shadow(&dark, GlassTier::Card);
+        let light_shadow = glass_shadow(&light, GlassTier::Card);
         assert_ne!(
             dark_shadow[1].color, light_shadow[1].color,
             "light and dark cards must cast different shadow ink"
         );
-        let black_ink: Hsla = hsla(Theme::dark().card_shadow());
+        let black_ink: Hsla = hsla(Theme::dark().glass_card().shadow);
         assert_eq!(
             dark_shadow[1].color, black_ink,
             "dark skins cast the locked black ink"

@@ -1,15 +1,21 @@
 use super::{
     CpuFactsMarkerData, PerfDevice, append_device_marker, append_marker, append_process_marker,
-    cpu_facts_marker_line, device_name, marker_line, page_name, performance_viewport_marker_line,
-    process_context_menu_marker_line, target_marker_line,
+    append_tooltip_overlay_marker, cpu_facts_marker_line, device_name, marker_line, page_name,
+    performance_viewport_marker_line, process_context_menu_marker_line, target_marker_line,
+    tooltip_overlay_marker_line,
 };
-use crate::ui::responsive::{
-    PerformanceChartInventory, PerformancePageBudget, PerformanceVerticalRunway,
-};
+use crate::ui::responsive::{performance_budget_for_perf_frame, performance_frame_for_perf_frame};
 use iced::Size;
 use taskforest_core::core::hardware::CoreBreakdown;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::AppPage;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::resolution::{parse_resolution_marker, verify_resolved};
+use taskmanager_ui_contract::presentation::thresholds::bands;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    PerformanceChartInventory, PerformanceVerticalRunway,
+};
 
 #[must_use]
 pub(crate) fn device_marker_line(device: PerfDevice) -> String {
@@ -114,12 +120,40 @@ fn device_markers_cover_every_performance_selector() {
 #[test]
 fn performance_viewport_marker_records_the_received_size_and_typed_budget() {
     let viewport = Size::new(1180.0, 780.0);
-    let budget = PerformancePageBudget::for_perf_frame(viewport, true);
+    let budget = performance_budget_for_perf_frame(viewport, true);
     assert_eq!(budget.vertical, PerformanceVerticalRunway::Charts);
     assert_eq!(budget.chart_inventory, PerformanceChartInventory::Full);
     assert_eq!(
-        performance_viewport_marker_line("cpu", viewport, viewport, budget),
+        performance_viewport_marker_line("cpu", viewport, viewport, budget, None),
         "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device=cpu width=1180.00 height=780.00 page_width=1180.00 page_height=780.00 rung=Charts inventory=Full\n"
+    );
+}
+
+#[test]
+fn performance_viewport_marker_carries_the_shared_resolution_record() {
+    let viewport = Size::new(1180.0, 780.0);
+    let frame = performance_frame_for_perf_frame(viewport, true);
+    let resolution = crate::presentation_binding::presentation_resolution_marker(
+        &frame,
+        UiSize::Standard,
+        RowDensity::Comfortable,
+    )
+    .expect("the frame reports a resolution");
+    let line = performance_viewport_marker_line(
+        "cpu",
+        viewport,
+        viewport,
+        frame.budget,
+        Some(&resolution),
+    );
+    assert!(
+        line.contains("control_extent=") && line.contains("profile="),
+        "the marker must carry the shared resolution record: {line}"
+    );
+    let parsed = parse_resolution_marker(&line).expect("the record parses back");
+    assert!(
+        verify_resolved(FrontendShape::Iced, &parsed, &bands(FrontendShape::Iced)).is_empty(),
+        "the captured resolution must satisfy the shared contract: {line}"
     );
 }
 
@@ -131,6 +165,20 @@ fn process_context_menu_surface_marker_carries_the_frozen_live_identity() {
         ),
         "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=process-context-menu pid=4321 start_token=7\n"
     );
+}
+
+#[test]
+fn tooltip_overlay_surface_marker_names_the_mounted_product_widget() {
+    assert_eq!(
+        tooltip_overlay_marker_line(),
+        "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=tooltip-overlay\n"
+    );
+    let directory = crate::test_support::temp_dir("capture-tooltip-marker");
+    let path = directory.join("markers.log");
+    append_tooltip_overlay_marker(&path);
+    let text = std::fs::read_to_string(&path).expect("appended tooltip marker");
+    assert_eq!(text, tooltip_overlay_marker_line());
+    let _ = std::fs::remove_dir_all(directory);
 }
 
 #[test]

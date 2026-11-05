@@ -2,7 +2,7 @@
 
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
-use gpui::{Div, ParentElement, Styled, div, px, relative};
+use gpui::{Div, ParentElement, Styled, div, px, relative, rems};
 use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::theme_binding::absolute;
@@ -10,8 +10,10 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -19,7 +21,7 @@ use taskforest_core::core::metrics::MemoryMetrics;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, Theme, with_alpha};
+use taskmanager_theme::{Color, GlassTier, Theme, with_alpha};
 
 mod stats;
 use stats::{composition_labels, overview_stats, segment_shares, summary_tiles, swap_bar_stats};
@@ -77,16 +79,23 @@ fn stacked_bar(theme: &Theme, segments: &[(Color, f32)], label: &str, height: f3
                 .child(label),
         );
     }
-    for (color, share) in segments {
+    let visible: Vec<_> = segments.iter().filter(|(_, share)| *share > 0.0).collect();
+    for (index, (color, share)) in visible.iter().enumerate() {
         let fraction = (*share / share_sum).clamp(0.0, 1.0);
         if fraction > 0.0 {
-            bar = bar.child(
-                div()
-                    .flex_basis(relative(fraction))
-                    .flex_shrink_0()
-                    .h_full()
-                    .bg(fill(*color)),
-            );
+            let mut segment = div()
+                .flex_basis(relative(fraction))
+                .flex_shrink_0()
+                .h_full()
+                .bg(fill(*color));
+            let radius = absolute(tokens::small_radius(theme));
+            if index == 0 {
+                segment = segment.rounded_tl(radius).rounded_bl(radius);
+            }
+            if index + 1 == visible.len() {
+                segment = segment.rounded_tr(radius).rounded_br(radius);
+            }
+            bar = bar.child(segment);
         }
     }
     bar
@@ -283,11 +292,10 @@ pub(super) fn composition_block(
         .gap(definite_length(tokens::SPACE_8))
         .px(definite_length(tokens::SPACE_12))
         .py(definite_length(tokens::SPACE_10))
-        .rounded(absolute(tokens::card_radius(theme)))
-        .border_1()
-        .border_color(hsla(theme.border))
-        .bg(fill(theme.card_surface()))
-        .shadow(elements::card_shadow(theme));
+        .rounded(rem_length(tokens::card_radius(theme)))
+        .border(rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(theme.glass_card().edge))
+        .bg(glass_fill(theme, GlassTier::Card));
     if mode == MemoryDetailMode::Full {
         column = column.child(summary_metrics(theme, memory, units));
     }

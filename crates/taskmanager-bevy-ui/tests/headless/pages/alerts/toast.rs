@@ -6,11 +6,13 @@
 
 use super::tests::{headless_shell_app, mount_alerts};
 use super::*;
+use crate::glass::OpticalGlassCard;
 use crate::text_selection::{ClipboardPort, flush_clipboard};
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use taskmanager_application::i18n::t;
+use taskmanager_theme::GlassTier;
 
 /// The export control, activated without advancing a frame: the headless
 /// composition has no native clipboard, so the frame's own flush would
@@ -83,6 +85,24 @@ fn a_successful_export_raises_the_confirmation_toast() {
         1,
         "the confirmation badge is mounted over the content region"
     );
+    let world = app.world_mut();
+    let badge = world
+        .query_filtered::<Entity, With<toast::ExportToastBadge>>()
+        .single(world)
+        .expect("the toast badge");
+    let mut stack = vec![badge];
+    let mut card = None;
+    while let Some(entity) = stack.pop() {
+        if let Some(marker) = world.get::<OpticalGlassCard>(entity) {
+            card = Some(*marker);
+            break;
+        }
+        if let Some(children) = world.get::<bevy::ecs::hierarchy::Children>(entity) {
+            stack.extend(children.iter().copied());
+        }
+    }
+    let card = card.expect("the toast is an optical glass candidate");
+    assert!(card.enabled && card.tier == GlassTier::Card);
 }
 
 #[test]

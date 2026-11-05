@@ -44,6 +44,7 @@ claude.json
 # Agent scratch + Cargo temp on NVMe (scripts/agent-workdir.sh) — never commit
 .tmp/
 .cargo-tmp
+.agent-scratch/
 
 # Private publication-preparation material. This directory is intentionally
 # outside the public documentation contract and must never be committed.

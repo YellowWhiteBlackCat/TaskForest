@@ -1,14 +1,14 @@
 //! Native navigation chrome; the rail owns one bounded scroll region.
 use super::components::IcedElement;
-use super::{alerts, current_window_capture_btn, page_icon, responsive::ChromePresentation};
+use super::{
+    alerts, current_window_capture_btn, page_icon, responsive::chrome_presentation_for_width,
+};
 use crate::{
     app::{FocusTarget, Message},
-    focus,
-    i18n::{self, Key},
-    theme,
+    focus, theme,
 };
 use iced::Element;
-use iced::widget::{column, row, scrollable};
+use iced::widget::{column, container, row, scrollable};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{PageHelp, page_help};
 use taskmanager_theme::tokens;
@@ -24,7 +24,6 @@ pub(super) enum NavigationChrome<'a> {
 pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
-    let language = app.language();
     // One GPUI-shaped nav strip: the page tabs (accent-filled when active — the
     // same `choice_pill` the Performance device rail uses) on the left, a flex
     // space, then the toolbar triggers pinned right. Collapses the old three
@@ -69,35 +68,35 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
             theme_snapshot,
             FocusTarget::SettingsTrigger,
             IconId::Settings,
-            i18n::t(language, Key::Settings),
+            t("chrome.settings"),
             Message::OpenSettings,
         ),
         focus::ghost_button(
             theme_snapshot,
             FocusTarget::ContainersTrigger,
-            i18n::t(language, Key::Containers),
+            t("containers.title"),
             Message::OpenContainers,
         ),
         focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::HealthTrigger,
             IconId::Health,
-            i18n::t(language, Key::Health),
+            t("health.title"),
             Message::OpenHealth,
         ),
-        current_window_capture_btn(theme_snapshot, language),
+        current_window_capture_btn(theme_snapshot),
         focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::Export,
             IconId::Export,
-            i18n::t(language, Key::Export),
+            t("common.export"),
             Message::ExportSnapshot,
         ),
         focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::AboutTrigger,
             IconId::System,
-            i18n::t(language, Key::About),
+            t("about.title"),
             Message::OpenAbout,
         ),
     ];
@@ -107,7 +106,7 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // past the right edge. The wide 1440px+ layout keeps the original one-row
     // desktop composition. The 1320px single-row seam is the frame budget's
     // chrome presentation (responsive.rs), not a local literal.
-    let chrome = ChromePresentation::for_width(app.viewport_width());
+    let chrome = chrome_presentation_for_width(app.viewport_width());
     let wrapped_chrome = app.compact_layout() || chrome.is_wrapped();
     let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if app.compact_layout() {
         scrollable(row(toolbar_items).spacing(4))
@@ -140,11 +139,17 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // one horizontal scroller made the first screenshot look like controls
     // had disappeared behind the right edge even though they were reachable.
     if app.nav_orientation == NavOrientation::Vertical {
-        let rail = scrollable(column(page_tabs).spacing(6))
-            .direction(iced::widget::scrollable::Direction::Vertical(
-                theme::scrollbar(),
-            ))
-            .style(theme::scrollbar_style)
+        let rail: Element<'_, Message, iced::Theme, iced::Renderer> =
+            scrollable(column(page_tabs).spacing(6))
+                .direction(iced::widget::scrollable::Direction::Vertical(
+                    theme::scrollbar(),
+                ))
+                .style(theme::scrollbar_style)
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .into();
+        let rail = container(rail)
+            .style(move |_| theme::chrome_style(theme_snapshot))
             .width(iced::Length::Fixed(app.navigation_rail_width()))
             .height(iced::Length::Fill)
             .into();
@@ -175,5 +180,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
             .into()
     };
 
+    let nav = container(nav)
+        .style(move |_| theme::chrome_style(theme_snapshot))
+        .width(iced::Length::Fill)
+        .into();
     NavigationChrome::Horizontal(nav)
 }

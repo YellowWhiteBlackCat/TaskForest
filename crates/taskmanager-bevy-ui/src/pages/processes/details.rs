@@ -44,6 +44,7 @@ use taskmanager_shell::presentation::MISSING_VALUE;
 use super::super::processes;
 use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
@@ -416,6 +417,14 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
     let lane = crate::widgets::scrollbar::rail_lane(UiRect::all(Val::Px(space_8())));
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         // The viewport wrapper owns the scroll area AND the floating rail:
         // the rail is a sibling of the scroll area, so it never scrolls with
@@ -424,6 +433,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             width: percent(32),
             min_width: px(0.0),
             height: percent(100),
+            display: bevy::ui::Display::None,
             flex_direction: FlexDirection::Column,
         }
         Children [
@@ -435,14 +445,18 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(space_8()),
                 padding: { lane },
-                border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+                border: UiRect::all(Val::Rem(edge_width_rem)),
+                border_radius: BorderRadius::all(Val::Rem(radius_rem)),
             }
-            BackgroundColor({ palette.panel_fill })
+            BackgroundColor({ fill })
+            bevy::ui::BorderColor::all(edge)
+            bevy::ui::BoxShadow({ shadows })
             ScrollArea
             on(bootstrap_details_page)
             ProcessDetailsRoot
             super::ProcessDetailsContainer
             Children [
+                 @{ grain } --
                  @{ details_content_scene(&projection(context.shell), palette) }
             ]
             --

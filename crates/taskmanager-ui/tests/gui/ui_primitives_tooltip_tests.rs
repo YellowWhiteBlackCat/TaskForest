@@ -1,4 +1,4 @@
-use super::{TOOLTIP_DELAY, Tooltip, TooltipHost, TooltipVisibility, tooltip_step};
+use super::{TOOLTIP_DELAY, Tooltip, TooltipHost, TooltipVisibility, tooltip_glass, tooltip_step};
 use gpui::Modifiers;
 use gpui::{
     AppContext, Context, InteractiveElement, IntoElement, ParentElement, Render,
@@ -169,4 +169,24 @@ impl Render for Harness {
             TooltipHost::new("host", div().w_24().h_8()).tooltip(Tooltip::text("label", palette())),
         )
     }
+}
+
+/// GLASS-01: the tooltip hint is a floating card. Its material must be the
+/// theme's Card glass tier, not the opaque page surface the block used to
+/// paint (and not the tooltip's own hardcoded `border_1` hairline).
+#[test]
+fn tooltip_content_wears_the_card_glass_tier() {
+    let theme = Theme::dark();
+    let palette = theme.palette();
+    let layer = tooltip_glass(&theme);
+    assert_eq!(layer, theme.glass_card());
+    assert!(
+        layer.fill.a < 1.0,
+        "the hint fill stays translucent glass: {layer:?}"
+    );
+    assert_ne!(
+        layer.fill, palette.surface,
+        "the hint must not fall back to the opaque page surface"
+    );
+    assert!(layer.edge.a > 0.0, "the Card tier carries an edge");
 }

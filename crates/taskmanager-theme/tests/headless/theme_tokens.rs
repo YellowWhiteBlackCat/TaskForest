@@ -2,8 +2,21 @@ use std::time::Duration;
 
 use super::{
     DURATION_FAST, DURATION_HOVER, DURATION_MEDIUM, LINE_HEIGHT_NORMAL, Length, MotionPolicy,
-    RowDensity, UiSize,
+    RowDensity, UiSize, rounded_content_inset,
 };
+
+#[test]
+fn rounded_surface_inset_keeps_rectangular_content_inside_the_arc() {
+    for radius in [0.0_f32, 4.0, 15.0, 24.0, 36.0] {
+        let inset = rounded_content_inset(Length(radius)).0;
+        assert!(inset >= 1.0);
+        let distance = (radius - inset).max(0.0);
+        assert!(
+            2.0 * distance * distance <= radius * radius,
+            "radius {radius} with inset {inset} leaves the corner arc"
+        );
+    }
+}
 
 #[test]
 fn compact_rows_are_tighter_than_comfortable_in_every_axis() {

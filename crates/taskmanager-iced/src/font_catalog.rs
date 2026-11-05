@@ -33,9 +33,11 @@ pub(crate) fn system() -> FontAvailability {
 
 /// Deterministic no-I/O catalog for demo fixtures and headless tests. The
 /// bundled names are included because the launcher registers those bytes
-/// before the first Iced frame is rendered.
+/// before the first Iced frame is rendered, and nothing else: the theme owner's
+/// embedded-only snapshot is the single definition of that state (ADR-063), the
+/// same one Bevy resolves against.
 pub(crate) fn bundled_only() -> FontAvailability {
-    FontAvailability::from_installed_families([FONT_MISANS_VF, FONT_ROBOTO_MONO])
+    FontAvailability::embedded_only(true)
 }
 
 #[cfg(test)]

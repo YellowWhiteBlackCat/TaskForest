@@ -196,3 +196,7 @@ system-npu	system	default	120	36	gnome-dark
 system-npu-compact	system	default	54	16	gnome-dark
 process-selection	applications	default	120	36	gnome-dark
 process-selection-compact	applications	default	54	16	gnome-dark
+process-context-menu	applications	default	120	36	gnome-dark
+process-context-menu-compact	applications	default	80	24	gnome-dark
+feedback-overlay	applications	default	120	36	gnome-dark
+feedback-overlay-compact	applications	default	80	24	gnome-dark

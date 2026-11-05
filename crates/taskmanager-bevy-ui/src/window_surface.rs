@@ -2,6 +2,7 @@
 
 use crate::app::FrontendTrack;
 use crate::first_run_modal::SetupState;
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 use crate::input::ShellInteractionApplied;
 use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalChanged};
 use crate::pages::performance::sidebar_editor::{self, SidebarState};
@@ -27,10 +28,11 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::ui::BorderColor;
 use bevy::ui::UiSystems;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, FlexWrap, JustifyContent, Node,
-    Overflow, PositionType, UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, FlexWrap, JustifyContent,
+    Node, Overflow, PositionType, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
@@ -38,6 +40,7 @@ use std::marker::PhantomData;
 use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
+use taskmanager_theme::GlassTier;
 
 /// The modal surface's maximum width, in rem: the widest a shell surface
 /// (the sidebar editor, the event center, the about box) may grow before it
@@ -355,20 +358,37 @@ pub(crate) fn modal_scene(
     actions: Vec<Box<dyn Scene>>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let modal_gap_rem = palette.rem_ratio(space_8());
+    let modal_padding_rem = palette.rem_ratio(space_24());
+    let footer_gap_rem = palette.rem_ratio(space_8());
+    let radius_rem = palette.panel_radius_rem();
+    let shadow = palette.glass_shadow(GlassTier::Modal);
+    let fill = palette.glass_modal_fill;
+    let edge = palette.glass_modal_edge;
+    let grain =
+        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
     bsn! {
         Node { width: percent(100), height: percent(100), position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
-        BackgroundColor({ palette.scrim }) WindowSurfaceOverlay({ kind })
+        BackgroundColor({ palette.glass_scrim_fill }) WindowSurfaceOverlay({ kind })
         Children [
-            Node { width: percent(90), max_width: rem(WINDOW_SURFACE_MAX_WIDTH_REM), height: percent(90), max_height: percent(90), min_height: px(0.0), min_width: px(0.0),
-                flex_direction: FlexDirection::Column, row_gap: Val::Px(space_8()), padding: UiRect::all(Val::Px(space_24())), border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)) }
-            BackgroundColor({ palette.panel_fill })
+            Node { width: percent(90), max_width: rem(WINDOW_SURFACE_MAX_WIDTH_REM), height: percent(90), max_height: percent(90), min_height: Val::Rem(0.0), min_width: Val::Rem(0.0),
+                flex_direction: FlexDirection::Column, row_gap: Val::Rem(modal_gap_rem), padding: UiRect::all(Val::Rem(modal_padding_rem)),
+                border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
+            BackgroundColor({ fill })
+            BorderColor::all(edge)
+            BoxShadow({ shadow })
+            OpticalGlassCard {
+                tier: GlassTier::Modal,
+                enabled: true,
+            }
             Children [
+                @{ grain } --
                 Node { min_height: rem(palette.control_height_rem), flex_shrink: 0.0 } ModalHeading
                 Children [ Text(title) TextRole(Role::Heading) ] --
-                Node { flex_grow: 1.0, flex_basis: px(0.0), min_height: px(0.0), min_width: px(0.0), overflow: Overflow::scroll_y() }
+                Node { flex_grow: 1.0, flex_basis: Val::Rem(0.0), min_height: Val::Rem(0.0), min_width: Val::Rem(0.0), overflow: Overflow::scroll_y() }
                 ScrollArea ModalBody Children [ @{ body } ] --
-                Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: Val::Px(space_8()), row_gap: Val::Px(space_8()), min_height: rem(palette.control_height_rem), flex_shrink: 0.0 }
+                Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: Val::Rem(footer_gap_rem), row_gap: Val::Rem(footer_gap_rem), min_height: rem(palette.control_height_rem), flex_shrink: 0.0 }
                 ModalFooter Children [ { actions } ]
             ]
         ]

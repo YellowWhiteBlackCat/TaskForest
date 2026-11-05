@@ -300,6 +300,65 @@ impl CaptureEvidence {
         }
     }
 
+    /// Strict tooltip evidence: the floating hint is a real Card-tier glass
+    /// surface, but the live pointer path needs a hover that no deterministic
+    /// capture can guarantee (a synthetic move may land between rows, and the
+    /// production hover slot only fills after a real pointer settles). This
+    /// scenario therefore publishes the SAME `hovered` slot the production
+    /// listeners write, once telemetry and the process list are real, so the
+    /// frame paints the ordinary `tooltip_overlay` — no second renderer, no
+    /// fixture-only tooltip widget.
+    pub fn tooltip_overlay_requested(&self) -> bool {
+        self.is_enabled()
+            && self.scenario == Some(CaptureScenario::TooltipOverlay)
+            && self.telemetry_ready()
+            && self.ui_data_ready()
+            && !self.scenario_ready()
+    }
+
+    /// Whether this strict scenario is still active, whether or not it has
+    /// already certified its first painted frame.
+    ///
+    /// The hover slot must stay published for the WHOLE capture, not only
+    /// until `scenario_ready`: the overlay's fade and the runner's settle both
+    /// land on later frames, and dropping the slot after the first certified
+    /// frame paints the tooltip away just before the screenshot is taken.
+    pub fn tooltip_overlay_active(&self) -> bool {
+        self.is_enabled() && self.scenario == Some(CaptureScenario::TooltipOverlay)
+    }
+
+    pub fn mark_tooltip_overlay_ready(&mut self, painted: bool) {
+        if self.tooltip_overlay_requested() && painted {
+            self.mark_scenario_ready();
+        }
+    }
+
+    /// GLASS-02 evidence: the transient feedback layer is a deferred corner
+    /// overlay, so the frame must be painted from a real shell notice rather
+    /// than a fixture widget. The scenario publishes one long, realistic
+    /// receipt through the production `report_notice` entry once telemetry and
+    /// the process list are real.
+    pub fn feedback_overlay_requested(&self) -> bool {
+        self.is_enabled()
+            && self.scenario == Some(CaptureScenario::FeedbackOverlay)
+            && self.telemetry_ready()
+            && self.ui_data_ready()
+            && !self.scenario_ready()
+    }
+
+    /// Keep the notice alive for the whole capture: the overlay is timed and
+    /// the runner settles on later frames, so dropping it after the first
+    /// certified frame would paint the receipt away before the screenshot.
+    pub fn feedback_overlay_active(&self) -> bool {
+        self.is_enabled() && self.scenario == Some(CaptureScenario::FeedbackOverlay)
+    }
+
+    pub fn mark_feedback_overlay_ready(&mut self, painted: bool) {
+        if self.feedback_overlay_requested() && painted {
+            self.mark_scenario_ready();
+        }
+    }
+
     /// Strict Apps identity evidence prepares a bounded, high-signal matrix
     /// containing PWA, Snap, and AppImage-shaped process facts. The marker is
     /// emitted only after the RootView projection observes all three validated

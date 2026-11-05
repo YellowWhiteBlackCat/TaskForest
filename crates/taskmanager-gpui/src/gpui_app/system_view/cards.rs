@@ -15,7 +15,7 @@ use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
 use taskmanager_application::i18n;
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{Color, GlassTier, Theme};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::layout::AdaptiveGrid;
 use taskmanager_ui::primitives::card_surface::CardSurface;
@@ -58,9 +58,9 @@ pub(super) fn hero_card(theme: &Theme, title: &str, subtitle: &str, badge: Optio
         );
     }
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_12)
-        .radius(tokens::control_radius(theme))
+        .radius(tokens::card_radius(theme))
         .bordered(false)
         .child(
             div()
@@ -121,9 +121,9 @@ pub(super) fn tile_row(theme: &Theme, tiles: &[SystemTile]) -> Div {
             );
         cards.push(
             CardSurface::new(theme.palette())
-                .background(theme.sidebar_card_bg)
+                .glass(GlassTier::Card)
                 .padding(tokens::SPACE_10)
-                .radius(tokens::control_radius(theme))
+                .radius(tokens::card_radius(theme))
                 .bordered(false)
                 .child(tile_content)
                 .render()
@@ -172,9 +172,9 @@ pub(super) fn section_card(theme: &Theme, section: &SystemSection) -> Div {
         content = content.child(chip_row);
     }
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_12)
-        .radius(tokens::control_radius(theme))
+        .radius(tokens::card_radius(theme))
         .bordered(false)
         .child(content)
         .render()
@@ -231,14 +231,14 @@ fn meter_bar(theme: &Theme, m: &SystemMeter, meter_fill: Color) -> Div {
     let mut track = div()
         .h(px(6.0))
         .w_full()
-        .rounded(px(3.0))
+        .rounded_full()
         .bg(fill(theme.sidebar_bg));
     if m.pct.is_some() {
         track = track.child(
             div()
                 .h_full()
                 .w(relative(pct))
-                .rounded(px(3.0))
+                .rounded_full()
                 .bg(fill(meter_fill)),
         );
     }

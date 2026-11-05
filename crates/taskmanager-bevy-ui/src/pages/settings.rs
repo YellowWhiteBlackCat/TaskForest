@@ -54,7 +54,10 @@ use taskmanager_application::{AppAction, ApplicationHistoryStatus, TelemetryInte
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskmanager_theme::tokens::UiSize;
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::{
+    FontAvailability, FontChoice, FontPreference, HighContrast, LightDark, ModePreference,
+    ResolvedFonts, Skin, Theme, resolve_fonts,
+};
 
 use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
@@ -69,6 +72,7 @@ use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 mod choices;
 use choices::{
     capacity_entries, language_entries, refresh_entries, theme_entries, ui_size_entries,
+    ui_size_label,
 };
 
 mod privilege_center;
@@ -119,11 +123,27 @@ pub(crate) fn theme_for_mode(mode: LightDark) -> Theme {
 }
 
 pub(crate) fn theme_for_mode_and_contrast(mode: LightDark, hc: HighContrast) -> Theme {
-    Theme::build(
-        Skin::Gnome,
-        mode,
-        hc,
-        ResolvedFonts::system_for(Skin::Gnome),
+    Theme::build(Skin::Gnome, mode, hc, embedded_fonts_for(Skin::Gnome))
+}
+
+/// The font faces this renderer can actually hold.
+///
+/// Bevy's font store consumes the registered embedded blobs and cannot load a
+/// host family by name, so its availability snapshot reports exactly the bundled
+/// collection for every skin. Resolving through the shared theme codec with this
+/// snapshot keeps the persisted preference meaningful while never claiming a
+/// family this product cannot paint (the toolkit-shaped difference ADR-063
+/// registers rather than hides).
+#[must_use]
+pub(crate) fn embedded_fonts_for(skin: Skin) -> ResolvedFonts {
+    let availability = FontAvailability::embedded_only(true);
+    resolve_fonts(
+        FontPreference {
+            ui: FontChoice::Bundled,
+            mono: FontChoice::Bundled,
+        },
+        skin,
+        &availability,
     )
 }
 
@@ -141,6 +161,11 @@ pub(crate) struct ThemePreferences {
     /// config (or a settings choice) resolves another step.
     pub(crate) ui_size: UiSize,
     pub(crate) observed_appearance: Option<DesktopAppearance>,
+    /// The saved font preference, read through the theme owner's codec. This
+    /// frontend paints the bundled faces for either segment (see
+    /// [`embedded_fonts_for`]), so the field keeps the shared config meaningful
+    /// for the other three products and for a future host-font loader.
+    pub(crate) fonts: FontPreference,
 }
 
 impl ThemePreferences {
@@ -174,11 +199,12 @@ impl ThemePreferences {
 
     #[must_use]
     pub(crate) fn resolve_theme(&self) -> Theme {
+        let availability = FontAvailability::embedded_only(true);
         Theme::build(
             self.effective_skin(),
             self.effective_mode(),
             self.effective_contrast(),
-            ResolvedFonts::system_for(self.effective_skin()),
+            resolve_fonts(self.fonts, self.effective_skin(), &availability),
         )
     }
 }
@@ -260,27 +286,19 @@ pub(crate) fn apply_persisted_config(
 ) {
     if let Some(prefs) = prefs {
         prefs.gray_zero_values = config.gray_zero_values;
-        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
-            prefs.mode = None;
-        } else if config.mode.eq_ignore_ascii_case("Light") {
-            prefs.mode = Some(LightDark::Light);
-        } else if config.mode.eq_ignore_ascii_case("Dark") {
-            prefs.mode = Some(LightDark::Dark);
-        } else if config.mode.eq_ignore_ascii_case("EyeForest") {
-            prefs.mode = Some(LightDark::EyeForest);
-        }
-
-        if !config.skin.is_empty() {
-            prefs.skin = match config.skin.to_ascii_lowercase().as_str() {
-                "kde" => Some(Skin::Kde),
-                "windows" => Some(Skin::Windows),
-                "macos" => Some(Skin::Macos),
-                _ => Some(Skin::Gnome),
-            };
-        }
-
+        // Every theme axis resolves through the owner's public codec (ADR-063):
+        // an empty or unknown token keeps the detected value instead of forcing
+        // a palette this frontend invented, and a preference written by GPUI,
+        // Iced or the TUI reads back identically here.
+        prefs.mode = ModePreference::from_config_token(&config.mode).explicit();
+        prefs.skin = Skin::from_config_token(&config.skin);
         prefs.hc = config.hc;
         prefs.ui_size = UiSize::from_config_token(&config.ui_size);
+        prefs.fonts = FontPreference::from_config_tokens(
+            &config.ui_font,
+            &config.mono_font,
+            &FontAvailability::embedded_only(true),
+        );
         apply_preferences(prefs, palette, clear);
     }
 
@@ -553,42 +571,48 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             context.palette,
         ),
         radio_row(
-            "Theme",
+            t("settings.mode"),
             theme_entries(mode),
-            match mode {
-                Some(LightDark::Light) => "Light",
-                Some(LightDark::Dark) => "Dark",
-                _ => "System",
-            },
+            mode.map_or(t("settings.system"), |mode| match mode {
+                LightDark::Light => t("settings.light"),
+                LightDark::Dark => t("settings.dark"),
+                LightDark::EyeForest => t("settings.eyeforest"),
+            }),
             context.palette,
         ),
         toggle_row(
-            "High contrast",
+            t("settings.high_contrast"),
             ChoiceEntry {
-                label: "enabled".to_owned(),
+                label: t(if hc {
+                    "common.enabled"
+                } else {
+                    "common.disabled"
+                })
+                .to_owned(),
                 choice: SettingsChoice(SettingsField::HighContrast(!hc)),
                 selected: hc,
             },
-            if hc { "enabled" } else { "disabled" },
+            t(if hc {
+                "common.enabled"
+            } else {
+                "common.disabled"
+            }),
             context.palette,
         ),
         radio_row(
-            "Language",
+            t("settings.language"),
             language_entries(language),
-            match language {
-                Language::En => "en",
-                Language::Zh => "zh",
-            },
+            t(language.self_name_key()),
             context.palette,
         ),
         radio_row(
-            "UI size",
+            t("settings.ui_size"),
             ui_size_entries(context.palette.ui_size),
-            context.palette.ui_size.config_token(),
+            ui_size_label(context.palette.ui_size),
             context.palette,
         ),
         radio_row(
-            "Refresh interval",
+            t("settings.refresh_interval"),
             refresh_entries(interval),
             &format!(
                 "{} ms",
@@ -597,9 +621,9 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             context.palette,
         ),
         radio_row(
-            "History capacity",
+            t("settings.history_capacity"),
             capacity_entries(capacity),
-            &format!("{capacity} samples"),
+            &t("settings.samples_value").replace("{count}", &capacity.to_string()),
             context.palette,
         ),
         toggle_row(
@@ -609,17 +633,30 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 choice: SettingsChoice(SettingsField::HistoryPersistence(!persistence)),
                 selected: persistence,
             },
-            if persistence { "enabled" } else { "disabled" },
+            t(if persistence {
+                "common.enabled"
+            } else {
+                "common.disabled"
+            }),
             context.palette,
         ),
         toggle_row(
-            "Telemetry updates",
+            t("settings.telemetry_updates"),
             ChoiceEntry {
-                label: "paused".to_owned(),
+                label: t(if paused {
+                    "common.paused"
+                } else {
+                    "common.live"
+                })
+                .to_owned(),
                 choice: SettingsChoice(SettingsField::PauseTelemetry),
                 selected: paused,
             },
-            if paused { "paused" } else { "live" },
+            t(if paused {
+                "common.paused"
+            } else {
+                "common.live"
+            }),
             context.palette,
         ),
     ];
@@ -634,7 +671,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_8())),
         }
-        BackgroundColor({ context.palette.content_bg })
+        // The page canvas, not the view surface: a page that paints its own
+        // lighter background re-flattens the glass ladder the shell already
+        // resolved, so every card on it loses its elevation again.
+        BackgroundColor({ context.palette.canvas })
         Children [
             Node { min_height: rem(context.palette.control_height_rem + context.palette.rem_ratio(space_8())), flex_shrink: 0.0 }
             SettingsHeading
@@ -655,7 +695,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     // The floating rail overlays the trailing edge: the
                     // content keeps that lane clear, so no row's right edge
                     // ever sits under the scrollbar.
-                    padding: UiRect::right(Val::Rem(crate::widgets::scrollbar::RAIL_WIDTH_REM)),
+                    padding: UiRect::right(Val::Rem(crate::widgets::scrollbar::LANE_WIDTH_REM)),
                     overflow: Overflow::scroll_y(),
                 }
                 ScrollArea

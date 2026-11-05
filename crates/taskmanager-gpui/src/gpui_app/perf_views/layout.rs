@@ -11,13 +11,13 @@
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::power_w;
 use taskmanager_shell::presentation::temperature_c;
-use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rgba;
 /// Debug-selector identity of the ONE Performance composition root.
 ///
@@ -27,7 +27,7 @@ pub const PERF_MAIN_VIEWPORT_SELECTOR: &str = "tm-perf-main-viewport";
 
 use gpui::{
     AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Styled,
-    div, px,
+    div, px, rems,
 };
 
 use crate::gpui_app::elements;
@@ -41,14 +41,15 @@ use crate::gpui_app::perf_views::{
     badge_pct, badge_rpm, badge_temperature, badge_watts, drive_badge_format, graph_summary_row,
     network_badge_format,
 };
-use crate::gpui_app::root::responsive::{
-    PERFORMANCE_STATS_MIN_WIDTH, PerformanceDetailsPresentation, PerformancePageBudget,
-    PerformanceVerticalRunway,
-};
+use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MIN_WIDTH;
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, Length, Theme};
+use taskmanager_theme::{Color, GlassTier, Length, Theme};
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    PerformanceDetailsPresentation, PerformanceVerticalRunway,
+};
 
 mod stats;
 pub(super) use stats::stats_panel;
@@ -518,8 +519,10 @@ fn summary_overlay(theme: &Theme, row: Div) -> Div {
         .max_w(px(320.0))
         .min_w(px(0.0))
         .child(
-            row.rounded(absolute(tokens::control_radius(theme)))
-                .bg(fill(theme.card_surface().with_alpha(0.85)))
+            row.rounded(rem_length(tokens::control_radius(theme)))
+                .border(rems(GlassTier::Card.edge_width_rem()))
+                .border_color(hsla(theme.glass_card().edge))
+                .bg(glass_fill(theme, GlassTier::Card))
                 .px(definite_length(tokens::SPACE_8))
                 .py(definite_length(tokens::SPACE_2)),
         )
@@ -747,7 +750,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         .min_h(px(0.0))
         .child(main_body);
     if let Some((pos, text)) = graph_hover(hover_slot) {
-        left = left.child(elements::tooltip_overlay(theme, &text, pos));
+        left = left.child(elements::graph_tooltip_overlay(theme, &text, pos));
     }
     match budget.details {
         PerformanceDetailsPresentation::Hidden => left,

@@ -23,9 +23,11 @@ have separate scene keys and independent hover facts.
 
 Device-sidebar width is clamped to current page slots before pinning its
 edges. If the rail cannot coexist with the main viewport, the same devices use
-the strip. The pinned scrollbar leaves a dedicated resize gutter. Drag order
-comes from the same immutable row props as paint, with no render-time writable
-order mirror.
+the strip. The pinned scrollbar leaves a dedicated resize gutter, transparent
+at rest and discoverable by hover or keyboard focus. Pointer dragging, arrow
+keys and accessibility increment/decrement actions share the same width bounds.
+Drag order comes from the same immutable row props as paint, with no
+render-time writable order mirror.
 
 Dashboard windows and readouts use application-correlated system history.
 Controls and paging stay fixed, all four complete metric cards remain

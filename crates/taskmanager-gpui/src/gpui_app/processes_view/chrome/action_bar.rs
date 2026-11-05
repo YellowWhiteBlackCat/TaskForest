@@ -7,12 +7,14 @@ use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
 
 use gpui::{
     AnyElement, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div,
+    StatefulInteractiveElement, Styled, div, rems,
 };
 use taskmanager_ui_contract::IconId;
 
@@ -20,8 +22,8 @@ use crate::gpui_app::root::{Hover, RootView};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_application::i18n;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{self, UiSize};
+use taskmanager_theme::{GlassTier, Theme};
 
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
@@ -438,18 +440,20 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     action_bar = match (surface, actions) {
         (ProcessActionSurface::Standalone, ProcessActionPresentation::Essential) => action_bar
             .w_full()
-            .py(definite_length(tokens::SPACE_2))
-            .rounded(absolute(tokens::card_radius(theme)))
-            .border_1()
-            .border_color(hsla(theme.border))
-            .bg(fill(theme.card_surface())),
+            .py(rem_length(tokens::SPACE_2))
+            .rounded(rem_length(tokens::card_radius(theme)))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+            .bg(glass_fill(theme, GlassTier::Card))
+            .shadow(glass_shadow(theme, GlassTier::Card)),
         (ProcessActionSurface::Standalone, ProcessActionPresentation::Primary) => action_bar
             .w_full()
-            .py(definite_length(tokens::SPACE_4))
-            .rounded(absolute(tokens::card_radius(theme)))
-            .border_1()
-            .border_color(hsla(theme.border))
-            .bg(fill(theme.card_surface())),
+            .py(rem_length(tokens::SPACE_4))
+            .rounded(rem_length(tokens::card_radius(theme)))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+            .bg(glass_fill(theme, GlassTier::Card))
+            .shadow(glass_shadow(theme, GlassTier::Card)),
         (ProcessActionSurface::Embedded, _) => action_bar.py(definite_length(tokens::SPACE_2)),
     };
     action_bar
