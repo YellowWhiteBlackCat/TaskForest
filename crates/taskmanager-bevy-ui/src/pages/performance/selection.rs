@@ -17,6 +17,44 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Query, Res};
 use bevy::ui::{Display, Node, UiSystems};
 
+type CategoryVisibility<'w, 's> = Query<
+    'w,
+    's,
+    (&'static DeviceViewCategory, &'static mut Node),
+    (
+        Without<PerformanceDeviceButton>,
+        Without<PerformanceStatsRailTarget>,
+        Without<PerformanceHeaderTarget>,
+    ),
+>;
+type RailVisibility<'w, 's> = Query<
+    'w,
+    's,
+    (&'static PerformanceStatsRailTarget, &'static mut Node),
+    (
+        Without<DeviceViewCategory>,
+        Without<PerformanceHeaderTarget>,
+    ),
+>;
+type HeaderVisibility<'w, 's> = Query<
+    'w,
+    's,
+    (&'static PerformanceHeaderTarget, &'static mut Node),
+    (
+        Without<DeviceViewCategory>,
+        Without<PerformanceStatsRailTarget>,
+    ),
+>;
+
+/// The three "newly mounted" queries the selection fold watches. Grouping
+/// them keeps one mount event from being confused with another surface's.
+#[derive(bevy::ecs::system::SystemParam)]
+struct NewSelectionTargets<'w, 's> {
+    categories: Query<'w, 's, Entity, Added<DeviceViewCategory>>,
+    rails: Query<'w, 's, Entity, Added<PerformanceStatsRailTarget>>,
+    headers: Query<'w, 's, Entity, Added<PerformanceHeaderTarget>>,
+}
+
 pub(super) fn register(app: &mut App) {
     app.add_systems(
         PostUpdate,
@@ -98,34 +136,16 @@ impl PerformanceDeviceTarget {
 
 fn sync_device_selection(
     focus: Res<PerformanceDeviceFocus>,
-    added: Query<Entity, Added<DeviceViewCategory>>,
-    added_rails: Query<Entity, Added<PerformanceStatsRailTarget>>,
-    added_headers: Query<Entity, Added<PerformanceHeaderTarget>>,
+    added: NewSelectionTargets,
     mut buttons: Query<(&PerformanceDeviceButton, &mut ControlVisual)>,
-    mut categories: Query<
-        (&DeviceViewCategory, &mut Node),
-        (
-            Without<PerformanceDeviceButton>,
-            Without<PerformanceStatsRailTarget>,
-            Without<PerformanceHeaderTarget>,
-        ),
-    >,
-    mut rail_targets: Query<
-        (&PerformanceStatsRailTarget, &mut Node),
-        (
-            Without<DeviceViewCategory>,
-            Without<PerformanceHeaderTarget>,
-        ),
-    >,
-    mut header_targets: Query<
-        (&PerformanceHeaderTarget, &mut Node),
-        (
-            Without<DeviceViewCategory>,
-            Without<PerformanceStatsRailTarget>,
-        ),
-    >,
+    mut categories: CategoryVisibility,
+    mut rail_targets: RailVisibility,
+    mut header_targets: HeaderVisibility,
 ) {
-    if !focus.is_changed() && added.is_empty() && added_rails.is_empty() && added_headers.is_empty()
+    if !focus.is_changed()
+        && added.categories.is_empty()
+        && added.rails.is_empty()
+        && added.headers.is_empty()
     {
         return;
     }

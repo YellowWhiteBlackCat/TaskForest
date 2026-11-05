@@ -162,9 +162,8 @@ pub(super) fn snapshot() -> SystemSnapshot {
                         false,
                         1_785_292_800_000,
                     ),
-                    ..Default::default()
+                    compressed_memory_used_bytes: OptionalObservation::default(),
                 },
-                ..Default::default()
             },
         ),
         disks: vec![{

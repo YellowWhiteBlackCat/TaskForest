@@ -53,6 +53,8 @@ src/theme.rs  theme_binding.rs  font_catalog.rs  text_metrics.rs
 src/icons.rs  tray.rs          icons resolution and system tray
 src/saved_views.rs  export.rs  saved view state and tabular data export
 src/capture.rs  capture_windows.rs  headless capture and screenshot routines
+src/presentation_binding.rs      ADR-064: theme-value lift, capture resolution
+                                 marker and Iced control/motion binding
 ```
 
 ## Docs

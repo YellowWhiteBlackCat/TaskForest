@@ -185,10 +185,12 @@ fn the_shared_bands_are_stated_once_at_their_exact_values() {
     assert_eq!(BOTTOM_SAFETY_BAND, 8.0);
     assert_eq!(MIN_WINDOW_WIDTH, 720.0);
     assert_eq!(MIN_WINDOW_HEIGHT, 480.0);
-    assert!(MAX_WINDOW_WIDTH > MIN_WINDOW_WIDTH && MAX_WINDOW_HEIGHT > MIN_WINDOW_HEIGHT);
-    assert!(
-        MIN_WINDOW_WIDTH - NAV_RAIL_WIDTH - BOTTOM_SAFETY_BAND < ULTRA_COMPACT_CONTENT_WIDTH,
-        "the smallest admissible window must still reach the Ultra-Compact rung, so the \
-         degradation path is exercised rather than unreachable"
-    );
+    const {
+        assert!(MAX_WINDOW_WIDTH > MIN_WINDOW_WIDTH && MAX_WINDOW_HEIGHT > MIN_WINDOW_HEIGHT);
+        assert!(
+            MIN_WINDOW_WIDTH - NAV_RAIL_WIDTH - BOTTOM_SAFETY_BAND < ULTRA_COMPACT_CONTENT_WIDTH,
+            "the smallest admissible window must still reach the Ultra-Compact rung, so the \
+             degradation path is exercised rather than unreachable"
+        );
+    }
 }

@@ -105,7 +105,7 @@ fn the_registered_axes_cover_every_field_that_may_differ() {
     for field in VerdictField::ALL {
         if field.axes_governing().is_empty() {
             assert!(
-                !registered.is_empty() == false || field == VerdictField::Profile,
+                registered.is_empty() || field == VerdictField::Profile,
                 "a pure fold must not be smuggled into the registered-explanation set"
             );
         }

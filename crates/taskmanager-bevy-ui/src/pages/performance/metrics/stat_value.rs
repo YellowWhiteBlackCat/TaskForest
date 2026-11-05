@@ -10,22 +10,22 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 /// observation it rewrites.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StatKey {
-    MemoryUsed,
-    MemoryAvailable,
-    MemoryHardwareReserved,
-    MemoryCached,
-    MemoryBuffers,
-    MemorySwap,
-    MemorySpeed,
-    MemorySlots,
-    MemoryCommitted,
-    MemoryZramSwap,
-    MemoryCompressionRatio,
-    MemoryZramRamUsed,
-    MemoryZswap,
-    MemoryUsageRate,
-    MemorySwapInRate,
-    MemorySwapOutRate,
+    Used,
+    Available,
+    HardwareReserved,
+    Cached,
+    Buffers,
+    Swap,
+    Speed,
+    Slots,
+    Committed,
+    ZramSwap,
+    CompressionRatio,
+    ZramRamUsed,
+    Zswap,
+    UsageRate,
+    SwapInRate,
+    SwapOutRate,
 }
 
 /// One stat rail row's current value. Each key reads exactly one typed fact;
@@ -36,7 +36,7 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
         return missing_value();
     };
     match key {
-        StatKey::MemoryUsed => match (
+        StatKey::Used => match (
             memory.current_used_bytes(),
             memory.used_percentage_observed(),
         ) {
@@ -46,40 +46,40 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
             (Some(used), None) => bytes(used),
             _ => missing_value(),
         },
-        StatKey::MemoryAvailable => memory
+        StatKey::Available => memory
             .projected_available_bytes()
             .map_or_else(missing_value, bytes),
-        StatKey::MemoryHardwareReserved => memory
+        StatKey::HardwareReserved => memory
             .current_hardware_reserved_bytes()
             .map_or_else(missing_value, bytes),
-        StatKey::MemoryCached => memory
+        StatKey::Cached => memory
             .current_cached_bytes()
             .map_or_else(missing_value, bytes),
-        StatKey::MemoryBuffers => memory
+        StatKey::Buffers => memory
             .current_buffers_bytes()
             .map_or_else(missing_value, bytes),
-        StatKey::MemorySwap => match (
+        StatKey::Swap => match (
             memory.current_swap_used_bytes(),
             memory.current_swap_total_bytes(),
         ) {
             (Some(used), Some(total)) => format!("{} / {}", bytes(used), bytes(total)),
             _ => missing_value(),
         },
-        StatKey::MemorySpeed => memory
+        StatKey::Speed => memory
             .current_speed_mhz()
             .map_or_else(missing_value, |speed| format!("{speed} MT/s")),
-        StatKey::MemorySlots => match (memory.current_slots_used(), memory.current_slots_total()) {
+        StatKey::Slots => match (memory.current_slots_used(), memory.current_slots_total()) {
             (Some(used), Some(total)) => format!("{used} / {total}"),
             _ => missing_value(),
         },
-        StatKey::MemoryCommitted => match (
+        StatKey::Committed => match (
             memory.current_committed_bytes(),
             memory.current_commit_limit_bytes(),
         ) {
             (Some(used), Some(total)) => format!("{} / {}", bytes(used), bytes(total)),
             _ => missing_value(),
         },
-        StatKey::MemoryZramSwap => match (
+        StatKey::ZramSwap => match (
             memory.current_compressed_swap_used_bytes(),
             memory.current_compressed_swap_capacity_bytes(),
         ) {
@@ -88,13 +88,13 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
             }
             _ => missing_value(),
         },
-        StatKey::MemoryCompressionRatio => memory
+        StatKey::CompressionRatio => memory
             .current_compressed_swap_ratio()
             .map_or_else(missing_value, |ratio| format!("{ratio:.1}:1")),
-        StatKey::MemoryZramRamUsed => memory
+        StatKey::ZramRamUsed => memory
             .current_compressed_swap_memory_used_bytes()
             .map_or_else(missing_value, bytes),
-        StatKey::MemoryZswap => {
+        StatKey::Zswap => {
             memory
                 .current_compressed_swap_cache_enabled()
                 .map_or_else(missing_value, |enabled| {
@@ -106,14 +106,14 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
                     .to_owned()
                 })
         }
-        StatKey::MemoryUsageRate => memory
+        StatKey::UsageRate => memory
             .current_used_rate_mib_per_sec()
             .filter(|rate| rate.abs() >= 0.05)
             .map_or_else(missing_value, |rate| format!("{rate:+.1} MiB/s")),
-        StatKey::MemorySwapInRate => memory
+        StatKey::SwapInRate => memory
             .current_swap_in_bytes_per_sec()
             .map_or_else(missing_value, |rate| format!("{}/s", bytes(rate))),
-        StatKey::MemorySwapOutRate => memory
+        StatKey::SwapOutRate => memory
             .current_swap_out_bytes_per_sec()
             .map_or_else(missing_value, |rate| format!("{}/s", bytes(rate))),
     }

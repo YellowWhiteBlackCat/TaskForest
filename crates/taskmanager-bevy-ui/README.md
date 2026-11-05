@@ -100,6 +100,7 @@ headless suite and capture flow live in
 - `src/saved_views.rs`, `export.rs`, `snapshot_export.rs`, `event_center.rs` — saved views, typed data exports and event center tracking.
 - `src/demo_fixture.rs` (+ `src/demo_fixture/`), `capture.rs` — deterministic demo fixtures and window capture seams.
 - `src/pages.rs` + `src/pages/` — nine mounted pages plus `process_tree.rs` and `history.rs`; `src/widgets.rs` + `src/widgets/` — the owned component layer; `icons.rs` — icon scenes.
+- `src/presentation_binding.rs` — ADR-064 theme-value lift and Bevy scene-rem / ECS-tween control and motion binding.
 - Per-module detail: [`docs/MODULE_NOTES.md`](docs/MODULE_NOTES.md).
 
 ## Docs

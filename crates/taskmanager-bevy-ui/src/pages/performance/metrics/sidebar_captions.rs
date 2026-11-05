@@ -213,34 +213,25 @@ pub(crate) fn device_sidebar_caption(
         PerformanceDeviceTarget::Cpu => cpu_sidebar_caption(shell),
         PerformanceDeviceTarget::Memory => memory_sidebar_caption(shell),
         PerformanceDeviceTarget::Disk(id) => disks(shell)
-            .and_then(|disks| disks.into_iter().find(|disk| &disk.device_id == id))
-            .map_or_else(
-                || (missing_value(), missing_value()),
-                |disk| disk_sidebar_caption(&disk),
-            ),
+            .and_then(|disks| disks.iter().find(|disk| &disk.device_id == id))
+            .map_or_else(|| (missing_value(), missing_value()), disk_sidebar_caption),
         PerformanceDeviceTarget::Network(id) => network_devices(shell)
-            .and_then(|nics| nics.into_iter().find(|nic| nic.device_id.as_ref() == id))
+            .and_then(|nics| nics.iter().find(|nic| nic.device_id.as_ref() == id))
             .map_or_else(
                 || (missing_value(), missing_value()),
-                |nic| network_sidebar_caption(&nic),
+                network_sidebar_caption,
             ),
         PerformanceDeviceTarget::Gpu(id) => gpu_devices(shell)
-            .and_then(|gpus| gpus.into_iter().find(|gpu| &gpu.device_id == id))
-            .map_or_else(
-                || (missing_value(), missing_value()),
-                |gpu| gpu_sidebar_caption(&gpu),
-            ),
+            .and_then(|gpus| gpus.iter().find(|gpu| &gpu.device_id == id))
+            .map_or_else(|| (missing_value(), missing_value()), gpu_sidebar_caption),
         PerformanceDeviceTarget::Battery(id) => batteries(shell)
-            .and_then(|bats| bats.into_iter().find(|bat| &bat.id == id))
+            .and_then(|bats| bats.iter().find(|bat| &bat.id == id))
             .map_or_else(
                 || (missing_value(), missing_value()),
-                |bat| battery_sidebar_caption(&bat),
+                battery_sidebar_caption,
             ),
         PerformanceDeviceTarget::Fan(id) => fans(shell)
             .and_then(|fans| fans.into_iter().find(|fan| fan.id() == id))
-            .map_or_else(
-                || (missing_value(), missing_value()),
-                |fan| fan_sidebar_caption(&fan),
-            ),
+            .map_or_else(|| (missing_value(), missing_value()), fan_sidebar_caption),
     }
 }

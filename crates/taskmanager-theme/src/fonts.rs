@@ -28,7 +28,7 @@ pub const FONT_ROBOTO_MONO: &str = "Roboto Mono";
 /// re-spells `"MiSans VF"` (ADR-063). `taskmanager-assets` owns the registered
 /// bytes, and the `taskmanager-gates` census welds one face per role to one
 /// embedded blob.
-pub const BUNDLED_FONT_FAMILIES: [&'static str; 2] = [FONT_MISANS_VF, FONT_ROBOTO_MONO];
+pub const BUNDLED_FONT_FAMILIES: [&str; 2] = [FONT_MISANS_VF, FONT_ROBOTO_MONO];
 
 /// The persisted `Config::ui_font` / `Config::mono_font` token that explicitly
 /// requests the host's own skin family. The ABSENT (empty) token is not this

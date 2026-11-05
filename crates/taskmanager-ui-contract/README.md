@@ -59,7 +59,8 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
 src/accessibility/               neutral accessibility model and snapshots
 src/conformance.rs               conformance suite contracts and test helpers
 src/presentation.rs              ADR-064: vocabulary → thresholds → budget →
-                                 parity, plus control and motion roles
+                                 parity; sizes/motion/resolution in
+                                 src/presentation/
 ```
 
 ## Docs
@@ -68,6 +69,8 @@ src/presentation.rs              ADR-064: vocabulary → thresholds → budget �
   navigation vocabulary and the feature-coverage ledger.
 - [`docs/ACCESSIBILITY_PROCESS_ROWS.md`](docs/ACCESSIBILITY_PROCESS_ROWS.md) — typed process
   observations, aggregate coverage, and tree action identity.
+- [`docs/PRESENTATION.md`](docs/PRESENTATION.md) — presentation resolution charter:
+  shared folds, the theme-value lift, divergence registry and capture evidence.
 - [`UI_COMPONENT_ARCHITECTURE`](../../docs/UI_COMPONENT_ARCHITECTURE.md) and
   [ADR-046](../../adr/046-bevy-fourth-shared-contract-shape.md) — shared contract shape.
 - [ADR-064](../../adr/064-presentation-resolution-layer.md) — presentation

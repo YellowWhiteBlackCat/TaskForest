@@ -28,6 +28,20 @@ use bevy::text::{ComputedTextBlock, TextSpan};
 use bevy::ui::prelude::ComputedNode;
 use bevy::ui::widget::Text;
 
+type BoundedTextCells<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static mut Text,
+        &'static ComputedNode,
+        &'static ComputedTextBlock,
+        &'static ChildOf,
+        Option<&'static Children>,
+    ),
+    With<BoundedText>,
+>;
+
 /// The suffix a truncated value ends with.
 pub(crate) const ELLIPSIS: &str = "...";
 
@@ -53,17 +67,7 @@ struct Section {
 /// width exceeds the slot, the value is cut at the last cluster that still
 /// fits and the ellipsis is appended.
 pub(crate) fn ellipsize_bounded_text(
-    mut cells: Query<
-        (
-            Entity,
-            &mut Text,
-            &ComputedNode,
-            &ComputedTextBlock,
-            &ChildOf,
-            Option<&Children>,
-        ),
-        With<BoundedText>,
-    >,
+    mut cells: BoundedTextCells,
     parents: Query<&ComputedNode>,
     mut spans: Query<&mut TextSpan>,
 ) {

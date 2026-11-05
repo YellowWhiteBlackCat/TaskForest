@@ -150,97 +150,97 @@ pub(super) fn memory_stats_card(shell: &ShellApp, palette: &UiPalette) -> Box<dy
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.in_use").to_owned(),
-            StatKey::MemoryUsed,
+            StatKey::Used,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.available").to_owned(),
-            StatKey::MemoryAvailable,
+            StatKey::Available,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.hardware_reserved").to_owned(),
-            StatKey::MemoryHardwareReserved,
+            StatKey::HardwareReserved,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.cached").to_owned(),
-            StatKey::MemoryCached,
+            StatKey::Cached,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.buffers").to_owned(),
-            StatKey::MemoryBuffers,
+            StatKey::Buffers,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.swap").to_owned(),
-            StatKey::MemorySwap,
+            StatKey::Swap,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("common.speed").to_owned(),
-            StatKey::MemorySpeed,
+            StatKey::Speed,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.slots").to_owned(),
-            StatKey::MemorySlots,
+            StatKey::Slots,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.committed").to_owned(),
-            StatKey::MemoryCommitted,
+            StatKey::Committed,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.zram_swap").to_owned(),
-            StatKey::MemoryZramSwap,
+            StatKey::ZramSwap,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.compression_ratio").to_owned(),
-            StatKey::MemoryCompressionRatio,
+            StatKey::CompressionRatio,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.zram_ram_used").to_owned(),
-            StatKey::MemoryZramRamUsed,
+            StatKey::ZramRamUsed,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.zswap").to_owned(),
-            StatKey::MemoryZswap,
+            StatKey::Zswap,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.usage_rate").to_owned(),
-            StatKey::MemoryUsageRate,
+            StatKey::UsageRate,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.swap_in_rate").to_owned(),
-            StatKey::MemorySwapInRate,
+            StatKey::SwapInRate,
             palette,
         ));
         rows.push(stat_dynamic_text_row(
             shell,
             t("mem.swap_out_rate").to_owned(),
-            StatKey::MemorySwapOutRate,
+            StatKey::SwapOutRate,
             palette,
         ));
     }

@@ -354,10 +354,10 @@ pub fn verify_resolved(
     if (measured.extent - resolved.control_extent).abs() > 0.01 {
         push(ResolutionFindingKind::ControlExtentMismatch);
     }
-    if let Some(target) = measured.hit_target {
-        if (target - resolved.hit_target.unwrap_or_default()).abs() > 0.01 {
-            push(ResolutionFindingKind::HitTargetMismatch);
-        }
+    if let Some(target) = measured.hit_target
+        && (target - resolved.hit_target.unwrap_or_default()).abs() > 0.01
+    {
+        push(ResolutionFindingKind::HitTargetMismatch);
     }
     findings
 }

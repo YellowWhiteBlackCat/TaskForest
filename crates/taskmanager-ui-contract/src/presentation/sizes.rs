@@ -355,12 +355,12 @@ fn axis_findings(
         if measured.unit != expected_unit {
             kinds.push(SizeFindingKind::WrongResolutionUnit);
         }
-        if let Some(target) = measured.hit_target {
-            if target < measured.extent
-                || (!expected_unit.supports_sub_unit_targets() && target < measured.realized_extent)
-            {
-                kinds.push(SizeFindingKind::HitTargetTooSmall);
-            }
+        if let Some(target) = measured.hit_target
+            && (target < measured.extent
+                || (!expected_unit.supports_sub_unit_targets()
+                    && target < measured.realized_extent))
+        {
+            kinds.push(SizeFindingKind::HitTargetTooSmall);
         }
         if !state.changes_measurement()
             && resolve_size(frontend, role, ControlState::Normal, ui_size, *density).extent

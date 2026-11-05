@@ -93,7 +93,7 @@ pub const PROBES: &[LayoutProbe] = &[
 ];
 
 /// One field of a layout verdict. Every field is governed by an explicit axis
-/// set ([`axes_governing`]), which is what makes a difference checkable.
+/// set (`axes_governing`), which is what makes a difference checkable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VerdictField {
     Profile,
