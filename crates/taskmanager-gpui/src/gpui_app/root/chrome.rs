@@ -12,6 +12,7 @@ use super::{Hover, RootView};
 use crate::gpui_app::process_insights::view::ProcessInsightsViewProps;
 use gpui::{
     Context, Div, Entity, InteractiveElement, MouseButton, ParentElement, Rgba, Styled, div, px,
+    rems,
 };
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::NetworkEscalationState;
@@ -24,8 +25,10 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rem_value;
 use taskmanager_ui::theme_binding::rgba;
 
 use crate::gpui_app::chrome;
@@ -45,7 +48,7 @@ use taskmanager_application::process_details_vm::{
 };
 use taskmanager_assets::product;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Theme, WindowControls, WindowCorner};
+use taskmanager_theme::{GlassTier, Theme, WindowControls, WindowCorner};
 use taskmanager_ui::brand_logo_image;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
@@ -81,12 +84,13 @@ pub fn top_bar(
         .unwrap_or(true);
 
     let mut bar = div()
+        .debug_selector(|| "tm-feedback-titlebar".to_string())
         .h(px(chrome::titlebar_height(t)))
         .flex()
         .flex_row()
         .items_center()
-        .bg(fill(t.sidebar_bg))
-        .border_b_1()
+        .bg(glass_fill(t, GlassTier::Sidebar))
+        .border_b(rems(GlassTier::Sidebar.edge_width_rem()))
         .border_color(elements::titlebar_border(t, window_active))
         // Round the titlebar's two TOP corners: it spans the full window width
         // and would otherwise paint square pixels into the transparent CSD
@@ -96,8 +100,8 @@ pub fn top_bar(
         // only rendered in the CSD fallback, so the rounding always composites
         // against the transparent Linux CSD surface (server-decorated windows
         // never reach this path).
-        .rounded_tl(px(t.window_corner_radius(WindowCorner::TopLeft)))
-        .rounded_tr(px(t.window_corner_radius(WindowCorner::TopRight)));
+        .rounded_tl(rem_value(t.window_corner_radius(WindowCorner::TopLeft)))
+        .rounded_tr(rem_value(t.window_corner_radius(WindowCorner::TopRight)));
 
     // Centered, draggable title region (flex_1 fills the space between the
     // control groups). Left mouse-down starts a window move (the CSD titlebar
@@ -127,6 +131,7 @@ pub fn top_bar(
                 .child(brand_logo_image().w(px(16.0)).h(px(16.0)))
                 .child(
                     div()
+                        .debug_selector(|| "tm-window-title".to_string())
                         .text_size(font_size(tokens::FONT_13))
                         .text_color(hsla(t.fg_dim))
                         .child(title),
@@ -677,7 +682,7 @@ fn process_insights_labels() -> ProcessInsightsLabels {
         unreadable: i18n::t("proc_insights.unreadable"),
         threads: i18n::t("proc_insights.threads"),
         no_threads: i18n::t("proc_insights.no_threads"),
-        thread_id: i18n::t("proc.pid"),
+        thread_id: i18n::t("proc_insights.thread_tid"),
         thread_name: i18n::t("common.name"),
         thread_state: i18n::t("common.status"),
         thread_cpu_time: i18n::t("proc_insights.thread_cpu_time"),

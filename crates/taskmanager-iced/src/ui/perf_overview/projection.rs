@@ -1,4 +1,5 @@
 //! Pure CPU and memory observation view models for the Performance overview.
+use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
 use taskforest_core::core::metrics::{CpuMetrics, MemoryMetrics};
 use taskforest_core::core::metrics::{ResourcePressure, SystemSnapshot};
@@ -16,14 +17,10 @@ pub(super) enum CpuChartLayout {
 
 impl CpuChartLayout {
     #[must_use]
-    pub(super) const fn for_inventory(
-        inventory: super::super::responsive::PerformanceChartInventory,
-    ) -> Self {
+    pub(super) const fn for_inventory(inventory: PerformanceChartInventory) -> Self {
         match inventory {
-            super::super::responsive::PerformanceChartInventory::AggregateOnly => {
-                Self::AggregateOnly
-            }
-            super::super::responsive::PerformanceChartInventory::Full => Self::AggregateWithPerCore,
+            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
+            PerformanceChartInventory::Full => Self::AggregateWithPerCore,
         }
     }
 }

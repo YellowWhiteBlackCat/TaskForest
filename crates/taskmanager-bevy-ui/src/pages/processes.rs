@@ -13,24 +13,20 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::text::{FontSize, LineBreak, TextColor, TextFont, TextLayout};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Val,
-    percent, px, rem,
+    BackgroundColor, ComputedNode, FlexDirection, Node, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button, TextInput};
+use bevy::ui_widgets::{Activate, Button};
 use taskforest_core::core::process::ProcessLiveKey;
-use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 
 use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::input::SearchEditor;
 use crate::input_contract::SemanticAddress;
-use crate::palette::{UiPalette, space_8, space_24};
+use crate::palette::{UiPalette, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::table::resize::{ColumnResizeSession, ColumnWidthOverrides};
 use crate::widgets::table::{header_scene_with_widths, row_scene_with_widths, visible_columns};
@@ -43,6 +39,7 @@ pub(crate) mod input;
 pub(crate) mod menu;
 pub(crate) mod projection;
 pub(crate) mod properties_modal;
+pub(crate) mod toolbar;
 
 pub(crate) use projection::*;
 
@@ -53,7 +50,7 @@ pub(crate) struct ProcessPageRoot;
 pub(crate) struct ProcessOptionalChrome;
 
 use crate::scene_attach::attach_child;
-use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns, choose_columns_button_scene};
+use columns_modal::{ProcessColumnsModalState, ProcessHiddenColumns};
 
 // ---- pure view model ----------------------------------------------------
 
@@ -134,28 +131,14 @@ pub(crate) fn sync_processes_responsive_layout(
     if width <= 0.0 {
         return;
     }
-    if width < 960.0 {
-        for mut node in &mut tables {
-            if node.width != percent(100) {
-                node.width = percent(100);
-            }
+    for mut node in &mut tables {
+        if node.width != percent(100) {
+            node.width = percent(100);
         }
-        for mut node in &mut details {
-            if node.display != bevy::ui::Display::None {
-                node.display = bevy::ui::Display::None;
-            }
-        }
-    } else {
-        for mut node in &mut tables {
-            if node.width != percent(68) {
-                node.width = percent(68);
-            }
-        }
-        for mut node in &mut details {
-            if node.display != bevy::ui::Display::Flex {
-                node.display = bevy::ui::Display::Flex;
-                node.width = percent(32);
-            }
+    }
+    for mut node in &mut details {
+        if node.display != bevy::ui::Display::None {
+            node.display = bevy::ui::Display::None;
         }
     }
 }
@@ -428,9 +411,15 @@ fn on_query_commit(
 
 /// Selected-row fill: the palette's elevated card surface (the same token the
 /// active nav item uses — one "selected" surface per theme).
-fn row_fill(selected: bool, palette: &UiPalette) -> bevy::color::Color {
+/// The row's resting fill, in one with the shared [`ControlTone::Row`]
+/// contract: a selected row wears the theme's selection tint, every other
+/// odd row wears the zebra stripe, and an even row stays open so the page
+/// canvas reads through the table.
+fn row_fill(selected: bool, zebra: bool, palette: &UiPalette) -> bevy::color::Color {
     if selected {
-        palette.nav_active_bg
+        palette.selection_bg
+    } else if zebra {
+        palette.zebra_bg
     } else {
         bevy::color::Color::NONE
     }
@@ -448,7 +437,8 @@ fn row_wrapper_scene(
     query: &str,
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
-    let fill = row_fill(row.selected, palette);
+    let zebra = row.index % 2 == 1;
+    let fill = row_fill(row.selected, zebra, palette);
     let index = row.index;
     let cells = row.cells.clone();
     let app_icon = row.app_icon;
@@ -465,7 +455,7 @@ fn row_wrapper_scene(
         BackgroundColor({ fill })
         ProcessRowLink({ index })
         ProcessTableArtifact
-        ControlVisual(ControlTone::Surface, { row.selected })
+        ControlVisual(ControlTone::Row { zebra: { zebra } }, { row.selected })
         Button
         on(input::on_row_activated)
         on(input::on_row_secondary_pressed)
@@ -594,36 +584,6 @@ fn live_widths(
     }
 }
 
-/// The search box: a display surface over the shell-owned query. The shell is
-/// the single search authority (Ctrl+F opens it, typing folds into the query,
-/// Escape closes) exactly like the TUI and GPUI surfaces; this node renders
-/// the query and the [`input::sync_after_shell_interaction`] observer keeps
-/// it in step — there is no second editor buffer to double-own the keyboard.
-fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
-    let text = query.to_owned();
-    let width = space_24() * 12.0;
-    let radius = palette.control_radius_px;
-    bsn! {
-        Node {
-            width: px(width),
-            height: rem(palette.control_height_rem),
-            align_items: AlignItems::Center,
-            padding: Val::Px(space_8()),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor({ palette.panel_fill })
-        ProcessSearchInput
-        SearchEditor({ text })
-        TextInput
-        TextFont { font_size: FontSize::Rem(1.0) }
-        TextColor({ palette.body_color })
-        TextRole(Role::Body)
-        TextLayout { linebreak: LineBreak::NoWrap }
-        Button
-        on(on_search_input_activated)
-    }
-}
-
 /// The rows root scene: measured virtual viewport, the five `on()` seam
 /// observers (bootstrap first, so it is registered before the marker's own
 /// `Add` trigger dispatches), and the mount-time static window inside.
@@ -660,7 +620,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Processes.title();
     let projection = rows_projection(context.shell, 1, 0);
     let count = count_line_text_for_shell(context.shell, projection.total, &context.shell.query);
-    let columns = visible_columns(&[]);
+    let columns = visible_columns(columns_modal::DEFAULT_HIDDEN_COLUMNS);
     let widths = live_widths(&columns, None);
     let header = header_scene_with_widths(
         &columns,
@@ -692,28 +652,12 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         palette,
         &context.shell.query,
     );
-    let search = search_input_scene(palette, &context.shell.query);
-    let choose_columns_btn = choose_columns_button_scene(palette);
-    let saved_views = crate::saved_views::button(
-        t("saved_views.title").into(),
-        crate::saved_views::SavedViewAction::Open,
-        palette,
-    );
-    let toolbar = bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center, flex_wrap:FlexWrap::Wrap, flex_shrink:0.0,
-            column_gap: Val::Px(space_8()),
-        }
-        Children [
-             @{ search } --
-             @{ choose_columns_btn } -- @{ saved_views } -- @{ crate::pages::process_tree::open_button(palette) }
-        ]
-    };
+    let toolbar = toolbar::toolbar_scene(context);
     let table = bsn! {
         Node {
-            width: percent(68),
+            width: percent(100),
+            flex_grow: 1.0,
+            flex_basis: px(0.0),
             min_width: px(0.0),
             height: percent(100), min_height:px(0.0),
             flex_direction: FlexDirection::Column,
@@ -734,7 +678,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             row_gap: Val::Px(space_8()),
             padding: Val::Px(space_8()),
         }
-        BackgroundColor({ palette.content_bg }) ProcessPageRoot
+        BackgroundColor({ palette.canvas }) ProcessPageRoot
         Children [
              Text(title) TextRole(Role::Heading) ProcessOptionalChrome --
              @{ toolbar } --

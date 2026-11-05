@@ -36,7 +36,7 @@ impl RootView {
         let entity = cx.entity();
         let hardware = self.hardware_rc().clone();
         let processes = self.processes_arc().clone();
-        let system_layout = responsive::SystemPageBudget::from_frame(frame);
+        let system_layout = responsive::system_budget_from_frame(frame);
         let content: AnyElement = match self.dashboard.section {
             SystemPageSection::Dashboard => {
                 dashboard::render_dashboard(dashboard::DashboardViewProps {

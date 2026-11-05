@@ -1,68 +1,26 @@
 //! Shared graph card and legend elements.
 
-use super::{CARD_SHADOW_AMBIENT_ALPHA, CARD_SHADOW_AMBIENT_BLUR, CARD_SHADOW_AMBIENT_DROP};
 use crate::gpui_app::graph::{
     GraphCacheHandle, GraphOpts, GraphSampleState, GraphSettings, graph_element, graph_sample_state,
 };
-use gpui::{
-    BoxShadow, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Point, Styled, div,
-    px,
-};
+use gpui::{Div, ElementId, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
 use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_theme::Color;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_ui::theme_binding::absolute;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rgba;
-
-/// The card shadow's ambient layer: the share of the ink alpha, the drop, and
-/// the blur radius. 2026-08 稳固效果 policy (owner: "很深的 blur 效果很糟糕")
-/// — the pre-change y4/blur16 halo read as heavy blur on EVERY graph card at
-/// once and muddied the gaps between adjacent cards; separation now comes
-/// from the tone ladder (window → sidebar → card fills + 1px border) and the
-/// shadow is only a whisper of lift. Shared with the shadow test so the
-/// contract lives in one place.
-/// The soft two-layer card shadow: a low, low-opacity ambient blur plus a
-/// tight, high-opacity edge blur — both painted in the theme's single
-/// `card_shadow` ink (the edge layer carries the full ink alpha, the ambient
-/// layer a fixed share of it — see the `CARD_SHADOW_AMBIENT_*` constants).
-/// Cards and dashboard tiles read
-/// through this helper. Dense list rows (the 10k-process table) NEVER do —
-/// per-row shadows would add a shadow pass per row on every scroll frame
-/// (performance discipline, see tokens.rs motion policy).
-pub fn card_shadow(t: &Theme) -> Vec<BoxShadow> {
-    let ink = t.card_shadow();
-    vec![
-        BoxShadow {
-            color: hsla(ink.with_alpha(ink.a * CARD_SHADOW_AMBIENT_ALPHA)),
-            offset: Point::new(px(0.0), px(CARD_SHADOW_AMBIENT_DROP)),
-            blur_radius: px(CARD_SHADOW_AMBIENT_BLUR),
-            spread_radius: px(0.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: hsla(ink),
-            offset: Point::new(px(0.0), px(1.0)),
-            blur_radius: px(4.0),
-            spread_radius: px(0.0),
-            inset: false,
-        },
-    ]
-}
 
 /// The recurring graph-container wrapper used by every Performance graph card
 /// (the shared `render_chart` headline/secondary tiers, and cpu_view.rs per-core
-/// grid plus headline). Pure layout helper — a flex-filling, rounded, 1px-bordered
-/// card surfaced in the theme's elevated card fill (`Theme::card_surface`) that
-/// clips its graph to the rounded corners via `overflow_hidden`. Carries the
-/// two-layer [`card_shadow`]. Collapses the
-/// 4 inline copies into one call.
+/// grid plus headline). The plot is inset from the rounded surface because
+/// GPUI's overflow mask is rectangular, and inline charts cast no shadow.
 ///
 /// Returns a `Div` (not `impl IntoElement`) so callers can keep chaining layout
 /// (e.g. an absolute overlay label on top of the graph, as cpu_view per-core does).
@@ -70,13 +28,20 @@ pub fn graph_card(theme: &Theme, graph: impl IntoElement) -> Div {
     div()
         .flex_1()
         .min_h(px(0.0))
-        .rounded(absolute(tokens::card_radius(theme)))
-        .border(px(1.0))
-        .border_color(hsla(theme.border))
-        .bg(fill(theme.card_surface()))
-        .shadow(card_shadow(theme))
+        .rounded(rem_length(tokens::card_radius(theme)))
+        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+        .bg(glass_fill(theme, GlassTier::Card))
+        .shadow_none()
         .overflow_hidden()
-        .child(graph)
+        .child(
+            div()
+                .size_full()
+                .p(rem_length(tokens::rounded_content_inset(
+                    tokens::card_radius(theme),
+                )))
+                .child(graph),
+        )
 }
 
 /// Graph card with an honest first-frame status overlay.
@@ -133,10 +98,10 @@ fn graph_card_with_explicit_state(
                     div()
                         .px(definite_length(tokens::SPACE_12))
                         .py(definite_length(tokens::SPACE_6))
-                        .rounded(absolute(tokens::control_radius(theme)))
-                        .border_1()
-                        .border_color(hsla(theme.border))
-                        .bg(fill(theme.card_surface()))
+                        .rounded(rem_length(tokens::control_radius(theme)))
+                        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
+                        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+                        .bg(glass_fill(theme, GlassTier::Card))
                         .text_size(font_size(tokens::FONT_12))
                         .text_color(hsla(theme.fg_dim))
                         .child(label),
@@ -172,7 +137,16 @@ pub(crate) fn mini_graph_cell(
     // the caller's full generation-scoped window.
     graph_card_with_state(
         theme,
-        graph_element(id, Rc::clone(&samples), rgba(color), opts, cache),
+        div()
+            .size_full()
+            .debug_selector(|| "tm-mini-graph-plot".to_string())
+            .child(graph_element(
+                id,
+                Rc::clone(&samples),
+                rgba(color),
+                opts,
+                cache,
+            )),
         &samples,
     )
     .child(

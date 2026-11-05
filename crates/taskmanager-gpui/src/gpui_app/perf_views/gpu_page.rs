@@ -29,7 +29,6 @@ use crate::gpui_app::perf_views::layout::{
     ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel,
 };
 use crate::gpui_app::perf_views::smart_status::status_footer;
-use crate::gpui_app::root::responsive::PerformanceChartInventory;
 use taskforest_core::core::metrics::{GpuMetrics, SystemSnapshot};
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
@@ -39,6 +38,10 @@ use taskmanager_shell::presentation::gpu_chart_metric::{
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    PerformanceChartInventory, PerformanceVerticalRunway,
+};
 
 pub(crate) mod engine_grid;
 
@@ -66,7 +69,7 @@ pub(crate) struct GpuRenderState<'a> {
     pub(crate) engine_device_id: DeviceId,
     pub(crate) chart_layout: GpuChartLayout,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) budget: crate::gpui_app::root::responsive::PerformancePageBudget,
+    pub(crate) budget: PerformancePageBudget,
     pub(crate) graph_cache: GraphCacheHandle,
 }
 
@@ -423,7 +426,7 @@ struct GpuMemoryGraphProps<'a> {
     /// Graph data-point/sliding preferences.
     graph_settings: GraphSettings,
     /// Vertical runway the card is admitted into.
-    vertical: crate::gpui_app::root::responsive::PerformanceVerticalRunway,
+    vertical: PerformanceVerticalRunway,
     /// Window-owned hover slot.
     hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     /// Cross-frame graph scene cache.

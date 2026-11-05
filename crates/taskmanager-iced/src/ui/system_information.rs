@@ -8,6 +8,7 @@ use iced::Length;
 use iced::widget::{column, text};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::system_information::SystemInformationGroup;
+use taskmanager_theme::tokens;
 
 pub(super) fn render<'a>(
     app: &'a crate::IcedApp,
@@ -18,14 +19,23 @@ pub(super) fn render<'a>(
         body = body.push(text(t("system_about.unavailable")));
     }
     for group in facts {
-        body = body.push(text(t(group.title_key)).size(18));
+        // Group titles ride the public scale at the header weight — the same
+        // rung the GPUI system-information surface paints.
+        body = body.push(
+            text(t(group.title_key))
+                .size(f32::from(tokens::FONT_18))
+                .font(crate::theme_binding::ui_font_weight(
+                    app.theme(),
+                    tokens::FONT_WEIGHT_HEADER,
+                )),
+        );
         for row in &group.rows {
             body = body.push(
                 column![
-                    text(t(row.label_key)).size(12),
-                    text(row.value.clone()).size(14)
+                    text(t(row.label_key)).size(f32::from(tokens::FONT_12)),
+                    text(row.value.clone()).size(f32::from(tokens::FONT_13))
                 ]
-                .spacing(4)
+                .spacing(f32::from(tokens::SPACE_4))
                 .width(Length::Fill),
             );
         }

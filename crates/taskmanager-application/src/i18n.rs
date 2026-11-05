@@ -42,12 +42,27 @@ pub enum Language {
 }
 
 impl Language {
+    /// Every bundled catalog, in picker order. Frontends iterate this source of
+    /// truth instead of carrying a drifting hand-written list (ADR-051).
+    pub const ALL: [Self; 2] = [Language::En, Language::Zh];
+
     /// Stable lowercase locale code used as the top-level catalog key. Matches the
     /// `include_str!` filename so adding a locale is a one-place edit.
     pub const fn code(self) -> &'static str {
         match self {
             Language::En => "en",
             Language::Zh => "zh",
+        }
+    }
+
+    /// The catalog key naming this language in its own tongue. Every frontend's
+    /// language picker resolves its labels through these keys, so the self-names
+    /// stay catalog-owned and no product can fork its own picker vocabulary.
+    #[must_use]
+    pub const fn self_name_key(self) -> &'static str {
+        match self {
+            Language::En => "settings.lang_en",
+            Language::Zh => "settings.lang_zh",
         }
     }
 

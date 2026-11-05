@@ -15,30 +15,6 @@ use taskmanager_application::AppPage;
 use taskmanager_application::service_submission_failure;
 use taskmanager_theme::tokens::{DURATION_MEDIUM, MotionPolicy};
 
-/// The persisted `Config::motion` token for one policy — the shared core
-/// `MOTION_NORMAL` / `MOTION_REDUCED` / `MOTION_NONE` vocabulary.
-#[must_use]
-pub(crate) const fn motion_token(policy: MotionPolicy) -> &'static str {
-    match policy {
-        MotionPolicy::Normal => "normal",
-        MotionPolicy::Reduced => "reduced",
-        MotionPolicy::NoMotion => "none",
-    }
-}
-
-/// Parse a persisted `Config::motion` token into the shared policy. The
-/// token comparison is case-insensitive; an empty or unknown token degrades
-/// to [`MotionPolicy::Normal`] (the pre-preference animated default) — never
-/// a panic and never a fabricated stronger restriction.
-#[must_use]
-pub(crate) fn motion_policy_from_token(token: &str) -> MotionPolicy {
-    match token.trim().to_ascii_lowercase().as_str() {
-        "reduced" => MotionPolicy::Reduced,
-        "none" | "no-motion" => MotionPolicy::NoMotion,
-        _ => MotionPolicy::Normal,
-    }
-}
-
 /// The modal-entrance animation state: the iced animation (easing engine)
 /// plus the eased progress (0..1) the renderer reads.
 #[derive(Clone, Debug)]

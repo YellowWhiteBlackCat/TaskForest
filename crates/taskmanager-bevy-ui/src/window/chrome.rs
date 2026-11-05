@@ -1,6 +1,8 @@
 //! One bounded workspace separates navigation width from page and feedback slots.
 use super::{AppShellRoot, FeedbackLine, Role, SummaryLine, TextRole};
-use crate::app::{ContentSlot, Page, nav_strip_scene};
+use crate::app::nav_strip::demo_notice_scene;
+use crate::app::nav_strip::nav_strip_scene;
+use crate::app::{ContentSlot, Page};
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::widgets::focus_ring::focus_ring_halo_scene;
 use crate::window::edge::edge_highlight_scene;
@@ -13,10 +15,12 @@ pub(crate) struct AppWorkspace;
 pub(super) fn app_shell_scene(
     palette: &UiPalette,
     route: Page,
+    demo_notice: Option<String>,
     summary: String,
     edge_highlight: bool,
 ) -> Box<dyn Scene> {
     let strip = nav_strip_scene(route, palette);
+    let notice = demo_notice.map(|notice| demo_notice_scene(notice, palette));
     let status: Vec<Box<dyn Scene>> = if route == Page::Performance {
         Vec::new()
     } else {
@@ -40,10 +44,11 @@ pub(super) fn app_shell_scene(
             @{ edge }
             --
             Node {width:percent(100),height:percent(100),min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column,flex_grow:1.0,flex_basis:px(0.0)} AppWorkspace
-            Children [@{strip} --
+            Children [@{notice} --
+                @{strip} --
                 Node {min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column,flex_grow:1.0,flex_basis:px(0.0)}
                 Children [{status} --
-                    Node {width:percent(100),min_width:px(0.0),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),padding:UiRect::all(Val::Px(space_8()))} BackgroundColor({palette.content_bg}) ContentSlot]
+                    Node {width:percent(100),min_width:px(0.0),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),padding:UiRect::all(Val::Px(space_8()))} BackgroundColor({palette.canvas}) ContentSlot]
             ]
         ]
     })

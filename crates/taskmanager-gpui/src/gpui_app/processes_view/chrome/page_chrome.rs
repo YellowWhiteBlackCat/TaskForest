@@ -3,11 +3,12 @@
 use std::collections::HashSet;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
 
-use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px};
+use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px, rems};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::primitives::toolbar::Toolbar;
@@ -22,9 +23,9 @@ use crate::gpui_app::root::{Hover, RootView};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
 use taskmanager_shell::{ProcessControlAvailability, SortCol};
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{GlassTier, Theme};
 
 pub(super) struct ProcessOverviewProps<'a> {
     pub theme: &'a Theme,
@@ -167,13 +168,14 @@ pub(super) fn process_control_chrome(
             .items_center()
             .w_full()
             .min_w(px(0.0))
-            .gap(definite_length(presentation.control_gap()))
-            .px(definite_length(tokens::SPACE_4))
-            .py(definite_length(tokens::SPACE_2))
-            .rounded(absolute(tokens::card_radius(theme)))
-            .border_1()
-            .border_color(hsla(theme.border))
-            .bg(fill(theme.card_surface()))
+            .gap(rem_length(presentation.control_gap()))
+            .px(rem_length(tokens::SPACE_4))
+            .py(rem_length(tokens::SPACE_2))
+            .rounded(rem_length(tokens::card_radius(theme)))
+            .border(rems(GlassTier::Card.edge_width_rem()))
+            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+            .bg(glass_fill(theme, GlassTier::Card))
+            .shadow(glass_shadow(theme, GlassTier::Card))
             .debug_selector(|| "tm-proc-unified-controls".to_string())
             .child(actions)
             .child(secondary_controls()),
@@ -182,7 +184,7 @@ pub(super) fn process_control_chrome(
             .flex_col()
             .w_full()
             .min_w(px(0.0))
-            .gap(definite_length(presentation.band_gap()))
+            .gap(rem_length(presentation.band_gap()))
             .debug_selector(|| "tm-proc-stacked-controls".to_string())
             .child(actions)
             .child(secondary_controls()),

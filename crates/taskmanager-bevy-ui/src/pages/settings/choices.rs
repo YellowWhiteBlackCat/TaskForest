@@ -5,7 +5,7 @@ use super::{
 };
 use std::time::Duration;
 use taskmanager_application::TelemetryInterval;
-use taskmanager_application::i18n::Language;
+use taskmanager_application::i18n::{Language, t};
 use taskmanager_theme::LightDark;
 use taskmanager_theme::tokens::UiSize;
 
@@ -22,30 +22,30 @@ pub(super) fn ui_size_entries(current: UiSize) -> Vec<ChoiceEntry> {
         .collect()
 }
 
-/// Stable display labels for the size ladder; the config keeps the typed
-/// `config_token()` vocabulary, these are only the row's visible words.
-fn ui_size_label(size: UiSize) -> &'static str {
-    match size {
-        UiSize::Small => "Small",
-        UiSize::Standard => "Standard",
-        UiSize::Large => "Large",
-    }
+/// Display labels for the size ladder, resolved from the shared catalog (the
+/// config keeps the typed `config_token()` vocabulary for persistence).
+pub(super) fn ui_size_label(size: UiSize) -> &'static str {
+    t(match size {
+        UiSize::Small => "settings.ui_size_small",
+        UiSize::Standard => "settings.ui_size_standard",
+        UiSize::Large => "settings.ui_size_large",
+    })
 }
 
 pub(super) fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
     vec![
         ChoiceEntry {
-            label: "System".to_owned(),
+            label: t("settings.system").to_owned(),
             choice: SettingsChoice(SettingsField::SystemMode),
             selected: mode.is_none(),
         },
         ChoiceEntry {
-            label: "Light".to_owned(),
+            label: t("settings.light").to_owned(),
             choice: SettingsChoice(SettingsField::Theme(LightDark::Light)),
             selected: mode == Some(LightDark::Light),
         },
         ChoiceEntry {
-            label: "Dark".to_owned(),
+            label: t("settings.dark").to_owned(),
             choice: SettingsChoice(SettingsField::Theme(LightDark::Dark)),
             selected: mode == Some(LightDark::Dark),
         },
@@ -53,10 +53,13 @@ pub(super) fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
 }
 
 pub(super) fn language_entries(language: Language) -> Vec<ChoiceEntry> {
-    [(Language::En, "English"), (Language::Zh, "中文")]
-        .into_iter()
-        .map(|(value, label)| ChoiceEntry {
-            label: label.to_owned(),
+    // Each language names itself through the owner's catalog key, so the picker
+    // enumerates the owner's `Language::ALL` instead of a frontend-private list.
+    Language::ALL
+        .iter()
+        .copied()
+        .map(|value| ChoiceEntry {
+            label: t(value.self_name_key()).to_owned(),
             choice: SettingsChoice(SettingsField::Language(value)),
             selected: language == value,
         })

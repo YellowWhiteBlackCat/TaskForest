@@ -15,7 +15,10 @@ use taskmanager_theme::tokens::{
     FONT_WEIGHT_BODY, FONT_WEIGHT_BOLD, FONT_WEIGHT_EXTRA_BOLD, FONT_WEIGHT_HEADER,
     FONT_WEIGHT_MEDIUM, FONT_WEIGHT_NORMAL,
 };
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{
+    Color, GlassTier, OpticalGlassCapability, OpticalGlassContext, OpticalGlassDecision,
+    OpticalGlassFallback, OpticalGlassFeature, OpticalGlassUnavailableReason, Theme,
+};
 
 fn token() -> Color {
     Color::from_hex(0x3584e4)
@@ -32,6 +35,25 @@ fn color_maps_channels_and_alpha() {
 
     let translucent = color(Color::from_hex(0x222226).with_alpha(0.55));
     assert_eq!(translucent.a, 0.55);
+}
+
+#[test]
+fn iced_reports_no_optical_glass_without_a_sampleable_backdrop() {
+    let capability = optical_glass_capability();
+    assert_eq!(capability, OpticalGlassCapability::UNSUPPORTED);
+    assert_eq!(
+        Theme::default().optical_glass_decision(
+            GlassTier::Card,
+            capability,
+            OpticalGlassContext::new(14.0, 1.0),
+        ),
+        OpticalGlassDecision::Fallback {
+            material: OpticalGlassFallback::Painted,
+            reason: OpticalGlassUnavailableReason::MissingFeature(
+                OpticalGlassFeature::BackdropSampling
+            ),
+        }
+    );
 }
 
 /// The PAIRED weight decision table (CORE-07): both platform columns of the

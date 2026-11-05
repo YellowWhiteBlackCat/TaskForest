@@ -25,6 +25,7 @@ use taskforest_core::core::config::sidebar::{
 use taskforest_core::core::metrics::NetworkAdapterType;
 use taskmanager_application::{ConfigSubmissionStatus, ConfigSubmitError};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
+use taskmanager_ui_contract::IconId;
 
 #[derive(Resource, Default)]
 pub(crate) struct SidebarState(pub(crate) Arc<Config>);
@@ -153,6 +154,27 @@ pub(crate) enum SidebarAction {
     Close,
     Visibility(PerformanceDeviceTarget, bool),
     Move(PerformanceDeviceTarget, isize),
+}
+pub(crate) fn icon_button(
+    icon: IconId,
+    action: SidebarAction,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    bsn! {
+        Node {
+            padding: UiRect::axes(px(crate::palette::space_4()), px(crate::palette::space_2())),
+            border_radius: bevy::ui::BorderRadius::all(bevy::ui::Val::Px(palette.control_radius_px)),
+            flex_shrink: 0.0,
+        }
+        BackgroundColor({ bevy::color::Color::NONE })
+        Button
+        SidebarControl({ action })
+        on(activate)
+        Children [
+            @{ crate::icons::icon_scene(icon, palette, palette.dim_color) }
+            Pickable::IGNORE
+        ]
+    }
 }
 pub(crate) fn button(
     label: String,

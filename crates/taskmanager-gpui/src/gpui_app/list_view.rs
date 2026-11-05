@@ -43,6 +43,7 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rem_length;
 
 use taskmanager_theme::Palette;
 use taskmanager_ui::icons_binding::icon;
@@ -647,7 +648,7 @@ pub fn source_notice_with_detail_presentation(
             SourceNoticePresentation::Standard => tokens::SPACE_6,
             SourceNoticePresentation::Compact => tokens::SPACE_3,
         }))
-        .rounded(px(6.0))
+        .rounded(rem_length(tokens::control_radius(theme)))
         .bg(fill(theme.warning.with_alpha(0.10)))
         .border_1()
         .border_color(hsla(theme.warning.with_alpha(0.28)))

@@ -7,8 +7,9 @@ use super::*;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::viewmodel::StatRow;
 
-use super::super::responsive::{
-    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PerformanceChartInventory,
 };
 
 // --- Battery --------------------------------------------------------------

@@ -70,6 +70,11 @@ fn radius_gradients_are_strictly_increasing_and_skin_distinct() {
     for skin in Skin::ALL {
         for mode in LightDark::ALL {
             let tokens = tokens_for(skin, mode);
+            assert!(
+                tokens.radii[2] >= 11.0 && tokens.radii[3] >= 15.0,
+                "{} controls and panels must keep the rounded product geometry",
+                skin.label(),
+            );
             let mut prev = -1.0;
             for (i, r) in tokens.radii.into_iter().enumerate() {
                 assert!(
@@ -92,6 +97,12 @@ fn radius_gradients_are_strictly_increasing_and_skin_distinct() {
                 seen.push((skin, tokens.radii));
             }
         }
+    }
+    for (index, (_, radii)) in seen.iter().enumerate() {
+        assert!(
+            seen.iter().skip(index + 1).all(|(_, other)| radii != other),
+            "each skin must retain a distinct radius gradient",
+        );
     }
 }
 

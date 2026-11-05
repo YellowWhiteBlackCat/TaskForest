@@ -14,16 +14,24 @@ use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
 };
 use taskmanager_theme::{
-    FontChoice, FontRole, HighContrast, LightDark, Skin, Theme, resolve_fonts,
+    FontChoice, FontPreference, FontRole, HighContrast, LightDark, ModePreference, Skin, Theme,
+    resolve_fonts,
 };
 use taskmanager_ui::theme_binding::background_appearance;
 
 impl RootView {
     pub(crate) fn resolved_persisted_appearance(&self, config: &Config) -> AppearancePreferences {
         let mut appearance = self.presentation.appearance();
-        appearance.font = super::startup::font_pref_from_config(config, &self.font_availability);
-        appearance.skin = super::startup::skin_preference_from_config(config);
-        appearance.color_scheme = super::startup::color_scheme_from_token(&config.mode);
+        // Every theme axis resolves through the theme owner's public codec
+        // (ADR-063): an empty or unknown token fails closed to the detected
+        // value instead of a frontend-local default.
+        appearance.font = FontPreference::from_config_tokens(
+            &config.ui_font,
+            &config.mono_font,
+            &self.font_availability,
+        );
+        appearance.skin = Skin::from_config_token(&config.skin);
+        appearance.color_scheme = ModePreference::from_config_token(&config.mode).config_token();
         appearance.high_contrast = config.hc;
         appearance
     }

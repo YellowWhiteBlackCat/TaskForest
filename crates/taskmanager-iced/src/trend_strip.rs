@@ -28,6 +28,7 @@ use iced::{Color, Point, Rectangle, Size};
 
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, line_path, series_point_runs_for};
+use taskmanager_theme::tokens;
 
 /// The fixed canvas height for the strip. Width is `Fill` so the strip tracks
 /// the panel width.
@@ -180,7 +181,7 @@ impl canvas::Program<Message> for TrendStrip {
                     content: entry.caption.to_string(),
                     position: origin,
                     color: caption_color,
-                    size: iced::Pixels(11.0),
+                    size: iced::Pixels(f32::from(tokens::FONT_11)),
                     ..iced::widget::canvas::Text::default()
                 });
                 // The polyline occupies the caption's baseline band; a series

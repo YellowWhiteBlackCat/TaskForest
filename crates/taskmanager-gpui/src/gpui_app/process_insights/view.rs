@@ -25,7 +25,7 @@ use taskforest_core::core::process_telemetry::LimitValue;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProjectedProcessResources;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{Color, GlassTier, Theme};
 
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
@@ -128,7 +128,7 @@ pub(crate) fn render_process_insights(props: ProcessInsightsViewProps<'_>) -> Di
 
 fn card(theme: &Theme, title: &str, width: f32) -> Div {
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(false)

@@ -7,7 +7,8 @@ use taskmanager_shell::presentation::wifi_signal_quality_percent;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
-use super::super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::DeviceNavigationPresentation;
 
 /// The Performance-page per-NIC panel readiness, mirroring the GPU/disk
 /// panels' Loading/Empty/Ready states.

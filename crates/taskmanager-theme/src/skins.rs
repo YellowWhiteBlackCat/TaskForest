@@ -90,6 +90,7 @@ impl SkinTokens {
             window_transparent: false,
             window_state: Default::default(),
             focus_visible: false,
+            root_rem_size: 14.0,
         }
     }
 }
@@ -136,7 +137,7 @@ fn product_tokens(mode: LightDark) -> SkinTokens {
 
 fn product_light() -> SkinTokens {
     product_palette(ProductPaletteSpec {
-        window_bg: 0xf3f6f4,
+        window_bg: 0xdfeae4,
         view_bg: 0xedf2ee,
         sidebar_bg: 0xe3ebe5,
         sidebar_card_bg: 0xd9e4dc,
@@ -178,7 +179,7 @@ fn product_dark() -> SkinTokens {
 
 fn product_eyeforest() -> SkinTokens {
     let mut palette = product_palette(ProductPaletteSpec {
-        window_bg: 0xeff5ec,
+        window_bg: 0xdce9d9,
         view_bg: 0xe6efe3,
         sidebar_bg: 0xd9e8d7,
         sidebar_card_bg: 0xcfe0cc,
@@ -263,7 +264,7 @@ fn product_palette(spec: ProductPaletteSpec) -> SkinTokens {
         warning: Color::from_hex(warning),
         // Native skin geometry is applied by `tokens_for` after this product
         // palette is built.
-        radii: [4.0, 6.0, 8.0, 10.0, 12.0],
+        radii: [6.0, 10.0, 14.0, 18.0, 22.0],
         material: Material::Opaque,
         window_controls: WindowControls::AdwaitaClose,
     }
@@ -340,10 +341,9 @@ fn gnome(mode: LightDark) -> SkinTokens {
         )
     };
     let accent = Color::from_hex(0x3584e4);
-    // Radius gradient: control 8 (Medium), card 10 (Large), window 12 (XLarge) —
-    // Adwaita-aligned (GNOME 46+ windows round at 12px; the strictly-increasing
-    // scale resolves cards/controls just below it).
-    let radii = [4.0, 6.0, 8.0, 10.0, 12.0];
+    // Rounded product radius gradient: control 14 (Medium), card 18 (Large),
+    // window 22 (XLarge).
+    let radii = [6.0, 10.0, 14.0, 18.0, 22.0];
     // Palette status accents: danger = app-wide destructive red; success =
     // the green_4/green_5 battery hue; warning = the yellow_4/yellow_5 disk hue.
     SkinTokens {
@@ -426,9 +426,9 @@ fn kde(mode: LightDark) -> SkinTokens {
             Color::from_hex(0x1abc9c), // teal
         )
     };
-    // Radius gradient: control 4 (Medium), card 5 (Large), window 6 (XLarge) —
-    // Breeze is the flattest skin (1px borders, no translucency).
-    let radii = [2.0, 3.0, 4.0, 5.0, 6.0];
+    // Rounded product radius gradient for Breeze: control 11 (Medium), card 15
+    // (Large), window 18 (XLarge).
+    let radii = [5.0, 8.0, 11.0, 15.0, 18.0];
     // Palette status accents: danger = app-wide destructive red; success =
     // Breeze Green (the network hue); warning = the amber fan hue.
     SkinTokens {
@@ -467,7 +467,7 @@ fn kde(mode: LightDark) -> SkinTokens {
 // ── Windows 11 / WinUI 3 (Fluent) ────────────────────────────────────────
 // WinUI 3 SolidBackgroundFillColorBase + accent tokens, Mica transparency
 // on dark surfaces. Card fills use SemiTransparentLayerOnMica flattened to
-// opaque hexes. Accent #0067c0 (light) / #60cdff (dark). Control radius 4px.
+// opaque hexes. Accent #0067c0 (light) / #60cdff (dark).
 fn windows(mode: LightDark) -> SkinTokens {
     let dark = mode.is_dark();
     let (window_bg, view_bg, sidebar_bg, card_bg, border, shade, fg, fg_dim) = if dark {
@@ -519,9 +519,9 @@ fn windows(mode: LightDark) -> SkinTokens {
             Color::from_hex(0x107c10), // battery: green
         )
     };
-    // Radius gradient: control 4 (Medium = Fluent ControlCornerRadius),
-    // card 6 (Large), window 8 (XLarge = WindowCornerRadius).
-    let radii = [2.0, 3.0, 4.0, 6.0, 8.0];
+    // Rounded product radius gradient for Fluent: control 12 (Medium),
+    // card 16 (Large), window 19 (XLarge).
+    let radii = [5.0, 8.0, 12.0, 16.0, 19.0];
     // Palette status accents: danger = app-wide destructive red; success =
     // the battery green; warning = the orange disk hue.
     SkinTokens {
@@ -610,8 +610,8 @@ fn macos(mode: LightDark) -> SkinTokens {
             Color::from_hex(0x34c759),
         )
     };
-    // Radius gradient: control 6 (Medium), card 8 (Large), window 10 (XLarge).
-    let radii = [2.0, 4.0, 6.0, 8.0, 10.0];
+    // Rounded product radius gradient: control 13, card 17, window 20.
+    let radii = [6.0, 9.0, 13.0, 17.0, 20.0];
     // Palette status accents: danger = app-wide destructive red; success =
     // the systemGreen battery hue; warning = the orange disk hue.
     SkinTokens {

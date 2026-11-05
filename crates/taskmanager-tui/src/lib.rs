@@ -38,6 +38,7 @@ mod history_runtime;
 mod information;
 mod menus;
 mod preferences;
+pub mod presentation_binding;
 mod process_view;
 mod runtime;
 mod saved_views;

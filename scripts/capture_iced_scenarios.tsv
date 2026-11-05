@@ -197,3 +197,7 @@ process-selection	process-selection	1180x780	gnome-dark
 process-selection-compact	process-selection	720x480	gnome-dark
 storage-health	storage-health	1180x780	gnome-dark
 storage-health-compact	storage-health	720x480	gnome-dark
+tooltip-overlay	tooltip-overlay	1180x780	gnome-dark
+tooltip-overlay-compact	tooltip-overlay	720x480	gnome-dark
+feedback-overlay	feedback-overlay	1180x780	gnome-dark
+feedback-overlay-compact	feedback-overlay	720x480	gnome-dark

@@ -14,7 +14,8 @@ if [ "${TM_CAPTURE_SUPERVISED:-0}" != "1" ] \
         || { printf 'capture requires the supervisor interpreter\n' >&2; exit 2; }
     command -v timeout >/dev/null 2>&1 \
         || { printf 'capture requires timeout for supervisor lifetime bounding\n' >&2; exit 2; }
-    exec timeout --kill-after=10s 30m python3 "$REPO/scripts/capture_supervisor.py" \
+    exec timeout --kill-after=10s "${TM_CAPTURE_SUPERVISOR_LIFETIME:-30m}" python3 \
+        "$REPO/scripts/capture_supervisor.py" \
         --repo-root "$REPO" --frontend bevy -- bash "$0" "$@"
 fi
 CAPTURE_RUN_UUID="${TM_CAPTURE_RUN_UUID:-}"
@@ -35,7 +36,7 @@ if [ "${TM_CAPTURE_NIRI_BACKGROUND:-1}" = "1" ] \
 fi
 
 cd "$REPO"
-MATRIX="$REPO/scripts/capture_bevy_scenarios.tsv"
+MATRIX="${TM_CAPTURE_BEVY_MATRIX:-$REPO/scripts/capture_bevy_scenarios.tsv}"
 APP_ID="io.github.YellowWhiteBlackCat.TaskForestB"
 RUN_ID="$CAPTURE_RUN_UUID"
 RUN_DIR="$CAPTURE_RUN_ROOT"
@@ -57,6 +58,15 @@ case "$CAPTURE_NIRI_BACKGROUND" in
     1) ;;
     0) die 'visible Bevy capture is disabled; use the private background route' ;;
     *) die 'TM_CAPTURE_NIRI_BACKGROUND must be 1' ;;
+esac
+# The nested Niri (and the virtual KWin framebuffer hosting it) is bounded by a
+# wall-clock `timeout`. The default fits the prior smaller matrix, but the full
+# Bevy matrix is ~204 scenarios and can exceed it on a software-rendering host;
+# the bound stays overridable so a complete single-invocation run is possible
+# without editing the script.
+CAPTURE_NIRI_LIFETIME="${TM_CAPTURE_NIRI_LIFETIME:-20m}"
+case "$CAPTURE_NIRI_LIFETIME" in
+    '' | *[!0-9smh]*) die "TM_CAPTURE_NIRI_LIFETIME must be a timeout duration: $CAPTURE_NIRI_LIFETIME" ;;
 esac
 if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
     need kwin_wayland
@@ -187,7 +197,7 @@ start_capture_host() {
         XDG_DATA_HOME="$KWIN_ROOT/data" XDG_CACHE_HOME="$KWIN_ROOT/cache" \
         XDG_STATE_HOME="$KWIN_ROOT/state" WAYLAND_DISPLAY= DISPLAY= \
         LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=wayland \
-        setsid timeout --foreground --kill-after=10s 20m \
+        setsid timeout --foreground --kill-after=10s "$CAPTURE_NIRI_LIFETIME" \
         kwin_wayland --virtual --socket="$KWIN_SOCKET" --width=1920 --height=1080 \
         --scale=1 --no-global-shortcuts --no-lockscreen \
         >"$RUN_DIR/kwin-wayland.log" 2>&1 &
@@ -216,7 +226,7 @@ start_capture_host
 XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
     XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
     XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" \
-    LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info setsid timeout --foreground --kill-after=10s 20m \
+    LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info setsid timeout --foreground --kill-after=10s "$CAPTURE_NIRI_LIFETIME" \
     niri --config "$CONF" >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
 NIRI_PGID="$(process_group "$NIRI_PID")"
@@ -246,14 +256,22 @@ NIRI_SOCKET="$IPC" timeout 10s niri msg -j outputs >"$RUN_DIR/niri-outputs.json"
 
 FILTERED="$RUN_DIR/matrix.tsv"
 if [ -n "${TM_BEVY_CAPTURE_SCENARIOS:-}" ]; then
+    PUBLISH_CAPTURE=0
     awk -F '\t' -v wanted="$TM_BEVY_CAPTURE_SCENARIOS" \
         'BEGIN { split(wanted, a, ","); for (i in a) ok[a[i]]=1 } NR == 1 || ok[$1]' \
         "$MATRIX" >"$FILTERED"
 else
+    PUBLISH_CAPTURE=1
     cp "$MATRIX" "$FILTERED"
 fi
 COUNT="$(awk -F '\t' 'NR > 1 && $1 != "" { n++ } END { print n + 0 }' "$FILTERED")"
 [ "$COUNT" -gt 0 ] || die 'capture matrix selection is empty'
+CANONICAL_COUNT="$(awk -F '\t' 'NR > 1 && $1 != "" { n++ } END { print n + 0 }' "$MATRIX")"
+if [ "$PUBLISH_CAPTURE" -eq 1 ] && [ "$COUNT" -ne "$CANONICAL_COUNT" ]; then
+    printf 'refusing to publish incomplete matrix: captured=%s canonical=%s; evidence retained at %s\n' \
+        "$COUNT" "$CANONICAL_COUNT" "$RUN_DIR" >&2
+    exit 1
+fi
 
 # The explicit appearance dimension. The scenario table's trailing `skin`
 # column uses the product's existing `TM_SKIN` token vocabulary
@@ -500,4 +518,14 @@ PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=10s 900s python3 scripts/validate
     --metadata "$RUN_DIR/metadata.txt" --source-manifest "$SOURCE_MANIFEST" \
     --niri-outputs "$RUN_DIR/niri-outputs.json" --receipt "$RUN_DIR/bevy-capture-validation.json" \
     --repo-root "$REPO" --binary "$APP" --current-worktree
+
+# Promote only a complete matrix to the ignored local latest pointer. The
+# pointer carries a receipt that binds the run to its source manifest, so a
+# reader can tell whether the published frames still match the live tree.
+if [ "$PUBLISH_CAPTURE" -eq 1 ]; then
+    PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s 30s python3 scripts/capture_publish.py \
+        --repo-root "$REPO" --frontend bevy --run-root "$RUN_DIR" --run-uuid "$RUN_ID"
+else
+    printf 'targeted capture accepted locally; durable matrix unchanged. Evidence: %s\n' "$RUN_DIR"
+fi
 printf 'Bevy Wayland capture: PASS -> %s\n' "$RUN_DIR"

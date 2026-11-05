@@ -1,19 +1,28 @@
-//! Bounded cell text: the overflow ellipsis.
+//! Bounded text: the overflow ellipsis for any measured slot.
 //!
-//! A table cell is a bounded slot: a value wider than its column is cut at
-//! the column edge. A HARD cut loses the tail without saying so, so the cell
-//! ends its value with an ellipsis instead — the same graceful degradation
-//! every other frontend's table shows.
+//! A bounded slot is any box whose width the layout owns: a table column, a
+//! sidebar caption, a device row's identity line. A value wider than the box
+//! is cut at the box edge. A HARD cut loses the tail without saying so, so
+//! the value ends with an ellipsis instead — the same graceful degradation
+//! every other frontend's bounded text shows.
 //!
 //! The width authority is the SHAPED paragraph, never a character count: the
 //! cut point comes from the laid-out text's own cluster advances, so
 //! proportional glyphs and CJK are measured, not guessed. The ellipsis itself
 //! is measured the same way — once it is on screen, its own clusters give its
 //! exact width, and the next pass cuts the prefix against it.
+//!
+//! The slot's own width is the second half of the contract. A text that is
+//! STRETCHED to its box reports the box's width as its shaped width, so the
+//! overflow would never be visible to this system: every bounded text is
+//! authored in a slot that sizes the line to its content (a row's main axis,
+//! or a column whose cross alignment is not stretch), and the box it must fit
+//! is the parent.
 
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::{ChildOf, Children};
+use bevy::ecs::query::With;
 use bevy::ecs::system::Query;
 use bevy::text::{ComputedTextBlock, TextSpan};
 use bevy::ui::prelude::ComputedNode;
@@ -22,10 +31,10 @@ use bevy::ui::widget::Text;
 /// The suffix a truncated value ends with.
 pub(crate) const ELLIPSIS: &str = "...";
 
-/// Marker on a bounded cell's text node: this text lives in a measured slot
-/// and is truncated with an ellipsis when it does not fit.
+/// Marker on a bounded text node: this text lives in a measured slot and is
+/// truncated with an ellipsis when it does not fit.
 #[derive(Component, Clone, Copy, Debug, Default)]
-pub(crate) struct BoundedCellText;
+pub(crate) struct BoundedText;
 
 /// One section of a cell's text: the root text or one of its spans. The
 /// sections are concatenated in this order into the paragraph the engine
@@ -37,26 +46,28 @@ struct Section {
     end: usize,
 }
 
-/// Truncate the cell texts that overflow their slot.
+/// Truncate the bounded texts that overflow their slot.
 ///
-/// The system runs after the layout: the cell's content box is the available
+/// The system runs after the layout: the slot's content box is the available
 /// width and the text node's own size is the shaped width. When the shaped
 /// width exceeds the slot, the value is cut at the last cluster that still
 /// fits and the ellipsis is appended.
-pub(crate) fn ellipsize_overflowing_cells(
-    mut cells: Query<(
-        Entity,
-        &BoundedCellText,
-        &mut Text,
-        &ComputedNode,
-        &ComputedTextBlock,
-        &ChildOf,
-        &Children,
-    )>,
+pub(crate) fn ellipsize_bounded_text(
+    mut cells: Query<
+        (
+            Entity,
+            &mut Text,
+            &ComputedNode,
+            &ComputedTextBlock,
+            &ChildOf,
+            Option<&Children>,
+        ),
+        With<BoundedText>,
+    >,
     parents: Query<&ComputedNode>,
     mut spans: Query<&mut TextSpan>,
 ) {
-    for (root, _marker, mut text, computed, block, child_of, children) in &mut cells {
+    for (root, mut text, computed, block, child_of, children) in &mut cells {
         let Ok(parent) = parents.get(child_of.parent()) else {
             continue;
         };
@@ -76,7 +87,8 @@ pub(crate) fn ellipsize_overflowing_cells(
             end: text.0.len(),
         }];
         let mut paragraph = text.0.clone();
-        for child in children.iter() {
+        let children = children.map_or(&[][..], |children| children.as_ref());
+        for child in children {
             let Ok(span) = spans.get_mut(*child) else {
                 continue;
             };

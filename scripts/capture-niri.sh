@@ -34,6 +34,13 @@ if [ "${TM_CAPTURE_SUPERVISED:-0}" != "1" ] \
     || { printf 'capture requires the supervisor interpreter\n' >&2; exit 2; }
   command -v timeout >/dev/null 2>&1 \
     || { printf 'capture requires timeout for supervisor lifetime bounding\n' >&2; exit 2; }
+  # The fixture regime keeps its own evidence root, so its runs never mix
+  # with the live-host runs of the release surface.
+  if [ "${TM_CAPTURE_DEMO:-0}" = "1" ]; then
+    TM_CAPTURE_EVIDENCE_ROOT="screenshot-evidence-demo" \
+      exec timeout --kill-after=10s 30m python3 "$REPO/scripts/capture_supervisor.py" \
+        --repo-root "$REPO" --frontend gpui -- bash "$0" "$@"
+  fi
   exec timeout --kill-after=10s 30m python3 "$REPO/scripts/capture_supervisor.py" \
     --repo-root "$REPO" --frontend gpui -- bash "$0" "$@"
 fi
@@ -73,8 +80,32 @@ CAPTURE_NIRI_BATCH_SIZE="${TM_CAPTURE_NIRI_BATCH_SIZE:-1}"
 CAPTURE_NIRI_MAX_ATTEMPTS="${TM_CAPTURE_NIRI_MAX_ATTEMPTS:-3}"
 OUT="$REPO/target/screenshot-evidence/latest"
 CANONICAL_MATRIX="$REPO/scripts/capture_scenarios.tsv"
-MATRIX="$CANONICAL_MATRIX"
+MATRIX="${TM_CAPTURE_MATRIX:-$CANONICAL_MATRIX}"
+# The live host and the compiled-in fixture are two different data regimes.
+# A cross-frontend comparison is only meaningful when both frontends render
+# the same regime, so the demo regime gets its own matrix and its own
+# evidence root. The live matrix stays the release surface's evidence.
+CAPTURE_DEMO="${TM_CAPTURE_DEMO:-0}"
+case "$CAPTURE_DEMO" in
+  0) CAPTURE_DEMO_ARG="" ;;
+  1) CAPTURE_DEMO_ARG="--demo" ;;
+  *) printf 'TM_CAPTURE_DEMO must be 0 or 1\n' >&2; exit 2 ;;
+esac
+if [ "$CAPTURE_DEMO" = "1" ] && [ "$MATRIX" = "$CANONICAL_MATRIX" ]; then
+  printf 'TM_CAPTURE_DEMO=1 needs an explicit TM_CAPTURE_MATRIX\n' >&2
+  exit 2
+fi
+if [ "$MATRIX" != "$CANONICAL_MATRIX" ]; then
+  CANONICAL_MATRIX="$MATRIX"
+fi
 EVIDENCE_ROOT="$REPO/target/screenshot-evidence"
+if [ "$CAPTURE_DEMO" = "1" ]; then
+  # The fixture regime owns its own root: its frames must never be published
+  # as the release surface's evidence, and the live `latest` must keep
+  # pointing at live-host frames.
+  EVIDENCE_ROOT="$REPO/target/screenshot-evidence-demo"
+  OUT="$EVIDENCE_ROOT/latest"
+fi
 SCRATCH_ROOT="$REPO/.tmp"
 RUN_STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 GIT_HEAD="$(git -C "$REPO" rev-parse --short=12 HEAD 2>/dev/null || printf 'no-git')"
@@ -176,6 +207,12 @@ esac
 # complete matrix with a partial manifest.
 PUBLISH_CAPTURE=1
 CAPTURE_SCOPE=full-matrix
+if [ "$CAPTURE_DEMO" = "1" ]; then
+  # The fixture regime is a comparison surface, not the release surface's
+  # evidence: it never replaces the live matrix's durable pointer.
+  PUBLISH_CAPTURE=0
+  CAPTURE_SCOPE=fixture-regime
+fi
 if [ -n "${TM_CAPTURE_SCENARIOS:-}" ]; then
   FILTERED_MATRIX="$RUN_DIR/capture-scenarios.tsv"
   awk -F '\t' -v list="$TM_CAPTURE_SCENARIOS" '
@@ -588,15 +625,28 @@ capture() {
   APP_PID=""
   APP_PGID=""
   rm -f "$shot" "$windows_json" "$windows_json_tmp" "$action_log" 2>/dev/null
-  mkdir -p "$config_home" "$data_home" "$cache_home" "$state_home"
+  mkdir -p "$config_home/taskmanager" "$data_home" "$cache_home" "$state_home"
+  # Keep the requested mode stable after a late native-appearance update.
+  # TM_SKIN selects the initial theme, while the persisted System preference
+  # otherwise allows that later event to replace its color mode.
+  local capture_skin="${skin%%-*}" capture_mode="${skin#*-}"
+  case "$capture_skin:$capture_mode" in
+    gnome:light|gnome:dark|gnome:eyeforest|kde:light|kde:dark|kde:eyeforest|windows:light|windows:dark|windows:eyeforest|macos:light|macos:dark|macos:eyeforest) ;;
+    *) printf 'invalid capture appearance: %s\n' "$skin" >&2; return 1 ;;
+  esac
+  local history_enabled=false
+  case "$scenario" in
+    history-replay|application-history-replay) history_enabled=true ;;
+  esac
+  printf '{"skin":"%s","mode":"%s","history_persistence":%s}\n' \
+    "$capture_skin" "$capture_mode" "$history_enabled" >"$config_home/taskmanager/config.json"
   # Replay scenarios exercise the REAL persistence path: config opts in and a
   # capture-private XDG data home carries pre-seeded JSONL series. Rows still
   # travel through the history-store query and async application projection.
   local xdg_data_env=(XDG_DATA_HOME="$data_home")
   case "$scenario" in
     history-replay|application-history-replay)
-      mkdir -p "$config_home/taskmanager" "$data_home/taskmanager/history"
-      printf '{"history_persistence": true}\n' >"$config_home/taskmanager/config.json"
+      mkdir -p "$data_home/taskmanager/history"
       if [ "$scenario" = "history-replay" ]; then
         timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" --directory "$data_home/taskmanager/history" --kind system
       else
@@ -616,7 +666,7 @@ capture() {
       TM_SKIN_HC="" TM_SETTINGS="$settings" \
       TM_CAPTURE_EVIDENCE=1 TM_CAPTURE_SCENARIO="$scenario" \
       TM_WINDOW_SIZE="$window_size" \
-      env "${xdg_data_env[@]}" setsid "$APP" &>"$log" & APP_PID=$!
+      env "${xdg_data_env[@]}" setsid "$APP" $CAPTURE_DEMO_ARG &>"$log" & APP_PID=$!
     APP_PGID=""
     for pgid_probe in $(seq 1 20); do
       APP_PGID="$(process_group "$APP_PID")"

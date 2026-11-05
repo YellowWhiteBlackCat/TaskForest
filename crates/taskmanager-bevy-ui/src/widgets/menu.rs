@@ -22,16 +22,30 @@ use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, Node, ShadowStyle, UiRect,
-    Val, percent, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection, Node,
+    Overflow, ShadowStyle, UiRect, Val, percent, rem, vh,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::ScrollArea;
 
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
+use taskmanager_theme::GlassTier;
 
 /// The menu panel's width, in rem — the type ladder's own step.
 const MENU_WIDTH_REM: f32 = 13.75;
+
+/// The menu body's height cap, as a share of the window height.
+///
+/// GPUI's popup caps its scroll body at 360 px and lets the list scroll
+/// (`taskmanager-ui/src/overlays/popup.rs`). The Applications menu carries 13
+/// verbs, which is taller than a compact window's whole content region; an
+/// uncapped card therefore flips above its anchor and clips its first verbs
+/// off the top edge. A viewport-relative cap keeps the card inside every
+/// supported window size (the compact 720x480 matrix included) and makes the
+/// overflow reachable by scrolling instead of unreachable.
+const MENU_BODY_MAX_HEIGHT_VH: f32 = 45.0;
 
 /// One menu entry. `enabled == false` renders a dimmed, non-activatable row
 /// (honest unavailable state — never hidden, never faked as clickable).
@@ -113,38 +127,20 @@ pub(crate) fn menu_row_background(highlighted: bool, palette: &UiPalette) -> Col
     }
 }
 
-/// The shadow ink of one layer: the theme's dimming token, scaled to the
-/// layer's weight. The token is a neutral dark ink in every skin, so the
-/// shadow darkens the surface behind the menu in light AND dark mode.
-fn shadow_ink(base: Color, weight: f32) -> Color {
-    let mut ink = base.to_srgba();
-    ink.alpha = (ink.alpha * weight).clamp(0.0, 1.0);
-    Color::srgba(ink.red, ink.green, ink.blue, ink.alpha)
-}
-
 /// The menu's drop shadow: a wide ambient layer plus a tight contact layer.
 ///
 /// A menu floats over a list, so it needs to read as a raised surface. One
 /// flat shadow looks like a border; two layers (a wide soft one and a small
 /// dark one) read as depth. The offsets ride the rem axis, so the depth
 /// scales with the user's reading size.
+///
+/// GLASS-01: a menu is a floating *card*, not a modal — [`GlassTier`] documents
+/// `Card` as "floating cards, panels, menus, popovers" — so the panel wears the
+/// Card tier. That matches the GPUI menu panel and Iced's `panel_style`; before
+/// this the Bevy menu alone used the stronger Modal layer, which made the same
+/// menu read heavier on Bevy than on the other two frontends.
 pub(crate) fn menu_shadow(palette: &UiPalette) -> Vec<ShadowStyle> {
-    vec![
-        ShadowStyle {
-            color: shadow_ink(palette.card_shadow, 0.45),
-            x_offset: Val::Rem(0.0),
-            y_offset: Val::Rem(0.25),
-            spread_radius: Val::Rem(0.0),
-            blur_radius: Val::Rem(0.75),
-        },
-        ShadowStyle {
-            color: shadow_ink(palette.card_shadow, 0.8),
-            x_offset: Val::Rem(0.0),
-            y_offset: Val::Rem(0.05),
-            spread_radius: Val::Rem(0.0),
-            blur_radius: Val::Rem(0.15),
-        },
-    ]
+    palette.glass_shadow(GlassTier::Card)
 }
 
 /// Full render: panel + title + one row per entry, the cursor row filled by
@@ -157,9 +153,14 @@ pub(crate) fn menu_scene_at(
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let title = spec.title.clone();
-    let radius = palette.control_radius_px;
+    let radius = palette.panel_radius_rem();
+    let row_gap = palette.rem_ratio(space_8() / 4.0);
+    let padding = palette.rem_ratio(space_8());
     let rows = menu_rows(spec, state.selection, palette);
     let shadow = menu_shadow(palette);
+    let fill = palette.glass_fill(GlassTier::Card);
+    let edge = palette.glass_edge(GlassTier::Card);
+    let grain = Box::new(noise_overlay_scene(GlassTier::Card, palette, radius)) as Box<dyn Scene>;
     bsn! {
         Node {
             // The menu's width rides the rem axis, so it re-scales with the
@@ -167,18 +168,39 @@ pub(crate) fn menu_scene_at(
             width: rem(MENU_WIDTH_REM),
             height: Val::Auto,
             flex_direction: FlexDirection::Column,
-            row_gap: Val::Px({ space_8() / 4.0 }),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
+            row_gap: Val::Rem(row_gap),
+            padding: UiRect::all(Val::Rem(padding)),
+            border: UiRect::all(Val::Rem(GlassTier::Card.edge_width_rem())),
+            border_radius: BorderRadius::all(Val::Rem(radius)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
         BoxShadow({ shadow })
+        OpticalGlassCard {
+            tier: GlassTier::Card,
+            enabled: true,
+        }
         Children [
+            @{ grain } --
              Text(title) TextRole(Role::Caption) --
-            { rows }
+            Node {
+                width: percent(100),
+                max_height: vh(MENU_BODY_MAX_HEIGHT_VH),
+                flex_direction: FlexDirection::Column,
+                overflow: Overflow::scroll_y(),
+            }
+            ScrollArea MenuScrollBody
+            Children [
+                { rows }
+            ]
         ]
     }
 }
+
+/// Marker on the menu's scrolling verb list, so a capture can prove the list
+/// (not the card) owns the overflow.
+#[derive(bevy::ecs::component::Component, Clone, Copy, Debug, Default)]
+pub(crate) struct MenuScrollBody;
 
 /// Marker on a rendered menu item row, holding its index in the menu spec.
 #[derive(bevy::ecs::component::Component, Clone, Copy, Debug, Default, PartialEq, Eq)]

@@ -2,7 +2,6 @@
 //! deterministic demo fixture, and the injected-config-store test seam.
 //! Extracted from [`super`] so the state + update module stays the entry point.
 
-use crate::i18n;
 use std::path::PathBuf;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::i18n::{Language, with_language};
@@ -54,13 +53,6 @@ fn default_category_expansions() -> std::collections::HashSet<String> {
         .copied()
         .map(category_expansion_key)
         .collect()
-}
-
-fn shared_demo_language(language: i18n::Language) -> Language {
-    match language {
-        i18n::Language::En => Language::En,
-        i18n::Language::Zh => Language::Zh,
-    }
 }
 
 impl IcedApp {
@@ -164,11 +156,11 @@ impl IcedApp {
     /// blank no-platform state for loading-state tests.
     #[must_use]
     pub fn demo() -> Self {
-        Self::demo_with_language(i18n::Language::En)
+        Self::demo_with_language(Language::En)
     }
 
-    fn demo_with_language(language: i18n::Language) -> Self {
-        let shell = with_language(shared_demo_language(language), || {
+    fn demo_with_language(language: Language) -> Self {
+        let shell = with_language(language, || {
             // Seed the shared boot-evidence slot (the TUI demo seeds the
             // same field through `shell.projection()`).
             let mut shell = demo_app();
@@ -258,8 +250,8 @@ impl IcedApp {
     ) -> Self {
         let language = locale
             .as_deref()
-            .and_then(i18n::Language::from_token)
-            .unwrap_or(i18n::Language::En);
+            .and_then(Language::from_code)
+            .unwrap_or(Language::En);
         let mut app = Self::demo_with_language(language);
         app.process_presentation.expanded_groups = default_category_expansions();
         seed_capture_performance_fixture(&mut app);
@@ -293,7 +285,7 @@ impl IcedApp {
             overridden = true;
         }
         if overridden {
-            with_language(shared_demo_language(language), || {
+            with_language(language, || {
                 app.apply_config_snapshot(&config, true);
             });
         }

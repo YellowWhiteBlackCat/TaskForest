@@ -30,6 +30,7 @@ use taskmanager_ui_contract::IconId;
 use super::IcedElement;
 use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
+use crate::theme;
 
 /// Switch track width (GPUI parity: 36px pill).
 const SWITCH_TRACK_WIDTH: f32 = 36.0;
@@ -311,7 +312,7 @@ fn select_style(
         border: Border {
             color: border_color,
             width: 1.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
         },
     }
 }
@@ -326,7 +327,7 @@ fn select_placeholder_style(theme_snapshot: &Theme) -> container::Style {
         border: Border {
             color: crate::theme_binding::color(palette.border),
             width: 1.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
         },
         ..container::Style::default()
     }
@@ -398,7 +399,7 @@ fn search_style(
         border: Border {
             color: border_color,
             width: 1.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
         },
         icon: crate::theme_binding::color(palette.fg_muted),
         placeholder: crate::theme_binding::color(palette.fg_muted),
@@ -432,17 +433,13 @@ pub(crate) fn segmented<'a>(
         return Space::new().into();
     }
     let on_change = Box::new(on_change);
-    let last = choices.len() - 1;
     let segments: Vec<IcedElement<'a>> = choices
         .iter()
-        .enumerate()
-        .map(|(index, (label, value))| {
+        .map(|(label, value)| {
             let selected = *value == active;
             button(text(label.clone()))
                 .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-                .style(move |_theme, status| {
-                    segment_style(theme_snapshot, selected, index, last, status)
-                })
+                .style(move |_theme, status| segment_style(theme_snapshot, selected, status))
                 .on_press(on_change(*value))
                 .into()
         })
@@ -459,7 +456,7 @@ pub(crate) fn segmented<'a>(
         active,
         focus_target,
         focus_color: crate::theme_binding::color(palette.accent),
-        focus_radius: f32::from(palette.control_radius),
+        focus_radius: theme::scaled_radius(theme_snapshot, palette.control_radius),
     })
     .into()
 }
@@ -500,7 +497,7 @@ fn segmented_track_style(theme_snapshot: &Theme) -> container::Style {
         border: Border {
             color: crate::theme_binding::color(palette.border),
             width: 1.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
         },
         ..container::Style::default()
     }
@@ -508,24 +505,10 @@ fn segmented_track_style(theme_snapshot: &Theme) -> container::Style {
 
 /// One segment's surface. The active segment fills with the accent and wins
 /// over hover (a selected segment stays accent-filled); idle segments are
-/// transparent over the track surface with token hover/pressed tints. Only
-/// the outer corners round — the track's control radius on the first/last
-/// segment's outer edges — so the group reads as one connected control.
-fn segment_style(
-    theme_snapshot: &Theme,
-    selected: bool,
-    index: usize,
-    last: usize,
-    status: button::Status,
-) -> button::Style {
+/// transparent over the track surface with token hover/pressed tints.
+fn segment_style(theme_snapshot: &Theme, selected: bool, status: button::Status) -> button::Style {
     let palette = theme_snapshot.palette();
-    let corner = f32::from(palette.control_radius);
-    let radius = iced::border::Radius {
-        top_left: if index == 0 { corner } else { 0.0 },
-        top_right: if index == last { corner } else { 0.0 },
-        bottom_right: if index == last { corner } else { 0.0 },
-        bottom_left: if index == 0 { corner } else { 0.0 },
-    };
+    let radius = theme::scaled_radius(theme_snapshot, palette.control_radius).into();
     let (background, text_color) = if selected {
         (
             Background::Color(crate::theme_binding::color(palette.accent)),

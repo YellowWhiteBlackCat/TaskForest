@@ -412,6 +412,563 @@ fn dynamic_i18n_key_check_reports_a_pruned_catalog() {
     );
 }
 
+/// The bodies of every `"..."` string literal in one Rust source, comment text
+/// removed. Rendered copy lives in a literal; `//` and `/* */` text never
+/// paints, so neither may be read (and a literal must not be missed just
+/// because a `//` inside a URL-like literal looks like a comment start).
+fn string_literal_bodies(source: &str) -> Vec<String> {
+    let chars: Vec<char> = source.chars().collect();
+    let mut bodies = Vec::new();
+    let mut index = 0usize;
+    while index < chars.len() {
+        match chars[index] {
+            '/' if chars.get(index + 1) == Some(&'/') => {
+                index += 2;
+                while index < chars.len() && chars[index] != '\n' {
+                    index += 1;
+                }
+            }
+            '/' if chars.get(index + 1) == Some(&'*') => {
+                index += 2;
+                let mut depth = 1usize;
+                while index < chars.len() && depth > 0 {
+                    if chars[index] == '/' && chars.get(index + 1) == Some(&'*') {
+                        depth += 1;
+                        index += 2;
+                    } else if chars[index] == '*' && chars.get(index + 1) == Some(&'/') {
+                        depth -= 1;
+                        index += 2;
+                    } else {
+                        index += 1;
+                    }
+                }
+            }
+            '"' => {
+                index += 1;
+                let mut body = String::new();
+                while index < chars.len() {
+                    let current = chars[index];
+                    if current == '\\' {
+                        body.push(current);
+                        if let Some(next) = chars.get(index + 1) {
+                            body.push(*next);
+                        }
+                        index += 2;
+                        continue;
+                    }
+                    if current == '"' || current == '\n' {
+                        index += 1;
+                        break;
+                    }
+                    body.push(current);
+                    index += 1;
+                }
+                bodies.push(body);
+            }
+            _ => index += 1,
+        }
+    }
+    bodies
+}
+
+fn contains_chinese(text: &str) -> bool {
+    text.chars().any(|c| matches!(c, '\u{4e00}'..='\u{9fff}'))
+}
+
+/// Every Chinese literal the copy-emitting product trees paint, as
+/// `(file:line, literal)`. `taskmanager-application::i18n` is the only Rust
+/// source allowed to hold catalog text, and it holds none: the catalogs are
+/// `locales/*.json`.
+fn painted_chinese_literals() -> Vec<(String, String)> {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut pending: Vec<std::path::PathBuf> = [
+        "crates/taskmanager-gpui/src",
+        "crates/taskmanager-iced/src",
+        "crates/taskmanager-tui/src",
+        "crates/taskmanager-bevy-ui/src",
+        "crates/taskmanager-ui/src",
+    ]
+    .into_iter()
+    .map(|dir| manifest.join(dir))
+    .collect();
+    let mut found = Vec::new();
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).expect("product source directory must be readable") {
+            let path = entry.expect("product source entry must be readable").path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+                continue;
+            }
+            for (index, line) in fs::read_to_string(&path)
+                .expect("product Rust source must be readable")
+                .lines()
+                .enumerate()
+            {
+                for body in string_literal_bodies(line)
+                    .into_iter()
+                    .filter(|body| contains_chinese(body))
+                {
+                    found.push((format!("{}:{}", path.display(), index + 1), body));
+                }
+            }
+        }
+    }
+    found
+}
+
+/// One message catalog, one authority: a frontend that paints Chinese copy the
+/// shared `zh` catalog does not already own has forked the message layer (a
+/// private dictionary), so the string can drift from the other three products
+/// with nothing to compare it against. Chinese that is catalog-owned is
+/// allowed because it is host-data-shaped fixture text or a product name the
+/// catalog itself carries — the catalog stays the single place to change it.
+#[test]
+fn no_frontend_paints_chinese_copy_the_catalog_does_not_own() {
+    let zh = locale_messages(include_str!("../../locales/zh.json"));
+    let owned: BTreeSet<String> = zh
+        .values()
+        .filter_map(serde_json::Value::as_str)
+        .map(str::to_string)
+        .collect();
+    let found = painted_chinese_literals();
+    assert!(
+        !found.is_empty(),
+        "the scan reached no Chinese literal at all, so the tree list is stale"
+    );
+    let unowned: Vec<String> = found
+        .into_iter()
+        .filter(|(_, body)| !owned.contains(body))
+        .map(|(site, body)| format!("{site}: {body:?} is not a value in locales/zh.json"))
+        .collect();
+    assert!(
+        unowned.is_empty(),
+        "frontends must resolve localized copy through the shared catalog; \
+         unowned Chinese literals fork the message layer:\n{}",
+        unowned.join("\n")
+    );
+}
+
+/// Negative proof the scan above is not vacuous: a literal is reported, a
+/// comment containing the same text is not, and the catalog-owned/painted split
+/// is decided by the catalog's values.
+#[test]
+fn chinese_literal_scan_reads_literals_not_comments() {
+    let source = "// 设置\nlet title = \"设置\"; // 关闭\n/* let hidden = \"隐藏\"; */\n";
+    let bodies: Vec<String> = string_literal_bodies(source)
+        .into_iter()
+        .filter(|body| contains_chinese(body))
+        .collect();
+    assert_eq!(
+        bodies,
+        ["设置"],
+        "only the rendered literal counts; comment text never paints"
+    );
+}
+
+// ── mandatory public-resource convergence standard (ADR-063) ───────────────
+
+/// The message layer has exactly one Rust address. Outside
+/// `taskmanager-application/src/i18n.rs` no production source may embed a
+/// locale catalog, define its own `Language`, or spell a per-language literal
+/// table — each is the signature of a second dictionary, which is what let one
+/// frontend's copy drift from the other three products.
+const LOCALE_OWNER: &str = "crates/taskmanager-application/src/i18n.rs";
+
+fn locale_fork_finding_in_line(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+        return None;
+    }
+    if line.contains("include_str!(") && line.contains("locales/") {
+        return Some("embeds a locale catalog instead of calling the owner resolver");
+    }
+    if line.contains("enum Language") {
+        return Some("defines a second `Language` type");
+    }
+    if line.contains("Language::En => \"") || line.contains("Language::Zh => \"") {
+        return Some("spells a per-language literal table");
+    }
+    None
+}
+
+/// Every production source tree (`crates/*/src` and the root `src/`).
+fn locale_fork_findings() -> Vec<String> {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut pending: Vec<std::path::PathBuf> = vec![manifest.join("src")];
+    for entry in fs::read_dir(manifest.join("crates")).expect("crates directory must be readable") {
+        let src = entry
+            .expect("crate entry must be readable")
+            .path()
+            .join("src");
+        if src.is_dir() {
+            pending.push(src);
+        }
+    }
+    let mut findings = Vec::new();
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).expect("production source directory must be readable") {
+            let path = entry
+                .expect("production source entry must be readable")
+                .path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+                continue;
+            }
+            let relative = path
+                .strip_prefix(manifest)
+                .unwrap_or(&path)
+                .display()
+                .to_string()
+                .replace('\\', "/");
+            if relative == LOCALE_OWNER {
+                continue;
+            }
+            for (index, line) in fs::read_to_string(&path)
+                .expect("production Rust source must be readable")
+                .lines()
+                .enumerate()
+            {
+                if let Some(finding) = locale_fork_finding_in_line(line) {
+                    findings.push(format!("{relative}:{}: {finding}", index + 1));
+                }
+            }
+        }
+    }
+    findings
+}
+
+#[test]
+fn only_the_owner_holds_the_message_layer() {
+    let findings = locale_fork_findings();
+    assert!(
+        findings.is_empty(),
+        "the message layer has one owner (`{LOCALE_OWNER}`): `locales/*.json` is the only \
+         copy store, `Language` the only language type, and `t` the only lookup (ADR-063):\n{}",
+        findings.join("\n")
+    );
+}
+
+/// Negative proof: each fork signature is detected, the owner's own forms are
+/// not matched by accident, and a comment cannot hide one.
+#[test]
+fn locale_fork_check_reports_a_second_dictionary() {
+    assert_eq!(
+        locale_fork_finding_in_line("const EN: &str = include_str!(\"../../../locales/en.json\");"),
+        Some("embeds a locale catalog instead of calling the owner resolver")
+    );
+    assert_eq!(
+        locale_fork_finding_in_line("pub enum Language { En, Zh }"),
+        Some("defines a second `Language` type")
+    );
+    assert_eq!(
+        locale_fork_finding_in_line("Language::En => \"Settings\","),
+        Some("spells a per-language literal table")
+    );
+    assert_eq!(
+        locale_fork_finding_in_line("// Language::En => \"Settings\","),
+        None
+    );
+    assert_eq!(
+        locale_fork_finding_in_line("let label = t(\"settings.title\");"),
+        None
+    );
+}
+
+/// Crate-scoped render-entry markers: at each of these a string literal is
+/// painted directly, so a literal there is product copy that bypassed the
+/// catalog. This table is the audited surface — a frontend that adds a new
+/// copy-emitting API must extend it (and its ceiling) in the same change.
+const HARD_COPY_MARKERS: [(&str, &[&str]); 5] = [
+    (
+        "crates/taskmanager-gpui/src",
+        &[".child(\"", ".label(\"", ".placeholder(\"", ".tooltip(\""],
+    ),
+    (
+        "crates/taskmanager-ui/src",
+        &[".child(\"", ".label(\"", ".placeholder(\"", ".tooltip(\""],
+    ),
+    (
+        "crates/taskmanager-iced/src",
+        &[
+            "text(\"",
+            "button(\"",
+            "titled(\"",
+            "tooltip(\"",
+            "section(\"",
+        ],
+    ),
+    (
+        "crates/taskmanager-tui/src",
+        &[
+            "Span::raw(\"",
+            "Line::from(\"",
+            "Span::styled(\"",
+            "Line::styled(\"",
+            "title(\"",
+        ],
+    ),
+    (
+        "crates/taskmanager-bevy-ui/src",
+        &["label: \"", "text(\"", "title(\""],
+    ),
+];
+
+/// Audited census of the markers above, all retired in the ADR-063 zeroing
+/// change. Every crate is zero: a rise is new hard-coded copy, and a stale
+/// ledger number means the ratchet was weakened without recording it.
+const HARD_COPY_CEILINGS: [(&str, usize); 5] = [
+    ("crates/taskmanager-gpui/src", 0),
+    ("crates/taskmanager-ui/src", 0),
+    ("crates/taskmanager-iced/src", 0),
+    ("crates/taskmanager-tui/src", 0),
+    ("crates/taskmanager-bevy-ui/src", 0),
+];
+
+/// Calls whose first literal is a stable identity token, not painted copy.
+/// `TableColumn::text(id, key, width)` renders the `key` through the catalog;
+/// the `id` is a persisted column address. Counting it as copy would punish a
+/// table for having an identity at all.
+const IDENTITY_FIRST_CONSTRUCTORS: &[&str] = &["TableColumn::text("];
+
+/// The literals painted on one source line through the given markers. A comment
+/// line is skipped; a body containing `.` is a catalog key or a number, and a
+/// body without three consecutive ASCII letters is a symbol (an escape such as
+/// `"\\u{2715}"`) rather than translatable copy.
+fn hard_copied_literals_in_line(line: &str, markers: &[&str]) -> Vec<String> {
+    let trimmed = line.trim_start();
+    if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+        return Vec::new();
+    }
+    if IDENTITY_FIRST_CONSTRUCTORS
+        .iter()
+        .any(|constructor| line.contains(constructor))
+    {
+        return Vec::new();
+    }
+    let mut found = Vec::new();
+    for marker in markers {
+        let mut from = 0usize;
+        while let Some(relative) = line[from..].find(marker) {
+            let start = from + relative + marker.len();
+            let Some(relative_end) = line[start..].find('"') else {
+                break;
+            };
+            let body = &line[start..start + relative_end];
+            from = start + relative_end + 1;
+            if body.len() >= 3 && !body.contains('.') && has_letter_run(body) {
+                found.push(body.to_string());
+            }
+        }
+    }
+    found
+}
+
+/// Three consecutive ASCII letters: the shape of a word, not a glyph or a unit.
+fn has_letter_run(body: &str) -> bool {
+    body.as_bytes()
+        .windows(3)
+        .any(|triplet| triplet.iter().all(u8::is_ascii_alphabetic))
+}
+
+fn hard_copied_literals(tree: &Path, markers: &[&str]) -> Vec<String> {
+    let mut pending: Vec<std::path::PathBuf> = vec![tree.to_path_buf()];
+    let mut found = Vec::new();
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).expect("render source directory must be readable") {
+            let path = entry.expect("render source entry must be readable").path();
+            if path.is_dir() {
+                pending.push(path);
+                continue;
+            }
+            if path.extension().and_then(|extension| extension.to_str()) != Some("rs") {
+                continue;
+            }
+            for (index, line) in fs::read_to_string(&path)
+                .expect("render Rust source must be readable")
+                .lines()
+                .enumerate()
+            {
+                for body in hard_copied_literals_in_line(line, markers) {
+                    found.push(format!("{}:{}: {body:?}", path.display(), index + 1));
+                }
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn hard_copied_widget_copy_stays_within_its_audited_census() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for (dir, markers) in HARD_COPY_MARKERS {
+        let ceiling = HARD_COPY_CEILINGS
+            .iter()
+            .find(|(ledger, _)| *ledger == dir)
+            .map(|(_, count)| *count)
+            .expect("every scanned render tree carries an audited census entry");
+        let found = hard_copied_literals(&manifest.join(dir), markers);
+        if found.len() > ceiling {
+            panic!(
+                "{dir}: hard-coded widget copy grew from the audited {ceiling} to {}; \
+                 resolve new copy through the shared `t` resolver and catalog (ADR-063):\n{}",
+                found.len(),
+                found.join("\n")
+            );
+        }
+        assert_eq!(
+            found.len(),
+            ceiling,
+            "{dir}: the audited census says {ceiling} but the tree now holds {}; lower \
+             `HARD_COPY_CEILINGS` in the same change so the ledger stays true",
+            found.len()
+        );
+    }
+}
+
+/// Negative proof the census detects a painted literal, spares a catalog call,
+/// ignores comments, and does not count symbols.
+#[test]
+fn hard_copy_census_detects_a_painted_literal() {
+    let markers = ["text(\""];
+    assert_eq!(
+        hard_copied_literals_in_line("let a = text(\"Name\");", &markers),
+        ["Name"]
+    );
+    assert!(
+        hard_copied_literals_in_line("let a = text(t(\"startup.name\"));", &markers).is_empty()
+    );
+    assert!(hard_copied_literals_in_line("// let a = text(\"Name\");", &markers).is_empty());
+    assert!(hard_copied_literals_in_line("let a = text(\"·\");", &markers).is_empty());
+    assert!(
+        hard_copied_literals_in_line(
+            "TableColumn::text(\"name\", \"common.name\", ColumnWidth::Fill)",
+            &markers
+        )
+        .is_empty(),
+        "a column identity is not painted copy"
+    );
+}
+
+/// The standard must stay registered end-to-end: charter invariant → ADR →
+/// quality-gate table → ADR index → task routing → the real gate names and
+/// their blocking execution layer. Deleting one link (or renaming a gate in
+/// one place) weakens the standard without breaking a compiler, so it is
+/// asserted mechanically here.
+#[test]
+fn public_resource_single_authority_is_registered_end_to_end() {
+    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let read = |relative: &str| {
+        fs::read_to_string(manifest.join(relative))
+            .unwrap_or_else(|_| panic!("{relative} must exist for the standard to stay registered"))
+    };
+    let charter = read("AGENTS.md");
+    let standards = read("docs/STANDARDS.md");
+    let adr = read("adr/063-public-resource-single-authority.md");
+    let gates = read("docs/QUALITY_GATES.md");
+    let index = read("adr/README.md");
+    let routing = read("docs/README.md");
+    let runner = read("scripts/quality/local-gates.sh");
+    let workflow = read(".github/workflows/ci.yml");
+
+    assert!(
+        charter.contains("ADR-063") && charter.contains("frontends bind, never fork"),
+        "AGENTS.md must state the one-authority invariant"
+    );
+    // The type and settings axes are named in the same invariant, so a new
+    // frontend cannot treat them as frontend-local.
+    assert!(
+        charter.contains("taskmanager-theme` owns all design tokens")
+            && charter.contains("No second dictionary"),
+        "AGENTS.md must name the theme owner for tokens as well as copy"
+    );
+    assert!(
+        standards.contains("ADR-063") && standards.contains("公共资源单源门"),
+        "the eight closure questions must require the ADR-063 gate"
+    );
+    assert!(
+        adr.contains("## Decision") && adr.contains("only_the_owner_holds_the_message_layer"),
+        "ADR-063 must own the decision and name its gates"
+    );
+    assert!(
+        gates.contains("公共资源单源门（ADR-063）") && gates.contains("standard `nextest-logic`"),
+        "QUALITY_GATES.md must register the gate at its blocking layer"
+    );
+    assert!(
+        index.contains("[063](063-public-resource-single-authority.md)"),
+        "the ADR index must link ADR-063"
+    );
+    assert!(
+        routing.contains("ADR-063") && routing.contains("`locales/*`"),
+        "the task routing table must point copy/locale edits at ADR-063"
+    );
+    assert!(
+        runner.contains("run_stage nextest-logic standard cargo nextest run")
+            && runner.contains("-p taskmanager-gates --test logic -j 4"),
+        "the standard gate must actually run the logic test binary"
+    );
+    assert!(
+        workflow.contains("cargo nextest run --locked --workspace --all-targets"),
+        "CI's test job must execute the workspace test binaries"
+    );
+
+    let source = read("tests/logic/quality_gate_test.rs");
+    for gate in [
+        "fn only_the_owner_holds_the_message_layer()",
+        "fn no_frontend_paints_chinese_copy_the_catalog_does_not_own()",
+        "fn every_i18n_t_callsite_literal_exists_in_the_catalog()",
+        "fn every_dynamic_i18n_key_producer_resolves_in_both_catalogs()",
+        "fn english_and_chinese_locale_keys_match_except_explicit_fallback_fixture()",
+        "fn hard_copied_widget_copy_stays_within_its_audited_census()",
+    ] {
+        assert!(
+            source.contains(gate),
+            "ADR-063 gate {gate} must exist in the logic test binary"
+        );
+    }
+
+    // The type/settings half of the same standard lives in its own source
+    // inspection module; deleting it would silently reopen the fork it closed.
+    let typography = read("tests/logic/typography_authority_gate_test.rs");
+    let logic_manifest = read("tests/logic.rs");
+    assert!(
+        logic_manifest.contains("logic/typography_authority_gate_test.rs"),
+        "the typography gate must be registered in the logic test binary"
+    );
+    for gate in [
+        "fn no_frontend_spells_a_font_family_name()",
+        "fn no_frontend_spells_a_hardcoded_type_size()",
+        "fn no_frontend_spells_a_hardcoded_font_weight()",
+        "fn no_frontend_reimplements_a_theme_axis_codec()",
+        "fn the_bundled_font_collection_is_the_asset_table()",
+        "fn the_public_axis_codecs_round_trip_and_match_the_wire_tokens()",
+    ] {
+        assert!(
+            typography.contains(gate),
+            "ADR-063 typography gate {gate} must exist"
+        );
+    }
+    for control in [
+        "fn type_size_scan_detects_a_literal_and_spares_a_token()",
+        "fn weight_scan_detects_a_literal_and_spares_a_token()",
+        "fn axis_codec_scan_detects_a_private_table()",
+    ] {
+        assert!(
+            typography.contains(control),
+            "ADR-063 typography gate {control} must prove its scanner is not vacuous"
+        );
+    }
+    assert!(
+        typography.contains("//! source-inspection: static-policy"),
+        "the typography gate must declare its source-inspection class"
+    );
+}
+
 #[test]
 fn github_actions_release_gate_runs_on_push_pull_request_and_dispatch() {
     let workflow = include_str!("../../.github/workflows/ci.yml");

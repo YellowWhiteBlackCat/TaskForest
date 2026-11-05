@@ -50,16 +50,9 @@ fn write_frame_ready(
             "TUI_CAPTURE_MARKER event=demo_data_ready mode=demo\n\
              TUI_CAPTURE_MARKER event=frame_ready page={page}\n\
              TUI_CAPTURE_MARKER event=terminal_profile language={} glyphs={} color={}\n",
-            language_name(language),
+            language.code(),
             profile.glyphs_name(),
             profile.color_name(),
         ),
     )
-}
-
-const fn language_name(language: Language) -> &'static str {
-    match language {
-        Language::En => "en",
-        Language::Zh => "zh",
-    }
 }

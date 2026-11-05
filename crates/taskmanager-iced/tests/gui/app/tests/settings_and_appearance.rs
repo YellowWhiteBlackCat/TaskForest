@@ -24,6 +24,7 @@ use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
+use taskmanager_theme::Skin;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::MotionPolicy;
 
@@ -143,10 +144,10 @@ fn language_preference_persists_and_applies_at_startup() {
     let dir = temp_dir("settings-language");
     let path = dir.join("config.json");
     let mut app = IcedApp::with_config_store(None, ConfigStore::new(&path));
-    assert_eq!(app.language(), crate::i18n::Language::En);
+    assert_eq!(app.language(), Language::En);
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::Language(
-        crate::i18n::Language::Zh,
+        Language::Zh,
     )));
     app.wait_for_config_where(|config| config.language.as_deref() == Some("zh"));
     let config = ConfigStore::new(&path).load_or_default();
@@ -155,12 +156,12 @@ fn language_preference_persists_and_applies_at_startup() {
         Some("zh"),
         "token write-through"
     );
-    assert_eq!(app.language(), crate::i18n::Language::Zh);
+    assert_eq!(app.language(), Language::Zh);
 
     // A fresh launch applies the persisted token and pins the shared catalog.
     let mut reloaded = IcedApp::with_config_store(None, ConfigStore::new(&path));
     reloaded.load_config();
-    assert_eq!(reloaded.language(), crate::i18n::Language::Zh);
+    assert_eq!(reloaded.language(), Language::Zh);
     assert_eq!(
         current_language(),
         Language::Zh,
@@ -177,7 +178,7 @@ fn language_preference_persists_and_applies_at_startup() {
     hostile.load_config();
     assert_eq!(
         hostile.language(),
-        crate::i18n::Language::En,
+        Language::En,
         "an unknown token keeps the default"
     );
 
@@ -242,15 +243,12 @@ fn motion_preference_seeds_the_policy_and_round_trips() {
         (MotionPolicy::Reduced, "reduced"),
         (MotionPolicy::NoMotion, "none"),
     ] {
-        assert_eq!(crate::app::motion::motion_token(policy), token);
-        assert_eq!(crate::app::motion::motion_policy_from_token(token), policy);
+        assert_eq!(policy.config_token(), token);
+        assert_eq!(MotionPolicy::from_config_token(token), policy);
     }
+    assert_eq!(MotionPolicy::from_config_token(""), MotionPolicy::Normal);
     assert_eq!(
-        crate::app::motion::motion_policy_from_token(""),
-        MotionPolicy::Normal
-    );
-    assert_eq!(
-        crate::app::motion::motion_policy_from_token("  No-Motion "),
+        MotionPolicy::from_config_token("  No-Motion "),
         MotionPolicy::NoMotion
     );
 
@@ -626,34 +624,41 @@ fn warmup_spin_and_frame_pump_lifecycle() {
     );
 }
 
-/// The progress-aware modal styles keep the token derivation (alpha ramps,
-/// never literals): the scrim darkening scales with the progress and the
-/// panel background fades in.
+/// The progress-aware modal styles keep the token derivation: the scrim
+/// depth alpha scales with progress, while the glass panel keeps its contract
+/// and animates only the shadow depth.
 #[test]
 fn modal_styles_scale_with_the_entrance_progress() {
     let theme = Theme::dark();
     let dim = crate::theme::scrim_style_with(&theme, 0.0);
     let full = crate::theme::scrim_style_with(&theme, 1.0);
-    let brightness = |style: &iced::widget::container::Style| match style.background.unwrap() {
-        iced::Background::Color(color) => (color.r + color.g + color.b) as f64,
+    let alpha = |style: &iced::widget::container::Style| match style.background.unwrap() {
+        iced::Background::Color(color) => color.a,
         other => panic!("unexpected background {other:?}"),
     };
     assert!(
-        brightness(&full) < brightness(&dim),
-        "the scrim darkens as the progress reaches 1.0"
+        alpha(&full) > alpha(&dim),
+        "the scrim depth grows as the progress reaches 1.0"
     );
-    assert_eq!(brightness(&full), brightness(&full), "deterministic");
+    assert_eq!(alpha(&full), alpha(&full), "deterministic");
 
     let panel_dim = crate::theme::elevated_style_with(&theme, 0.0);
     let panel_full = crate::theme::elevated_style_with(&theme, 1.0);
-    let panel_dim_alpha = match panel_dim.background.unwrap() {
-        iced::Background::Color(color) => color.a,
-        other => panic!("unexpected background {other:?}"),
-    };
-    let panel_full_alpha = match panel_full.background.unwrap() {
-        iced::Background::Color(color) => color.a,
-        other => panic!("unexpected background {other:?}"),
-    };
-    assert!(panel_dim_alpha < panel_full_alpha, "panel fades in");
-    assert_eq!(panel_full_alpha, 1.0, "fully visible at progress 1.0");
+    assert_eq!(
+        panel_dim.background, panel_full.background,
+        "glass fill does not fade through an opaque interim surface"
+    );
+    assert_eq!(
+        panel_dim.border, panel_full.border,
+        "glass edge stays present while the modal enters"
+    );
+    assert!(
+        panel_dim.shadow.color.a < panel_full.shadow.color.a,
+        "panel depth follows entrance progress"
+    );
+    assert_eq!(
+        panel_full.shadow,
+        crate::theme::elevated_glass_style(&theme).shadow,
+        "the settled modal uses the full glass depth"
+    );
 }

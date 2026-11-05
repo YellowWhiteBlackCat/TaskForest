@@ -3,19 +3,19 @@
 //! This module owns the selector → detail mapping, responsive rail geometry,
 //! bounded device windows, and unit preferences. It does not collect provider
 //! data; every label and panel reads the current Iced projection. The page's
-//! ONE layout authority is [`PerformancePageBudget::for_perf_frame`]: the
+//! ONE layout authority is [`performance_budget_for_perf_frame`]: the
 //! typed slot allocation from the real tracked viewport (GPUI `from_frame`
 //! parity). No secondary compact-flag derivation remains.
 
 use iced::Element;
-use iced::widget::{Space, column, container, mouse_area, row, scrollable, text};
+use iced::widget::{Space, column, container, row, scrollable, text};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::virtual_horizontal_body;
 
 use super::history_replay;
-use super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
+use super::responsive::performance_budget_for_perf_frame;
 use super::{
     battery_section, cpu_memory_detail, disk_section, fan, gpu_section, network_section,
     npu_section, perf_rail,
@@ -25,6 +25,8 @@ use crate::{focus, theme};
 use iced::Length;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::DeviceNavigationPresentation;
 
 /// Compact detail viewport ownership. CPU and GPU use elastic, non-scrolling
 /// aggregate surfaces; device pages with variable-length inventories keep the
@@ -57,7 +59,7 @@ pub(crate) fn performance_page(
     // strip (GPUI parity) so every device stays reachable at any width; the
     // statistics rail is Pinned while capacity allows, Stacked below the
     // main viewport while the main floor survives, and only then Hidden.
-    let budget = PerformancePageBudget::for_perf_frame(
+    let budget = performance_budget_for_perf_frame(
         app.page_viewport_size(),
         app.performance.sidebar_visible,
     );
@@ -137,25 +139,8 @@ pub(crate) fn performance_page(
                 detail_stack.push(entry);
             }
             detail_stack.push(detail.into());
-            let resize_handle: Element<'_, Message, iced::Theme, iced::Renderer> = mouse_area(
-                container(
-                    Space::new()
-                        .width(iced::Length::Fixed(1.0))
-                        .height(iced::Length::Fill),
-                )
-                .width(iced::Length::Fixed(6.0))
-                .height(iced::Length::Fill)
-                .center_x(iced::Length::Fixed(6.0))
-                .style(move |_| iced::widget::container::Style {
-                    background: Some(
-                        crate::theme_binding::color(theme_snapshot.palette().border).into(),
-                    ),
-                    ..Default::default()
-                }),
-            )
-            .interaction(iced::mouse::Interaction::ResizingColumn)
-            .into();
-            row![selector, resize_handle, column(detail_stack).spacing(8)]
+            let gap = Space::new().width(iced::Length::Fixed(6.0));
+            row![selector, gap, column(detail_stack).spacing(8)]
                 .spacing(6)
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill)

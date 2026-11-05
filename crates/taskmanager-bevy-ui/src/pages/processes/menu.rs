@@ -20,7 +20,16 @@ use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId, ShellApp,
 };
 
-use crate::menu_modal::{ActionMenuContext, MenuModal};
+use bevy::app::App;
+use bevy::ecs::lifecycle::Add;
+use bevy::ecs::observer::On;
+use bevy::ecs::system::{Commands, ResMut};
+use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::ui::prelude::{Node, PositionType, percent, px};
+
+use super::ProcessRowsRoot;
+use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalTrigger};
+use crate::scene_attach::attach_child;
 use crate::widgets::menu::{MenuItem, MenuSpec};
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::ProcessAffinityRequest;
@@ -197,6 +206,47 @@ impl ActionMenuContext for ProcessMenuCtx {
             }
         }
     }
+
+    /// Publish the table body as the menu's anchor. Unlike
+    /// Services/Startup/Sessions (whose whole page is the inventory), the
+    /// Applications page wraps a table plus a details rail, so anchoring to
+    /// the page-sized content slot places the popover against the window edge
+    /// and clips it.
+    ///
+    /// The anchor is the rows ROOT, not the acted-on row: the row wrappers are
+    /// despawned and respawned by every table rebuild, and a popover childed to
+    /// one of them would vanish mid-session. The rows root survives rebuilds,
+    /// starts at the table body's top edge, and is bounded by the viewport, so
+    /// the trailing-side placement below the body top always fits.
+    fn register(app: &mut App) {
+        app.add_observer(on_process_rows_added);
+    }
+}
+
+/// Publish the action-menu trigger on the mounted process table body. The
+/// marker is a typed component, so the popover mounts as that surface's child.
+fn menu_trigger_anchor_scene() -> impl Scene + use<> {
+    bsn! {
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(0.0),
+            top: px(0.0),
+            width: percent(45),
+            height: percent(100),
+        }
+        MenuModalTrigger
+    }
+}
+
+fn on_process_rows_added(
+    add: On<Add<ProcessRowsRoot>>,
+    mut commands: Commands,
+    mut modal: ResMut<ProcessMenuModal>,
+) {
+    let root = add.event().entity;
+    let anchor = commands.spawn_scene(menu_trigger_anchor_scene()).id();
+    attach_child(&mut commands, root, anchor);
+    modal.set_trigger(anchor);
 }
 
 /// The page's modal state resource.

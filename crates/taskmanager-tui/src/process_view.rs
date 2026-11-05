@@ -210,6 +210,24 @@ fn materialize_row_on<'a, L: ?Sized + VisibleLookup<'a>>(
     index: usize,
 ) -> Option<ProcessRow<'a>> {
     match ids.get(index)? {
+        ProcessTreeRow::Container {
+            metadata,
+            expansion_key: name,
+            expanded,
+            member_count: count,
+            aggregate,
+        } => Some(ProcessRow::Group {
+            name: name.clone(),
+            label: metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
+            depth: 0,
+            count: *count,
+            aggregate: Box::new(aggregate.clone()),
+            expanded: *expanded,
+            row_key: None,
+        }),
         ProcessTreeRow::Category {
             category,
             expansion_key: name,

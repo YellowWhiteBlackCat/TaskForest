@@ -24,7 +24,7 @@ use taskmanager_application::ConfigRevision;
 use taskmanager_application::ConfigStoreErrorKind;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::TelemetryRefreshPolicyChange;
-use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 pub(super) fn apply_root_persisted_projection(
     view: &mut RootView,
@@ -33,7 +33,9 @@ pub(super) fn apply_root_persisted_projection(
 ) {
     let mut next = view.presentation_snapshot();
     next.appearance = view.resolved_persisted_appearance(cfg);
-    if let Some(density) = super::super::persistence::density_from_token(&cfg.density) {
+    // An unknown density token is ignored (the caller keeps the built-in
+    // comfortable geometry); the codec is the theme owner's (ADR-063).
+    if let Some(density) = RowDensity::from_config_token(&cfg.density) {
         next.appearance.density = density;
     }
     next.appearance.ui_size = UiSize::from_config_token(&cfg.ui_size);

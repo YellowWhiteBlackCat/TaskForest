@@ -215,10 +215,16 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
     let resize = visual
         .debug_bounds("tm-sidebar-resize-handle")
         .expect("the resize gutter must remain mounted");
+    let indicator = visual
+        .debug_bounds("tm-sidebar-resize-indicator")
+        .expect("the hover indicator must be inside the resize gutter");
     assert_eq!(frame.size.width, px(276.0));
     assert_eq!(viewport.size.width, px(268.0));
     assert!(rail.right() <= resize.left());
     assert_eq!(resize.right(), frame.right());
+    assert!(indicator.left() >= resize.left() && indicator.right() <= resize.right());
+    assert!(indicator.top() >= resize.top() && indicator.bottom() <= resize.bottom());
+    assert!(indicator.size.height < resize.size.height);
 
     let start = resize.center();
     visual.simulate_mouse_move(start, None, Modifiers::none());
@@ -258,6 +264,65 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
         .expect("sidebar root must remain alive after drag"),
         px(316.0),
         "a real pointer drag in the dedicated gutter must resize the sidebar"
+    );
+
+    let focus = win
+        .read_with(cx, |view, _cx| view.sidebar_resize_focus.clone())
+        .expect("the sidebar owns a stable resize focus target");
+    for _ in 0..128 {
+        if visual.update(|window, _| focus.is_focused(window)) {
+            break;
+        }
+        visual.update(|window, cx| window.focus_next(cx));
+    }
+    assert!(
+        visual.update(|window, _| focus.is_focused(window)),
+        "the resize gutter must be reachable through the window's tab order"
+    );
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        win.read_with(cx, |view, _cx| {
+            view.presentation_snapshot().sidebar_width()
+        })
+        .unwrap(),
+        px(326.0),
+        "Right expands the focused sidebar without moving device selection"
+    );
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        win.read_with(cx, |view, _cx| {
+            view.presentation_snapshot().sidebar_width()
+        })
+        .unwrap(),
+        px(316.0),
+        "Left shrinks the focused sidebar"
+    );
+
+    win.update(cx, |view, _window, cx| {
+        view.resize_sidebar(px(205.0), cx);
+    })
+    .unwrap();
+    visual.simulate_keystrokes("left");
+    assert_eq!(
+        win.read_with(cx, |view, _cx| {
+            view.presentation_snapshot().sidebar_width()
+        })
+        .unwrap(),
+        px(200.0),
+        "keyboard resizing stops at the sidebar's minimum width"
+    );
+    win.update(cx, |view, _window, cx| {
+        view.resize_sidebar(px(455.0), cx);
+    })
+    .unwrap();
+    visual.simulate_keystrokes("right");
+    assert_eq!(
+        win.read_with(cx, |view, _cx| {
+            view.presentation_snapshot().sidebar_width()
+        })
+        .unwrap(),
+        px(460.0),
+        "keyboard resizing stops at the sidebar's maximum width"
     );
 }
 

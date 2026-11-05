@@ -237,7 +237,9 @@ fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
     .filter(|row| {
         matches!(
             row,
-            ProcessTreeRow::Category { .. } | ProcessTreeRow::Application { .. }
+            ProcessTreeRow::Container { .. }
+                | ProcessTreeRow::Category { .. }
+                | ProcessTreeRow::Application { .. }
         )
     })
     .take(MAX_PUBLISHED_GROUP_ROWS)
@@ -250,6 +252,17 @@ fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
             |index| processes.get(index).copied(),
             |row, process| {
                 let (name, aggregate) = match row {
+                    ProcessTreeRow::Container {
+                        metadata,
+                        aggregate,
+                        ..
+                    } => (
+                        metadata
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| metadata.container_id.clone()),
+                        aggregate,
+                    ),
                     ProcessTreeRow::Category {
                         category,
                         aggregate,

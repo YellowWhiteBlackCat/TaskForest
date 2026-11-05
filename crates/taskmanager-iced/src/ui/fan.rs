@@ -25,13 +25,14 @@ use taskmanager_theme::Theme;
 
 use super::device_chart;
 use super::perf_devices::DeviceBlockContext;
-use super::responsive::{
-    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
-};
 use super::tables;
 use crate::app::Message;
 use crate::theme;
 use crate::trend_strip::finite_peak;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PerformanceChartInventory,
+};
 
 /// The RPM graph's dynamic-scale floor (GPUI `finite_series_peak_floored`
 /// parity): an idle or all-gap window keeps a neutral 1000-RPM axis instead

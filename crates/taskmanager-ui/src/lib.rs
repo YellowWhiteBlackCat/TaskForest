@@ -64,6 +64,7 @@ pub mod icons_binding;
 pub mod inputs;
 pub mod layout;
 pub mod overlays;
+pub mod presentation_binding;
 pub mod primitives;
 pub mod styled;
 pub mod theme_binding;

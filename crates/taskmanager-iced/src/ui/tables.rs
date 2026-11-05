@@ -101,16 +101,16 @@ pub(super) struct ServicesColumns {
 
 pub(super) fn services_columns(compact: bool) -> ServicesColumns {
     ServicesColumns {
-        name: TableColumn::text("Name", InfoSortCol::Name.label(), ColumnWidth::Fixed(220.0)),
+        name: TableColumn::text("name", InfoSortCol::Name.label(), ColumnWidth::Fixed(220.0)),
         status: TableColumn::text(
-            "Status",
+            "status",
             InfoSortCol::Status.label(),
             ColumnWidth::Fixed(90.0),
         ),
         description: (!compact)
-            .then(|| TableColumn::text("Description", "common.description", ColumnWidth::Fill)),
+            .then(|| TableColumn::text("description", "common.description", ColumnWidth::Fill)),
         actions: TableColumn::text(
-            "Actions",
+            "actions",
             "common.actions",
             ColumnWidth::Fixed(if compact { 300.0 } else { 450.0 }),
         ),

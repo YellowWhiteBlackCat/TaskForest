@@ -10,6 +10,7 @@
 //! shell decides whether it is earned.
 
 use crate::app::ContentSlot;
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::icons::icon_scene;
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::scene_attach::attach_child;
@@ -26,12 +27,13 @@ use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::time::Time;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderColor, BorderRadius, FlexDirection, JustifyContent, Node,
-    PositionType, UiRect, Val, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, PositionType, UiRect, Val, px, rem,
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
+use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
 
 /// How long the confirmation toast stays on screen.
@@ -153,6 +155,14 @@ pub(crate) fn scene(message: String, palette: &UiPalette) -> Box<dyn Scene> {
     // The toast floats half a control height above the bottom edge: the
     // bottom safety band belongs to the budget, not to a clipping accident.
     let inset = palette.control_height_rem * 0.5;
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     Box::new(bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -171,11 +181,19 @@ pub(crate) fn scene(message: String, palette: &UiPalette) -> Box<dyn Scene> {
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(space_8()),
                 padding: UiRect::horizontal(Val::Px(space_12())),
-                border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+                border: UiRect::all(Val::Rem(edge_width_rem)),
+                border_radius: BorderRadius::all(Val::Rem(radius_rem)),
              }
-             BackgroundColor({ palette.panel_fill })
+             BackgroundColor({ fill })
+             BorderColor::all(edge)
+             BoxShadow({ shadows })
+             OpticalGlassCard {
+                 tier: GlassTier::Card,
+                 enabled: true,
+             }
              Pickable::IGNORE
              Children [
+                  @{ grain } --
                   Node {
                     width: rem(palette.icon_rem * 1.5),
                     height: rem(palette.icon_rem * 1.5),

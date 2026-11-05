@@ -90,9 +90,9 @@ pub(super) fn render_health_overlay_at(
     }
     frame.render_widget(
         Paragraph::new(vec![
-            Line::from("p Active · e Events · w/s Device review"),
-            Line::from("q Rules · Up/Down Select"),
-            Line::from("Enter/Space Toggle · h / Esc Close"),
+            Line::from(t("health.review_active_hint")),
+            Line::from(t("health.review_rules_hint")),
+            Line::from(t("health.review_toggle_hint")),
         ])
         .style(Style::new().fg(theme.dim)),
         footer,

@@ -29,6 +29,26 @@ pub fn append_process_semantic_rows<'process>(
     for (row_index, row) in rows.iter().enumerate() {
         let process = row.visible_index().and_then(&mut process_at);
         match row {
+            ProcessTreeRow::Container {
+                expansion_key,
+                expanded,
+                aggregate,
+                ..
+            } => {
+                let id = projection_local_id("container", generation, row_index, row_index);
+                builder = builder.process_group_row_with_semantics(
+                    ProcessGroupRowInput {
+                        id,
+                        name: name_for(row, None),
+                        expanded: *expanded,
+                        selected: false,
+                    },
+                    Some(expansion_key.clone()),
+                    false,
+                    true,
+                    aggregate_semantics(aggregate),
+                );
+            }
             ProcessTreeRow::Category {
                 category,
                 expansion_key,

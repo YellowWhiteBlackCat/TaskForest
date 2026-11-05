@@ -15,7 +15,7 @@ pub struct ProgressBar {
     palette: Palette,
     value: Option<f32>,
     height: f32,
-    radius: f32,
+    radius: Option<f32>,
 }
 
 impl ProgressBar {
@@ -25,7 +25,7 @@ impl ProgressBar {
             palette,
             value: Some(value.clamp(0.0, 1.0)),
             height: 6.0,
-            radius: 3.0,
+            radius: None,
         }
     }
 
@@ -35,7 +35,7 @@ impl ProgressBar {
             palette,
             value: None,
             height: 6.0,
-            radius: 3.0,
+            radius: None,
         }
     }
 
@@ -49,7 +49,7 @@ impl ProgressBar {
     /// Corner radius override (default half the height).
     #[must_use]
     pub fn radius(mut self, radius: f32) -> Self {
-        self.radius = radius;
+        self.radius = Some(radius);
         self
     }
 
@@ -62,10 +62,11 @@ impl ProgressBar {
 
 impl RenderOnce for ProgressBar {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
+        let radius = self.radius.unwrap_or(self.height / 2.0);
         let track = div()
             .w_full()
             .h(px(self.height))
-            .rounded(px(self.radius))
+            .rounded(px(radius))
             .bg(crate::theme_binding::fill(self.palette.border))
             .overflow_hidden();
 
@@ -74,14 +75,14 @@ impl RenderOnce for ProgressBar {
                 div()
                     .h_full()
                     .w(relative(value))
-                    .rounded(px(self.radius))
+                    .rounded(px(radius))
                     .bg(crate::theme_binding::fill(self.palette.accent)),
             ),
             None => track.child(
                 div()
                     .h_full()
                     .w_1_2()
-                    .rounded(px(self.radius))
+                    .rounded(px(radius))
                     .bg(crate::theme_binding::fill(self.palette.accent))
                     .with_animation(
                         ElementId::Name("tm-progress-indeterminate".into()),

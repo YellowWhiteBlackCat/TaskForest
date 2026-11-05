@@ -1,7 +1,7 @@
 use super::{Toast, ToastEvent, ToastKind, ToastState};
 use gpui::{
-    AppContext, Context, Entity, IntoElement, Modifiers, ParentElement, Render, Styled,
-    TestAppContext, Window, div,
+    AppContext, Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
+    Styled, TestAppContext, Window, div, px, size,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -112,6 +112,9 @@ async fn dismiss_control_accepts_pointer_click_without_emitting_auto_dismiss(
     let window = cx.add_window(|_window, _cx| ToastHarness {
         toast: toast.clone(),
         dismissals: dismissals.clone(),
+        slot_width: 688.0,
+        single_line: false,
+        indicator: false,
     });
 
     let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
@@ -143,6 +146,9 @@ async fn dismiss_control_is_a_keyboard_tab_stop_and_activates_with_enter(cx: &mu
     let window = cx.add_window(|_window, _cx| ToastHarness {
         toast: toast.clone(),
         dismissals: dismissals.clone(),
+        slot_width: 688.0,
+        single_line: false,
+        indicator: false,
     });
     let focus_handle = toast.read_with(cx, |state, _| state.dismiss_focus.clone());
 
@@ -165,18 +171,146 @@ async fn dismiss_control_is_a_keyboard_tab_stop_and_activates_with_enter(cx: &mu
     );
 }
 
+/// A toast is a bounded overlay, not an intrinsic-width banner. An operation
+/// receipt may contain a full filesystem path; that path must wrap inside the
+/// card instead of widening it past the viewport or displacing the page.
+#[gpui::test]
+async fn long_receipt_wraps_inside_the_toast_card(cx: &mut TestAppContext) {
+    let path = format!(
+        "/run/media/{}/very-long-workspace/target/host-wayland-diagnostic/runs/{}/capture.png",
+        "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9"
+    );
+    let message = format!("Current window saved: {path} (1180\u{00d7}780)");
+    let toast = cx.new(|cx| ToastState::new(15, message, ToastKind::Success, cx));
+    let window = cx.add_window(|_window, _cx| ToastHarness {
+        toast: toast.clone(),
+        dismissals: Rc::new(RefCell::new(0)),
+        slot_width: 688.0,
+        single_line: false,
+        indicator: false,
+    });
+    cx.simulate_window_resize(window.into(), size(px(720.0), px(480.0)));
+
+    let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
+    let container = vcx
+        .debug_bounds("tm-toast-slot")
+        .expect("the bounded toast slot must render");
+    let card = vcx
+        .debug_bounds("tm-toast-card")
+        .expect("the toast card must render");
+
+    assert!(
+        card.size.width <= container.size.width,
+        "the toast must stay inside its bounded slot: card={card:?} slot={container:?}"
+    );
+    assert!(
+        card.size.height > px(40.0),
+        "a long receipt must wrap to multiple lines instead of being clipped: {card:?}"
+    );
+}
+
+/// The GPUI shell can also mount a receipt inside a one-line titlebar slot.
+#[gpui::test]
+async fn single_line_receipt_stays_inside_a_compact_chrome_slot(cx: &mut TestAppContext) {
+    let path = format!(
+        "/run/media/{}/very-long-workspace/target/host-wayland-diagnostic/runs/{}/capture.png",
+        "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9"
+    );
+    let message = format!("Current window saved: {path} (1180\u{00d7}780)");
+    let toast = cx.new(|cx| ToastState::new(16, message, ToastKind::Success, cx));
+    let window = cx.add_window(|_window, _cx| ToastHarness {
+        toast: toast.clone(),
+        dismissals: Rc::new(RefCell::new(0)),
+        slot_width: 254.0,
+        single_line: true,
+        indicator: false,
+    });
+    cx.simulate_window_resize(window.into(), size(px(720.0), px(480.0)));
+
+    let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
+    let slot = vcx
+        .debug_bounds("tm-toast-slot")
+        .expect("the compact chrome slot must render");
+    let card = vcx
+        .debug_bounds("tm-toast-card")
+        .expect("the one-line toast card must render");
+
+    assert!(
+        card.size.width <= slot.size.width,
+        "the one-line toast must fit its compact chrome slot: card={card:?} slot={slot:?}"
+    );
+    assert!(
+        card.size.height <= px(46.0),
+        "the one-line toast must fit a GNOME titlebar: {card:?}"
+    );
+}
+
+#[gpui::test]
+async fn indicator_toast_fits_a_compact_navigation_rail(cx: &mut TestAppContext) {
+    let toast = cx.new(|cx| {
+        ToastState::new(
+            17,
+            "Current window saved: /workspace/archive/capture.png",
+            ToastKind::Success,
+            cx,
+        )
+    });
+    let window = cx.add_window(|_window, _cx| ToastHarness {
+        toast: toast.clone(),
+        dismissals: Rc::new(RefCell::new(0)),
+        slot_width: 46.0,
+        single_line: true,
+        indicator: true,
+    });
+    cx.simulate_window_resize(window.into(), size(px(720.0), px(480.0)));
+
+    let mut vcx = gpui::VisualTestContext::from_window(window.into(), cx);
+    vcx.update(|window, cx| window.draw(cx).clear(cx));
+    let slot = vcx
+        .debug_bounds("tm-toast-slot")
+        .expect("the compact rail slot must render");
+    let card = vcx
+        .debug_bounds("tm-toast-card")
+        .expect("the severity indicator must render");
+
+    assert!(
+        card.size.width <= slot.size.width,
+        "the indicator must stay inside the navigation rail: card={card:?} slot={slot:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-toast-dismiss").is_none(),
+        "the indicator must not paint a close target outside its narrow rail"
+    );
+}
+
 struct ToastHarness {
     toast: Entity<ToastState>,
     dismissals: Rc<RefCell<usize>>,
+    slot_width: f32,
+    single_line: bool,
+    indicator: bool,
 }
 
 impl Render for ToastHarness {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let dismissals = self.dismissals.clone();
-        div().size_full().child(
-            Toast::new(self.toast.clone(), Theme::dark().palette()).on_dismiss(move |_, _| {
+        let toast = Toast::new(self.toast.clone(), Theme::dark().palette());
+        let toast = if self.single_line {
+            toast.single_line()
+        } else {
+            toast
+        };
+        let toast = toast.indicator(self.indicator);
+        // Mirror the production overlay's bounded width so the card is tested
+        // against the slot it actually receives, not the full test window.
+        div()
+            .debug_selector(|| "tm-toast-slot".to_string())
+            .w(px(self.slot_width))
+            .h_full()
+            .child(toast.on_dismiss(move |_, _| {
                 *dismissals.borrow_mut() += 1;
-            }),
-        )
+            }))
     }
 }

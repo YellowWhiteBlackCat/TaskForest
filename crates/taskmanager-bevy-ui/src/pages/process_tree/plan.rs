@@ -65,6 +65,8 @@ pub(crate) struct TreeRowPlan {
     pub(crate) guide: Vec<GuideColumn>,
     /// The aggregate badge label, when the row aggregates several members.
     pub(crate) aggregate_badge: Option<String>,
+    /// The runtime badge of a container group header.
+    pub(crate) container_badge: Option<String>,
     /// Whether the row names a zombie process (BEVY-129).
     pub(crate) zombie_badge: bool,
     /// The structural fingerprint: a row whose fingerprint matches keeps its
@@ -162,6 +164,7 @@ fn plan_of(row: &ProcessTreeRowView<'_>) -> TreeRowPlan {
     let toggle = row_toggle(row);
     let aggregate_badge =
         (row.item.is_none() && row.member_count > 1).then(|| format!("x{}", row.member_count));
+    let container_badge = row.container_badge.clone();
     let zombie_badge = row
         .item
         .is_some_and(|process| process.status_kind().is_zombie());
@@ -183,6 +186,7 @@ fn plan_of(row: &ProcessTreeRowView<'_>) -> TreeRowPlan {
         summary,
         guide: row.guide.clone(),
         aggregate_badge,
+        container_badge,
         zombie_badge,
         shape,
     }

@@ -3,7 +3,7 @@
 use super::*;
 use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
-use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers};
+use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers, i18n::Language};
 
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process::ProcessLiveKey;
@@ -274,11 +274,11 @@ fn demo_instances_use_isolated_throwaway_config_paths() {
     let second = IcedApp::demo();
     let default = IcedApp::default();
     let _ = first.update(Message::SettingsChanged(SettingsChange::Language(
-        crate::i18n::Language::Zh,
+        Language::Zh,
     )));
-    assert_eq!(first.language(), crate::i18n::Language::Zh);
-    assert_eq!(second.language(), crate::i18n::Language::En);
-    assert_eq!(default.language(), crate::i18n::Language::En);
+    assert_eq!(first.language(), Language::Zh);
+    assert_eq!(second.language(), Language::En);
+    assert_eq!(default.language(), Language::En);
 }
 
 #[test]

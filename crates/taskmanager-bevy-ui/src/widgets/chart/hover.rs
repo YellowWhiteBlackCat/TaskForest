@@ -12,6 +12,8 @@ use bevy::ecs::system::Query;
 use bevy::math::Vec2;
 use bevy::picking::events::{PointerMove, PointerOut};
 
+use crate::widgets::chart::geometry::ChartSlots;
+
 /// The pointer's position inside the canvas, normalized to the node's box
 /// (the origin at the center, the corners at ±0.5).
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq)]
@@ -60,21 +62,22 @@ pub(crate) fn hover_position(normalized: Option<Vec2>, size: Vec2) -> Option<Vec
     Some(position)
 }
 
-/// The sample slot under the pointer.
+/// The sample slot under the pointer, inside a `capacity`-wide frame.
 ///
 /// The newest sample owns the right edge, so the slot is resolved from the
 /// right exactly like the reference surface's slot grid: a sparse window can
-/// never report a value from the opposite side.
+/// never report a value from the opposite side. The slot grid is the same one
+/// the curve is drawn on, so the readout can never name a sample the curve
+/// does not show.
 #[must_use]
-pub(crate) fn hover_slot(points: usize, width: f32, x: f32) -> Option<usize> {
-    if points == 0 || width <= 0.0 {
+pub(crate) fn hover_slot_in(points: usize, capacity: usize, width: f32, x: f32) -> Option<usize> {
+    if points == 0 {
         return None;
     }
     if points == 1 {
         return Some(0);
     }
-    let relative = (x / width).clamp(0.0, 1.0);
-    Some((((points - 1) as f32) * relative).round() as usize)
+    ChartSlots::new(points, capacity, width).index_at(x)
 }
 
 /// The pill's readout: the hovered value, plus how many samples the slot sits

@@ -7,23 +7,25 @@
 use super::*;
 use crate::icons::{IconInk, IconPlate};
 use crate::pages::performance::metrics::disk_caption;
-use crate::palette::{UiPalette, space_1, space_4, space_8, space_12};
+use crate::palette::{UiPalette, space_4, space_8, space_12};
 use crate::widgets::controls::{
     ControlTone, ControlVisual, SurfaceTone, device_row_with_accessory_scene, graph_card_scene,
-    pill_scene, stat_row_scene, surface_scene,
+    pill_scene, surface_scene,
 };
 use crate::widgets::layout::{
-    MAIN_GRAPH_MIN_WIDTH_PX, WIDE_DEVICE_SIDEBAR_WIDTH_PX, WIDE_STATS_WIDTH_PX,
+    MAIN_GRAPH_MIN_WIDTH_PX, PERFORMANCE_SIDEBAR_MAX_WIDTH_PX, PERFORMANCE_SIDEBAR_MIN_WIDTH_PX,
+    WIDE_STATS_WIDTH_PX,
 };
 use bevy::color::Alpha;
 use bevy::scene::on;
 use bevy::text::{LineBreak, TextLayout};
-use bevy::ui::prelude::{BackgroundColor, BorderRadius, FlexWrap, PositionType};
+use bevy::ui::prelude::{BackgroundColor, BorderColor, BorderRadius, FlexWrap, PositionType};
 use bevy::ui_widgets::Button;
 use taskmanager_ui_contract::IconId;
 
 pub(crate) mod battery;
 pub(super) mod blocks;
+pub(crate) use blocks::sync_memory_legend_layout;
 pub(crate) mod chart;
 pub(crate) mod hover;
 pub(crate) mod npu_power;
@@ -33,12 +35,8 @@ use super::replay::{PerformanceLiveBody, PerformanceReplayRoot, entry_scene};
 use sidebar::cpu::cpu_main_scene;
 use sidebar::{device_sidebar_scene, stats_rail_scene};
 
-/// The vertical divider's rail width, in rem.
-///
-/// The rail is the lane the hairline divider is centered in: the line
-/// itself is one logical px, and the rail carries the air on both sides of
-/// it. The rail rides the rem axis with the rest of the page furniture.
-const DIVIDER_RAIL_WIDTH_REM: f32 = 0.375;
+/// Separation between the device panel and the detail surface.
+const DEVICE_PANEL_GAP_REM: f32 = 0.375;
 
 /// The disk spare warning is a semantic plate sibling of the live caption.
 /// Keeping the icon outside the text node preserves both the tofu law and the
@@ -97,6 +95,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         Node {
             width: percent(100),
             height: percent(100),
+            min_width: px(0.0),
+            min_height: px(0.0),
             flex_direction: FlexDirection::Row,
             row_gap: Val::Px(space_2()),
             column_gap: Val::Px(space_2()),
@@ -107,23 +107,15 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
              @{ devices } --
 
                 Node {
-                    width: rem(DIVIDER_RAIL_WIDTH_REM),
-                    min_width: rem(DIVIDER_RAIL_WIDTH_REM),
+                    width: rem(DEVICE_PANEL_GAP_REM),
+                    min_width: rem(DEVICE_PANEL_GAP_REM),
                     height: percent(100),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                }
-                Children [
-
-                        Node {
-                            width: px(space_1()),
-                            height: percent(100),
-                        }
-                        BackgroundColor({ palette.border_color })
-
-                ] --
+                } --
                 Node {
                     flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    min_width: px(0.0),
+                    min_height: px(0.0),
                     height: percent(100),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),

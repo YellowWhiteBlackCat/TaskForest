@@ -24,7 +24,7 @@ use taskforest_core::core::services::{
 };
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
-use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, tokens};
 
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -332,8 +332,8 @@ fn with_log_line_selector(row: Div, _index: usize) -> Div {
 pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div {
     let panel = CardSurface::new(theme.palette())
         .padding(tokens::SPACE_8)
-        .radius(tokens::control_radius(theme))
-        .background(theme.sidebar_card_bg)
+        .radius(tokens::card_radius(theme))
+        .glass(GlassTier::Card)
         .render()
         .flex()
         .flex_col()

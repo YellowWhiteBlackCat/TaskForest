@@ -47,10 +47,14 @@ pub fn disabled_fg(palette: &Palette) -> Color {
     blend(palette.fg, palette.surface, 0.55)
 }
 
-/// Translucent scrim over the window (dialog masks read `palette.surface`).
+/// Translucent modal depth wash over the window.
 #[must_use]
 pub fn scrim(palette: &Palette, alpha: f32) -> Color {
-    palette.surface.with_alpha(alpha.clamp(0.0, 1.0))
+    palette
+        .theme
+        .glass_scrim()
+        .fill
+        .with_alpha(alpha.clamp(0.0, 1.0))
 }
 
 /// A hairline separator color derived from the palette border token.

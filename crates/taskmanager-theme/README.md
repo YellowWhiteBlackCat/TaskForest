@@ -3,7 +3,12 @@
 ## Role
 
 Toolkit-neutral theme tokens for skins, light/dark mode, high contrast, fonts,
-UI size, density, motion and semantic state colors.
+UI size, density, motion, semantic state colors, and the four-tier glass
+material contract. It is also the single codec between a saved setting and its
+axis, the only address for a font family name, and the only ladder for a type
+size or weight (ADR-063). `GlassLayer` is the painted frosted fallback; the separate
+`optical_glass` contract owns REM-authored optical intent, explicit renderer
+capabilities and fail-closed fallback decisions.
 
 ## Boundary
 
@@ -25,8 +30,10 @@ specified in [`docs/TOKEN_NEUTRALITY.md`](docs/TOKEN_NEUTRALITY.md).
 
 ```text
 src/tokens.rs  palette.rs  color.rs    neutral layout and color tokens
+src/optical_glass.rs                    optical spec, capability and fallback rules
 src/skins.rs                     skin registry — the single color source (ADR-026)
 src/theme.rs  fonts.rs           theme assembly and fonts
+src/settings.rs                   saved-axis codecs, mode preference, TM_SKIN override
 src/platform.rs  detection.rs    platform and appearance detection
 ```
 
@@ -35,3 +42,8 @@ src/platform.rs  detection.rs    platform and appearance detection
 - [`docs/TOKEN_NEUTRALITY.md`](docs/TOKEN_NEUTRALITY.md) — unconditional neutrality,
   per-frontend bindings, platform compensation and the `UiSize` token codec.
 - [ADR-026](../../adr/026-toolkit-neutral-theme-layer.md) — toolkit-neutral theme layer.
+- [ADR-061](../../adr/061-frosted-glass-material-system.md) — glass tiers,
+  REM-authored material geometry, the scrim/depth-wash contract and the
+  capability-gated optical extension.
+- [ADR-062](../../adr/062-backdrop-sampled-optical-glass.md) — optical-glass
+  definition, backend verdicts, capability reporting and no-vendor rule.

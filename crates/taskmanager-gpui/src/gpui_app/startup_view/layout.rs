@@ -5,9 +5,10 @@ use taskforest_core::core::BootTimeline;
 use taskmanager_ui::theme_binding::definite_length;
 
 use crate::gpui_app::list_view;
-use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget, VerticalSpace};
 use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{LayoutProfile, VerticalSpace};
 
 use super::boot_evidence::boot_timeline_block;
 use taskmanager_theme::tokens;

@@ -575,6 +575,9 @@ impl TuiApp {
         }
         self.with_canonical_rows_indexed(|ids, visible| {
             match ids.get(self.selected)? {
+                ProcessTreeRow::Container { .. } => visible
+                    .expansion_key_of(ids.get(self.selected)?)
+                    .map(ApplicationRowAnchor::Structural),
                 ProcessTreeRow::Category { .. } => {
                     // A structural category header anchors on its
                     // locale-neutral expansion key; it has no pid.
@@ -882,6 +885,9 @@ impl TuiApp {
         anchor: &ApplicationRowAnchor,
     ) -> bool {
         match (row, anchor) {
+            (ProcessTreeRow::Container { .. }, ApplicationRowAnchor::Structural(anchor_key)) => {
+                visible.expansion_key_of(row).as_deref() == Some(anchor_key.as_str())
+            }
             (ProcessTreeRow::Category { .. }, ApplicationRowAnchor::Structural(anchor_key)) => {
                 visible.expansion_key_of(row).as_deref() == Some(anchor_key.as_str())
             }

@@ -1,6 +1,7 @@
 //! Canonical category-hierarchy behavior tests (real mouse path + projection).
 
 use super::*;
+use crate::gpui_app::processes_view::Toggle;
 use std::collections::HashSet;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n::Language;
@@ -178,6 +179,89 @@ async fn category_group_chevron_click_expands_and_collapses_the_row(cx: &mut Tes
             "collapsed canonical hierarchy contains only its two headers"
         );
     });
+}
+
+/// A current container observation forms its own group section above the
+/// category tree. Its header carries the runtime/id facts, the observed name
+/// (or the id when no name was reported), and only its members appear beneath
+/// it after expansion. Host processes remain in their category buckets.
+#[gpui::test]
+async fn container_group_rides_above_the_category_tree(cx: &mut TestAppContext) {
+    use taskforest_core::core::process::{
+        ContainerMetadata, ContainerRuntime, ProcessMetadataObservations, ProcessOwner,
+    };
+
+    set_language(Language::En);
+    let (win, view) = wrapped_root(cx);
+    let container =
+        ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6").with_name("capture-web");
+    let container_member = |pid: u32, name: &str| {
+        let mut process = ProcessItemFixtureBuilder::new()
+            .pid(pid)
+            .name(name.into())
+            .current_cpu_percentage(1.0)
+            .current_memory_bytes(1_024)
+            .status("S".into())
+            .build();
+        process.apply_metadata_observations(ProcessMetadataObservations::current_with_container(
+            ProcessOwner::opaque("capture-user"),
+            None,
+            Some(container.clone()),
+            1,
+        ));
+        process
+    };
+    let host = ProcessItemFixtureBuilder::new()
+        .pid(90_000)
+        .name("capture-app".into())
+        .current_cpu_percentage(2.0)
+        .current_memory_bytes(2_048)
+        .status("S".into())
+        .application_identity_observation(ProcessMetadataObservation::absent(1))
+        .build();
+
+    view.update(cx, |v, _cx| {
+        v.page = TopPage::Apps;
+        v.processes_state.expanded_apps.clear();
+        v.replace_processes_for_test(vec![
+            container_member(90_001, "capture-worker-1"),
+            container_member(90_002, "capture-worker-2"),
+            host,
+        ]);
+        let (rows, _, _) = v.processes_projection();
+        let header = rows
+            .first()
+            .expect("the container group rides above the category tree");
+        assert_eq!(header.name, "capture-web");
+        assert_eq!(header.badge.as_deref(), Some("x2"));
+        assert_eq!(header.container_badge.as_deref(), Some("Docker"));
+        assert_eq!(header.depth, 0);
+        assert!(header.has_children);
+        assert!(header.collapsed);
+        assert!(matches!(header.toggle, Toggle::GroupUnknown(_)));
+
+        let key = match &header.toggle {
+            Toggle::GroupUnknown(key) => key.clone(),
+            _ => panic!("container header carries its own expansion key"),
+        };
+        v.processes_state.expanded_apps.insert(key.clone());
+        let (expanded, _, _) = v.processes_projection();
+        let member_pids: Vec<u32> = expanded
+            .iter()
+            .take(3)
+            .filter_map(|row| row.process_identity.map(ProcessLiveKey::pid))
+            .collect();
+        assert_eq!(member_pids, [90_001, 90_002]);
+        assert!(
+            expanded
+                .iter()
+                .filter(|row| row.process_identity.is_some())
+                .all(|row| row.container_badge.is_none()),
+            "member rows do not repeat the container runtime chip"
+        );
+        v.processes_state.expanded_apps.remove(&key);
+    });
+    draw(cx, win);
 }
 
 /// Real GPUI event path for the new Applications hierarchy: the category

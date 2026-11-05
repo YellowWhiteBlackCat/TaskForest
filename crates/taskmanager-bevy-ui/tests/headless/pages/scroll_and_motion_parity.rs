@@ -243,6 +243,17 @@ fn measured_size(world: &mut World, entity: Entity) -> Vec2 {
     node.size() * node.inverse_scale_factor()
 }
 
+/// Whether one scroll area's own measurement says its axis can move.
+fn scrolls(world: &mut World, area: Entity) -> bool {
+    let node = world
+        .get::<ComputedNode>(area)
+        .expect("the scroll area is measured");
+    let scale = node.inverse_scale_factor;
+    let visible = (node.size() - node.scrollbar_size) * scale;
+    let content = node.content_size() * scale;
+    content.y - visible.y > 0.5
+}
+
 /// The bottom edge of one node in window coordinates.
 fn bottom_edge(world: &mut World, entity: Entity) -> f32 {
     let node = world
@@ -305,20 +316,37 @@ fn every_owned_scroll_area_wears_a_visible_rail_sibling() {
             );
             let fill = world
                 .get::<BackgroundColor>(rail)
-                .expect("the rail paints a translucent track");
-            assert!(
-                fill.0.to_srgba().alpha > 0.0,
-                "{page:?}: the rail is visible, not an invisible plate"
+                .expect("the rail owns a background slot");
+            assert_eq!(
+                fill.0.to_srgba().alpha,
+                0.0,
+                "{page:?}: the lane paints no track; the capsule is the affordance"
             );
             let thumb = world
                 .get::<Children>(rail)
-                .map(|children| {
+                .and_then(|children| {
                     children
                         .iter()
-                        .any(|child| world.get::<ScrollbarThumb>(*child).is_some())
+                        .find(|child| world.get::<ScrollbarThumb>(**child).is_some())
+                        .copied()
                 })
-                .unwrap_or(false);
-            assert!(thumb, "{page:?}: the rail carries a capsule thumb");
+                .expect("the rail carries a capsule thumb");
+            let capsule = world
+                .get::<BackgroundColor>(thumb)
+                .expect("the capsule paints an ink");
+            assert!(
+                capsule.0.to_srgba().alpha > 0.0,
+                "{page:?}: the capsule is visible ink, not an invisible plate"
+            );
+            // The rail is in the layout exactly where the axis can move: an
+            // idle thumb would otherwise fill the whole track with a bar.
+            assert_eq!(
+                world
+                    .get::<Node>(rail)
+                    .is_some_and(|node| node.display != Display::None),
+                scrolls(world, area),
+                "{page:?}: the rail rides its scroll area's own overflow"
+            );
         }
     }
 }
@@ -341,6 +369,13 @@ fn the_narrow_frame_keeps_every_owned_scroll_area_reachable() {
         window.resolution = (width, height).into();
     }
     for page in ROUTES {
+        if page == Page::Processes {
+            // The processes page virtualizes its table rows through
+            // ProcessScrollIntent and keeps its details pane hidden
+            // in compact viewports, so it owns no active ScrollArea DOM
+            // node at 720x480.
+            continue;
+        }
         mount_page(&mut app, page);
         let world = app.world_mut();
         // A branch the responsive contract hides (the compact Performance

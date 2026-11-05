@@ -10,9 +10,9 @@ use taskmanager_assets::product::TAGLINE_EN;
 use taskmanager_assets::product::TAGLINE_ZH;
 use taskmanager_assets::product::ZH_NAME;
 use taskmanager_assets::{
-    EMBEDDED_FONT_FAMILIES, TASKMANAGER_ICON_PATHS, UI_ICON_RGBA_PATHS, UI_ICON_RGBA_SIZE,
-    all_asset_paths, asset_bytes, embedded_fonts, product_logo_bytes, product_logo_svg,
-    ui_icon_rgba,
+    GLASS_NOISE_RGBA_SIZE, TASKMANAGER_ICON_PATHS, UI_ICON_RGBA_PATHS, UI_ICON_RGBA_SIZE,
+    all_asset_paths, asset_bytes, embedded_fonts, glass_noise_rgba, product_logo_bytes,
+    product_logo_svg, ui_icon_rgba,
 };
 
 #[test]
@@ -72,6 +72,44 @@ fn every_registered_plate_is_exactly_one_rgba_plate() {
 }
 
 #[test]
+fn glass_noise_is_one_tileable_neutral_rgba_plate() {
+    let bytes = glass_noise_rgba();
+    let expected = GLASS_NOISE_RGBA_SIZE as usize * GLASS_NOISE_RGBA_SIZE as usize * 4;
+    assert_eq!(bytes.len(), expected);
+    let mut non_transparent = 0;
+    let mut min_alpha = u8::MAX;
+    let mut max_alpha = u8::MIN;
+    let mut min_luminance = u8::MAX;
+    let mut max_luminance = u8::MIN;
+    for &[red, green, blue, alpha] in bytes.as_chunks::<4>().0 {
+        assert!(
+            red >= 240 && green >= 240 && blue >= 240,
+            "grain stays neutral/white so the tier ink is its only tint"
+        );
+        assert!(
+            red == green && green == blue,
+            "grain is neutral: ({red}, {green}, {blue})"
+        );
+        if alpha > 0 {
+            non_transparent += 1;
+        }
+        min_alpha = min_alpha.min(alpha);
+        max_alpha = max_alpha.max(alpha);
+        min_luminance = min_luminance.min(red);
+        max_luminance = max_luminance.max(red);
+    }
+    assert_eq!(non_transparent, expected / 4, "every pixel is opaque grain");
+    assert!(
+        max_alpha == min_alpha,
+        "alpha is the renderer-owned strength, not baked into the plate"
+    );
+    assert!(
+        max_luminance - min_luminance > 8,
+        "the noise has visible luminance variation without becoming a wash"
+    );
+}
+
+#[test]
 fn every_asset_is_valid_tintable_svg() {
     let options = usvg::Options::default();
 
@@ -118,9 +156,16 @@ fn domain_asset_paths_are_complete() {
 }
 
 #[test]
-fn embedded_fonts_are_valid_truetype_with_expected_families() {
+fn embedded_fonts_are_valid_truetype_in_role_order() {
     let blobs = embedded_fonts();
-    assert_eq!(blobs.len(), 2);
+    // One blob per bundled role, UI first then monospace. The family NAMES are
+    // the theme owner's public collection (ADR-063); the `taskmanager-gates`
+    // census welds this count to it, so bytes and names cannot drift apart.
+    assert_eq!(
+        blobs.len(),
+        2,
+        "the bundled collection is one UI + one mono face"
+    );
     for blob in &blobs {
         // TrueType collection / TrueType sfnt magic (0x00010000 or 'true').
         let magic = u32::from_be_bytes([blob[0], blob[1], blob[2], blob[3]]);
@@ -130,8 +175,6 @@ fn embedded_fonts_are_valid_truetype_with_expected_families() {
         );
         assert!(blob.len() > 1_000, "font blob is suspiciously small");
     }
-    assert!(EMBEDDED_FONT_FAMILIES.contains(&"MiSans VF"));
-    assert!(EMBEDDED_FONT_FAMILIES.contains(&"Roboto Mono"));
 }
 
 #[test]

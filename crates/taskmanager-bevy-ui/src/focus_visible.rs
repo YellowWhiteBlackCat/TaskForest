@@ -38,9 +38,10 @@ use bevy::window::PrimaryWindow;
 use crate::confirmation::ConfirmationOverlay;
 use crate::pages::processes::columns_modal::ProcessColumnsPopover;
 use crate::pages::processes::properties_modal::ProcessPropertiesOverlay;
+use crate::pages::settings::SettingsChoice;
 use crate::scene_attach::insert_into;
 use crate::widgets::scene_paint::ScenePaint;
-use crate::window::{AppShellRoot, WindowPalette};
+use crate::window::{AppShellRoot, DemoMode, WindowPalette};
 
 /// The most recent origin capable of changing focus in the window.
 ///
@@ -175,6 +176,35 @@ fn decorate_groups(
     }
 }
 
+/// Demo-only capture arm for the `settings-switch-focus` scenario: name the
+/// High-contrast switch directly, because the live window's tab order is not
+/// guaranteed to reach a page-level switch before the capture deadline (the
+/// GPUI and Iced capture paths likewise focus their switch programmatically).
+fn arm_settings_switch_focus(
+    demo: Option<Res<DemoMode>>,
+    mut modality: ResMut<InputModalityState>,
+    mut focus: ResMut<InputFocus>,
+    targets: Query<(Entity, &SettingsChoice), With<FocusRing>>,
+) {
+    if demo.is_none() || crate::capture::capture_scenario_target() != Some("settings-switch-focus")
+    {
+        return;
+    }
+    let Some((entity, _)) = targets.iter().find(|(_, choice)| {
+        matches!(
+            choice.0,
+            crate::pages::settings::SettingsField::HighContrast(_)
+        )
+    }) else {
+        return;
+    };
+    if focus.get() == Some(entity) && modality.shows_focus_ring() {
+        return;
+    }
+    modality.transition(InputModality::Keyboard);
+    focus.set(entity, bevy::input_focus::FocusCause::Navigated);
+}
+
 /// Toolkit focus is the authority; moving focus updates the ring even when
 /// the input modality stays Keyboard across successive Tab presses.
 fn paint_focus_ring(
@@ -249,6 +279,9 @@ pub(crate) fn capture_ready(access: &mut FocusCapture, switch: bool) -> bool {
         });
         return ring_visible && node.size().x > 0.0 && node.size().y > 0.0 && visible;
     }
+    if crate::capture::capture_scenario_target() == Some("settings-switch-focus") {
+        return false;
+    }
     let Some(window) = access.windows.iter().next() else {
         return false;
     };
@@ -297,9 +330,13 @@ pub(crate) fn register(app: &mut App) {
     }
     app.add_systems(
         PostUpdate,
+        arm_settings_switch_focus.chain().after(ScenePaint),
+    );
+    app.add_systems(
+        PostUpdate,
         (decorate_groups, decorate_controls, paint_focus_ring)
             .chain()
-            .after(ScenePaint),
+            .after(arm_settings_switch_focus),
     );
     app.add_systems(
         PostUpdate,

@@ -7,8 +7,8 @@
 use ::gpui::{Font, FontFallbacks, font};
 use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 use taskmanager_theme::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, HighContrast, LightDark, NativeAppearance, ResolvedFonts,
-    Skin, Theme,
+    AppearanceOverride, FONT_MISANS_VF, FONT_ROBOTO_MONO, HighContrast, LightDark,
+    NativeAppearance, ResolvedFonts, Skin, Theme,
 };
 
 /// Build the UI font with the product CJK face as an explicit glyph fallback.
@@ -52,28 +52,28 @@ pub fn skin_for_appearance(appearance: DesktopAppearance) -> Skin {
 /// This is kept separate from [`skin_for_appearance`] so a late native event
 /// cannot accidentally erase an intentional test override.
 pub fn forced_skin_from_env() -> Option<Skin> {
-    std::env::var("TM_SKIN")
-        .ok()
-        .and_then(|value| parse_skin(&value))
-        .map(|(skin, _)| skin)
+    AppearanceOverride::from_env().map(|forced| forced.skin)
 }
 
 /// Resolve the active theme from native-adapter appearance facts.
 /// Honors `TM_SKIN=<skin>-<light|dark>` (and optional `TM_SKIN_HC=1`) for
 /// testing.
 pub fn detect(appearance: DesktopAppearance) -> Theme {
-    if let Ok(v) = std::env::var("TM_SKIN")
-        && let Some((skin, mode)) = parse_skin(&v)
-    {
-        let hc = if std::env::var("TM_SKIN_HC")
-            .map(|s| !s.is_empty())
-            .unwrap_or(false)
-        {
+    // The override vocabulary and both environment names belong to the theme
+    // owner (ADR-063); this frontend only projects the forced axes onto a
+    // snapshot, so the capture harness and the product can never drift.
+    if let Some(forced) = AppearanceOverride::from_env() {
+        let hc = if forced.high_contrast {
             HighContrast::On
         } else {
             HighContrast::Off
         };
-        return Theme::build(skin, mode, hc, ResolvedFonts::system_for(skin));
+        return Theme::build(
+            forced.skin,
+            forced.mode,
+            hc,
+            ResolvedFonts::system_for(forced.skin),
+        );
     }
     Theme::detect(NativeAppearance {
         family: match appearance.family {
@@ -92,24 +92,6 @@ pub fn detect(appearance: DesktopAppearance) -> Theme {
         },
         high_contrast: appearance.high_contrast,
     })
-}
-
-fn parse_skin(s: &str) -> Option<(Skin, LightDark)> {
-    let (p, m) = s.split_once('-')?;
-    let skin = match p.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match m.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
 }
 
 #[cfg(test)]

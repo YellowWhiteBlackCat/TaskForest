@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, App, BoxShadow, ElementId, InteractiveElement, IntoElement, KeyBinding,
-    MouseDownEvent, ParentElement, Point, SharedString, Styled, Window, actions, div, px,
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, KeyBinding, MouseDownEvent,
+    ParentElement, SharedString, Styled, Window, actions, div, rems,
 };
 use taskmanager_theme::Palette;
 use taskmanager_ui_contract::IconId;
@@ -22,8 +22,8 @@ use crate::overlays::layer_stack::{LayerBackfill, ModalSpec, PaletteScrim};
 use crate::primitives::button::ButtonVariant;
 use crate::primitives::icon_button::{IconButton, IconButtonState};
 use crate::{BackfillBuilder, ElementBuilder, OptBoolCallback, OptCallback};
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, Theme};
 
 /// The dialog key context (Escape/Enter bindings live under it).
 pub const DIALOG_CONTEXT: &str = "TaskManagerDialog";
@@ -86,24 +86,8 @@ type RenderButtonFn = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 /// wide, low-opacity ambient blur plus a tight, high-opacity edge blur —
 /// both painted in the palette's single `card_shadow` ink (the edge layer
 /// carries the full ink alpha, the ambient layer 60% of it).
-fn panel_shadow(palette: &Palette) -> Vec<BoxShadow> {
-    let ink = palette.card_shadow;
-    vec![
-        BoxShadow {
-            color: crate::theme_binding::hsla(ink.with_alpha(ink.a * 0.6)),
-            offset: Point::new(px(0.0), px(4.0)),
-            blur_radius: px(16.0),
-            spread_radius: px(0.0),
-            inset: false,
-        },
-        BoxShadow {
-            color: crate::theme_binding::hsla(ink),
-            offset: Point::new(px(0.0), px(1.0)),
-            blur_radius: px(4.0),
-            spread_radius: px(0.0),
-            inset: false,
-        },
-    ]
+fn panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
+    crate::theme_binding::glass_shadow(theme, GlassTier::Modal)
 }
 
 /// Builder for one modal dialog.
@@ -340,13 +324,18 @@ impl Dialog {
                 "tm-dialog".into(),
                 backfill.layer_ix as u64,
             ))
-            .w(px(self.width))
-            .when_some(self.max_width, |el, max| el.max_w(px(max)))
-            .rounded(crate::theme_binding::absolute(palette.panel_radius))
-            .bg(crate::theme_binding::fill(palette.surface))
-            .border_1()
-            .border_color(crate::theme_binding::hsla(palette.border))
-            .shadow(panel_shadow(&palette))
+            .w(crate::theme_binding::rem_value(self.width))
+            .when_some(self.max_width, |el, max| {
+                el.max_w(crate::theme_binding::rem_value(max))
+            })
+            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
+            .bg(crate::theme_binding::glass_fill(
+                &palette.theme,
+                GlassTier::Modal,
+            ))
+            .border(rems(GlassTier::Modal.edge_width_rem()))
+            .border_color(crate::theme_binding::hsla(palette.theme.glass_modal().edge))
+            .shadow(panel_shadow(&palette.theme))
             .flex()
             .flex_col()
             .overflow_hidden()
@@ -366,7 +355,7 @@ impl Dialog {
                     .flex_row()
                     .items_center()
                     .justify_between()
-                    .px(crate::theme_binding::definite_length(tokens::SPACE_16))
+                    .px(crate::theme_binding::rem_length(tokens::SPACE_16))
                     .py(crate::theme_binding::definite_length(tokens::SPACE_12))
                     .child(
                         div()
@@ -401,7 +390,7 @@ impl Dialog {
                 .collect();
             panel = panel.child(
                 div()
-                    .px(crate::theme_binding::definite_length(tokens::SPACE_16))
+                    .px(crate::theme_binding::rem_length(tokens::SPACE_16))
                     .py(crate::theme_binding::definite_length(tokens::SPACE_12))
                     .flex_col()
                     .gap(crate::theme_binding::definite_length(tokens::SPACE_8))

@@ -21,8 +21,8 @@ use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{
-    AlignSelf, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent, px,
+    AlignSelf, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -32,10 +32,12 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 
 use crate::app::FrontendTrack;
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole};
+use taskmanager_theme::GlassTier;
 
 use super::paint;
 
@@ -102,7 +104,14 @@ pub(super) fn bubble_scene(
         SessionControlAction::Disconnect => palette.danger_color,
         SessionControlAction::Lock => palette.accent,
     };
-    let radius = palette.control_radius_px;
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             width: Val::Auto,
@@ -127,10 +136,18 @@ pub(super) fn bubble_scene(
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_4()),
                     padding: UiRect::all(Val::Px(space_12())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
+                    border: UiRect::all(Val::Rem(edge_width_rem)),
+                    border_radius: BorderRadius::all(Val::Rem(radius_rem)),
                 }
-                BackgroundColor({ palette.panel_fill })
+                BackgroundColor({ fill })
+                BorderColor::all(edge)
+                BoxShadow({ shadows })
+                OpticalGlassCard {
+                    tier: GlassTier::Card,
+                    enabled: true,
+                }
                 Children [
+                     @{ grain } --
                      Text(headline) TextRole(Role::Body) --
                      Text(body) TextRole(Role::Caption) --
 

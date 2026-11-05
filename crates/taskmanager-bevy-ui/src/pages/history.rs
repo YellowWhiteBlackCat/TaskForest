@@ -26,7 +26,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, percent, px,
 };
 use bevy::ui::widget::Text;
 use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};

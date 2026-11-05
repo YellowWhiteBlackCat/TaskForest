@@ -18,8 +18,8 @@ use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
@@ -27,6 +27,7 @@ use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
 
 use super::phases::{boot_phase_slices, phase_rows_scene, phase_total_ms};
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_2, space_4, space_8};
 use crate::window::{Role, TextRole};
 
@@ -125,7 +126,7 @@ pub(crate) fn boot_timeline_scene(
                                  width: percent(48),
                                  min_width: Val::Px(0.0),
                                  height: rem(palette.control_height_rem * 0.45),
-                                 border_radius: BorderRadius::all(Val::Px(space_2())),
+                                 border_radius: BorderRadius::all(rem(palette.control_height_rem * 0.225)),
                                  overflow: Overflow::clip_x(),
                              }
                              BackgroundColor({ palette.panel_fill })
@@ -135,7 +136,7 @@ pub(crate) fn boot_timeline_scene(
                                       min_width: rem(palette.control_height_rem * 0.08),
                                       height: percent(100),
                                       margin: UiRect::left(percent(start_share * 100.0)),
-                                      border_radius: BorderRadius::all(Val::Px(space_2())),
+                                      border_radius: BorderRadius::all(rem(palette.control_height_rem * 0.225)),
                                   }
                                   BackgroundColor({ palette.accent })
                                   StartupTimelineWindow(window_unit, window_start, window_duration)
@@ -221,16 +222,28 @@ pub(crate) fn boot_timeline_scene(
         }
     }
 
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     Some(Box::new(bsn! {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.content_bg })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
         Children [
+            @{ grain } --
             { children }
         ]
     }))

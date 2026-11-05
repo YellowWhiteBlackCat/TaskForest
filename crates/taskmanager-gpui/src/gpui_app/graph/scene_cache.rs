@@ -31,7 +31,7 @@
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use taskmanager_application::history_decimation::lttb_gap_preserving_runs;
-use taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD;
+use taskmanager_theme::tokens::{FONT_10, FONT_WEIGHT_SEMIBOLD, LINE_HEIGHT_BADGE};
 use taskmanager_ui::theme_binding::font_weight;
 
 use gpui::{
@@ -611,9 +611,10 @@ fn draw_value_badge(
         let mut run = window.text_style().to_run(text.len());
         run.color = Hsla::from(base);
         run.font.weight = font_weight(FONT_WEIGHT_SEMIBOLD);
-        let line = window
-            .text_system()
-            .shape_line(text.into(), px(10.0), &[run], None);
+        let line =
+            window
+                .text_system()
+                .shape_line(text.into(), px(f32::from(FONT_10)), &[run], None);
         *cache = Some(ValueBadgeCache {
             latest_bits,
             secondary_latest_bits,
@@ -628,7 +629,9 @@ fn draw_value_badge(
         return;
     };
     let text_w = cached.line.width;
-    let line_height = px(12.0);
+    // The badge's line box comes from the theme's badge leading on the same
+    // caption rung it was shaped at, so the pill scales with the type.
+    let line_height = px(f32::from(FONT_10) * f32::from(LINE_HEIGHT_BADGE));
     let pad_x = px(4.0);
     let pad_y = px(1.5);
 

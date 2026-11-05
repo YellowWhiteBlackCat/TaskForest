@@ -32,6 +32,12 @@ perf-gpu	perf-gpu	1180x780	gnome-light
 perf-gpu-compact	perf-gpu	720x480	gnome-light
 perf-battery	perf-battery	1180x780	gnome-light
 perf-battery-compact	perf-battery	720x480	gnome-light
+perf-cpu-normal	performance	1280x720	gnome-light
+perf-memory-normal	perf-memory	1280x720	gnome-light
+perf-disk-normal	perf-disk	1280x720	gnome-light
+perf-network-normal	perf-network	1280x720	gnome-light
+perf-gpu-normal	perf-gpu	1280x720	gnome-light
+perf-battery-normal	perf-battery	1280x720	gnome-light
 applications-dark	applications	1180x780	gnome-dark
 applications-compact-dark	applications	720x480	gnome-dark
 services-dark	services	1180x780	gnome-dark
@@ -125,6 +131,8 @@ apps-search-highlight	apps-search-highlight	1180x780	gnome-light
 apps-search-highlight-compact	apps-search-highlight	720x480	gnome-light
 apps-group-expanded	apps-group-expanded	1180x780	gnome-light
 apps-group-expanded-compact	apps-group-expanded	720x480	gnome-light
+apps-container-group	apps-container-group	1180x780	gnome-light
+apps-container-group-compact	apps-container-group	720x480	gnome-light
 telemetry-paused	telemetry-paused	1180x780	gnome-light
 telemetry-paused-compact	telemetry-paused	720x480	gnome-light
 sidebar-hidden	sidebar-hidden	1180x780	gnome-light
@@ -197,9 +205,15 @@ diagnostic-failure	diagnostic-failure	1180x780	gnome-light
 diagnostic-failure-compact	diagnostic-failure	720x480	gnome-light
 process-selection	process-selection	1180x780	gnome-light
 process-selection-compact	process-selection	720x480	gnome-light
+process-context-menu	process-context-menu	1180x780	gnome-light
+process-context-menu-compact	process-context-menu	720x480	gnome-light
+tooltip-overlay	tooltip-overlay	1180x780	gnome-light
+tooltip-overlay-compact	tooltip-overlay	720x480	gnome-light
 service-details-logs	service-logs	1180x780	gnome-light
 service-details-logs-compact	service-logs	720x480	gnome-light
 settings-switch-focus	settings-switch-focus	1180x780	gnome-light
 settings-switch-focus-compact	settings-switch-focus	720x480	gnome-light
 settings-zero-gray	settings-zero-gray	1180x780	gnome-light
 settings-zero-gray-compact	settings-zero-gray	720x480	gnome-light
+feedback-overlay	feedback-overlay	1180x780	gnome-light
+feedback-overlay-compact	feedback-overlay	720x480	gnome-light

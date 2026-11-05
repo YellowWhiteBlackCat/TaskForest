@@ -90,12 +90,24 @@ pub(crate) fn thread_header<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     row![
-        text("TID").width(Length::Fixed(56.0)).color(muted),
-        text("Name").width(Length::Fixed(196.0)).color(muted),
-        text("State").width(Length::Fixed(48.0)).color(muted),
-        text("CPU-time").width(Length::Fixed(72.0)).color(muted),
-        text("Wait").width(Length::Fixed(72.0)).color(muted),
-        text("CPU%").width(Length::Fill).color(muted),
+        text(t("proc_insights.thread_tid"))
+            .width(Length::Fixed(56.0))
+            .color(muted),
+        text(t("common.name"))
+            .width(Length::Fixed(196.0))
+            .color(muted),
+        text(t("common.status"))
+            .width(Length::Fixed(48.0))
+            .color(muted),
+        text(t("proc_insights.thread_cpu_time"))
+            .width(Length::Fixed(72.0))
+            .color(muted),
+        text(t("proc_insights.thread_wait"))
+            .width(Length::Fixed(72.0))
+            .color(muted),
+        text(t("proc_insights.thread_cpu_percent"))
+            .width(Length::Fill)
+            .color(muted),
     ]
     .spacing(8)
     .padding(2)

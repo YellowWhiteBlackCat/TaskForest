@@ -26,13 +26,11 @@ use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskforest_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 use taskmanager_application::container_row_window;
 
-// Shared locale catalog for the per-container table column headers and the
-// typed source states (the page title and status messages stay on the
-// renderer-local `crate::i18n`).
+// Shared locale catalog: the page title, the scope subtitle, the per-container
+// table column headers and the typed source states all resolve here.
 use taskmanager_application::i18n::t;
 
 use crate::app::Message;
-use crate::i18n::{self, Key};
 use crate::theme;
 use taskmanager_theme::tokens;
 
@@ -323,12 +321,11 @@ pub(crate) fn page_branch(rollup: Option<&ContainerRollup>) -> ContainersPageBra
 /// non-healthy `DeviceState` explains why there are no rows.
 pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
-    let language = app.language();
     let shell = &app.shell;
 
     let body: Element<'_, Message, iced::Theme, iced::Renderer> =
         page_body(theme_snapshot, containers_rollup(shell));
-    let page = column![page_header(theme_snapshot, language), body]
+    let page = column![page_header(theme_snapshot), body]
         .spacing(f32::from(tokens::SPACE_12))
         .width(Length::Fill)
         .height(Length::Fill);
@@ -341,14 +338,11 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
 
 /// The page header: title, the honest scope subtitle, and the close action
 /// (the local-surface dismissal — same semantics as Escape).
-fn page_header<'a>(
-    theme_snapshot: &'a Theme,
-    language: crate::i18n::Language,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+fn page_header<'a>(theme_snapshot: &'a Theme) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
         column![
-            text(i18n::t(language, Key::Containers)).size(f32::from(tokens::FONT_20)),
-            text(i18n::t(language, Key::ContainersHeader))
+            text(t("containers.title")).size(f32::from(tokens::FONT_20)),
+            text(t("containers.header"))
                 .size(f32::from(tokens::FONT_11))
                 .color(theme::muted_text_color(theme_snapshot)),
         ]

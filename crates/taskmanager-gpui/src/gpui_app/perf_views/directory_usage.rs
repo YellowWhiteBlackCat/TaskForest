@@ -24,8 +24,8 @@ use taskforest_core::core::DirectoryUsageSnapshot;
 use taskforest_core::core::metrics::{DiskMetrics, ScalarAvailability};
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 /// Maximum entry rows painted before collapsing into a "+N" summary. The
@@ -50,9 +50,9 @@ pub(super) fn directory_usage_panel(
 ) -> Div {
     let ent = cx.entity();
     let mut panel = CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_10)
-        .radius(tokens::control_radius(theme))
+        .radius(tokens::card_radius(theme))
         .bordered(true)
         .render()
         .flex()

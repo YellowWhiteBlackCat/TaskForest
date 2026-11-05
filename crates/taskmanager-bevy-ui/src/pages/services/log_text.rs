@@ -28,6 +28,7 @@ use bevy::ui::widget::Text;
 
 use crate::palette::UiPalette;
 use crate::window::{Role, TextRole};
+use taskmanager_theme::tokens;
 
 /// The ink one log text run wears.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -84,9 +85,6 @@ const WARNING_KEYWORDS: &[&str] = &["warning", "warn"];
 
 /// The info vocabulary.
 const INFO_KEYWORDS: &[&str] = &["info"];
-
-/// The small mono size of the timestamp run, relative to the body size.
-const STAMP_FONT_REM: f32 = 0.75;
 
 #[must_use]
 fn is_word_char(byte: u8) -> bool {
@@ -249,6 +247,10 @@ pub(crate) fn log_run_ink(kind: LogInk, palette: &UiPalette) -> Color {
 /// The timestamp run: small, monospace and quiet — the RFC3339 stamp sits
 /// beside the message without competing with it.
 pub(crate) fn log_stamp_scene(text: String) -> impl Scene + use<> {
+    // The micro rung of the public type ladder, expressed as a root-relative
+    // factor so the stamp follows the user's UI-size choice like every other
+    // tier (ADR-063: no frontend-authored number).
+    let stamp_size = FontSize::Rem(f32::from(tokens::FONT_RATIO_MICRO));
     bsn! {
         Node {
             flex_shrink: 0.0,
@@ -257,7 +259,7 @@ pub(crate) fn log_stamp_scene(text: String) -> impl Scene + use<> {
         Children [
              Text(text)
              TextRole(Role::Mono)
-             TextFont { font_size: FontSize::Rem(STAMP_FONT_REM) }
+             TextFont { font_size: stamp_size }
              ServiceLogInk(LogInk::Quiet)
              TextLayout { linebreak: LineBreak::NoWrap }
         ]

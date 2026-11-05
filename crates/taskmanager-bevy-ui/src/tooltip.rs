@@ -56,14 +56,17 @@ use bevy::prelude::Visibility;
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, ComputedNode, FixedNode, JustifyContent, Node,
-    UiGlobalTransform, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
+    ComputedUiRenderTargetInfo, FixedNode, JustifyContent, Node, UiGlobalTransform, UiRect, Val,
+    px,
 };
 use bevy::ui::widget::Text;
+use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::{
     OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
 };
 
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::scene_attach::attach_child;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
@@ -206,29 +209,55 @@ pub(crate) fn resolve_placement(
 /// The card is viewport-anchored: the placement system writes its resolved
 /// position every frame, so the card follows its anchor and never leaves
 /// the viewport.
-pub(crate) fn tooltip_card_scene(text: &str, palette: &UiPalette) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
+///
+/// GLASS-01: the hint is a floating card, so it wears the shared Card glass
+/// material (fill + specular edge + two-layer shadow + grain) — the same layer
+/// Bevy's menus and the GPUI/Iced tooltips paint — rather than the bare panel
+/// fill it used to carry.
+pub(crate) fn tooltip_card_scene(
+    text: &str,
+    palette: &UiPalette,
+    max_width: Option<f32>,
+) -> impl Scene + use<> {
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     let label = text.to_string();
+    let card_max_width = max_width.map_or(Val::Auto, px);
     bsn! {
         Node {
             // Viewport-anchored hover card: offsets resolve against the
             // camera viewport, immune to any future shell layout reflow.
             left: Val::Px(0.0),
             top: Val::Px(0.0),
-            min_width: px(0.0),
-            max_width: percent(90),
+            // A percentage cap on this FixedNode resolves against its own
+            // content box and collapses the hint to a narrow column. The
+            // caller supplies the viewport-derived cap in pixels instead.
+            max_width: { card_max_width },
             padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_4())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
         }
         FixedNode
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
+        OpticalGlassCard {
+            tier: GlassTier::Card,
+            enabled: true,
+        }
         TooltipOverlay
         Pickable::IGNORE
         Children [
+            @{ grain } --
              Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::WordOrCharacter }
-             Node { min_width: px(0.0), max_width: percent(100) } Pickable::IGNORE
         ]
     }
 }
@@ -314,6 +343,7 @@ pub(crate) fn tooltip_focus_interaction_system(
     mut commands: Commands,
 ) {
     let focused_target = focus.get().filter(|entity| targets.contains(*entity));
+
     if state.focused_target == focused_target {
         return;
     }
@@ -355,6 +385,50 @@ pub(crate) fn tooltip_focus_interaction_system(
 /// The card is mounted with the hover — so its size is measurable for the
 /// viewport fit — but it stays hidden until the pointer has rested on the
 /// same target for [`TOOLTIP_DELAY`].
+///
+/// Demo-only capture arm for the `tooltip-overlay` scenario.
+///
+/// The production paths are pointer hover (after a 500 ms rest) and keyboard
+/// focus on a trigger. A deterministic capture can time neither: the pointer
+/// never settles, and the nav toggle that publishes `TooltipText` is respawned
+/// on route remounts, which clears `InputFocus`. This arm therefore publishes
+/// the SAME `TooltipState` session the production systems write and triggers
+/// the SAME `TooltipStateChanged` event, so the ordinary observer mounts and
+/// places the real Card-tier card. No fixture-only tooltip widget exists.
+fn arm_tooltip_overlay(
+    demo: Option<Res<crate::window::DemoMode>>,
+    state: Option<ResMut<TooltipState>>,
+    targets: Query<(Entity, &TooltipText, &ComputedNode, &UiGlobalTransform)>,
+    mut commands: Commands,
+) {
+    if demo.is_none() || crate::capture::capture_scenario_target() != Some("tooltip-overlay") {
+        return;
+    }
+    let Some(mut state) = state else {
+        return;
+    };
+    // Only a laid-out, visible trigger can anchor the card. The nav strip is
+    // respawned on route remounts, so a session frozen on a stale entity would
+    // leave the card unplaced (or pinned to the window's bottom-left corner).
+    let Some((target, text, _, _)) = targets
+        .iter()
+        .find(|(_, _, node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+    else {
+        return;
+    };
+    // Re-publish whenever the live target moved: the nav strip is respawned on
+    // route remounts, and a session frozen on the old entity would leave the
+    // card unplaced. Matching the CURRENT entity keeps the anchor live.
+    if state.session.as_ref().is_some_and(|session| {
+        session.target == target && session.text == text.0 && state.is_ready()
+    }) {
+        return;
+    }
+    state.show(target, text.0.clone());
+    state.ready = true;
+    commands.trigger(TooltipStateChanged);
+}
+
 pub(crate) fn tooltip_delay_system(mut state: ResMut<TooltipState>, time: Res<bevy::time::Time>) {
     let Some(session) = state.session.clone() else {
         return;
@@ -441,7 +515,7 @@ fn on_tooltip_state_changed(
     _changed: On<TooltipStateChanged>,
     state: Option<Res<TooltipState>>,
     palette: Option<Res<WindowPalette>>,
-    roots: Query<Entity, With<AppShellRoot>>,
+    roots: Query<(Entity, &ComputedUiRenderTargetInfo), With<AppShellRoot>>,
     overlays: Query<Entity, With<TooltipOverlay>>,
     mut commands: Commands,
 ) {
@@ -457,10 +531,12 @@ fn on_tooltip_state_changed(
     let Some(palette) = palette else {
         return;
     };
-    let Ok(root) = roots.single() else {
+    let Ok((root, target)) = roots.single() else {
         return;
     };
-    let scene = tooltip_card_scene(&session.text, &palette.inner);
+    let viewport_width = target.logical_size().x;
+    let max_width = (viewport_width > 0.0).then_some(viewport_width * 0.9);
+    let scene = tooltip_card_scene(&session.text, &palette.inner, max_width);
     let overlay = commands.spawn_scene(scene).id();
     attach_child(&mut commands, root, overlay);
 }
@@ -472,6 +548,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_systems(
         bevy::app::Update,
         (
+            arm_tooltip_overlay,
             tooltip_hover_interaction_system,
             tooltip_focus_interaction_system,
             tooltip_delay_system,

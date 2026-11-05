@@ -47,6 +47,7 @@ the lower document layers.
 - Frontends never read OS sources directly. Blocking collection stays off the UI thread; rendering and keyboard paths consume the same cached projection.
 - Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is an independent product crate with its own binary over the shared `taskmanager-cli` harness; the workspace carries no `ui-*` features, and shared layers never gate code on a frontend identity.
 - Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens, and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
+- Public UI resources have one authority (ADR-063): `locales/*.json` + `taskmanager-application::i18n` own all copy/language, `taskmanager-theme` owns all design tokens including the axis token codecs, the font collection, and the type size/weight ladders, and `IconId` + `taskmanager-icons` + `taskmanager-assets` own all icon semantics; frontends bind, never fork. No second dictionary, `Language`, key enum, palette, glyph set, saved-theme decoder, font family, or hand-numbered size/weight is permitted; gates reject new forks at zero tolerance.
 - Windows telemetry, tests, and helpers never use PowerShell or another command interpreter.
 - Production code is panic-free by gate. Tests prove behavior and side effects, not source text, vacuous assertions, or host-specific values.
 - Public-repository checks reject private paths, live captures, personal email addresses, credentials, and host-specific absolute paths.

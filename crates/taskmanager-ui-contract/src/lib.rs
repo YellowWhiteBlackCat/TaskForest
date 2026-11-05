@@ -15,6 +15,7 @@ mod keybindings;
 mod message;
 pub mod navigation;
 mod overlay;
+pub mod presentation;
 mod text_edit;
 
 pub use accessibility::AlertRuleInput;

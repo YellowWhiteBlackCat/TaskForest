@@ -19,6 +19,10 @@ application-history-replay	gnome-light	app-history	cpu	0	application-history-rep
 apps-group-expanded	gnome-light	apps	cpu	0	apps-group-expanded	1180x780	1180x780
 apps-group-expanded-wide	gnome-light	apps	cpu	0	apps-group-expanded	1920x1080	1920x1080
 apps-group-expanded-compact	gnome-light	apps	cpu	0	apps-group-expanded	720x480	720x480
+tooltip-overlay	gnome-light	apps	cpu	0	tooltip-overlay	1180x780	1180x780
+tooltip-overlay-compact	gnome-light	apps	cpu	0	tooltip-overlay	720x480	720x480
+feedback-overlay	gnome-light	performance	cpu	0	feedback-overlay	1180x780	1180x780
+feedback-overlay-compact	gnome-light	performance	cpu	0	feedback-overlay	720x480	720x480
 apps-identity-matrix	gnome-light	apps	cpu	0	apps-identity-matrix	1180x780	1180x780
 apps-identity-matrix-compact	gnome-light	apps	cpu	0	apps-identity-matrix	720x480	720x480
 keyboard-focus	gnome-light	apps	cpu	0	keyboard-focus	1180x780	1180x780
@@ -57,6 +61,8 @@ settings	gnome-light	performance	cpu	1	standard	1180x780	1180x780
 disk-smart-missing-tool	gnome-light	performance	disk	0	smart-missing-tool	1180x780	1180x780
 process-force-kill-confirmation	gnome-light	apps	cpu	0	process-force-kill	1180x780	1180x780
 process-selection	gnome-light	apps	cpu	0	process-selection	1180x780	1180x780
+process-context-menu	gnome-light	apps	cpu	0	process-context-menu	1180x780	1180x780
+process-context-menu-compact	gnome-light	apps	cpu	0	process-context-menu	720x480	720x480
 process-memory-pss-swap	gnome-light	apps	cpu	0	process-memory-pss-swap	1180x780	1180x780
 process-memory-pss-swap-compact	gnome-light	apps	cpu	0	process-memory-pss-swap	720x480	720x480
 device-disconnected	gnome-light	performance	disk	0	device-hotplug	1180x780	1180x780

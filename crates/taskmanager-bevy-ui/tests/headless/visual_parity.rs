@@ -93,17 +93,35 @@ fn the_owner_chain_icons_are_registered_and_stampable_here() {
 #[test]
 fn the_nav_tab_set_is_the_shared_page_vocabulary_onto_shared_icons() {
     // The strip's tabs, routed back through the shared action vocabulary,
-    // must equal AppPage::ALL exactly — same pages, same order. A bevy-only
-    // tab or a reordered strip forks the product's route contract.
+    // carry every shared page. GPUI screens them in a performance-first
+    // order with history before system; the same actions remain the route
+    // contract, and a frontend-local tab with no shared page (Containers)
+    // rides the strip without inventing a shared action.
     let routed: Vec<_> = crate::app::NAV_TABS
         .iter()
-        .map(|&page| crate::app::action_for_page(page))
+        .filter_map(|&page| crate::app::action_for_page(page))
         .collect();
-    let shared: Vec<_> = AppPage::ALL
-        .iter()
-        .map(|&page| Some(AppAction::SelectPage(page)))
-        .collect();
-    assert_eq!(routed, shared, "nav tabs must mirror AppPage::ALL in order");
+    let shared: Vec<_> = [
+        AppPage::Performance,
+        AppPage::Applications,
+        AppPage::Services,
+        AppPage::Startup,
+        AppPage::Users,
+        AppPage::AppHistory,
+        AppPage::System,
+    ]
+    .iter()
+    .map(|&page| AppAction::SelectPage(page))
+    .collect();
+    assert_eq!(
+        routed, shared,
+        "nav tabs carry the shared actions in GPUI screen order"
+    );
+    assert_eq!(
+        crate::app::NAV_TABS.len(),
+        shared.len() + 1,
+        "the strip adds exactly the frontend-local Containers tab"
+    );
     // Every tab and trailing affordance resolves its icon in BOTH asset
     // forms: the SVG source GPUI draws and the bitmap plate this frontend
     // draws. One semantic identity, two materializations, no drift.

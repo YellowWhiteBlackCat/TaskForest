@@ -3,7 +3,9 @@
 //! This module consumes typed snapshots and emits typed confirmation requests.
 //! It performs no collection, filesystem access, or SMART command execution.
 
-use gpui::{App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative};
+use gpui::{
+    App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative, rems,
+};
 use std::rc::Rc;
 use taskmanager_application::SourceStateKind;
 use taskmanager_shell::presentation::filesystem_backing_label;
@@ -12,10 +14,11 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use taskmanager_ui::theme_binding::rem_length;
 
-use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
 use taskforest_core::core::metrics::DiskMetrics;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskforest_core::core::{
@@ -24,10 +27,12 @@ use taskforest_core::core::{
     SensorReading, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,
     SmartSelfTestReport,
 };
-use taskmanager_theme::Color;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, GlassTier};
 use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui_contract::presentation::budget::SystemPageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::SystemSurfacePresentation;
 
 mod capture;
 pub use capture::capture_english_text;
@@ -217,10 +222,10 @@ fn filesystem_row(
         .map_or_else(unavailable, |value| format!("{value:.1}%"));
     div()
         .p(definite_length(tokens::SPACE_9))
-        .rounded(absolute(tokens::control_radius(theme)))
-        .border_1()
-        .border_color(hsla(theme.border))
-        .bg(fill(theme.sidebar_card_bg))
+        .rounded(rem_length(tokens::control_radius(theme)))
+        .border(rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+        .bg(glass_fill(theme, GlassTier::Card))
         .child(
             div()
                 .flex()
@@ -343,8 +348,10 @@ fn sensor_group(
             rows = rows.child(
                 div()
                     .p(definite_length(tokens::SPACE_8))
-                    .rounded(absolute(tokens::control_radius(theme)))
-                    .bg(fill(theme.sidebar_card_bg))
+                    .rounded(rem_length(tokens::control_radius(theme)))
+                    .border(rems(GlassTier::Card.edge_width_rem()))
+                    .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
+                    .bg(glass_fill(theme, GlassTier::Card))
                     .flex()
                     .flex_row()
                     .flex_wrap()
@@ -427,7 +434,7 @@ fn section_shell(
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
     CardSurface::new(theme.palette())
-        .background(theme.card_surface())
+        .glass(GlassTier::Card)
         .padding(match layout.surfaces {
             SystemSurfacePresentation::SingleColumn => tokens::SPACE_9,
             SystemSurfacePresentation::MultiColumn => tokens::SPACE_12,

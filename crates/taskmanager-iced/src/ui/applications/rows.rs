@@ -11,9 +11,12 @@ use super::sort_tint;
 use super::*;
 use iced::widget::canvas;
 use iced::widget::text::Wrapping;
+use std::path::PathBuf;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarAvailability;
 use taskforest_core::core::process::ProcessLiveKey;
-use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::presentation::optional_nice;
+use taskmanager_shell::{ProcessRowAggregate, ProcessRowId};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -102,7 +105,7 @@ fn tree_node_row(
     if *has_children && *collapsed {
         name_row = name_row.push(
             iced::widget::container(
-                iced::widget::text("subtree")
+                iced::widget::text(t("proc.subtree"))
                     .size(f32::from(tokens::FONT_9))
                     .style(move |_| iced::widget::text::Style {
                         color: Some(theme::muted_text_color(&theme_snapshot)),
@@ -311,6 +314,9 @@ pub(crate) struct RowRender {
     /// unchanged. Part of the lazy-body key so opening/closing the menu
     /// rebuilds exactly the materialized window.
     pub(crate) open_menu_identity: Option<ProcessLiveKey>,
+    /// Capture-only path that opens the one partial CPU aggregate tooltip and
+    /// receives the mounted-surface marker from the real widget.
+    pub(crate) tooltip_capture_marker: Option<PathBuf>,
 }
 
 impl RowRender {
@@ -353,6 +359,7 @@ fn aggregate_tinted_text(
     ctx: &RowRender,
     aggregate: AggregateCellProjection,
     column: SortCol,
+    capture_marker: Option<&PathBuf>,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let AggregateCellProjection {
         text: label,
@@ -375,10 +382,38 @@ fn aggregate_tinted_text(
         .align_x(alignment)
         .into();
     if has_detail {
-        crate::ui::components::tooltip_owned(ctx.theme, content, label)
+        if let Some(marker) = capture_marker {
+            crate::ui::components::tooltip_owned_for_capture(
+                ctx.theme,
+                content,
+                label,
+                marker.clone(),
+            )
+        } else {
+            crate::ui::components::tooltip_owned(ctx.theme, content, label)
+        }
     } else {
         content
     }
+}
+
+/// Select the single application aggregate whose CPU value is partially
+/// available and whose only missing member is the aggregate root itself.
+fn capture_cpu_aggregate_tooltip<'a>(
+    ctx: &'a RowRender,
+    row_key: Option<ProcessRowId>,
+    metrics: &ProcessRowAggregate,
+    column: SortCol,
+) -> Option<&'a PathBuf> {
+    let marker = ctx.tooltip_capture_marker.as_ref()?;
+    (column == SortCol::Cpu
+        && matches!(row_key, Some(ProcessRowId::Application(_)))
+        && matches!(
+            metrics.cpu().availability(),
+            ScalarAvailability::Partial(FailureKind::PermissionDenied)
+        )
+        && metrics.cpu().current_member_count() + 1 == metrics.cpu().member_count())
+    .then_some(marker)
 }
 
 /// A plain text cell bounded and aligned by the column's contract spec.
@@ -530,6 +565,7 @@ fn group_header_row(
         nice,
         start_time_secs: _,
         start_clock,
+        container_badge,
     } = row
     else {
         // The dispatch arms guarantee a GroupHeader row here; an empty element
@@ -543,6 +579,7 @@ fn group_header_row(
     // separate. This projection preserves each aggregate's freshness,
     // coverage, and typed failure reason before any widget is constructed.
     let aggregate = project_group_aggregate_cells(metrics);
+    let cpu_capture_marker = capture_cpu_aggregate_tooltip(ctx, *row_key, metrics, SortCol::Cpu);
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.
@@ -559,6 +596,8 @@ fn group_header_row(
                 .width(Length::Fill)
                 .clip(true),
                 text(format!("x{member_count}")).size(f32::from(tokens::FONT_12)),
+                iced::widget::text(container_badge.clone().unwrap_or_default())
+                    .size(f32::from(tokens::FONT_12)),
             ]
             .spacing(6)
             .align_y(iced::Alignment::Center)
@@ -566,10 +605,10 @@ fn group_header_row(
         ),
         text_cell(ctx, user.clone(), SortCol::User),
         text_cell(ctx, "—".to_string(), SortCol::Pid),
-        aggregate_tinted_text(ctx, aggregate.threads, SortCol::Threads),
+        aggregate_tinted_text(ctx, aggregate.threads, SortCol::Threads, None),
         text_cell(ctx, start_clock.clone(), SortCol::StartTime),
         text_cell(ctx, status.clone(), SortCol::State),
-        aggregate_tinted_text(ctx, aggregate.cpu, SortCol::Cpu),
+        aggregate_tinted_text(ctx, aggregate.cpu, SortCol::Cpu, cpu_capture_marker),
         // Aggregate group headers carry no single CPU history, so the Trend
         // column stays blank — but the same-width cell keeps the column
         // boundary pixel-aligned with the member rows beneath it.
@@ -577,25 +616,33 @@ fn group_header_row(
             .width(Length::Fixed(PROCESS_SPARK_WIDTH))
             .height(Length::Shrink)
             .into(),
-        aggregate_tinted_text(ctx, aggregate.memory, SortCol::Memory),
+        aggregate_tinted_text(ctx, aggregate.memory, SortCol::Memory, None),
     ];
     if ctx.swap_visible {
-        cells.push(aggregate_tinted_text(ctx, aggregate.swap, SortCol::Swap));
+        cells.push(aggregate_tinted_text(
+            ctx,
+            aggregate.swap,
+            SortCol::Swap,
+            None,
+        ));
     }
     cells.push(aggregate_tinted_text(
         ctx,
         aggregate.memory_pss,
         SortCol::Pss,
+        None,
     ));
     cells.push(aggregate_tinted_text(
         ctx,
         aggregate.disk_read,
         SortCol::DiskRead,
+        None,
     ));
     cells.push(aggregate_tinted_text(
         ctx,
         aggregate.disk_write,
         SortCol::DiskWrite,
+        None,
     ));
     cells.push(zero_tinted_text(
         ctx,
@@ -607,8 +654,14 @@ fn group_header_row(
         ctx,
         aggregate.cpu_time,
         SortCol::CpuTime,
+        None,
     ));
-    cells.push(aggregate_tinted_text(ctx, aggregate.fds, SortCol::Fds));
+    cells.push(aggregate_tinted_text(
+        ctx,
+        aggregate.fds,
+        SortCol::Fds,
+        None,
+    ));
     cells.push(zero_tinted_text(
         ctx,
         optional_nice(*nice),

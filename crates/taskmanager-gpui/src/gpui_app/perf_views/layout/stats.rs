@@ -13,9 +13,8 @@ use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::formatting;
-use crate::gpui_app::root::responsive::{
-    PERFORMANCE_STATS_MAX_WIDTH, PerformanceDetailsPresentation,
-};
+use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MAX_WIDTH;
+use taskmanager_ui_contract::presentation::vocabulary::PerformanceDetailsPresentation;
 
 /// The shared Performance stat panel body. A detail rail is a fixed, non-
 /// scrolling surface, so a field without an accepted value is omitted before

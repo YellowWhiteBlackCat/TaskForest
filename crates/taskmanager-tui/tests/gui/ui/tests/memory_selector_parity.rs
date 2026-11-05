@@ -7,6 +7,7 @@
 
 use taskforest_core::core::device_state::DeviceState;
 use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::MemoryOptionalObservations;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 use taskforest_core::core::sensors::{
@@ -106,9 +107,22 @@ fn memory_stats_rows_render_every_measured_fact() {
 fn memory_stats_rows_render_honest_dashes_when_unavailable() {
     let mut app = crate::demo_app();
     app.perf_device = crate::PerfDevice::Memory;
-    // The demo memory carries total/used/available/swap/cached only: no
-    // hardware reservation, module speed, slots, commit counters, usage
-    // rate or buffers.
+    // The optional enrichments are the ones a host may never report: no
+    // hardware reservation, module speed, slots, commit counters or buffers.
+    // The demo snapshot may carry them, so this test clears the whole
+    // optional group itself — the dash behavior under test is the absence
+    // of the fact, not the shape of the demo fixture.
+    let mut snapshot = app.projection().snapshot.clone().expect("demo snapshot");
+    let mut scalars = *snapshot.memory.scalar_observations();
+    scalars.used_rate_mib_per_sec = ScalarObservation::unavailable(FailureKind::Unsupported);
+    snapshot.memory = MemoryMetricsFixtureBuilder::from_item(snapshot.memory.clone())
+        .scalar_observations(scalars)
+        .optional_observations(MemoryOptionalObservations::default())
+        .build();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
 
     let text = frame_text(&app, WIDE.0, WIDE.1);
 

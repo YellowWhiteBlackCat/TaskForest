@@ -15,8 +15,8 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
-    Overflow, UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, Display, FlexDirection,
+    JustifyContent, Node, Overflow, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -29,11 +29,13 @@ use taskmanager_shell::presentation::control_error_detail;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
+use taskmanager_theme::GlassTier;
 
 /// The dependency tree's viewport height, in rem: the visible budget of the
 /// dependency list before it starts scrolling. The bound rides the rem axis
@@ -208,17 +210,33 @@ pub(crate) fn service_dependencies_panel_scene_expanded(
         })
     };
 
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     Box::new(bsn! {
         Node {
             width: percent(100.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_12())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
+        OpticalGlassCard {
+            tier: GlassTier::Card,
+            enabled: true,
+        }
         ServicesDependenciesPanelRoot
         Children [
+             @{ grain } --
 
                 Node {
                     width: percent(100.0),

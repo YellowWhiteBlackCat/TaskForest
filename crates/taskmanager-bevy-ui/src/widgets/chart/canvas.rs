@@ -363,7 +363,7 @@ pub(crate) fn rasterize(spec: &CanvasSpec) -> CanvasImage {
         let offset = index * 4;
         over(
             &mut pixels[offset..offset + 4],
-            [ink.red, ink.green, ink.blue, *value],
+            [ink.red, ink.green, ink.blue, ink.alpha * *value],
         );
     }
     paint_flow(&mut pixels, spec, &coverage);

@@ -35,18 +35,20 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::px;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, GlobalZIndex, JustifyContent, Node,
-    OverrideClip, PositionType, UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection, GlobalZIndex,
+    JustifyContent, Node, OverrideClip, PositionType, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
+use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::{
     ColumnResizePolicy, IconId, OverlayDismissCause, OverlayDismissContext, OverlayKind,
     PROCESS_COLUMNS, ProcessColumnSpec, dismiss_outcome,
 };
 
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::input::ShellInteractionApplied;
 use crate::palette::{UiPalette, space_4, space_8, space_16};
 use crate::scene_attach::attach_child;
@@ -54,9 +56,23 @@ use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::table::resize::{ColumnWidthNode, ColumnWidthOverrides, live_column_width};
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) const DEFAULT_HIDDEN_COLUMNS: &[&str] =
+    &["Threads", "StartTime", "Swap", "CPUTime", "FDs", "Nice"];
+
 /// Stores the user's hidden column IDs for the processes table.
-#[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Resource, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ProcessHiddenColumns(pub(crate) HashSet<String>);
+
+impl Default for ProcessHiddenColumns {
+    fn default() -> Self {
+        Self(
+            DEFAULT_HIDDEN_COLUMNS
+                .iter()
+                .map(|&s| s.to_string())
+                .collect(),
+        )
+    }
+}
 
 /// One open chooser session: the keyboard focus index plus the anchor the
 /// popover is positioned against. `anchor == None` means "the chooser's
@@ -271,6 +287,14 @@ pub(crate) fn columns_popover_scene(
         })
         .collect();
     items.push(reset_row_scene(palette));
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -279,10 +303,17 @@ pub(crate) fn columns_popover_scene(
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: Val::Px(space_8()),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
             overflow: bevy::ui::prelude::Overflow::clip_y(),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
+        OpticalGlassCard {
+            tier: GlassTier::Card,
+            enabled: true,
+        }
         OverrideClip
         GlobalZIndex({ 100 })
         ProcessColumnsPopover
@@ -294,6 +325,7 @@ pub(crate) fn columns_popover_scene(
             window_margin: { 8.0_f32 },
         }
         Children [
+             @{ grain } --
              { items }
         ]
     }

@@ -71,6 +71,9 @@ mod ui_component_boundary;
 #[path = "logic/theme_neutrality_test.rs"]
 mod theme_neutrality_test;
 
+#[path = "logic/typography_authority_gate_test.rs"]
+mod typography_authority_gate_test;
+
 #[path = "logic/panic_surface_test.rs"]
 mod panic_surface_test;
 
@@ -94,6 +97,12 @@ mod control_vocabulary_boundary;
 
 #[path = "logic/control_semantic_parity.rs"]
 mod control_semantic_parity;
+
+#[path = "logic/presentation_resolution_test.rs"]
+mod presentation_resolution_test;
+
+#[path = "logic/presentation_capture_resolution_test.rs"]
+mod presentation_capture_resolution_test;
 
 #[path = "logic/shared_fold_write_boundary.rs"]
 mod shared_fold_write_boundary;

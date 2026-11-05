@@ -27,6 +27,16 @@ fn default_mask_is_palette_scrim() {
     let spec = dialog.into_modal_spec();
     let mask = spec.mask.expect("default mask present");
     assert!((mask.alpha - 0.5).abs() < 1e-4);
+    let depth = mask.color();
+    assert_eq!(
+        (depth.r, depth.g, depth.b),
+        (
+            mask.palette.theme.glass_scrim().fill.r,
+            mask.palette.theme.glass_scrim().fill.g,
+            mask.palette.theme.glass_scrim().fill.b,
+        ),
+        "the default mask resolves through the theme's Scrim tier"
+    );
 }
 
 /// The panel shadow is the Mission Center two-layer pair in the palette's
@@ -41,12 +51,15 @@ fn panel_shadow_is_two_layer_token_ink() {
             HighContrast::Off,
             ResolvedFonts::system_for(Skin::Gnome),
         );
-        let palette = theme.palette();
-        let shadow = panel_shadow(&palette);
+        let shadow = panel_shadow(&theme);
         assert_eq!(shadow.len(), 2, "panel shadow must have two layers");
-        let ink: gpui::Hsla = crate::theme_binding::hsla(palette.card_shadow);
-        let ambient: gpui::Hsla =
-            crate::theme_binding::hsla(palette.card_shadow.with_alpha(palette.card_shadow.a * 0.6));
+        let ink: gpui::Hsla = crate::theme_binding::hsla(theme.glass_modal().shadow);
+        let ambient: gpui::Hsla = crate::theme_binding::hsla(
+            theme
+                .glass_modal()
+                .shadow
+                .with_alpha(theme.glass_modal().shadow.a * 0.6),
+        );
         assert_eq!(shadow[1].color, ink, "edge layer carries the token ink");
         assert_eq!(
             shadow[0].color, ambient,

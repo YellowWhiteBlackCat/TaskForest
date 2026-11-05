@@ -3,7 +3,8 @@
 
 use crossbeam_channel::Receiver;
 use gpui::{
-    AnyWindowHandle, Context, Entity, Pixels, ScrollHandle, Subscription, UniformListScrollHandle,
+    AnyWindowHandle, Context, Entity, FocusHandle, Pixels, ScrollHandle, Subscription,
+    UniformListScrollHandle,
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -509,6 +510,8 @@ pub struct RootView {
     /// is a stable delta from the drag origin (mirrors
     /// `ProcessesState::resize_anchor_x` for the column drag).
     pub(crate) sidebar_resize_anchor_x: Option<Pixels>,
+    /// Stable keyboard focus target for the sidebar's resize gutter.
+    pub(crate) sidebar_resize_focus: FocusHandle,
     /// Coalesces cursor-following tooltip invalidations to one RootView update
     /// per animation frame. Pointer devices can emit hundreds of MouseMove
     /// events per frame; the table hover surface itself only changes when the
@@ -660,6 +663,16 @@ impl RootView {
         view.shell = demo_direct_track();
         let projection = view.shell.projection().clone();
         view.materialized.seed_from_projection(&projection);
+        // The fixture regime is a first-class capture regime. The live host
+        // satisfies the capture readiness contract through the platform
+        // snapshot and process updates; the fixture satisfies the same
+        // contract through the seeded projection, so a fixture frame carries
+        // the same evidence receipt a host frame does. Only an armed capture
+        // is touched: an ordinary demo launch is unaffected.
+        if view.capture_evidence.is_enabled() {
+            let capture_evidence = &mut view.capture_evidence;
+            view.materialized.arm_capture_readiness(capture_evidence);
+        }
         view.telemetry_frame_state = TelemetryFrameState::Ready;
         view.local_time_rules = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0);
         if let Some(snapshot) = projection.snapshot.as_ref() {
@@ -849,6 +862,7 @@ impl RootView {
             sidebar_visible: true,
             sidebar_edit_mode: false,
             sidebar_resize_anchor_x: None,
+            sidebar_resize_focus: cx.focus_handle().tab_stop(true),
             cursor_refresh_state: render::CursorRefreshState::Idle,
             dashboard: DashboardState::new(),
             capture_evidence,

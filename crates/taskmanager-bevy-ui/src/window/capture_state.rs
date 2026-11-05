@@ -91,6 +91,10 @@ pub(super) fn initialize_capture_state(
         commands.trigger(WindowSurfaceCommand::ProcessTree);
         commands.trigger(crate::pages::process_tree::TreeExpansionCommand::ExpandAll);
     }
+    if capture_scenario_target() == Some("apps-container-group") {
+        commands.trigger(WindowSurfaceCommand::ProcessTree);
+        commands.trigger(crate::pages::process_tree::TreeExpansionCommand::ExpandAll);
+    }
     if capture_scenario_target() == Some("event-center") {
         commands.trigger(crate::event_center::EventCommand(
             crate::event_center::EventAction::Open,

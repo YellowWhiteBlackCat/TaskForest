@@ -10,6 +10,7 @@ use taskforest_core::core::identity::DeviceId;
 use taskmanager_application::i18n;
 
 use crate::presentation::{msr_thermal_status_segments, msr_thermal_status_summary};
+use taskmanager_telemetry_store::live_graph::{LiveGraphHistory, MetricSeries};
 
 /// The demo/capture bootstrap seeds the real-time thermal-status readout
 /// through the real request-session path, so the new row is visible in every
@@ -136,5 +137,51 @@ fn demo_telemetry_contains_measured_chart_windows() {
             .system_history
             .storage_rate(&disk)
             .is_some_and(|history| history.samples().len() >= 2)
+    );
+}
+
+/// GPUI's standalone demo store and the composed track's shell history must
+/// expose the same accepted waveform. Different frontends may use different
+/// read adapters, but a different sample sequence is a second demo data
+/// regime and would make sparkline/headline capture comparisons meaningless.
+#[test]
+fn both_demo_tracks_read_the_same_history_sequence() {
+    let composed = demo_app();
+    let (store, _ingestor) = demo_telemetry();
+    for series in [
+        MetricSeries::CpuUsagePercent,
+        MetricSeries::MemoryUsagePercent,
+        MetricSeries::DiskBytesPerSec,
+        MetricSeries::NetworkBytesPerSec,
+        MetricSeries::GpuUsagePercent,
+    ] {
+        let shell_window = composed.history.series(series);
+        let standalone = LiveGraphHistory::from_store(std::sync::Arc::clone(&store), 600);
+        let store_window = standalone.series(series);
+        assert_eq!(
+            shell_window.len(),
+            25,
+            "{series:?}: the shared demo history owns one seed frame and 24 adjacent frames"
+        );
+        assert_eq!(
+            shell_window, store_window,
+            "{series:?}: GPUI and Bevy must read identical accepted demo samples"
+        );
+    }
+    let cpu = composed
+        .history
+        .series(MetricSeries::CpuUsagePercent)
+        .into_iter()
+        .map(|value| value.round() as i32)
+        .collect::<Vec<_>>();
+    assert_ne!(
+        cpu.first().copied(),
+        cpu.get(1).copied(),
+        "the shared sequence is a real waveform, not repeated flat frames"
+    );
+    assert_eq!(
+        cpu.last().copied(),
+        Some(37),
+        "the waveform tail returns to the current CPU fact"
     );
 }

@@ -21,6 +21,11 @@ Domain facts and platform contracts are imported directly from `taskforest-core`
 `taskforest-contract` at their actual owner modules; this crate maintains no
 model-forwarding facade.
 
+`i18n` is the repository's only message resolver: `locales/*.json` is the only
+copy store, `Language` the only language type, and `t` the only lookup. Each
+frontend pins the active language and renders through this resolver — it owns no
+dictionary, no key enum, and no parallel `Language`.
+
 ## Contract and verification
 
 Cross-crate ownership and transition matrices are authoritative only in

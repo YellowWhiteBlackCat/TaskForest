@@ -20,7 +20,7 @@
 use super::{Hover, RootView, TopPage};
 use crate::gpui_app::elements;
 use gpui::{
-    AnimationExt, Context, DefiniteLength, InteractiveElement, IntoElement, Length, ParentElement,
+    AnimationExt, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 use taskmanager_application::i18n;
@@ -37,8 +37,8 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
-use super::responsive::NavigationPresentation;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::vocabulary::NavigationPresentation;
 
 mod strips;
 pub use strips::{nav_strip, nav_strip_horizontal, nav_strip_vertical};
@@ -156,32 +156,6 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
                         },
                     ),
             ),
-        )
-        // Mission-Center-style selected indicator: a 3px accent underline
-        // that grows across the tab when it becomes active and shrinks back
-        // when it loses the selection. Painted by the same absolute-overlay
-        // child pattern as the background (never wraps the focusable shell).
-        .child(
-            div()
-                .absolute()
-                .bottom(px(0.0))
-                .left(px(0.0))
-                .right(px(0.0))
-                .h(px(3.0))
-                .child(
-                    div()
-                        .h_full()
-                        .rounded(absolute(tokens::xsmall_radius(t)))
-                        .bg(fill(accent))
-                        .with_animation(
-                            ("tab-indicator", hover_state_key(is_act, false)),
-                            hover_animation(),
-                            move |el, delta| {
-                                let width = if is_act { delta } else { 1.0 - delta };
-                                el.w(Length::Definite(DefiniteLength::Fraction(width)))
-                            },
-                        ),
-                ),
         )
         .flex()
         .items_center()

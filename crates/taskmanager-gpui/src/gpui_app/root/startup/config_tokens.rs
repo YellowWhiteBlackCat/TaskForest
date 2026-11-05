@@ -1,68 +1,31 @@
 //! Persisted-config ↔ token mapping glue.
 //!
-//! Local string↔enum mappers for the fields `core::Config` carries as opaque
-//! `String`s (it lives in `core`, which cannot depend on `gpui_app::theme`).
-//! The tokens are the theme labels (`Skin::label` / `LightDark::label`) so a
-//! human can read the JSON; unknown values fall back to the detected theme
-//! rather than forcing a wrong skin/mode. These are pure functions of the
-//! stored config; [`super::init`] applies them to the theme/RootView.
+//! The only mappers left in this file are the GPUI-shaped ones: the
+//! text-rendering mode the pinned GPUI snapshot understands and the top-page
+//! vocabulary this frontend owns. Every THEME axis resolves through the theme
+//! owner's public codec (`taskmanager_theme::settings` plus each axis' own
+//! `config_token` / `from_config_token`), never through a local string match, so
+//! unknown values fail closed to the detected theme in all four products
+//! identically (ADR-063). [`super::init`] applies the result to the
+//! theme/RootView.
 
 use crate::gpui_app::root::TopPage;
 use gpui::TextRenderingMode;
 use taskforest_core::core::config::{
-    COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
-    STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
+    Config, STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
 };
 use taskmanager_assets::product;
-use taskmanager_theme::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, LightDark,
-    Skin, Theme,
-};
+use taskmanager_theme::{ModePreference, Skin, Theme};
 
 pub(super) const DEFAULT_APP_ID: &str = product::GPUI_APP_ID;
 
-/// Map a stored skin token back to `Skin`. Case-insensitive; returns `None`
-/// for empty/unknown so the caller keeps the host-detected skin.
-fn skin_from_token(s: &str) -> Option<Skin> {
-    match s.trim().to_ascii_lowercase().as_str() {
-        "gnome" => Some(Skin::Gnome),
-        "kde" => Some(Skin::Kde),
-        "windows" | "win" => Some(Skin::Windows),
-        "macos" | "mac" => Some(Skin::Macos),
-        "" => None,
-        _ => None,
-    }
-}
-
-pub(in crate::gpui_app::root) fn skin_preference_from_config(cfg: &Config) -> Option<Skin> {
-    skin_from_token(&cfg.skin)
-}
-
-/// Map a stored color-mode token back to `LightDark`. Case-insensitive; `None`
-/// for empty/unknown.
-fn mode_from_token(s: &str) -> Option<LightDark> {
-    match s.trim().to_ascii_lowercase().as_str() {
-        "light" => Some(LightDark::Light),
-        "dark" => Some(LightDark::Dark),
-        "eyeforest" | "eye-forest" => Some(LightDark::EyeForest),
-        _ => None,
-    }
-}
-
-/// Resolve the persisted color-scheme preference token. Empty and unknown
-/// values deliberately mean System so a newer/corrupt config cannot force a
-/// palette that the user did not select. Legacy Light/Dark files remain
-/// explicit overrides because they predate the System option.
-pub(in crate::gpui_app::root) fn color_scheme_from_token(s: &str) -> &'static str {
-    match s.trim().to_ascii_lowercase().as_str() {
-        "light" => COLOR_SCHEME_LIGHT,
-        "dark" => COLOR_SCHEME_DARK,
-        "eyeforest" | "eye-forest" => COLOR_SCHEME_EYEFOREST,
-        "system" | "" => COLOR_SCHEME_SYSTEM,
-        _ => COLOR_SCHEME_SYSTEM,
-    }
-}
+// The axis codecs are the theme owner's public contract (ADR-063): this
+// frontend resolves persisted tokens through `Skin::from_config_token`,
+// `LightDark::from_config_token`, `ModePreference::from_config_token` and
+// `FontPreference::from_config_tokens`, and writes them back through the
+// matching `config_token` methods. It keeps no local matcher over a token
+// string, so a preference recorded by any product reads identically here.
 
 /// Normalize a stored text-rendering token to a mode supported by the pinned
 /// GPUI snapshot. Unknown values fail closed to the platform default.
@@ -79,48 +42,6 @@ pub(in crate::gpui_app::root) fn text_rendering_mode_from_token(token: &str) -> 
         TEXT_RENDERING_SUBPIXEL => TextRenderingMode::Subpixel,
         TEXT_RENDERING_GRAYSCALE => TextRenderingMode::Grayscale,
         _ => TextRenderingMode::PlatformDefault,
-    }
-}
-
-/// Map persisted font tokens (`""` = bundled default, `"system"` = skin
-/// default, a bundled family, or an observed system family) back to a
-/// [`FontPreference`]. Unknown names fall back to the skin default so a config
-/// written by a newer version never forces an unresolvable family; a token
-/// naming a retired bundled face (no longer embedded) therefore resolves to
-/// the skin default until the user re-saves the preference.
-/// Stable config token for the explicit system choice (round-trips through
-/// [`font_tokens`]). Distinct from the empty default so an explicit System
-/// preference survives reloads while the ABSENT token still means "product
-/// default" — the bundled faces.
-pub(in crate::gpui_app::root) const FONT_TOKEN_SYSTEM: &str = "system";
-
-pub(in crate::gpui_app::root) fn font_pref_from_config(
-    cfg: &Config,
-    availability: &FontAvailability,
-) -> FontPreference {
-    // The shipped default is the PRODUCT font: an absent token ("" — never
-    // chosen, or a pre-policy config) resolves to the bundled faces. Only an
-    // explicit opt-in ("system", or a legacy named system family) selects the
-    // host's fonts.
-    let parse = |token: &str, bundled_names: &[&str]| {
-        let token = token.trim();
-        if token.is_empty()
-            || bundled_names
-                .iter()
-                .any(|name| name.eq_ignore_ascii_case(token))
-        {
-            FontChoice::Bundled
-        } else if token.eq_ignore_ascii_case(FONT_TOKEN_SYSTEM) {
-            FontChoice::System
-        } else if let Some(choice) = availability.choice_for(token) {
-            choice
-        } else {
-            FontChoice::System
-        }
-    };
-    FontPreference {
-        ui: parse(&cfg.ui_font, &[FONT_MISANS_VF, FONT_ROBOTO_MONO]),
-        mono: parse(&cfg.mono_font, &[FONT_ROBOTO_MONO]),
     }
 }
 
@@ -191,10 +112,12 @@ pub(super) fn resolve_startup_page(
 /// `hc` is always applied (its default `false` matches the non-HC host norm).
 /// Each setter rebuilds the theme via `Theme::build`, preserving the other axes.
 pub(super) fn apply_cfg_to_theme(theme: &mut Theme, cfg: &Config) {
-    if let Some(skin) = skin_from_token(&cfg.skin) {
+    if let Some(skin) = Skin::from_config_token(&cfg.skin) {
         theme.set_skin(skin);
     }
-    if let Some(mode) = mode_from_token(&cfg.mode) {
+    // Only an explicit palette overrides the detected mode; follow-native and
+    // the empty/unknown sentinel keep it.
+    if let Some(mode) = ModePreference::from_config_token(&cfg.mode).explicit() {
         theme.set_mode(mode);
     }
     theme.set_high_contrast(cfg.hc);

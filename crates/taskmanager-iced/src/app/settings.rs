@@ -6,9 +6,10 @@
 use super::*;
 use std::time::Duration;
 use taskmanager_application::TelemetryInterval;
-use taskmanager_theme::fonts;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_theme::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontPreference, resolve_fonts,
+    AppearanceOverride, FontAvailability, FontPreference, FontRole, ModePreference, Skin,
+    resolve_fonts,
 };
 
 impl IcedApp {
@@ -20,16 +21,21 @@ impl IcedApp {
         let mut config = self.config_draft();
         match change {
             SettingsChange::Skin(skin) => config.skin = skin.label().to_string(),
-            SettingsChange::Mode(choice) => config.mode = choice.token().to_string(),
+            SettingsChange::Mode(choice) => config.mode = choice.config_token().to_string(),
             SettingsChange::HighContrast(on) => config.hc = on,
             SettingsChange::UiFont(choice) => {
-                config.ui_font = font_token(choice, fonts::FONT_MISANS_VF);
+                config.ui_font = choice.config_token(FontRole::Ui).to_string()
             }
             SettingsChange::MonoFont(choice) => {
-                config.mono_font = font_token(choice, fonts::FONT_ROBOTO_MONO);
+                config.mono_font = choice.config_token(FontRole::Mono).to_string();
             }
             SettingsChange::CompactDensity(compact) => {
-                config.density = if compact { "Compact" } else { "Comfortable" }.to_string();
+                let density = if compact {
+                    RowDensity::Compact
+                } else {
+                    RowDensity::Comfortable
+                };
+                config.density = density.config_token().to_string();
             }
             SettingsChange::UiSize(size) => {
                 config.ui_size = size.config_token().to_string();
@@ -72,7 +78,7 @@ impl IcedApp {
             // persisting a token that cannot affect rendering.
             SettingsChange::TextRendering(_) => config.text_rendering.clear(),
             SettingsChange::Motion(policy) => {
-                config.motion = super::motion::motion_token(policy).to_string();
+                config.motion = policy.config_token().to_string();
             }
             SettingsChange::StartupPage(token) => config.startup_page = token.to_string(),
             SettingsChange::GrayZeroValues(on) => config.gray_zero_values = on,
@@ -94,7 +100,7 @@ impl IcedApp {
                 // The config snapshot application below updates the language
                 // projection and shared catalog atomically with every other
                 // persisted preference.
-                config.language = Some(language.token().to_string());
+                config.language = Some(language.code().to_string());
             }
         }
         self.commit_config_draft(config);
@@ -149,86 +155,28 @@ impl IcedApp {
                 .map_or(0, |(_, end)| u8::try_from(end / 60).unwrap_or(0)),
         };
         let theme = build_resolved_theme(
-            skin_from_token(config.skin.as_str()),
-            ModeChoice::from_token(config.mode.as_str()),
+            Skin::from_config_token(&config.skin).unwrap_or(Skin::Gnome),
+            ModePreference::from_config_token(&config.mode),
             config.hc,
             config.ui_font.as_str(),
             config.mono_font.as_str(),
             &font_availability,
             self.configuration.observed_color_scheme(),
+        )
+        .with_root_rem_size(
+            UiSize::from_config_token(&config.ui_size)
+                .body_font_size()
+                .0,
         );
         (preferences, theme)
     }
 }
 
-/// Parse the shared testing/developer appearance override GPUI owns
-/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
-/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
-/// `None` for an unset or syntactically invalid value, so an invalid request
-/// never forces a wrong skin. This is the SAME vocabulary (and env name) GPUI's
-/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
-/// vocabulary would let the capture harness and the frontends drift.
-#[must_use]
-pub(super) fn parse_skin_override(value: &str) -> Option<(Skin, LightDark)> {
-    let (skin_token, mode_token) = value.split_once('-')?;
-    let skin = match skin_token.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match mode_token.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
-}
-
-/// Resolve the shared `TM_SKIN` override plus the optional `TM_SKIN_HC`
-/// contrast flag. The override is a FALLBACK: an explicit persisted
-/// preference wins because the production `load_config` path never consults
-/// the environment. `None` when the variable is unset or invalid.
-#[must_use]
-pub(super) fn forced_appearance(
-    value: Option<&str>,
-    high_contrast: bool,
-) -> Option<(Skin, LightDark, bool)> {
-    let (skin, mode) = parse_skin_override(value?)?;
-    Some((skin, mode, high_contrast))
-}
-
-/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override from the process
-/// environment for the demo/capture boot.
+/// The theme owner publishes the appearance-override vocabulary
+/// ([`AppearanceOverride`]); this frontend only reads it for the capture boot.
 #[must_use]
 pub(super) fn forced_appearance_from_env() -> Option<(Skin, LightDark, bool)> {
-    let value = std::env::var("TM_SKIN").ok();
-    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
-    forced_appearance(value.as_deref(), high_contrast)
-}
-
-/// Parse a persisted `Config::skin` token into the theme enum. Unknown or
-/// empty tokens fall back to GNOME (the theme crate's own fallback).
-#[must_use]
-pub(super) fn skin_from_token(token: &str) -> Skin {
-    match token.to_ascii_lowercase().as_str() {
-        "kde" => Skin::Kde,
-        "windows" => Skin::Windows,
-        "macos" => Skin::Macos,
-        _ => Skin::Gnome,
-    }
-}
-
-/// The persisted font token for one preference: the explicit system marker,
-/// a selected system family, or the bundled family name.
-fn font_token(choice: FontChoice, bundled_family: &'static str) -> String {
-    match choice {
-        FontChoice::System => "system".to_string(),
-        FontChoice::Custom(family) => family.to_string(),
-        FontChoice::Bundled => bundled_family.to_string(),
-    }
+    AppearanceOverride::from_env().map(AppearanceOverride::axes)
 }
 
 /// Rebuild the resolved theme snapshot from the persisted config values.
@@ -241,7 +189,7 @@ fn font_token(choice: FontChoice, bundled_family: &'static str) -> String {
 #[must_use]
 pub(super) fn build_resolved_theme(
     skin: Skin,
-    mode: ModeChoice,
+    mode: ModePreference,
     high_contrast: bool,
     ui_font_token: &str,
     mono_font_token: &str,
@@ -250,40 +198,16 @@ pub(super) fn build_resolved_theme(
 ) -> Theme {
     Theme::build(
         skin,
-        super::appearance::resolve_color_mode_with(mode, observed_color_scheme),
+        mode.resolve(observed_color_scheme.map(super::appearance::OsColorScheme::light_dark)),
         if high_contrast {
             HighContrast::On
         } else {
             HighContrast::Off
         },
         resolve_fonts(
-            font_preference_from_tokens(ui_font_token, mono_font_token, availability),
+            FontPreference::from_config_tokens(ui_font_token, mono_font_token, availability),
             skin,
             availability,
         ),
     )
-}
-
-/// Convert persisted tokens into typed choices using only families observed by
-/// the cached catalog. Empty tokens are the bundled product default; unknown
-/// tokens degrade to `System` instead of becoming an unchecked font request.
-fn font_preference_from_tokens(
-    ui_token: &str,
-    mono_token: &str,
-    availability: &FontAvailability,
-) -> FontPreference {
-    let parse = |token: &str, bundled: &[&str]| {
-        let token = token.trim();
-        if token.is_empty() || bundled.iter().any(|name| name.eq_ignore_ascii_case(token)) {
-            FontChoice::Bundled
-        } else if token.eq_ignore_ascii_case("system") {
-            FontChoice::System
-        } else {
-            availability.choice_for(token).unwrap_or(FontChoice::System)
-        }
-    };
-    FontPreference {
-        ui: parse(ui_token, &[FONT_MISANS_VF, FONT_ROBOTO_MONO]),
-        mono: parse(mono_token, &[FONT_ROBOTO_MONO]),
-    }
 }

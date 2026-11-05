@@ -19,7 +19,7 @@ use super::sections::memory_inventory::{
 };
 use crate::gpui_app::root::RootView;
 use taskforest_core::core::units::UnitPreferences;
-use taskmanager_theme::{Length, Theme, tokens};
+use taskmanager_theme::{GlassTier, Length, Theme, tokens};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -113,9 +113,9 @@ pub(super) fn render_memory_inventory(
         );
     }
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_12)
-        .radius(tokens::control_radius(theme))
+        .radius(tokens::card_radius(theme))
         .bordered(false)
         .child(content)
         .render()

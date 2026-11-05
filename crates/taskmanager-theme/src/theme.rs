@@ -21,6 +21,9 @@ use crate::detection::{NativeAppearance, detect_high_contrast, detect_mode, dete
 use crate::fonts::ResolvedFonts;
 use crate::skins::tokens_for;
 
+/// The standard UI-size root used to translate physical skin tokens into REM.
+pub const STANDARD_ROOT_REM_SIZE: f32 = 14.0;
+
 /// The four native OS skins. (`Platform` kept as an alias for back-compat.)
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Skin {
@@ -32,12 +35,36 @@ pub enum Skin {
 
 impl Skin {
     pub const ALL: [Skin; 4] = [Skin::Gnome, Skin::Kde, Skin::Windows, Skin::Macos];
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Skin::Gnome => "GNOME",
             Skin::Kde => "KDE",
             Skin::Windows => "Windows",
             Skin::Macos => "macOS",
+        }
+    }
+    /// The persisted [`taskforest-core` config] token for this skin. It is the
+    /// label by design (ADR-063): a config file stays human-readable and one
+    /// public vocabulary serves all four products, so no frontend may re-spell
+    /// these strings in a private codec.
+    pub const fn config_token(self) -> &'static str {
+        self.label()
+    }
+    /// Resolve a persisted skin token (or the skin half of a
+    /// [`crate::settings::AppearanceOverride`]) back into the axis. Case and
+    /// surrounding whitespace are irrelevant, and the short platform aliases the
+    /// appearance override has always accepted (`win`, `mac`) stay legal so a
+    /// token written by any product or harness resolves through this one codec.
+    /// Empty and unknown tokens yield `None`: the caller keeps the
+    /// host-detected skin instead of forcing a wrong palette.
+    #[must_use]
+    pub fn from_config_token(token: &str) -> Option<Self> {
+        match token.trim().to_ascii_lowercase().as_str() {
+            "gnome" => Some(Self::Gnome),
+            "kde" => Some(Self::Kde),
+            "windows" | "win" => Some(Self::Windows),
+            "macos" | "mac" => Some(Self::Macos),
+            _ => None,
         }
     }
     /// Index into `Skin::ALL` — maps the enum to `[ResolvedFonts; 4]` slots.
@@ -103,11 +130,31 @@ impl LightDark {
         matches!(self, LightDark::Dark)
     }
 
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             LightDark::Light => "Light",
             LightDark::Dark => "Dark",
             LightDark::EyeForest => "EyeForest",
+        }
+    }
+    /// The persisted color-mode token for an explicit choice. The fourth
+    /// segment a product offers — follow the native desktop — is not a mode, so
+    /// it lives in [`crate::settings::ModePreference`], never as a
+    /// frontend-local variant of this axis.
+    pub const fn config_token(self) -> &'static str {
+        self.label()
+    }
+    /// Resolve a persisted or override mode token. Case-insensitive; accepts
+    /// the historical `eye-forest` spelling. Empty, `System`, and unknown
+    /// tokens yield `None` because they request native resolution rather than a
+    /// concrete mode.
+    #[must_use]
+    pub fn from_config_token(token: &str) -> Option<Self> {
+        match token.trim().to_ascii_lowercase().as_str() {
+            "light" => Some(Self::Light),
+            "dark" => Some(Self::Dark),
+            "eyeforest" | "eye-forest" => Some(Self::EyeForest),
+            _ => None,
         }
     }
 }
@@ -121,6 +168,120 @@ pub enum Material {
     Opaque,
     Mica,
     Vibrancy,
+}
+
+/// One glass layer's resolved surface tokens. Renderers use the theme's
+/// gradient stops with this fill, edge and shadow; backdrop blur is available
+/// only where the window system actually supplies it.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct GlassLayer {
+    /// The translucent panel fill composited over the available backdrop.
+    pub fill: Color,
+    /// Hairline edge with enough contrast against the surrounding surface.
+    pub edge: Color,
+    /// The soft two-layer shadow ink (the card shadow's glass variant).
+    pub shadow: Color,
+}
+
+impl GlassLayer {
+    const fn new(fill: Color, edge: Color, shadow: Color) -> Self {
+        Self { fill, edge, shadow }
+    }
+}
+
+/// The four glass tiers the product paints, with their blur radii.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlassTier {
+    /// Side navigation and other persistent chrome.
+    Sidebar,
+    /// Floating cards, panels, menus, popovers.
+    Card,
+    /// Modal dialogs and the strongest elevation.
+    Modal,
+    /// The dimmed backdrop beneath a modal. A scrim carries no edge,
+    /// shadow, blur, or noise: it is the material's depth wash, not a panel.
+    Scrim,
+}
+
+impl GlassTier {
+    pub const ALL: [Self; 4] = [Self::Sidebar, Self::Card, Self::Modal, Self::Scrim];
+
+    /// The backdrop-blur radius in root-relative units for this tier.
+    pub const fn blur_radius_rem(self) -> f32 {
+        match self {
+            Self::Sidebar => 24.0 / STANDARD_ROOT_REM_SIZE,
+            Self::Card => 20.0 / STANDARD_ROOT_REM_SIZE,
+            Self::Modal => 30.0 / STANDARD_ROOT_REM_SIZE,
+            Self::Scrim => 0.0,
+        }
+    }
+
+    /// Specular edge thickness. At the standard 14-unit root this resolves
+    /// to a one-unit hairline and follows the user's UI-size choice.
+    pub const fn edge_width_rem(self) -> f32 {
+        match self {
+            Self::Sidebar | Self::Card | Self::Modal => 1.0 / STANDARD_ROOT_REM_SIZE,
+            Self::Scrim => 0.0,
+        }
+    }
+
+    /// Ambient shadow vertical offset and blur radius, both in REM.
+    pub const fn ambient_shadow_rem(self) -> (f32, f32) {
+        match self {
+            Self::Sidebar => (2.0 / STANDARD_ROOT_REM_SIZE, 12.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Card => (3.0 / STANDARD_ROOT_REM_SIZE, 12.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Modal => (8.0 / STANDARD_ROOT_REM_SIZE, 30.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Scrim => (0.0, 0.0),
+        }
+    }
+
+    /// Contact shadow vertical offset and blur radius, both in REM.
+    pub const fn contact_shadow_rem(self) -> (f32, f32) {
+        match self {
+            Self::Sidebar => (0.5 / STANDARD_ROOT_REM_SIZE, 3.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Card => (1.0 / STANDARD_ROOT_REM_SIZE, 4.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Modal => (2.0 / STANDARD_ROOT_REM_SIZE, 6.0 / STANDARD_ROOT_REM_SIZE),
+            Self::Scrim => (0.0, 0.0),
+        }
+    }
+
+    /// The noise-texture opacity factor for this tier (0..=1). Small on
+    /// persistent chrome, strongest on the largest glass panel.
+    pub const fn noise_strength(self) -> f32 {
+        match self {
+            Self::Sidebar => 0.04,
+            Self::Card => 0.06,
+            Self::Modal => 0.08,
+            Self::Scrim => 0.0,
+        }
+    }
+
+    /// The glass layer the active skin × mode resolves for this tier.
+    pub fn layer(self, theme: &Theme) -> GlassLayer {
+        theme.glass_layer(self)
+    }
+}
+
+impl Theme {
+    /// Stable-role aliases over [`Theme::glass_layer`]. Persistent chrome is
+    /// the most open surface, cards remain the product's default panel, and
+    /// modals are the most opaque: the roles make call sites self-documenting
+    /// without letting each frontend re-derive its own alpha.
+    pub fn glass_chrome(self) -> GlassLayer {
+        self.glass_layer(GlassTier::Sidebar)
+    }
+
+    pub fn glass_card(self) -> GlassLayer {
+        self.glass_layer(GlassTier::Card)
+    }
+
+    pub fn glass_modal(self) -> GlassLayer {
+        self.glass_layer(GlassTier::Modal)
+    }
+
+    pub fn glass_scrim(self) -> GlassLayer {
+        self.glass_layer(GlassTier::Scrim)
+    }
 }
 
 /// Native window-control placement/style — drives the CSD titlebar chrome.
@@ -241,7 +402,7 @@ impl RadiusScale {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Theme {
     // Identity
     pub skin: Skin,
@@ -313,9 +474,22 @@ pub struct Theme {
     // is deliberately not an input state source: each frame copies the
     // resolved skin and injects the current per-window focus-visible decision.
     pub(crate) focus_visible: bool,
+
+    /// Root-relative unit size in renderer-independent logical units.
+    /// Frontends with a user-controlled reading scale set this per window.
+    pub root_rem_size: f32,
 }
 
 impl Theme {
+    /// Carry a frontend's live root size into theme-owned surface metrics.
+    #[must_use]
+    pub fn with_root_rem_size(mut self, root_rem_size: f32) -> Self {
+        if root_rem_size.is_finite() && root_rem_size > 0.0 {
+            self.root_rem_size = root_rem_size;
+        }
+        self
+    }
+
     /// Produce the immutable theme snapshot used for one window render.
     pub const fn with_focus_visible(mut self, focus_visible: bool) -> Self {
         self.focus_visible = focus_visible;
@@ -375,10 +549,11 @@ impl Theme {
     }
 
     /// Rebuild the token set for a new skin/mode/HC while preserving the
-    /// resolved font families and the platform window-transparency decision.
+    /// resolved font families, root size, and platform window state.
     fn recompose(&mut self, skin: Skin, mode: LightDark, hc: bool) {
         let transparent = self.window_transparent;
         let state = self.window_state;
+        let root_rem_size = self.root_rem_size;
         *self = Self::build(
             skin,
             mode,
@@ -391,6 +566,7 @@ impl Theme {
         );
         self.window_transparent = transparent;
         self.window_state = state;
+        self.root_rem_size = root_rem_size;
     }
 
     /// The corner radius for `scale` in the active skin's gradient. All UI
@@ -480,19 +656,19 @@ impl Theme {
     /// Card/panel drop-shadow ink (Mission Center soft two-layer shadows).
     /// Mode-derived from the neutral `shade` token: dark skins cast a
     /// translucent BLACK shadow (raised cards read against dark chrome),
-    /// light skins darken `shade` 55% toward black at 40% alpha (grey ink
+    /// light skins darken `shade` 55% toward black at 16% alpha (grey ink
     /// reads softer than pure black on light surfaces). Always translucent —
     /// the two-layer shadow helper scales this ink by layer.
     pub const fn card_shadow(self) -> Color {
         if self.dark {
-            Color::BLACK.with_alpha(0.45)
+            Color::BLACK.with_alpha(0.18)
         } else {
             let darken = 0.55;
             Color::new(
                 self.shade.r * (1.0 - darken),
                 self.shade.g * (1.0 - darken),
                 self.shade.b * (1.0 - darken),
-                0.4,
+                0.16,
             )
         }
     }
@@ -507,6 +683,77 @@ impl Theme {
             self.accent.b + (1.0 - self.accent.b) * lift,
             self.accent.a,
         )
+    }
+
+    /// The resolved glass layer for `tier`. The light-mode outline uses the
+    /// palette border rather than white on white; the gradient supplies the
+    /// highlight. High contrast forces an opaque fill and solid outline.
+    /// A scrim is the modal depth wash rather than a panel: it keeps the
+    /// theme's own translucent scrim token in every contrast mode.
+    pub fn glass_layer(self, tier: GlassTier) -> GlassLayer {
+        if tier == GlassTier::Scrim {
+            return GlassLayer::new(self.scrim, Color::TRANSPARENT, Color::TRANSPARENT);
+        }
+        let base = match tier {
+            GlassTier::Sidebar => self.sidebar_bg,
+            GlassTier::Card | GlassTier::Modal => self.card_surface(),
+            GlassTier::Scrim => self.sidebar_bg,
+        };
+        let (fill_alpha, edge_alpha) = if self.hc {
+            (1.0, 1.0)
+        } else if self.dark {
+            match tier {
+                GlassTier::Sidebar => (0.74, 0.23),
+                GlassTier::Card => (0.78, 0.25),
+                GlassTier::Modal => (0.82, 0.28),
+                GlassTier::Scrim => (1.0, 0.0),
+            }
+        } else {
+            match tier {
+                GlassTier::Sidebar => (0.80, 0.48),
+                GlassTier::Card => (0.82, 0.55),
+                GlassTier::Modal => (0.86, 0.62),
+                GlassTier::Scrim => (1.0, 0.0),
+            }
+        };
+        let edge = if self.hc {
+            self.border
+        } else if self.dark {
+            self.fg.with_alpha(edge_alpha)
+        } else {
+            self.border.with_alpha(edge_alpha)
+        };
+        GlassLayer::new(base.with_alpha(fill_alpha), edge, self.card_shadow())
+    }
+
+    /// Top and bottom stops for the glass surface. This is a painted sheen,
+    /// not a promise that the toolkit blurs content behind the panel.
+    pub fn glass_gradient(self, tier: GlassTier) -> [Color; 2] {
+        let fill = self.glass_layer(tier).fill;
+        if self.hc || tier == GlassTier::Scrim {
+            return [fill, fill];
+        }
+        let top = mix(
+            fill,
+            Color::WHITE.with_alpha(fill.a),
+            if self.dark { 0.16 } else { 0.65 },
+        );
+        let bottom = if self.dark {
+            fill
+        } else {
+            mix(fill, self.sidebar_bg.with_alpha(fill.a), 0.38)
+        };
+        [top, bottom]
+    }
+
+    /// Translucent highlight for renderers that place a sheen over an
+    /// existing panel instead of replacing its fill with a gradient.
+    pub fn glass_sheen(self, tier: GlassTier) -> Color {
+        if self.hc || tier == GlassTier::Scrim {
+            return Color::TRANSPARENT;
+        }
+        let [top, _] = self.glass_gradient(tier);
+        top.with_alpha(if self.dark { 0.14 } else { 0.24 })
     }
 
     /// Accent-gradient END stop: the accent sunk 16% toward black — the

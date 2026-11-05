@@ -25,7 +25,7 @@ use taskforest_core::core::startup::StartupImpact;
 
 use super::inks::{InkRole, StartupInk};
 use super::tinted;
-use crate::palette::{UiPalette, space_2, space_4, space_8};
+use crate::palette::{UiPalette, space_4, space_8};
 use crate::window::{Role, TextRole};
 
 /// The boot-cost tiers the impact badge distinguishes.
@@ -115,7 +115,7 @@ pub(crate) fn impact_badge_scene(
                  width: rem(palette.control_height_rem * 0.18),
                  height: rem(palette.control_height_rem * 0.72),
                  flex_shrink: 0.0,
-                 border_radius: BorderRadius::all(Val::Px(space_2())),
+                 border_radius: BorderRadius::all(rem(palette.control_height_rem * 0.36)),
              }
              BackgroundColor(ink)
              StartupImpactMark(tier)

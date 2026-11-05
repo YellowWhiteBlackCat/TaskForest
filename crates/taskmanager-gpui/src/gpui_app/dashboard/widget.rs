@@ -19,7 +19,7 @@ use taskmanager_ui_contract::IconId;
 use crate::gpui_app::formatting;
 use taskforest_core::core::SystemSnapshot;
 use taskmanager_application::i18n;
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{Color, GlassTier, Theme};
 
 use super::readouts::cpu_summary_readout;
 use taskmanager_theme::tokens;
@@ -41,7 +41,7 @@ fn metric_card(
     icon: IconId,
 ) -> Stateful<Div> {
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(true)
@@ -74,7 +74,6 @@ fn metric_card(
         .flex_1()
         .min_w(px(0.0))
         .h_full()
-        .shadow(crate::gpui_app::elements::card_shadow(theme))
 }
 
 /// Render the fixed-size desktop-widget content.

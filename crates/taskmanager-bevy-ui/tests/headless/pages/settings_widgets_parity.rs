@@ -3,7 +3,8 @@
 //! The settings center's owned component layer, end to end:
 //!
 //! - the **scrollbar** rail: a translucent floating track with a capsule
-//!   thumb, bound to the scroll area it belongs to (BEVY-175);
+//!   thumb, bound to the scroll area it belongs to (BEVY-175); the lane
+//!   paints no track and the rail leaves the layout when its area fits;
 //! - the **tooltip**: a 300 ms hover delay and a viewport fit that flips
 //!   the card above a bottom anchor instead of hanging off the edge
 //!   (BEVY-176);
@@ -27,6 +28,7 @@ use bevy::app::App;
 use bevy::asset::Assets;
 use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
 use bevy::ecs::entity::Entity;
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::With;
 use bevy::ecs::world::World;
 use bevy::image::TextureAtlasLayout;
@@ -168,13 +170,24 @@ fn settings_scroll_area_owns_a_bound_scrollbar_rail() {
         .next()
         .expect("the rail carries a draggable thumb");
     assert_ne!(thumb, rail, "the thumb is the rail's own child");
-    let fill = world
+    // The lane itself is transparent: the capsule is the whole affordance,
+    // so a rail never paints a bar over the content it serves.
+    let track = world
         .get::<bevy::ui::BackgroundColor>(rail)
-        .expect("the track paints a fill");
+        .expect("the rail owns a background slot");
+    assert_eq!(
+        track.0.to_srgba().alpha,
+        0.0,
+        "the lane paints no track: {:?}",
+        track.0.to_srgba()
+    );
+    let capsule = world
+        .get::<bevy::ui::BackgroundColor>(thumb)
+        .expect("the capsule paints a fill");
     assert!(
-        fill.0.to_srgba().alpha > 0.0,
-        "the track is a visible translucent rail: {:?}",
-        fill.0.to_srgba()
+        capsule.0.to_srgba().alpha > 0.0,
+        "the capsule is the visible ink: {:?}",
+        capsule.0.to_srgba()
     );
 }
 
@@ -309,6 +322,34 @@ fn settings_boolean_rows_mount_a_sliding_switch() {
     assert_eq!(
         slide.position, 0.0,
         "an off switch rests at the off end of its slot"
+    );
+}
+
+/// GPUI and Iced render the High-contrast preference as a real sliding
+/// switch, not a radio. Bevy must match: the boolean switch rows are the
+/// `Checkbox` widgets, so High contrast has to carry the `Checkbox` marker
+/// (and its `SwitchId`) or the `settings-switch-focus` capture — which
+/// focuses that switch — has no switch to focus.
+#[test]
+fn high_contrast_preference_renders_as_a_switch_like_the_other_frontends() {
+    let mut app = headless_shell_app();
+    mount_settings(&mut app);
+
+    let world = app.world_mut();
+    let hc_slot = world
+        .query::<(&SettingsChoice, Entity)>()
+        .iter(world)
+        .find(|(choice, _)| matches!(choice.0, SettingsField::HighContrast(_)))
+        .map(|(_, entity)| entity)
+        .expect("the High-contrast row mounts a control");
+
+    assert!(
+        world.get::<Checkbox>(hc_slot).is_some(),
+        "High contrast must mount the switch (Checkbox) behavior, not a radio"
+    );
+    assert!(
+        world.get::<SwitchId>(hc_slot).is_some(),
+        "the High-contrast switch carries its stable slide identity"
     );
 }
 
@@ -588,7 +629,7 @@ fn translucent_surfaces_composite_in_the_theme_srgb_space() {
 }
 
 #[test]
-fn the_scrollbar_rail_wears_the_calibrated_track_ink() {
+fn the_scrollbar_capsule_wears_the_calibrated_ink() {
     let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let mut app = headless_shell_app();
     mount_settings(&mut app);
@@ -598,18 +639,28 @@ fn the_scrollbar_rail_wears_the_calibrated_track_ink() {
         .iter(app.world())
         .next()
         .expect("the scroll area owns a visible scrollbar rail");
+    let thumb = app
+        .world()
+        .get::<Children>(rail)
+        .and_then(|children| {
+            children
+                .iter()
+                .find(|child| app.world().get::<ScrollbarThumb>(**child).is_some())
+                .copied()
+        })
+        .expect("the rail carries a capsule thumb");
     let fill = app
         .world()
-        .get::<bevy::ui::BackgroundColor>(rail)
-        .expect("the track paints a fill");
+        .get::<bevy::ui::BackgroundColor>(thumb)
+        .expect("the capsule paints a fill");
     let expected = composite_over(
         palette.content_bg,
-        crate::palette::with_alpha(palette.border_color, 0.25),
+        crate::palette::with_alpha(palette.body_color, 0.30),
     );
     assert_eq!(
         fill.0.to_srgba(),
         expected.to_srgba(),
-        "the rail's track is the calibrated composite"
+        "the capsule is the theme foreground at the shared idle alpha, composited in sRGB"
     );
 }
 

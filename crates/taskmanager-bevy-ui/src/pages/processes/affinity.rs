@@ -14,9 +14,10 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
-    PositionType, UiRect, Val, percent, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, JustifyContent, Node,
+    Overflow, PositionType, UiRect, Val, percent, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
@@ -27,6 +28,7 @@ use taskmanager_shell::ShellApp;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
+use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_8, space_12, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
@@ -34,6 +36,7 @@ use crate::widgets::layout::MODAL_PANEL_WIDTH_REM;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_application::ProcessAffinityRequest;
+use taskmanager_theme::GlassTier;
 
 /// The CPU button's width, in rem: the widest button label ("CPU 63") plus
 /// its air, so every core in the grid is the same size.
@@ -202,6 +205,12 @@ pub(crate) fn affinity_modal_scene(
         ]
     }) as Box<dyn Scene>;
 
+    let radius_rem = palette.panel_radius_rem();
+    let grain =
+        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
+    let modal_fill = palette.glass_modal_fill;
+    let modal_edge = palette.glass_modal_edge;
+    let modal_shadow = palette.glass_shadow(GlassTier::Modal);
     let panel = Box::new(bsn! {
         Node {
             width: rem(MODAL_PANEL_WIDTH_REM),
@@ -210,9 +219,17 @@ pub(crate) fn affinity_modal_scene(
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_24())),
             border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ modal_fill })
+        BorderColor::all(modal_edge)
+        BoxShadow({ modal_shadow })
+        OpticalGlassCard {
+            tier: GlassTier::Modal,
+            enabled: true,
+        }
         Children [
+             @{ grain } --
              Text(title) TextRole(Role::Heading) --
              Text(subtitle) TextRole(Role::Caption) --
              @{ grid } --
@@ -254,7 +271,7 @@ pub(crate) fn affinity_modal_scene(
         ]
     }) as Box<dyn Scene>;
 
-    let scrim = palette.scrim;
+    let scrim = palette.glass_scrim_fill;
     Box::new(bsn! {
         Node {
             width: percent(100),

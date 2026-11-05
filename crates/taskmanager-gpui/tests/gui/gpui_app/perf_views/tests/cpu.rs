@@ -65,6 +65,24 @@ async fn cpu_page_paints_one_cell_per_reported_core(cx: &mut TestAppContext) {
     }
     let first = vcx.debug_bounds("tm-perf-core:0").expect("cell 0");
     let third = vcx.debug_bounds("tm-perf-core:2").expect("cell 2");
+    let plot = vcx
+        .debug_bounds("tm-mini-graph-plot")
+        .expect("a core has an inset plot");
+    assert!(
+        [
+            "tm-perf-core:0",
+            "tm-perf-core:1",
+            "tm-perf-core:2",
+            "tm-perf-core:3",
+        ]
+        .into_iter()
+        .filter_map(|selector| vcx.debug_bounds(selector))
+        .any(|cell| plot.left() > cell.left()
+            && plot.right() < cell.right()
+            && plot.top() > cell.top()
+            && plot.bottom() < cell.bottom()),
+        "the plot must stay inside its rounded core cell: plot={plot:?}"
+    );
     assert!(third.origin.y > first.origin.y);
 }
 

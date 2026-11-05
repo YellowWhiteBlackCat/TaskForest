@@ -11,12 +11,15 @@
 //! (nav rail, tables, dialogs) consume `UiPalette` — never the official
 //! Feathers skin system, which this frontend does not adopt.
 
+use bevy::color::Alpha;
 use bevy::text::{FontSize, FontWeight, TextFont};
+use bevy::ui::prelude::{ShadowStyle, Val};
 use taskmanager_theme::Theme;
 use taskmanager_theme::Weight;
 use taskmanager_theme::palette::SeverityPalette;
+use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::{self, UiSize};
-use taskmanager_theme::{Color, LightDark};
+use taskmanager_theme::{Color, GlassTier, Length, LightDark};
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
@@ -46,10 +49,28 @@ pub(crate) struct UiPalette {
     pub(crate) memory: bevy::color::Color,
     pub(crate) disk: bevy::color::Color,
     pub(crate) network: bevy::color::Color,
+    /// The theme's shade token — the recessive surface fill a composition
+    /// bar paints under its segments and an unaccounted segment wears.
+    pub(crate) shade: bevy::color::Color,
     /// Window clear color — the theme's window backdrop token.
     pub(crate) window_clear: bevy::color::Color,
+    /// The page canvas: the surface every glass tier is composited over and
+    /// the backdrop the content slot paints. The reference surface roots its
+    /// whole page in the theme's window token, so this does too — a canvas
+    /// one step lighter than the window flattens the entire glass elevation
+    /// ladder, because a card's elevation is only ever visible as the
+    /// difference between the card and what sits behind it.
+    pub(crate) canvas: bevy::color::Color,
     /// Card/panel fill — the theme's derived elevated surface, shared by
     /// menus, confirmations, and page cards.
+    ///
+    /// Pre-composited over [`UiPalette::canvas`] in the theme's own sRGB
+    /// space and therefore opaque: Bevy's UI pass blends translucent fills in
+    /// a working space the theme's tokens were never authored for, so a
+    /// card painted with a raw alpha lands several luminance steps below the
+    /// same token on the reference surface (the BEVY-183 colour-space
+    /// contract already applied to the scrollbar capsule and the alarm wash).
+    /// An opaque composited fill paints the same value in every blend space.
     pub(crate) panel_fill: bevy::color::Color,
     /// Content-region backdrop — the theme's view surface.
     pub(crate) content_bg: bevy::color::Color,
@@ -57,6 +78,11 @@ pub(crate) struct UiPalette {
     pub(crate) nav_bg: bevy::color::Color,
     /// Active nav item fill — the theme's elevated sidebar card surface.
     pub(crate) nav_active_bg: bevy::color::Color,
+    /// The stripe on every other row of a table: the theme's neutral zebra
+    /// tint, pre-composited over the page canvas so the stripe is the value
+    /// the frame paints. An unselected odd row wears this; an even row stays
+    /// open so the canvas reads through it.
+    pub(crate) zebra_bg: bevy::color::Color,
     /// Hovered control surface — the theme's semantic accent tint.
     pub(crate) hover_bg: bevy::color::Color,
     /// Pressed control surface — the theme's semantic selection tint.
@@ -66,6 +92,8 @@ pub(crate) struct UiPalette {
     /// Modal scrim — the theme's dimming overlay token, shared by modal
     /// surfaces and status treatments.
     pub(crate) scrim: bevy::color::Color,
+    /// The glass scrim tier's resolved depth wash.
+    pub(crate) glass_scrim_fill: bevy::color::Color,
     /// Card corner radius in px, from the theme's radius scale.
     pub(crate) panel_radius_px: f32,
     /// Control (nav item, table row) corner radius in px.
@@ -112,6 +140,16 @@ pub(crate) struct UiPalette {
     pub(crate) mono: TextFont,
     /// High-contrast theme active flag.
     pub(crate) high_contrast: bool,
+    /// The theme's resolved modal glass fill.
+    pub(crate) glass_modal_fill: bevy::color::Color,
+    /// Shared floating-card glass edge.
+    pub(crate) glass_card_edge: bevy::color::Color,
+    /// Shared modal glass edge.
+    pub(crate) glass_modal_edge: bevy::color::Color,
+    /// Persistent-chrome glass edge.
+    pub(crate) glass_sidebar_edge: bevy::color::Color,
+    /// Shared translucent highlight painted over panel fills.
+    pub(crate) glass_sheen: bevy::color::Color,
     /// The theme's mode identity, carried so read-back projections (the
     /// settings page's current-selection display) stay honest for every skin
     /// instead of inferring the mode from surface colors.
@@ -128,6 +166,8 @@ pub(crate) struct UiPalette {
     /// the window's [`RemSize`] resource must carry while this palette is
     /// live (the body type of the size ladder: 14/16/18px).
     pub(crate) rem_px: f32,
+    /// The theme that owns optical decisions for the current palette.
+    pub(crate) optical_theme: Theme,
 }
 
 impl UiPalette {
@@ -153,6 +193,65 @@ impl UiPalette {
     pub(crate) fn rem_ratio(&self, px: f32) -> f32 {
         px / self.rem_px
     }
+
+    #[must_use]
+    pub(crate) fn panel_radius_rem(&self) -> f32 {
+        self.panel_radius_px / STANDARD_ROOT_REM_SIZE
+    }
+
+    #[must_use]
+    pub(crate) fn control_radius_rem(&self) -> f32 {
+        self.control_radius_px / STANDARD_ROOT_REM_SIZE
+    }
+
+    #[must_use]
+    pub(crate) fn panel_content_inset_rem(&self) -> f32 {
+        tokens::rounded_content_inset(Length(self.panel_radius_px)).0 / STANDARD_ROOT_REM_SIZE
+    }
+
+    #[must_use]
+    pub(crate) fn glass_shadow(&self, tier: GlassTier) -> Vec<ShadowStyle> {
+        let (ambient_y, ambient_blur) = tier.ambient_shadow_rem();
+        let (contact_y, contact_blur) = tier.contact_shadow_rem();
+        vec![
+            ShadowStyle {
+                color: self
+                    .card_shadow
+                    .with_alpha(self.card_shadow.to_srgba().alpha * 0.6),
+                x_offset: Val::Rem(0.0),
+                y_offset: Val::Rem(ambient_y),
+                spread_radius: Val::Rem(0.0),
+                blur_radius: Val::Rem(ambient_blur),
+            },
+            ShadowStyle {
+                color: self.card_shadow,
+                x_offset: Val::Rem(0.0),
+                y_offset: Val::Rem(contact_y),
+                spread_radius: Val::Rem(0.0),
+                blur_radius: Val::Rem(contact_blur),
+            },
+        ]
+    }
+
+    #[must_use]
+    pub(crate) fn glass_fill(&self, tier: GlassTier) -> bevy::color::Color {
+        match tier {
+            GlassTier::Sidebar => self.nav_bg,
+            GlassTier::Card => self.panel_fill,
+            GlassTier::Modal => self.glass_modal_fill,
+            GlassTier::Scrim => self.glass_scrim_fill,
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn glass_edge(&self, tier: GlassTier) -> bevy::color::Color {
+        match tier {
+            GlassTier::Sidebar => self.glass_sidebar_edge,
+            GlassTier::Card => self.glass_card_edge,
+            GlassTier::Modal => self.glass_modal_edge,
+            GlassTier::Scrim => bevy::color::Color::NONE,
+        }
+    }
 }
 
 /// Resolve the window palette from a theme snapshot and the UI-size axis.
@@ -160,33 +259,51 @@ impl UiPalette {
 /// Every length that belongs to the type ladder is authored as a `rem` ratio
 /// of the size's body type (14/16/18px), mirroring GPUI's root-rem contract:
 /// the window's `RemSize` resource carries `rem_px`, so a UI-size choice
-/// re-scales type, icons and controls in one place. Radii are theme radius
-/// tokens and stay px — they do not ride the reading-size axis.
+/// re-scales type, icons and controls in one place. Glass and rem-authored
+/// controls convert theme radii against the standard root so they scale too.
 ///
 /// The ratios derive from the same `UiSize` tables the other frontends read,
 /// so all four surfaces resolve identical px metrics per size choice.
 pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
     let rem_px = ui_size.body_font_size().0;
-    let ratio = |px: f32| px / rem_px;
+    // Every type rung converts through the theme's own rem-ratio helper, so
+    // this frontend divides by the same root the other three use instead of
+    // re-deriving the factor here.
+    let ratio = |size: Length| f32::from(ui_size.rem_ratio(size));
+    // The glass ladder, pre-composited over the page canvas in the theme's
+    // sRGB space (BEVY-183). Each tier's edge is composited over its OWN
+    // tier fill, because an edge is drawn on the panel it belongs to, never
+    // on the canvas behind it.
+    let canvas = theme_color(theme.window_bg);
+    let panel_fill = composite_over(canvas, theme_color(theme.glass_card().fill));
+    let nav_bg = composite_over(canvas, theme_color(theme.glass_chrome().fill));
+    let glass_modal_fill = composite_over(canvas, theme_color(theme.glass_modal().fill));
+    let glass_card_edge = composite_over(panel_fill, theme_color(theme.glass_card().edge));
+    let glass_modal_edge = composite_over(glass_modal_fill, theme_color(theme.glass_modal().edge));
+    let glass_sidebar_edge = composite_over(nav_bg, theme_color(theme.glass_chrome().edge));
     UiPalette {
         cpu: theme_color(theme.cpu),
         memory: theme_color(theme.memory),
         disk: theme_color(theme.disk),
         network: theme_color(theme.network),
+        shade: theme_color(theme.shade),
         mode: theme.mode,
         window_clear: theme_color(theme.window_bg),
-        panel_fill: theme_color(theme.card_surface()),
+        canvas,
+        panel_fill,
         content_bg: theme_color(theme.view_bg),
-        nav_bg: theme_color(theme.sidebar_bg),
+        nav_bg,
         nav_active_bg: theme_color(theme.sidebar_card_bg),
+        zebra_bg: composite_over(canvas, theme_color(theme.zebra_bg())),
         hover_bg: theme_color(theme.hover_bg()),
         selection_bg: theme_color(theme.selection_bg()),
         nav_active_ink: theme_color(theme.accent_text),
         scrim: theme_color(theme.scrim),
+        glass_scrim_fill: theme_color(theme.glass_scrim().fill),
         panel_radius_px: tokens::card_radius(theme).0,
         control_radius_px: tokens::control_radius(theme).0,
-        control_height_rem: ratio(ui_size.control_height().0),
-        icon_rem: ratio(ui_size.icon_size().0),
+        control_height_rem: ratio(ui_size.control_height()),
+        icon_rem: ratio(ui_size.icon_size()),
         accent: theme_color(theme.accent),
         heading_color: theme_color(theme.fg),
         body_color: theme_color(theme.fg),
@@ -198,30 +315,36 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
         card_shadow: theme_color(theme.card_shadow()),
         severity: theme.severity_palette(),
         high_contrast: theme.hc,
+        glass_modal_fill,
+        glass_card_edge,
+        glass_modal_edge,
+        glass_sidebar_edge,
+        glass_sheen: theme_color(theme.glass_sheen(GlassTier::Card)),
         border_color: theme_color(theme.border),
         focus_ring: theme_color(theme.with_focus_visible(true).palette().ring),
         heading: TextFont {
-            font_size: FontSize::Rem(ratio(ui_size.page_title_font_size().0)),
+            font_size: FontSize::Rem(ratio(ui_size.page_title_font_size())),
             weight: theme_weight(tokens::FONT_WEIGHT_HEADER),
             ..TextFont::default()
         },
         body: TextFont {
-            font_size: FontSize::Rem(1.0),
+            font_size: FontSize::Rem(ratio(ui_size.body_font_size())),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
         caption: TextFont {
-            font_size: FontSize::Rem(ratio(ui_size.caption_font_size().0)),
+            font_size: FontSize::Rem(ratio(ui_size.caption_font_size())),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
         mono: TextFont {
-            font_size: FontSize::Rem(1.0),
+            font_size: FontSize::Rem(ratio(ui_size.body_font_size())),
             weight: theme_weight(tokens::FONT_WEIGHT_NORMAL),
             ..TextFont::default()
         },
         ui_size,
         rem_px,
+        optical_theme: *theme,
     }
 }
 

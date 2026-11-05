@@ -1014,9 +1014,8 @@ fn shared_page_body_strings_follow_the_active_language() {
     // the confirm bar and the per-row buttons render. Driving the global and
     // asserting the resolved text proves the shared-page chrome follows the
     // active language rather than a hard-coded English literal. The `Language`
-    // here is the *shared* one (the catalog resolver), distinct from the
-    // renderer-local `crate::i18n::Language`; `IcedApp` mirrors the picker into
-    // it via `i18n::sync_shared_languages`.
+    // `Language` here is the shared one: the catalog resolver is the frontend's
+    // only language, and `IcedApp` pins it whenever a config snapshot lands.
     use taskmanager_application::i18n::{Language, set_language};
 
     pin_english();

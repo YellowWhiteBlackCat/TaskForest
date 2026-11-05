@@ -61,7 +61,7 @@ impl PaletteScrim {
         }
     }
 
-    /// Resolve the scrim color.
+    /// Resolve the scrim color from the theme's Scrim glass tier.
     pub fn color(&self) -> Color {
         scrim(&self.palette, self.alpha)
     }

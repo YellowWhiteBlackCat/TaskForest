@@ -39,13 +39,12 @@ use crate::window::{CustomTextInk, Role, TextRole};
 use taskmanager_ui_contract::ColumnResizePolicy;
 
 pub(crate) mod contrast;
-pub(crate) mod ellipsis;
 pub(crate) mod figures;
 pub(crate) mod resize;
 pub(crate) mod selection;
 
+use crate::widgets::bounded_text::BoundedText;
 use contrast::calibrate_muted_ink;
-use ellipsis::BoundedCellText;
 use figures::TabularFigures;
 use resize::ColumnWidthNode;
 use selection::CellSelection;
@@ -491,7 +490,7 @@ fn cell_scene(cell: CellRender<'_>, palette: Option<&UiPalette>) -> impl Scene +
              TextRole({ role })
              TextLayout { linebreak: LineBreak::NoWrap }
              Node { flex_shrink: 0.0 }
-             BoundedCellText
+             BoundedText
              ZeroValueCell({ is_zero })
              TabularFigures({ cell.numeric })
              Children [

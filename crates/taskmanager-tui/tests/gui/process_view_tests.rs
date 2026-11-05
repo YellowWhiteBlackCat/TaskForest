@@ -6,6 +6,7 @@ use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::process::ProcessScalarObservations;
 use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::container_expansion_key;
 use taskmanager_shell::{SortCol, SortDir, project_process_tree_rows};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};
 
@@ -127,6 +128,63 @@ fn group_rows_keep_typed_missing_metrics_instead_of_fabricating_zero() {
     );
     assert_eq!(aggregate.cpu().current_value(), None);
     assert_eq!(aggregate.memory().current_value(), None);
+}
+
+#[test]
+fn container_group_header_and_members_ride_above_the_category_tree() {
+    use taskforest_core::core::process::{
+        ContainerMetadata, ContainerRuntime, ProcessMetadataObservations, ProcessOwner,
+    };
+
+    let metadata =
+        ContainerMetadata::new(ContainerRuntime::Docker, "a1b2c3d4e5f6").with_name("capture-web");
+    let container_member = |pid: u32, name: &str| {
+        let mut process = proc(pid, name, 1.0, 16);
+        process.apply_metadata_observations(ProcessMetadataObservations::current_with_container(
+            ProcessOwner::opaque("capture-user"),
+            None,
+            Some(metadata.clone()),
+            1,
+        ));
+        process
+    };
+    let host = proc(90_000, "host-process", 2.0, 8);
+    let processes = [
+        container_member(90_001, "capture-worker-1"),
+        container_member(90_002, "capture-worker-2"),
+        host,
+    ];
+    let refs: Vec<_> = processes.iter().collect();
+    let expanded = HashSet::from([container_expansion_key(&metadata)]);
+    let projected = rows(&refs, &expanded, &HashSet::new());
+
+    let ProcessRow::Group {
+        name,
+        label,
+        depth,
+        count,
+        expanded,
+        row_key,
+        ..
+    } = &projected[0]
+    else {
+        panic!("the container header is the first row");
+    };
+    assert_eq!(name, "container:Docker:a1b2c3d4e5f6");
+    assert_eq!(label, "capture-web");
+    assert_eq!(*depth, 0);
+    assert_eq!(*count, 2);
+    assert!(*expanded);
+    assert_eq!(*row_key, None);
+
+    let member_pids: Vec<_> = projected[1..3]
+        .iter()
+        .map(|row| match row {
+            ProcessRow::TreeNode { process, depth, .. } => (process.pid, *depth),
+            ProcessRow::Group { .. } => panic!("container members are process rows"),
+        })
+        .collect();
+    assert_eq!(member_pids, [(90_001, 1), (90_002, 1)]);
 }
 
 #[test]

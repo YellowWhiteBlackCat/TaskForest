@@ -39,9 +39,30 @@ Detail behind the README module map:
   batches into the shell and triggers `ShellProjectionFolded` (the pages'
   data-refresh event).
 - `src/palette.rs` — the theme-token → bevy adapter; the only place tokens
-  become bevy colors/type metrics.
+  become bevy colors/type metrics. It owns no optical-glass claim.
+- `src/glass/optical/capability.rs` — derives the live renderer capability
+  from Bevy's `RenderAdapterInfo` and pins the operations/limits proved by the
+  standard optical GPU gate. No adapter means `UNSUPPORTED` and Painted.
+- `src/glass/optical.rs` — the production GPU binding for the shared
+  `OpticalGlassSpec`: one aligned uniform projects blur/refraction/dispersion,
+  specular/frost/quality, linear tint, grain ink/strength, element bounds and
+  viewport/DPI. It embeds `optical_glass.wesl`, registers the `UiMaterial`
+  pipeline, and records whether a material was attached or a typed fallback
+  applies. Attachment is a main-world fact, not GPU readiness. The Performance
+  hero card is marked as a candidate; headless renders and high-contrast
+  themes keep their painted or opaque fallback visible.
+- `src/window.rs` camera composition — the inactive `BackdropCaptureCamera`
+  and explicitly targeted `BackdropCaptureRoot` are offscreen scaffolding;
+  `PresentationCamera` owns the primary-window interactive shell. A chart-grid
+  mirror is not the real lower composite. The target follows physical size/DPI
+  changes. The invalidation controller (`drive_backdrop_capture`) bounds offscreen
+  rendering to exactly one frame per lower-composite change (fold, resize,
+  palette, route) and only while a live optical surface exists.
+- `src/window/overlay_root.rs` — the floating-overlay root (`OverlayRoot`),
+  separating transient surfaces from the resident `AppShellRoot`.
 - `src/pages/processes/properties_modal/` — the properties modal's surfaces:
-  `backdrop.rs` (the modal's frost contract over a translucent viewport),
+  `backdrop.rs` (the modal's painted fallback over a translucent viewport,
+  with no fake blur-radius field),
   `tabs.rs` (the sliding tab indicator, a typed frame-stepped motion),
   `memory.rs` (the PSS/USS/Swap segment comparison bar), `gpu.rs` (the VRAM
   and per-engine micro bars), `quota.rs` (the observed resource-quota gauge

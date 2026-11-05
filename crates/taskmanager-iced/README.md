@@ -21,6 +21,11 @@ around one bounded body; unsupported submissions appear immediately, and Refresh
 and Properties consume the app-host-injected local-time rules. Iced owns no `TZ`, zoneinfo filesystem or implicit UTC
 fallback path.
 
+The locked `iced_wgpu 0.14.0` renderer cannot expose the already-composited backdrop to a custom primitive with stable
+painter order, so the production binding reports `OpticalGlassCapability::UNSUPPORTED`; glass surfaces remain the
+shared painted fallback. Optical glass is not claimed on this frontend until a released upstream API passes the P0 gate
+without vendor, fork or local patches.
+
 ## Contract and verification
 
 Cross-crate owners and transition matrices are authoritative in
@@ -45,7 +50,7 @@ src/capabilities.rs  functional.rs  feature_coverage.rs
                                parity registry, surface decisions and capability declarations
 src/theme.rs  theme_binding.rs  font_catalog.rs  text_metrics.rs
                                palette bindings, typography, font catalog and metrics
-src/icons.rs  tray.rs  i18n.rs  icons resolution, system tray and locale helpers
+src/icons.rs  tray.rs          icons resolution and system tray
 src/saved_views.rs  export.rs  saved view state and tabular data export
 src/capture.rs  capture_windows.rs  headless capture and screenshot routines
 ```

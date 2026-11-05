@@ -17,6 +17,7 @@
 //! Mounted from `pages/services.rs` (the panel is a Services-page surface).
 
 use bevy::app::App;
+use bevy::ecs::query::With;
 use bevy::input::keyboard::KeyCode;
 use taskforest_core::core::services::ServiceLogLevel;
 use taskforest_core::core::services::{ServiceItem, ServiceStatus};
@@ -28,6 +29,7 @@ use taskforest_core::core::services::{
 use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::app::OpenServiceLog;
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::tokens::UiSize;
 
 use super::log_panel::{
@@ -35,6 +37,7 @@ use super::log_panel::{
     log_status_caption,
 };
 use super::tests::{headless_services_app, push_services, route_to_services};
+use crate::glass::OpticalGlassCard;
 use taskforest_core::core::target::ServiceId;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::FeedbackSeverity;
@@ -201,6 +204,11 @@ fn painted_panel(shell: &ShellApp) -> Vec<(crate::window::Role, String)> {
         .spawn_scene(scene)
         .expect("the log panel scene resolves without app resources")
         .id();
+    let card = world
+        .query_filtered::<&OpticalGlassCard, With<bevy::ui::Node>>()
+        .single(world)
+        .expect("the log panel is an optical glass candidate");
+    assert!(card.enabled && card.tier == GlassTier::Card);
     let texts = world
         .query::<(&Text, &crate::window::TextRole)>()
         .iter(world)

@@ -2,6 +2,7 @@
 
 use super::SystemBody;
 use super::paint::SystemPaint;
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::icons::icon_scene;
 use crate::widgets::layout::SystemDashboardBudget;
 use crate::{
@@ -30,8 +31,8 @@ use bevy::{
     ui::{
         UiSystems,
         prelude::{
-            BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, Overflow,
-            ScrollPosition, UiRect, percent, px, rem,
+            BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode, FlexDirection,
+            FlexWrap, Node, Overflow, ScrollPosition, UiRect, Val, percent, px, rem,
         },
     },
     ui_widgets::{Activate, Button},
@@ -194,6 +195,14 @@ pub(crate) fn body(
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let cards = TimelineMetric::ALL.into_iter().skip(state.first_metric).take(budget.count).map(|metric| {
+        let GlassPanelMaterial {
+            fill,
+            edge,
+            shadows,
+            edge_width_rem,
+            radius_rem,
+            grain,
+        } = card_material(palette);
         let samples = series.samples(metric);
         let ceiling = match metric { TimelineMetric::Cpu | TimelineMetric::Memory => 100.0, _ => samples.iter().copied().filter(|v| v.is_finite()).fold(1.0_f32, f32::max) };
         let color = match metric { TimelineMetric::Cpu => palette.cpu, TimelineMetric::Memory => palette.memory, TimelineMetric::Disk => palette.disk, TimelineMetric::Network => palette.network };
@@ -205,9 +214,11 @@ pub(crate) fn body(
         }
         parts.push(Box::new(bsn! { Text({coverage(series, metric)}) TextRole(Role::Caption) }));
         Box::new(bsn! {
-            Node { flex_basis: rem(DASHBOARD_CARD_FLEX_BASIS_REM), flex_grow: 1.0, min_width: px(0.0), max_width: percent(100), height: px(budget.card_height), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(px(space_8())), border_radius: BorderRadius::all(px(palette.panel_radius_px)) }
-            BackgroundColor({palette.panel_fill})
-            Children [{parts}]
+            Node { flex_basis: rem(DASHBOARD_CARD_FLEX_BASIS_REM), flex_grow: 1.0, min_width: px(0.0), max_width: percent(100), height: px(budget.card_height), flex_shrink: 0.0, flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(Val::Rem(palette.panel_content_inset_rem().max(palette.rem_ratio(space_8())))), border: UiRect::all(Val::Rem(edge_width_rem)), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
+            BackgroundColor({ fill })
+            BorderColor::all(edge)
+            BoxShadow({ shadows })
+            Children [ @{grain} -- {parts}]
         }) as Box<dyn Scene>
     }).collect::<Vec<_>>();
     let notice: Vec<Box<dyn Scene>> = if budget.count == 0 {

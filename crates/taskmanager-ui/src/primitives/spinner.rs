@@ -10,7 +10,7 @@ use gpui::{
     Animation, AnimationExt, App, ElementId, IntoElement, PathBuilder, Pixels, Point, RenderOnce,
     Styled, Window, canvas, point, px,
 };
-use taskmanager_theme::Palette;
+use taskmanager_theme::{Palette, tokens};
 
 /// A circular loading spinner with an accent-colored arc. Pure visual: no
 /// interaction state, so no entity is needed (M2 applies to stateful
@@ -23,11 +23,11 @@ pub struct Spinner {
 }
 
 impl Spinner {
-    /// Build a spinner with the given palette snapshot.
+    /// Build a spinner at the theme's inline-icon extent.
     pub fn new(palette: Palette) -> Self {
         Self {
             palette,
-            size: 16.0,
+            size: f32::from(tokens::ICON_INLINE),
             speed: Duration::from_millis(800),
         }
     }

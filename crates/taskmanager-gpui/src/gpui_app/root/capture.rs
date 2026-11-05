@@ -50,11 +50,14 @@ mod scenarios;
 mod session_control;
 mod state;
 mod system_health;
+
 use fixtures::{
     dynamic_power_fixture, dynamic_sensor_fixture, npu_inventory_fixture, prepare_active_alert,
     prepare_gpu_engine_inventory, prepare_hotplug, prepare_intel_gpu, prepare_missing_tool_disk,
     prepare_partition_disk, prepare_permission_disk,
 };
+/// Emit the resolved presentation facts of the captured frame (ADR-064).
+pub(crate) use marker::emit_resolution_marker;
 use marker::{emit_marker, emit_theme_marker};
 use process_fixtures::{
     prepare_apps_group_expanded, prepare_apps_identity_matrix, prepare_apps_search_highlight,
@@ -72,6 +75,11 @@ pub(super) use state::{
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
+    /// The capture scenario this frame belongs to, when the run is a capture.
+    pub(crate) fn scenario(&self) -> Option<CaptureScenario> {
+        self.scenario
+    }
+
     pub(crate) fn properties_insight_facet(&self) -> ProcessInsightFacet {
         match self.scenario {
             Some(CaptureScenario::ProcessGpuDetails) => ProcessInsightFacet::Gpu,

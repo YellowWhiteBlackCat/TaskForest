@@ -11,6 +11,7 @@
 //! batch, so the system remembers which alert instances it already opened and
 //! leaves an already-known banner settled.
 
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::icons::icon_scene;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
@@ -25,8 +26,8 @@ use bevy::text::{LineBreak, TextLayout};
 use bevy::time::Time;
 use bevy::ui::UiSystems;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, Overflow, PositionType,
-    UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, Overflow, PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use std::collections::VecDeque;
@@ -169,6 +170,14 @@ pub(crate) fn scene(
         alert.target,
         alert.active_since_ms
     );
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             width: percent(100),
@@ -176,11 +185,16 @@ pub(crate) fn scene(
             position_type: PositionType::Relative,
             overflow: Overflow::clip_y(),
             flex_shrink: 0.0,
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
         BannerSpring { value: 0.0, velocity: 0.0, target: slot, initialized: false }
         BannerAlert({ key })
         Children [
+             @{ grain } --
              Node {
                 position_type: PositionType::Absolute,
                 left: px(0.0),

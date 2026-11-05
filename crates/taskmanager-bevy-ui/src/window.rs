@@ -30,7 +30,7 @@ use std::time::Duration;
 use bevy::DefaultPlugins;
 use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup};
 use bevy::asset::{Assets, Handle};
-use bevy::camera::{Camera2d, ClearColor};
+use bevy::camera::ClearColor;
 use bevy::ecs::change_detection::DetectChanges;
 use bevy::ecs::component::Component;
 use bevy::ecs::lifecycle::Add;
@@ -39,8 +39,9 @@ use bevy::ecs::query::{Changed, Has, Or, With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::image::Image;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, bsn};
+use bevy::scene::CommandsSceneExt;
 use bevy::text::{
     Font, FontFeatureTag, FontFeatures, FontSmoothing, FontSource, TextColor, TextFont,
 };
@@ -51,14 +52,18 @@ use bevy::window::{PrimaryWindow, Window, WindowPlugin};
 use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::NativeAppHost;
 
+mod backdrop_capture;
+pub(crate) use backdrop_capture::BackdropCaptureTarget;
 mod capture_marker;
+mod capture_marker_interactive;
 mod capture_state;
+use backdrop_capture::{drive_backdrop_capture, sync_backdrop_capture};
 use capture_marker::emit_capture_marker;
 use capture_state::{initialize_capture_state, is_demo, is_production};
 
 use taskmanager_assets::product;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{FontRole, Theme};
 
 pub(crate) mod chrome;
 use chrome::app_shell_scene;
@@ -75,11 +80,11 @@ use crate::pages::settings::ThemePreferences;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
+use crate::widgets::chart::ChartPointer;
 use crate::widgets::controls::{ControlVisual, control_background};
 use taskforest_contract::InstanceRole;
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::i18n::t;
-use taskmanager_assets::EMBEDDED_FONT_FAMILIES;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::FeedbackTone;
 use taskmanager_shell::ShellApp;
@@ -156,8 +161,10 @@ struct CaptureMarkerState {
     emitted: bool,
     history_open_requested: bool,
     data_presented: bool,
+    container_members_presented: bool,
     hardware_scroll_requested: bool,
     tree_scroll_requested: bool,
+    menu_open_requested: bool,
 }
 
 /// Build and run the live windowed frontend to completion.
@@ -225,7 +232,13 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
             // reference frames without compositor window borders; under normal
             // desktop launches, follow the repo-wide SSD direction (decorations: true)
             // so the window has native titlebar, dragging, and minimize/close controls.
-            decorations: std::env::var_os("TASKFOREST_CAPTURE_SCENARIO").is_none(),
+            // The capture harness announces itself through `TM_BEVY_CAPTURE_PAGE`
+            // (the same variable that selects the captured page). A borderless
+            // content surface is what makes a Bevy frame the same size and the
+            // same geometry as the reference frames it is compared against; a
+            // server-side title bar and its shadow would otherwise inflate
+            // every captured frame.
+            decorations: std::env::var_os("TM_BEVY_CAPTURE_PAGE").is_none(),
             ..Window::default()
         }),
         ..WindowPlugin::default()
@@ -351,17 +364,25 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<HistoryProjectionResource>();
         app.init_resource::<RemSize>();
         app.init_resource::<crate::widgets::switch::SwitchMemory>();
-        app.init_resource::<PerformanceLayoutState>().add_systems(
-            PostUpdate,
-            (
-                sync_rem_size,
-                sync_node_em_size,
-                sync_performance_layout,
-                sync_control_visuals,
-                crate::widgets::table::paint_zero_values,
+        app.init_resource::<PerformanceLayoutState>()
+            .add_systems(
+                PostUpdate,
+                (
+                    sync_rem_size,
+                    sync_node_em_size,
+                    sync_performance_layout,
+                    crate::pages::performance::scene::sync_memory_legend_layout,
+                    sync_control_visuals,
+                    crate::widgets::table::paint_zero_values,
+                )
+                    .chain(),
             )
-                .chain(),
-        );
+            .add_systems(
+                PostUpdate,
+                (sync_backdrop_capture, drive_backdrop_capture)
+                    .chain()
+                    .before(bevy::ui::UiSystems::Layout),
+            );
         // The product-owned interaction layer: the switch thumb's slide, the
         // scrollbar rail's target binding, and the focus ring's outer halo.
         // The halo and the rail resolve before the UI layout, so their boxes
@@ -380,6 +401,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
+        backdrop_capture::register(app);
         crate::window_surface::register(app);
         crate::saved_views::register(app);
         crate::event_center::register(app);
@@ -396,6 +418,17 @@ impl Plugin for FrontendWindowPlugin {
         crate::pages::process_tree::register(app);
         crate::pages::processes::layout::register(app);
         crate::pages::performance::register(app);
+        app.add_systems(
+            bevy::app::PostUpdate,
+            crate::widgets::bounded_text::ellipsize_bounded_text.after(bevy::ui::UiSystems::Layout),
+        );
+        // A rail paints only where there is something to scroll: the widget
+        // sizes an idle thumb to the whole track, so the lane is taken out of
+        // layout as soon as the bound scroll area fits its content.
+        app.add_systems(
+            bevy::app::PostUpdate,
+            crate::widgets::scrollbar::sync_rail_visibility.after(bevy::ui::UiSystems::PostLayout),
+        );
         crate::pages::history::scene::register(app);
         app.add_observer(rewrite_summary_line);
         app.add_observer(rewrite_feedback_line);
@@ -409,6 +442,7 @@ impl Plugin for FrontendWindowPlugin {
             app.add_plugins(bevy::a11y::AccessibilityPlugin);
         }
         app.add_plugins(AppShellPlugin);
+        crate::glass::register(app);
         crate::icons::register(app);
         crate::confirmation::register(app);
         crate::pages::processes::affinity::register(app);
@@ -428,6 +462,7 @@ impl Plugin for FrontendWindowPlugin {
             (
                 initialize_capture_state,
                 register_embedded_fonts,
+                crate::glass::build_glass_noise,
                 crate::icons::build_icon_plates,
                 spawn_app_shell,
             )
@@ -436,12 +471,27 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.add_systems(PreUpdate, drain::drain_system.run_if(is_production));
         app.add_systems(PreUpdate, drain::drain_demo_effects.run_if(is_demo));
+        app.add_systems(
+            PostUpdate,
+            reset_demo_chart_pointer
+                .run_if(is_demo)
+                .before(crate::widgets::chart::painter::paint_chart_canvases),
+        );
+    }
+}
+
+/// Clear any stray pointer position during demo/capture runs so the chart
+/// never paints a hover crosshair or pill over a static reference snapshot.
+fn reset_demo_chart_pointer(mut pointers: Query<&mut ChartPointer>) {
+    for mut pointer in &mut pointers {
+        pointer.normalized = None;
     }
 }
 
 /// Register the bundled faces every other frontend embeds (ADR-026) into the
-/// bevy font store. `embedded_fonts()` yields MiSans VF followed by Roboto
-/// Mono, the same UI/metric-role order used by GPUI and Iced.
+/// bevy font store. `embedded_fonts()` yields the bundled faces in
+/// [`FontRole::ALL`] order (UI, then monospace) — the same role order GPUI and
+/// Iced register, and the pairing the `taskmanager-gates` census proves.
 fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<PlaceholderFonts>) {
     let mut embedded = embedded_fonts().into_iter();
     handles.ui = embedded
@@ -454,14 +504,14 @@ fn register_embedded_fonts(mut fonts: ResMut<Assets<Font>>, mut handles: ResMut<
         eprintln!(
             "taskforest-b: embedded font table empty (expected the {} face); \
              text falls back to the default font source",
-            EMBEDDED_FONT_FAMILIES.first().copied().unwrap_or("ui")
+            FontRole::Ui.bundled_family()
         );
     }
     if handles.mono.is_none() {
         eprintln!(
             "taskforest-b: embedded mono face missing (expected the {} face); \
              metric text falls back to the UI face",
-            EMBEDDED_FONT_FAMILIES.get(1).copied().unwrap_or("mono")
+            FontRole::Mono.bundled_family()
         );
     }
 }
@@ -638,9 +688,10 @@ fn rewrite_feedback_line(
     }
 }
 
-/// Startup spawn: one camera for the ui render node to target, then the
-/// shell scene. The initial route comes from the (default) route resource —
-/// no window-local page state exists.
+/// Startup spawn: the offscreen backdrop camera/tree and the primary-window
+/// presentation camera, then the interactive shell scene. The initial route
+/// comes from the (default) route resource — no window-local page state
+/// exists.
 ///
 /// The window's own frame decides the edge highlight: a window the
 /// compositor decorates already has a visible frame, while an undecorated
@@ -651,9 +702,12 @@ fn spawn_app_shell(
     route: Res<Route>,
     demo: Option<Res<DemoMode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
+    images: Option<ResMut<Assets<Image>>>,
     mut commands: Commands,
 ) {
-    commands.spawn_scene(bsn! { Camera2d });
+    backdrop_capture::spawn(&palette.inner, windows.iter().next(), images, &mut commands);
+
+    let demo_notice = demo.is_some().then(|| t("demo.no_host_actions").to_owned());
     let summary = if demo.is_some() {
         t("status.demo_snapshot").to_owned()
     } else {
@@ -666,6 +720,7 @@ fn spawn_app_shell(
     commands.spawn_scene(app_shell_scene(
         &palette.inner,
         route.page,
+        demo_notice,
         summary,
         !decorated,
     ));

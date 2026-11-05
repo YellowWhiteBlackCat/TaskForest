@@ -22,9 +22,6 @@ use crate::gpui_app::history_samples::{
     network_graph_samples,
 };
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::root::responsive::{
-    COMPACT_CONTENT_WIDTH, PerformanceChartInventory, PerformancePageBudget,
-};
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskforest_core::core::DirectoryUsageSnapshot;
@@ -32,6 +29,10 @@ use taskforest_core::core::metrics::{DiskMetrics, NetworkAdapterType, SystemSnap
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    COMPACT_CONTENT_WIDTH, PerformanceChartInventory,
+};
 
 mod directory_usage;
 mod disk_stats;

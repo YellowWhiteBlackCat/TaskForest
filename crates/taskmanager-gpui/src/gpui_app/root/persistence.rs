@@ -8,17 +8,14 @@ use super::graph_options::normalize_graph_data_points;
 use super::{PROC_COL_MAX_WIDTH, PROC_COL_MIN_WIDTH, RootView, page_token};
 use crate::gpui_app::dashboard::DashboardState;
 use crate::gpui_app::processes_view::rows::is_resizable;
-use taskforest_core::core::config::{
-    ColumnWidthConfig, Config, DENSITY_COMFORTABLE, DENSITY_COMPACT, ProcessViewPresetConfig,
-};
+use taskforest_core::core::config::{ColumnWidthConfig, Config, ProcessViewPresetConfig};
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::saved_views::{
     hidden_from_tokens, hidden_tokens, preset_to_config, restore_saved_views, sort_from_token,
     sort_token,
 };
-use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, FontPreference};
+use taskmanager_theme::Skin;
 
 fn saved_views_to_config(dashboard: &DashboardState) -> Vec<ProcessViewPresetConfig> {
     dashboard
@@ -108,50 +105,6 @@ pub(super) fn apply_process_config(view: &mut RootView, config: &Config) {
     view.motion_token = config.motion.clone();
 }
 
-/// Row-density token mapping. `""` (no recorded preference) resolves to
-/// `None` → the caller keeps the built-in comfortable default; an unknown
-/// token is ignored the same way (`None`), so a config written by a newer
-/// version never forces an unresolvable geometry.
-pub(super) fn density_from_token(token: &str) -> Option<RowDensity> {
-    match token.trim() {
-        DENSITY_COMPACT => Some(RowDensity::Compact),
-        DENSITY_COMFORTABLE | "" => Some(RowDensity::Comfortable),
-        _ => None,
-    }
-}
-
-/// The density token written into [`Config`]. Comfortable (the default) is
-/// persisted explicitly so the round-trip is byte-stable.
-fn density_token(density: RowDensity) -> &'static str {
-    match density {
-        RowDensity::Comfortable => DENSITY_COMFORTABLE,
-        RowDensity::Compact => DENSITY_COMPACT,
-    }
-}
-
-/// Font tokens written into [`Config`]: the bundled family name the user
-/// opted into, or the explicit `"system"` token ("never chosen" persists as
-/// the empty token, which the loader resolves to the bundled product faces).
-/// The bundled UI token is MiSans VF (the app's primary reading face); the
-/// bundled mono token remains Roboto Mono. Kept pure + tiny so the token
-/// contract is unit-testable without constructing a full view.
-fn font_tokens(pref: FontPreference) -> (String, String) {
-    // System persists as the explicit "system" token (NOT "") — the empty
-    // token is reserved for "never chosen", which resolves to the bundled
-    // product faces on reload.
-    let ui = match pref.ui {
-        FontChoice::System => super::startup::FONT_TOKEN_SYSTEM.to_string(),
-        FontChoice::Custom(family) => family.to_string(),
-        FontChoice::Bundled => FONT_MISANS_VF.to_string(),
-    };
-    let mono = match pref.mono {
-        FontChoice::System => super::startup::FONT_TOKEN_SYSTEM.to_string(),
-        FontChoice::Custom(family) => family.to_string(),
-        FontChoice::Bundled => FONT_ROBOTO_MONO.to_string(),
-    };
-    (ui, mono)
-}
-
 pub(super) fn config_from_view(view: &RootView) -> Config {
     let presentation = view.presentation_snapshot();
     let appearance = presentation.appearance;
@@ -166,14 +119,17 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
             .as_millis(),
     )
     .unwrap_or(u64::MAX);
-    let (ui_font, mono_font) = font_tokens(appearance.font);
+    // The persisted font tokens come from the theme owner's codec: a bundled
+    // choice writes its own family and the host choice writes the explicit
+    // marker, so one config file reads back as the same faces in every product.
+    let (ui_font, mono_font) = appearance.font.config_tokens();
     Config {
         // Empty means "follow native desktop family". Persisting the
         // currently resolved skin here would turn an automatic first launch
         // into an accidental explicit override on the next restart.
         skin: appearance
             .skin
-            .map(|skin| skin.label())
+            .map(Skin::config_token)
             .unwrap_or_default()
             .to_string(),
         // Persist the preference token, not only the currently resolved
@@ -181,9 +137,9 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // Light/Dark remain valid explicit overrides.
         mode: appearance.color_scheme.to_string(),
         hc: appearance.high_contrast,
-        ui_font,
-        mono_font,
-        density: density_token(appearance.density).to_string(),
+        ui_font: ui_font.to_string(),
+        mono_font: mono_font.to_string(),
+        density: appearance.density.config_token().to_string(),
         ui_size: appearance.ui_size.config_token().to_string(),
         text_rendering: appearance.text_rendering.to_string(),
         startup_page: presentation.startup_page.to_string(),

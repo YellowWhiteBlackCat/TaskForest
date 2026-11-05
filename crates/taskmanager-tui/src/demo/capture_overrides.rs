@@ -33,6 +33,7 @@ use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::smart::self_test_intent;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::capture::{self, prepare_capture_settings};
 use super::fixtures;
@@ -58,6 +59,8 @@ pub(super) fn apply_capture_overrides(app: &mut TuiApp) {
             "process-force-kill"
                 | "process-tree-confirm"
                 | "process-batch-confirm"
+                | "process-context-menu"
+                | "feedback-overlay"
                 | "process-properties-performance"
                 | "process-memory-pss-swap"
                 | "process-network-details"
@@ -393,6 +396,30 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
                 let _ = app.shell.select_row(index);
                 app.reconcile_applications_cursor();
             }
+        }
+        "process-context-menu" => {
+            // Open the production process-action menu for a real identity row,
+            // so the captured frame proves the shipped menu, not a fixture.
+            app.shell.application.active_page = AppPage::Applications;
+            let index = (0..app.shell.visible_process_count())
+                .find(|index| app.shell.row_identity_at(*index).is_some());
+            if let Some(index) = index {
+                let _ = app.shell.select_row(index);
+                app.reconcile_applications_cursor();
+                let _ = app.open_process_menu();
+            }
+        }
+        "feedback-overlay" => {
+            app.shell.application.active_page = AppPage::Applications;
+            app.shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Success,
+                FeedbackLifecycle::UntilReplaced,
+                format!(
+                    "Current window saved: /run/media/{}/very-long-workspace/target/capture/runs/{}/capture.png (1180x780)",
+                    "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9",
+                ),
+            );
         }
         "process-properties-performance" => {
             app.shell.application.active_page = AppPage::Applications;

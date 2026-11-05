@@ -96,6 +96,7 @@ pub(crate) fn battery_icon_scene(
                     left: px(0.0),
                     top: px(0.0),
                     bottom: px(0.0),
+                    border_radius: BorderRadius::all(rem(radius)),
                     overflow: Overflow::clip(),
                 }
                 BackgroundColor({ fill_ink })
@@ -108,6 +109,7 @@ pub(crate) fn battery_icon_scene(
                         left: percent(0.0),
                         top: px(0.0),
                         bottom: px(0.0),
+                        border_radius: BorderRadius::all(rem(radius)),
                     }
                     BackgroundColor({ flow_ink })
                     BatteryChargeFlow { battery: { id.clone() }, phase: 0.0, charging: false }

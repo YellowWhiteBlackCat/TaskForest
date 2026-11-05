@@ -17,12 +17,31 @@ use gpui::{
     App, AppContext, ClickEvent, Context, DismissEvent, ElementId, Entity, EventEmitter,
     FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseDownEvent,
     ParentElement, Pixels, Point, Render, ScrollHandle, SharedString, StatefulInteractiveElement,
-    Styled, Window, actions, anchored, deferred, div, px,
+    Styled, Window, actions, anchored, deferred, div, px, rems,
 };
 use taskmanager_theme::{Palette, Theme};
 use taskmanager_ui_contract::IconId;
 
 use crate::primitives::scrollbar::{SCROLLBAR_WIDTH, Scrollbar, ScrollbarShow};
+use crate::theme_binding::glass_shadow;
+use taskmanager_theme::GlassTier;
+
+/// The menu panel's glass role. A menu is a floating card, not a modal or the
+/// window chrome, so it wears the Card tier — the same layer Iced's
+/// `panel_style` and Bevy's `menu_scene` read — instead of the opaque page
+/// surface it used to paint.
+#[must_use]
+pub fn menu_panel_tier() -> GlassTier {
+    GlassTier::Card
+}
+
+/// The menu panel's two-layer depth. Before GLASS-01 the panel used a
+/// hardcoded `shadow_md` pair; it now reads the theme's Card-tier glass shadow
+/// so elevation scales with the user's reading size and the skin ink.
+#[must_use]
+pub fn menu_panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
+    glass_shadow(theme, menu_panel_tier())
+}
 
 /// The popup key context (navigation bindings live under it).
 pub const POPUP_CONTEXT: &str = "TaskManagerPopup";
@@ -462,7 +481,11 @@ impl Render for PopupMenuState {
                                 palette.fg
                             }))
                             .when(is_selected, |el| {
-                                el.bg(crate::theme_binding::fill(hover_fill(palette.surface)))
+                                // Cursor row reads the theme's hover tint over
+                                // the glass panel (the same token Iced and Bevy
+                                // menus use), not a shade of the opaque page
+                                // surface the panel no longer paints.
+                                el.bg(crate::theme_binding::fill(palette.hover))
                             })
                             .on_hover({
                                 let state = state.clone();
@@ -518,11 +541,14 @@ impl Render for PopupMenuState {
             .debug_selector(|| "tm-popup".into())
             .relative()
             .min_w(px(self.min_width))
-            .rounded(crate::theme_binding::absolute(palette.panel_radius))
-            .bg(crate::theme_binding::fill(palette.surface))
-            .border_1()
-            .border_color(crate::theme_binding::hsla(palette.border))
-            .shadow_md()
+            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
+            .bg(crate::theme_binding::glass_fill(
+                &palette.theme,
+                GlassTier::Card,
+            ))
+            .border(rems(menu_panel_tier().edge_width_rem()))
+            .border_color(crate::theme_binding::hsla(palette.theme.glass_card().edge))
+            .shadow(menu_panel_shadow(&palette.theme))
             .child(body)
             .child(
                 div()
@@ -549,7 +575,6 @@ impl Render for PopupMenuState {
 }
 
 use crate::OptCallback;
-use crate::styled::hover_fill;
 use taskmanager_theme::tokens;
 
 #[cfg(test)]

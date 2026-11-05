@@ -1,35 +1,32 @@
 use super::{StartupPageBudget, TimelinePresentation};
 use crate::gpui_app::list_view::SourceNoticePresentation;
-use crate::gpui_app::root::responsive::{
-    LayoutProfile, NavigationPresentation, PageLayoutBudget, VerticalSpace,
-};
+use crate::gpui_app::root::responsive::page_layout_for_viewport;
 use gpui::{px, size};
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    LayoutProfile, NavigationPresentation, VerticalSpace,
+};
 
 #[test]
 fn startup_allocation_keeps_width_and_height_as_independent_facts() {
-    let constrained_wide = StartupPageBudget::from_page_layout(PageLayoutBudget::for_viewport(
-        size(px(1920.0), px(540.0)),
-    ));
+    let constrained_wide =
+        StartupPageBudget::from_page_layout(page_layout_for_viewport(size(px(1920.0), px(540.0))));
     assert_eq!(constrained_wide.timeline, TimelinePresentation::Collapsed);
     assert_eq!(
         constrained_wide.source_notice,
         SourceNoticePresentation::Compact
     );
 
-    let standard = StartupPageBudget::from_page_layout(PageLayoutBudget::for_viewport(size(
-        px(1180.0),
-        px(780.0),
-    )));
+    let standard =
+        StartupPageBudget::from_page_layout(page_layout_for_viewport(size(px(1180.0), px(780.0))));
     assert_eq!(
         standard.timeline,
         TimelinePresentation::Expanded { row_limit: 4 }
     );
     assert_eq!(standard.source_notice, SourceNoticePresentation::Standard);
 
-    let wide = StartupPageBudget::from_page_layout(PageLayoutBudget::for_viewport(size(
-        px(1920.0),
-        px(1080.0),
-    )));
+    let wide =
+        StartupPageBudget::from_page_layout(page_layout_for_viewport(size(px(1920.0), px(1080.0))));
     assert_eq!(
         wide.timeline,
         TimelinePresentation::SidePanel { row_limit: 16 }
@@ -80,6 +77,9 @@ fn every_startup_profile_state_has_one_bounded_timeline_allocation() {
                 vertical_space,
                 page_padding: 16.0,
                 navigation: NavigationPresentation::Labeled,
+                content_width: 0.0,
+                content_height: 0.0,
+                chrome: None,
             };
             let presentation = StartupPageBudget::from_page_layout(layout);
             assert_eq!(presentation.timeline, expected_timeline);

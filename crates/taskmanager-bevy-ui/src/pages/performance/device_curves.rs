@@ -425,6 +425,9 @@ pub(crate) fn paint_curves(
     mut statuses: Query<(&DeviceCurveStatus, &mut Text)>,
 ) {
     let mut painted = false;
+    // The frame's slot capacity: the shell's own history window, the same
+    // `graph_data_points` preference the other frontends read.
+    let capacity = track.shell().history.capacity();
     for (entity, curve, node, mut measurement) in &mut curves {
         let size = node.size() * node.inverse_scale_factor();
         if size.x <= 0.0 || size.y <= 0.0 || (!refresh.0 && measurement.0 == Some((size.x, size.y)))
@@ -447,6 +450,7 @@ pub(crate) fn paint_curves(
             canvas.content = ChartContent::Samples {
                 values: values.clone(),
                 ceiling,
+                capacity: capacity.max(values.len()),
             };
             if curve.kind == DeviceCurveKind::BatteryCharge {
                 canvas.style.flow = charging.then(|| CanvasFlow {

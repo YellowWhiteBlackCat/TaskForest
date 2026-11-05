@@ -15,10 +15,11 @@ use taskmanager_shell::presentation::{
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
-use super::super::responsive::{
-    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
-};
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PerformanceChartInventory,
+};
 
 mod header;
 pub(crate) use header::{disk_subtitle, disk_title};

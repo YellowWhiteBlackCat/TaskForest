@@ -68,6 +68,7 @@ pub mod feature_coverage;
 pub(crate) mod first_run_modal;
 pub(crate) mod focus_visible;
 pub mod functional;
+pub(crate) mod glass;
 pub mod icons;
 pub mod input;
 pub mod input_contract;
@@ -75,6 +76,7 @@ pub mod menu_modal;
 pub(crate) mod navigation;
 pub mod pages;
 pub mod palette;
+pub mod presentation_binding;
 pub mod runtime;
 pub(crate) mod saved_views;
 pub(crate) mod scene_attach;
@@ -85,7 +87,7 @@ pub(crate) mod text_selection;
 pub(crate) mod tooltip;
 pub(crate) mod tray;
 pub mod widgets;
-mod window;
+pub(crate) mod window;
 pub(crate) mod window_surface;
 
 #[cfg(test)]

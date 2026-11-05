@@ -13,9 +13,9 @@ use std::time::Duration;
 use crate::{OptCallback, Validator};
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, AppContext, Context, ElementId, ElementInputHandler, Entity, EventEmitter, FocusHandle,
-    InteractiveElement, IntoElement, KeyBinding, ParentElement, RenderOnce, SharedString, Styled,
-    Subscription, Task, Window, actions, canvas, div, px,
+    AbsoluteLength, App, AppContext, Context, ElementId, ElementInputHandler, Entity, EventEmitter,
+    FocusHandle, InteractiveElement, IntoElement, KeyBinding, ParentElement, RenderOnce,
+    SharedString, Styled, Subscription, Task, Window, actions, canvas, div, px,
 };
 use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
@@ -571,7 +571,7 @@ pub struct TextInput {
     palette: Palette,
     placeholder: Option<SharedString>,
     height: f32,
-    radius: f32,
+    radius: Option<f32>,
     on_change: OptCallback,
 }
 
@@ -583,7 +583,7 @@ impl TextInput {
             palette,
             placeholder: None,
             height: 30.0,
-            radius: 6.0,
+            radius: None,
             on_change: None,
         }
     }
@@ -602,10 +602,10 @@ impl TextInput {
         self
     }
 
-    /// Corner radius override (default 6px).
+    /// Corner radius override in pixels (default is the theme's control radius).
     #[must_use]
     pub fn radius(mut self, radius: f32) -> Self {
-        self.radius = radius;
+        self.radius = Some(radius);
         self
     }
 
@@ -623,6 +623,10 @@ impl RenderOnce for TextInput {
             .state
             .read_with(cx, |state, _| (state.disabled, state.focus_handle.clone()));
         let palette = self.palette;
+        let radius: AbsoluteLength = self.radius.map_or_else(
+            || crate::theme_binding::rem_length(palette.control_radius).into(),
+            |radius| px(radius).into(),
+        );
         let placeholder = self.placeholder.or_else(|| {
             self.state
                 .read_with(cx, |state, _| state.placeholder())
@@ -648,7 +652,7 @@ impl RenderOnce for TextInput {
             .items_center()
             .px(crate::theme_binding::definite_length(tokens::SPACE_10))
             .h(px(self.height))
-            .rounded(px(self.radius))
+            .rounded(radius)
             .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
             .border_color(crate::theme_binding::hsla(palette.border))

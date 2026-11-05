@@ -131,6 +131,8 @@ pub(crate) struct ProcessTreeRowView<'a> {
     pub(crate) has_children: bool,
     pub(crate) expanded: bool,
     pub(crate) item: Option<&'a ProcessItem>,
+    /// The runtime badge of a container group header, if this row is one.
+    pub(crate) container_badge: Option<String>,
     /// The hierarchy guide columns of this row (BEVY-125).
     pub(crate) guide: Vec<GuideColumn>,
 }
@@ -166,6 +168,30 @@ pub(crate) fn project_items<'a>(
     )
     .into_iter()
     .filter_map(|row| match row {
+        ProcessTreeRow::Container {
+            metadata,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+        } => Some(ProcessTreeRowView {
+            key: None,
+            semantic_key: expansion_key.clone(),
+            expansion_key: Some(expansion_key),
+            depth: 0,
+            label: metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
+            member_count,
+            cpu: Some(aggregate.cpu().clone()),
+            memory: Some(aggregate.memory().clone()),
+            has_children: true,
+            expanded,
+            item: None,
+            container_badge: Some(metadata.runtime.display_label().to_owned()),
+            guide: Vec::new(),
+        }),
         ProcessTreeRow::Category {
             category,
             expansion_key,
@@ -185,6 +211,7 @@ pub(crate) fn project_items<'a>(
             has_children: true,
             expanded,
             item: None,
+            container_badge: None,
             guide: Vec::new(),
         }),
         ProcessTreeRow::Application {
@@ -217,6 +244,7 @@ pub(crate) fn project_items<'a>(
                 has_children,
                 expanded,
                 item: None,
+                container_badge: None,
                 guide: Vec::new(),
             })
         }
@@ -243,6 +271,7 @@ pub(crate) fn project_items<'a>(
                 has_children,
                 expanded: !collapsed,
                 item: Some(process),
+                container_badge: None,
                 guide: Vec::new(),
             })
         }

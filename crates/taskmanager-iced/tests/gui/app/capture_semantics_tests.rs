@@ -1,8 +1,32 @@
 use super::apply_capture_target;
 use crate::app::{IcedApp, LocalSurfaceKind, Message};
-use iced::Size;
+use iced::advanced::layout::{Layout, Limits};
+use iced::advanced::renderer::Headless;
+use iced::advanced::widget::Tree;
+use iced::{Element, Point, Rectangle, Size, Vector};
 use std::time::Instant;
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::metrics::ScalarAvailability;
 use taskmanager_application::AppPage;
+use taskmanager_assets::embedded_fonts;
+use taskmanager_shell::ProcessRowId;
+
+fn software_renderer() -> iced::Renderer {
+    {
+        let mut fonts = iced::advanced::graphics::text::font_system()
+            .write()
+            .expect("font system");
+        for font in embedded_fonts() {
+            fonts.load_font(font);
+        }
+    }
+    iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        iced::Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer")
+}
 
 #[test]
 fn startup_failure_scene_requires_failed_units_and_their_boot_chain() {
@@ -154,9 +178,76 @@ fn performance_capture_waits_for_received_viewport_and_records_its_budget() {
     let _ = app.update(Message::Frame(Instant::now()));
     assert!(app.capture.emitted);
     let markers = std::fs::read_to_string(&marker).expect("capture markers are written");
+    // The line ends with the appended shared resolution record, so the
+    // stable prefix is asserted instead of the whole line.
     assert!(markers.contains(
-        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device=cpu width=1180.00 height=780.00 page_width=1180.00 page_height=780.00 rung=Charts inventory=Full\n"
+        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device=cpu \
+         width=1180.00 height=780.00 page_width=1180.00 page_height=780.00 rung=Charts inventory=Full "
     ));
     assert!(markers.contains("ICED_CAPTURE_MARKER event=frame_ready mode=demo page=performance\n"));
+    let _ = std::fs::remove_dir_all(directory);
+}
+
+#[test]
+fn tooltip_overlay_capture_mounts_the_real_partial_cpu_aggregate_surface() {
+    let directory = crate::test_support::temp_dir("capture-tooltip-overlay");
+    let marker = directory.join("markers.log");
+    let mut app = IcedApp::demo_for_capture_with(Some("en".to_owned()), None);
+    app.capture.marker = Some(marker.clone());
+    apply_capture_target(&mut app, "tooltip-overlay");
+
+    assert_eq!(app.shell.page(), AppPage::Applications);
+    assert!(app.projected_rows().rows().iter().any(|row| {
+        matches!(
+            row,
+            crate::ui::process_projection::ProjectedRow::GroupHeader {
+                row_key: Some(ProcessRowId::Application(_)),
+                metrics,
+                ..
+            } if matches!(
+                metrics.cpu().availability(),
+                ScalarAvailability::Partial(FailureKind::PermissionDenied)
+            ) && metrics.cpu().current_member_count() + 1 == metrics.cpu().member_count()
+        )
+    }));
+
+    let _ = app.update(Message::Frame(Instant::now()));
+    assert!(!app.capture.emitted);
+    let _ = app.update(Message::Frame(Instant::now()));
+    assert!(app.capture.emitted);
+
+    let renderer = software_renderer();
+    let viewport = Rectangle::new(Point::ORIGIN, Size::new(1180.0, 780.0));
+    let mut view: Element<'_, Message, iced::Theme, iced::Renderer> = crate::ui::view(&app);
+    let mut tree = Tree::new(&view);
+    let node = view.as_widget_mut().layout(
+        &mut tree,
+        &renderer,
+        &Limits::new(Size::ZERO, viewport.size()),
+    );
+    for _ in 0..2 {
+        let overlay = view.as_widget_mut().overlay(
+            &mut tree,
+            Layout::new(&node),
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        );
+        assert!(
+            overlay.is_some(),
+            "the capture scenario must mount the real tooltip overlay"
+        );
+        drop(overlay);
+    }
+
+    let markers = std::fs::read_to_string(&marker).expect("capture markers are written");
+    assert_eq!(
+        markers
+            .lines()
+            .filter(|line| *line == crate::capture::tooltip_overlay_marker_line().trim_end())
+            .count(),
+        1,
+        "the real mounted surface emits exactly one tooltip marker: {markers:?}"
+    );
     let _ = std::fs::remove_dir_all(directory);
 }

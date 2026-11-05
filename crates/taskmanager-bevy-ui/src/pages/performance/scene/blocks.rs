@@ -6,7 +6,7 @@ use crate::pages::performance::device_curves::{
     self, DeviceCurve, DeviceCurveKind, DeviceCurveStatus,
 };
 use crate::pages::performance::metrics::{
-    batteries, battery_fact_line, disks, fan_fact_line, fans, gpu_vram_view_model,
+    batteries, battery_fact_line, disks, fan_fact_line, fans, gpu_block_title, gpu_vram_view_model,
     smart_source_guidance, smart_source_status,
 };
 use crate::palette::space_2;
@@ -19,6 +19,12 @@ use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetricChoiceState;
 
 use super::super::gpu_metric::gpu_metric_button_activated;
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
+use taskmanager_theme::GlassTier;
+
+pub(crate) mod memory;
+use memory::{memory_legend_container_scene, section_header, segment_row_scene, swap_bar_scene};
+pub(crate) use memory::{segment_bar_scene, sync_memory_legend_layout};
 
 /// The GPU engine row's fixed column widths, in rem.
 ///
@@ -36,24 +42,6 @@ const USAGE_READOUT_SLOT_WIDTH_REM: f32 = 3.125;
 /// track — but it still rides the rem axis, so a larger reading size gives
 /// it a proportionally thicker track.
 const USAGE_BAR_HEIGHT_REM: f32 = 0.375;
-
-/// The legend swatch's side, in rem: the square that names one memory
-/// segment's ink in the segment row.
-const LEGEND_SWATCH_SIZE_REM: f32 = 0.625;
-
-/// The stacked composition bar's height, in rem: the whole-bar strip that
-/// shows every memory segment's share of the physical memory.
-const SEGMENT_BAR_HEIGHT_REM: f32 = 0.875;
-
-pub(super) fn gpu_block_title(gpu: &GpuMetrics) -> String {
-    let identity = gpu_display_identity(gpu);
-    match (identity.headline, identity.qualifier) {
-        (Some(headline), Some(qualifier)) => format!("{headline} ({qualifier})"),
-        (Some(headline), None) => headline.to_owned(),
-        (None, Some(qualifier)) => qualifier.to_owned(),
-        (None, None) => gpu.device_id.clone(),
-    }
-}
 
 /// The shared GPU chart-metric selector (ADR-034): one button per vocabulary
 /// family in fixed order, the selected family carrying the active fill and
@@ -83,7 +71,7 @@ fn gpu_metric_selector_scene(
         buttons.push(Box::new(bsn! {
             Node {
                 padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
-                border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+                border_radius: BorderRadius::all(rem(palette.control_radius_rem())),
             }
             BackgroundColor(fill)
             Button GpuMetricButton({ metric }) on(gpu_metric_button_activated)
@@ -148,7 +136,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
                     Node {
                         width: percent(100),
                         height: rem(USAGE_BAR_HEIGHT_REM),
-                        border_radius: BorderRadius::all(Val::Px(space_2())),
+                        border_radius: BorderRadius::all(rem(USAGE_BAR_HEIGHT_REM / 2.0)),
                         overflow: Overflow::clip_x(),
                     }
                     BackgroundColor({ palette.panel_fill })
@@ -157,7 +145,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
                             Node {
                                 width: percent(vram.pct),
                                 height: percent(100.0),
-                                border_radius: BorderRadius::all(Val::Px(space_2())),
+                                border_radius: BorderRadius::all(rem(USAGE_BAR_HEIGHT_REM / 2.0)),
                             }
                             BackgroundColor({ palette.accent })
 
@@ -193,7 +181,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
                         flex_grow: 1.0,
                         min_width: rem(USAGE_BAR_FLOOR_WIDTH_REM),
                         height: rem(USAGE_BAR_HEIGHT_REM),
-                        border_radius: BorderRadius::all(Val::Px(space_2())),
+                        border_radius: BorderRadius::all(rem(USAGE_BAR_HEIGHT_REM / 2.0)),
                         overflow: Overflow::clip_x(),
                     }
                     BackgroundColor({ palette.panel_fill })
@@ -202,7 +190,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
                             Node {
                                 width: percent(pct),
                                 height: percent(100.0),
-                                border_radius: BorderRadius::all(Val::Px(space_2())),
+                                border_radius: BorderRadius::all(rem(USAGE_BAR_HEIGHT_REM / 2.0)),
                             }
                             BackgroundColor({ palette.nav_active_bg })
 
@@ -405,40 +393,6 @@ fn fan_block_scene(
     }
 }
 
-fn segment_row_scene(
-    shell: &ShellApp,
-    segment: &MemSegment,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let key = segment_key(segment.kind);
-    let label = segment.label.to_owned();
-    let value = segment_value(shell, segment.kind);
-    let kind = segment.kind;
-    let color = segment_color(kind, palette);
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-        }
-        DynBlock(Section::MemorySegments, key)
-        Children [
-
-                Node {
-                    width: rem(LEGEND_SWATCH_SIZE_REM),
-                    height: rem(LEGEND_SWATCH_SIZE_REM),
-                    border_radius: BorderRadius::all(Val::Px(space_2())),
-                }
-                BackgroundColor(color)
-            --
-             Text(label) TextRole(Role::Caption) --
-             Node { flex_grow: 1.0 } --
-             Text(value) TextRole(Role::Mono) DynText(DynField::Segment(kind))
-        ]
-    }
-}
-
 /// One block for mount or refresh, keyed by the section's stable identity.
 /// `None` when the key is no longer in the projection (a race the caller's
 /// desired list makes unreachable).
@@ -502,101 +456,57 @@ pub(super) fn section_scene(
     shell: &ShellApp,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let title = section_title(section).to_owned();
+    let title = section_title(section);
+    let header = section_header(section, title, shell, palette);
     let mut children: Vec<Box<dyn Scene>> = Vec::new();
     if section == Section::MemorySegments
         && let Some(memory) = memory_metrics(shell)
     {
         children.push(Box::new(segment_bar_scene(memory, palette)) as Box<dyn Scene>);
     }
-    children.extend(
-        section_keys(shell, section)
-            .iter()
-            .filter_map(|key| block_scene(section, key, shell, palette)),
-    );
+    let block_rows: Vec<Box<dyn Scene>> = section_keys(shell, section)
+        .iter()
+        .filter_map(|key| block_scene(section, key, shell, palette))
+        .collect();
+    if section == Section::MemorySegments {
+        children.push(memory_legend_container_scene(block_rows));
+    } else {
+        children.extend(block_rows);
+    }
+    if section == Section::MemorySegments
+        && let Some(swap_bar) = swap_bar_scene(shell, palette)
+    {
+        children.push(swap_bar);
+    }
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_2()),
-            padding: UiRect::all(Val::Px(space_2())),
+            padding: UiRect::all(Val::Rem(palette.panel_content_inset_rem())),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        bevy::ui::BoxShadow({ shadows })
+        OpticalGlassCard {
+            tier: {GlassTier::Card},
+            enabled: true,
+        }
         DynSection(section)
         Children [
-             Text(title) TextRole(Role::Caption) --
+             @{ grain } --
+             @{ header } --
             { children }
-        ]
-    }
-}
-
-/// One stacked-bar span: byte count plus the resolved fraction of the total.
-/// Pure; headless tests pin the math.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct SegmentSpan {
-    pub(crate) bytes: u64,
-    pub(crate) fraction: f32,
-}
-
-/// Fractions across the composition segments, in shell order. A zero total
-/// (nothing measured yet) yields an empty layout — never NaN widths.
-#[must_use]
-pub(crate) fn segment_bar_layout(segments: &[MemSegment]) -> Vec<SegmentSpan> {
-    let total: u64 = segments.iter().map(|segment| segment.bytes).sum();
-    if total == 0 {
-        return Vec::new();
-    }
-    segments
-        .iter()
-        .map(|segment| SegmentSpan {
-            bytes: segment.bytes,
-            fraction: segment.bytes as f32 / total as f32,
-        })
-        .collect()
-}
-
-/// The semantic token for one segment role. Roles map onto the palette's
-/// semantic surfaces — no literal product colors (the theme owns every ink).
-fn segment_color(kind: MemSegmentKind, palette: &UiPalette) -> bevy::color::Color {
-    match kind {
-        MemSegmentKind::Active | MemSegmentKind::InUse => palette.accent,
-        MemSegmentKind::Cache | MemSegmentKind::ZfsArc => palette.nav_active_bg,
-        MemSegmentKind::Inactive => palette.selection_bg,
-        MemSegmentKind::Free | MemSegmentKind::Available => palette.content_bg,
-        MemSegmentKind::Other => palette.hover_bg,
-    }
-}
-
-/// The stacked composition bar: one flex-weighted span per segment, in shell
-/// order, filling the full width. Zero measured bytes render an empty track.
-pub(crate) fn segment_bar_scene(memory: &MemoryMetrics, palette: &UiPalette) -> impl Scene + use<> {
-    let segments = memory_segments(memory);
-    let spans: Vec<Box<dyn Scene>> = segment_bar_layout(&segments)
-        .iter()
-        .zip(segments.iter())
-        .map(|(span, segment)| {
-            let color = segment_color(segment.kind, palette);
-            Box::new(bsn! {
-                Node {
-                    width: percent(span.fraction * 100.0),
-                    height: percent(100.0),
-                }
-                BackgroundColor(color)
-            }) as Box<dyn Scene>
-        })
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            height: rem(SEGMENT_BAR_HEIGHT_REM),
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(0.0),
-            overflow: Overflow::clip_x(),
-            border_radius: BorderRadius::all(Val::Px(space_4())),
-        }
-        BackgroundColor({ palette.content_bg })
-        Children [
-            { spans }
         ]
     }
 }

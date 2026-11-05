@@ -30,7 +30,7 @@ use taskmanager_shell::presentation::trend::{sample_timestamp_text, timestamped_
 
 use crate::app::ShellTrack;
 use crate::pages::performance::SystemCurve;
-use crate::widgets::chart::hover::{hover_position, hover_slot};
+use crate::widgets::chart::hover::{hover_position, hover_slot_in};
 use crate::widgets::chart::painter::paint_chart_canvases;
 use crate::widgets::chart::{ChartCanvas, ChartContent, ChartHoverLabel, ChartPointer};
 
@@ -119,10 +119,13 @@ pub(crate) fn publish_hover_pill(
         let Some(position) = hover_position(pointer.normalized, size) else {
             continue;
         };
-        let ChartContent::Samples { values, .. } = &canvas.content else {
+        let ChartContent::Samples {
+            values, capacity, ..
+        } = &canvas.content
+        else {
             continue;
         };
-        let Some(slot) = hover_slot(values.len(), size.x, position.x) else {
+        let Some(slot) = hover_slot_in(values.len(), *capacity, size.x, position.x) else {
             continue;
         };
         let Some(value) = values.get(slot).copied().filter(|value| value.is_finite()) else {

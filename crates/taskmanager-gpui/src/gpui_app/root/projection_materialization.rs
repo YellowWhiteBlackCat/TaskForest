@@ -118,6 +118,22 @@ pub(super) struct ProjectionMaterialization {
 }
 
 impl ProjectionMaterialization {
+    /// Let a capture read the seeded fixture as if it had arrived from the
+    /// platform. The live host reaches the capture readiness contract
+    /// through `on_snapshot` / `on_processes_update`; the fixture regime
+    /// reaches the same contract through the projection it just seeded, so
+    /// both regimes carry the same evidence receipt.
+    pub(super) fn arm_capture_readiness(
+        &mut self,
+        capture_evidence: &mut super::capture::CaptureEvidence,
+    ) {
+        let snapshot = Rc::make_mut(&mut self.snapshot.value);
+        capture_evidence.on_snapshot(snapshot);
+        let processes_observed_at_ms = self.processes_observed_at_ms;
+        let processes = Arc::make_mut(&mut self.processes.value);
+        let _ = capture_evidence.on_processes_update(true, processes_observed_at_ms, processes);
+    }
+
     pub(super) fn replace_snapshot(&mut self, revision: u64, snapshot: SystemSnapshot) {
         let _ = self.snapshot.replace(revision, Rc::new(snapshot));
     }

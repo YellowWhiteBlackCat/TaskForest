@@ -515,7 +515,7 @@ pub(super) fn cold_start_placeholder(
             .gap(definite_length(tokens::SPACE_10))
             .text_color(hsla(theme.fg_dim))
             .text_size(font_size(tokens::FONT_13))
-            .child(Spinner::new(theme.palette()).size(16.0))
+            .child(Spinner::new(theme.palette()).size(f32::from(tokens::ICON_INLINE)))
             .child(t("common.collecting_telemetry")),
     )
 }

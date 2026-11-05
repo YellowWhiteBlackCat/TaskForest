@@ -1,35 +1,28 @@
 //! Canonical category-tree row projection and cache shared by rendering and
 //! keyboard paging.
 
-use std::collections::HashSet;
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 use taskforest_core::core::text::match_ranges_ascii_ci;
-use taskforest_core::core::time::LocalTimeRulesCacheKey;
-
-use crate::gpui_app::graph::GraphCacheHandle;
-use crate::gpui_app::root::RootView;
-use gpui::Entity;
-use taskforest_core::core::process::aggregate::AggregateMetric;
-use taskforest_core::core::process::{
-    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
-};
-use taskforest_core::core::time::LocalTimeRulesObservation;
-use taskforest_core::core::units::UnitPreferences;
-use taskmanager_application::i18n;
-use taskmanager_shell::ProcessStatusFilter;
-use taskmanager_shell::SortCol;
-use taskmanager_shell::matches_process_query;
-use taskmanager_shell::presentation::missing_value;
-use taskmanager_shell::{
-    ProcessRowAggregate, ProcessRowId, ProcessTreeRow, SortDir, project_process_tree_rows,
-};
-use taskmanager_theme::Theme;
-use taskmanager_theme::tokens::{RowDensity, UiSize};
+use taskforest_core::core::time::{LocalTimeRulesCacheKey, LocalTimeRulesObservation};
 
 use super::aggregate_display::{
     cpu_aggregate_compact, cpu_aggregate_summary, memory_aggregate_compact,
     memory_aggregate_summary,
 };
+use crate::gpui_app::{graph::GraphCacheHandle, root::RootView};
+use gpui::Entity;
+use taskforest_core::core::process::{
+    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
+    aggregate::AggregateMetric,
+};
+use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::i18n;
+use taskmanager_shell::{
+    ProcessRowAggregate, ProcessRowId, ProcessStatusFilter, ProcessTreeRow, SortCol, SortDir,
+    matches_process_query, presentation::missing_value, project_process_tree_rows,
+};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 /// Stable expansion-set key for one category bucket (the shared neutral
 /// implementation): the `category:`-prefixed [`ProcessCategory::stable_key`],
@@ -37,6 +30,25 @@ use super::aggregate_display::{
 use taskmanager_application::process_category_projection::{
     category_expansion_key, process_memory_observation_for_display,
 };
+
+/// Count the honest application-tree roots in a process snapshot. This is the
+/// Applications page summary authority: it is independent from expansion,
+/// sorting and filtering, so collapsing the Applications category cannot make
+/// the page title claim that zero apps are running.
+#[must_use]
+pub fn application_root_count(processes: &[&ProcessItem]) -> usize {
+    let expanded = HashSet::from([category_expansion_key(ProcessCategory::Application)]);
+    project_process_tree_rows(
+        processes,
+        &expanded,
+        &HashSet::new(),
+        (SortCol::Pid, SortDir::Asc),
+        0,
+    )
+    .iter()
+    .filter(|row| matches!(row, ProcessTreeRow::Application { .. }))
+    .count()
+}
 
 /// Seed the canonical category tree expanded on first use. The set is also
 /// used by capture/bootstrap paths, so every surface starts with the same
@@ -163,6 +175,9 @@ pub enum Toggle {
     /// [`category_expansion_key`] entries of `RootView::processes.expanded_apps`
     /// (the shared hierarchy expansion set).
     GroupCategory(ProcessCategory),
+    /// A container bucket header. Its expansion key is the locale-neutral
+    /// `container:<runtime>:<id>` token shared with the other frontends.
+    GroupUnknown(String),
 }
 
 /// Pre-formatted display text for one row's data cells (the columns whose
@@ -369,6 +384,8 @@ pub struct VisibleRow {
     /// Small inline annotation (e.g. "×3" instance count on group rows).
     pub badge: Option<String>,
     pub toggle: Toggle,
+    /// The observed container runtime badge for a container group header.
+    pub container_badge: Option<String>,
 }
 
 impl VisibleRow {
@@ -460,6 +477,47 @@ fn visible_row_from_shared(
     units: UnitPreferences,
 ) -> Option<VisibleRow> {
     match row {
+        ProcessTreeRow::Container {
+            metadata,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+        } => Some(VisibleRow {
+            name: metadata
+                .name
+                .clone()
+                .unwrap_or_else(|| metadata.container_id.clone()),
+            selection_key: None,
+            process_identity: None,
+            application_identity: None,
+            user: missing_value(),
+            status: missing_value(),
+            cpu: aggregate.cpu().current_value().copied(),
+            mem: aggregate.memory().current_value().copied(),
+            cpu_aggregate: Some(aggregate.cpu().clone()),
+            memory_aggregate: Some(aggregate.memory().clone()),
+            swap: None,
+            pss: None,
+            disk_read: None,
+            disk_write: None,
+            network: None,
+            threads: None,
+            start_time_secs: None,
+            cpu_time_secs: None,
+            fds: None,
+            nice: None,
+            cpu_history: Rc::from([]),
+            name_highlights: Vec::new(),
+            cell_text: RowCellText::default(),
+            depth: 0,
+            has_children: true,
+            collapsed: !expanded,
+            parent_key: None,
+            badge: Some(format!("x{member_count}")),
+            toggle: Toggle::GroupUnknown(expansion_key),
+            container_badge: Some(metadata.runtime.display_label().to_owned()),
+        }),
         ProcessTreeRow::Category {
             category,
             representative_index,
@@ -559,6 +617,7 @@ fn visible_row_from_shared(
                 } else {
                     Toggle::None
                 },
+                container_badge: None,
             };
             let mut row = row;
             row.cell_text = RowCellText::build(&row, units);
@@ -625,6 +684,7 @@ fn group_row_from_shared(
         parent_key: None,
         badge: None,
         toggle,
+        container_badge: None,
     };
     row.cell_text = RowCellText::build(&row, units);
     row
@@ -784,25 +844,6 @@ pub fn project_visible_rows_from_shell(props: ShellVisibleRowsProps<'_>) -> Vec<
             .apply_local_time(row.start_time_secs, local_time_rules);
     }
     rows
-}
-
-/// Count the honest application-tree roots in a process snapshot. This is the
-/// Applications page summary authority: it is independent from expansion,
-/// sorting and filtering, so collapsing the Applications category cannot make
-/// the page title claim that zero apps are running.
-#[must_use]
-pub fn application_root_count(processes: &[&ProcessItem]) -> usize {
-    let expanded = HashSet::from([category_expansion_key(ProcessCategory::Application)]);
-    project_process_tree_rows(
-        processes,
-        &expanded,
-        &HashSet::new(),
-        (SortCol::Pid, SortDir::Asc),
-        0,
-    )
-    .iter()
-    .filter(|row| matches!(row, ProcessTreeRow::Application { .. }))
-    .count()
 }
 
 /// Cached visible-row projection for the processes table. Rebuilt only when

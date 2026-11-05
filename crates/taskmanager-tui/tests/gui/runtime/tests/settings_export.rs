@@ -226,21 +226,20 @@ fn settings_form_navigates_and_ent_applies_without_platform_effect() {
             KeyModifiers::NONE,
         ),
     );
-    // Tab moves to the mode field; Right steps Dark -> EyeForest -> System
-    // -> Light (wrapping), so three steps land on Light.
+    // Tab moves to the mode field; Right steps the shared ladder
+    // (Light -> Dark -> EyeForest -> follow-native, wrapping). An unrecorded
+    // preference starts at follow-native, so one step lands on Light.
     let _ = handle_key(
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Tab, KeyModifiers::NONE),
     );
-    for _ in 0..3 {
-        let _ = handle_key(
-            &mut app,
-            KeyEvent::new(
-                ratatui::crossterm::event::KeyCode::Right,
-                KeyModifiers::NONE,
-            ),
-        );
-    }
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Right,
+            KeyModifiers::NONE,
+        ),
+    );
     assert_eq!(app.settings_form.mode, 0, "mode steps to Light");
 
     // Enter applies and closes; no platform effect is produced.
@@ -338,7 +337,8 @@ fn settings_form_reverse_keys_walk_back_fields_and_values() {
         ),
     );
     // Tab to the mode field (1), then Right steps its value forward and Left
-    // steps it back. The default mode is 1 (Dark), so Right → 2 and Left → 1.
+    // steps it back. An unrecorded preference is follow-native — the last rung of
+    // the published ladder — so Right wraps to Light (0) and Left returns to 3.
     let _ = handle_key(
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Tab, KeyModifiers::NONE),
@@ -351,13 +351,13 @@ fn settings_form_reverse_keys_walk_back_fields_and_values() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.settings_form.mode, 2, "Right must step the mode value");
+    assert_eq!(app.settings_form.mode, 0, "Right must step the mode value");
     let _ = handle_key(
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Left, KeyModifiers::NONE),
     );
     assert_eq!(
-        app.settings_form.mode, 1,
+        app.settings_form.mode, 3,
         "Left must step the mode value back"
     );
 

@@ -3,21 +3,21 @@
 use gpui::{
     AnimationExt, AnyElement, App, AppContext, Div, Entity, InteractiveElement, IntoElement,
     MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Styled, Window, anchored, deferred,
-    div, px,
+    div, px, rems,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Theme, WindowCorner};
+use taskmanager_theme::{GlassTier, Theme, WindowCorner};
 use taskmanager_ui::overlays::dialog::Dialog;
 use taskmanager_ui::overlays::layer_stack::{LayerBackfill, LayerStack};
-use taskmanager_ui::theme_binding::absolute;
-use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::{appear, fade_in};
+use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
 
 /// A modal overlay built on the own `taskmanager_ui` dialog + layer stack
 /// (`overlays::dialog::Dialog` pushed into a [`LayerStack`] modal layer).
@@ -237,13 +237,13 @@ pub fn dialog_overlay_width(
 /// `anchored` / `deferred` wrapper if you need custom placement.
 pub fn tooltip(t: &Theme, text: &str) -> Div {
     div()
-        .bg(fill(t.card_surface()))
-        .border_1()
-        .border_color(hsla(t.border))
-        .rounded(absolute(tokens::control_radius(t)))
-        .shadow_lg()
-        .px(definite_length(tokens::SPACE_8))
-        .py(definite_length(tokens::SPACE_4))
+        .bg(glass_fill(t, GlassTier::Card))
+        .border(rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(t.glass_layer(GlassTier::Card).edge))
+        .rounded(rem_length(tokens::control_radius(t)))
+        .shadow(glass_shadow(t, GlassTier::Card))
+        .px(rem_length(tokens::SPACE_8))
+        .py(rem_length(tokens::SPACE_4))
         .text_size(font_size(tokens::FONT_12))
         .text_color(hsla(t.fg))
         .child(text.to_string())
@@ -302,14 +302,36 @@ pub fn tooltip(t: &Theme, text: &str) -> Div {
 /// the host remains interactive — so [`tooltip_overlay`] omits the catcher and
 /// lets `anchored` place the bare label directly.
 pub fn tooltip_overlay(t: &Theme, text: &str, anchor: Point<Pixels>) -> impl IntoElement {
+    tooltip_overlay_with_elevation(t, text, anchor, true)
+}
+
+pub(crate) fn graph_tooltip_overlay(
+    t: &Theme,
+    text: &str,
+    anchor: Point<Pixels>,
+) -> impl IntoElement {
+    tooltip_overlay_with_elevation(t, text, anchor, false)
+}
+
+fn tooltip_overlay_with_elevation(
+    t: &Theme,
+    text: &str,
+    anchor: Point<Pixels>,
+    elevated: bool,
+) -> impl IntoElement {
     // Appear transition: the label fades in over DURATION_FAST the first time
     // this text shows. The animation element is keyed by the label so a
     // cursor moving within the same hover target (same text) does not restart
     // it; once the tooltip disappears the element state is dropped and the
     // next appearance fades again (gpui drops element state for unmounted
     // ids — see window.rs finish()).
-    let label =
-        tooltip(t, text).with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
+    let mut label = tooltip(t, text);
+    if !elevated {
+        label = label.shadow_none();
+    }
+    let label = label
+        .debug_selector(|| "tm-tooltip-overlay".to_string())
+        .with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
     deferred(anchored().position(anchor).snap_to_window().child(label))
 }
 

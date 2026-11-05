@@ -38,6 +38,8 @@ crates/*/docs/*.md       crate 专题章程：单个 crate 的深层细节，由
 | 动权限 / unsafe / helper | [PERMISSION_MODEL](PERMISSION_MODEL.md)、[escalation](../crates/taskmanager-escalation/README.md) 与对应 helper README | 018 019 022 023 024 025 031 035 048 049 055 056 |
 | 改宿主组合 / 窗口 / 托盘 | [HOST_ARCHITECTURE](HOST_ARCHITECTURE.md)、[STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[app-host](../crates/taskmanager-app-host/README.md)、[platform-native](../crates/taskmanager-platform-native/README.md) | 029 032 037 040 051 |
 | 改配置 / saved-view / 启动流程 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[application README](../crates/taskmanager-application/README.md) | 036 040 |
+| 改文案 / 多语言 / `locales/*` | [application README](../crates/taskmanager-application/README.md)、[ADR-063](../adr/063-public-resource-single-authority.md)、[QUALITY_GATES](QUALITY_GATES.md)、对应前端 README（`i18n` 是唯一解析器与 `Language` owner） | 051 063 |
+| 改主题设定 / 字体集合 / 字号 / 字重 | [theme README](../crates/taskmanager-theme/README.md) 与 [TOKEN_NEUTRALITY](../crates/taskmanager-theme/docs/TOKEN_NEUTRALITY.md)（轴 token 编解码、字型阶梯与 `TM_SKIN` 覆盖词表的唯一 owner）、[ADR-063](../adr/063-public-resource-single-authority.md)、[QUALITY_GATES](QUALITY_GATES.md) | 026 051 063 |
 | 改打包 / 安装 / 发布 | [RELEASE](RELEASE.md)、[SYSTEM_INSTALL_MANIFEST](SYSTEM_INSTALL_MANIFEST.md)、[PRODUCT_IDENTITY](PRODUCT_IDENTITY.md) | 006 044 045 051 |
 | 新增前端 / 改产品组合 | [ARCH](ARCH.md) §2/§6、[taskmanager-cli README](../crates/taskmanager-cli/README.md)、对应前端 README | 051 |
 | 四端语义对等与验收 | [ARCH.md](ARCH.md)、[UI_PARITY_AUDIT.md](UI_PARITY_AUDIT.md)、[QUALITY_GATES.md](QUALITY_GATES.md) | 016 027 051 053 054 |

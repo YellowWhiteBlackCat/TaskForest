@@ -4,6 +4,14 @@ Every asset is compiled into the consuming binary; frontends decide how to
 register or render those bytes. The GPUI `AssetSource` adapter is owned by
 `taskmanager-gpui`, while Iced consumes the font bytes directly.
 
+## Glass grain transaction
+
+`assets/glass/noise-64.rgba` is the seamless neutral grain used by Bevy's
+glass bridge. `packaging/regenerate-glass-noise.sh` deterministically rebuilds
+it; the tile stays near-white and opaque so the theme tier supplies the only
+ink and opacity. Bevy repeats it through `NodeImageMode::Tiled`. The file is
+not part of the SVG icon registry and must not be hand-edited.
+
 ## Tray bitmap transaction
 
 The product tray bitmap is a decoded RGBA derivative of the dedicated tray

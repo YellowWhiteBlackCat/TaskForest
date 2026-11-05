@@ -17,10 +17,15 @@
 //! - [`palette`] — the window/panel color contract for UI crates:
 //!   `window_backdrop` (transparent-capable) and `surface` (always opaque)
 //!   are independent tokens (ADR-017 §3.1 upstream lesson).
+//! - [`optical_glass`] — the toolkit-neutral optical-glass spec, renderer
+//!   capability report, and fail-closed fallback contract (ADR-061).
 //! - [`tokens`] — semantic radius/spacing/type tokens.
 //! - [`platform`] — platform rendering compensation policy, projected by
 //!   BOTH toolkit bindings so it can never drift to one frontend (CORE-07).
 //! - [`fonts`] — font roles, preferences, host availability, resolution.
+//! - [`settings`] — the public theme-settings contract: the color-scheme
+//!   preference axis, the shared appearance override, and the one token
+//!   vocabulary each axis persists through (ADR-063).
 //! - [`detection`] — native-appearance facts → theme axes mapping.
 
 #![forbid(unsafe_code)]
@@ -29,8 +34,10 @@
 pub mod color;
 pub mod detection;
 pub mod fonts;
+pub mod optical_glass;
 pub mod palette;
 pub mod platform;
+pub mod settings;
 pub mod skins;
 pub mod theme;
 pub mod tokens;
@@ -38,12 +45,21 @@ pub mod tokens;
 pub use color::{Color, FontSize, Length, Ratio, Weight};
 pub use detection::{NativeAppearance, detect_high_contrast, detect_mode, detect_skin};
 pub use fonts::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, FontRole,
-    ResolvedFonts, intern_font_family, resolve_fonts,
+    BUNDLED_FONT_FAMILIES, FONT_MISANS_VF, FONT_ROBOTO_MONO, FONT_TOKEN_SYSTEM, FontAvailability,
+    FontChoice, FontPreference, FontRole, ResolvedFonts, intern_font_family, resolve_fonts,
+};
+pub use optical_glass::{
+    OpticalGlassCapability, OpticalGlassContext, OpticalGlassDecision, OpticalGlassFallback,
+    OpticalGlassFeature, OpticalGlassGeometry, OpticalGlassOperations, OpticalGlassQuality,
+    OpticalGlassSpec, OpticalGlassUnavailableReason,
 };
 pub use palette::Palette;
+pub use settings::{
+    AppearanceOverride, HIGH_CONTRAST_OVERRIDE_ENV, MODE_TOKEN_SYSTEM, ModePreference,
+    SKIN_OVERRIDE_ENV,
+};
 pub use skins::SkinTokens;
 pub use theme::{
-    EdgeTiling, HighContrast, LightDark, Material, RadiusScale, Skin, Theme, WindowChromeState,
-    WindowControls, WindowCorner, with_alpha,
+    EdgeTiling, GlassLayer, GlassTier, HighContrast, LightDark, Material, RadiusScale, Skin, Theme,
+    WindowChromeState, WindowControls, WindowCorner, with_alpha,
 };

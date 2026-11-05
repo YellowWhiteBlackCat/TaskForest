@@ -33,11 +33,12 @@ use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
-use super::responsive::{
-    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
-};
 use stats::memory_stats_rows;
 use taskmanager_shell::presentation::duration;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PerformanceChartInventory,
+};
 
 /// Dispatch the two singleton Performance resources to their named renderers.
 pub(super) fn cpu_memory_detail(
@@ -64,9 +65,9 @@ fn overview_gauges(app: &crate::IcedApp) -> Element<'static, Message, iced::Them
         .and_then(|snapshot| snapshot.memory.swap_percentage_observed())
         .map(|value| value.clamp(0.0, 100.0));
     row![
-        gauge(t("common.cpu"), cpu_value),
-        gauge(t("common.memory"), memory_value),
-        gauge(t("mem.swap"), swap_value),
+        gauge(t("common.cpu"), cpu_value, *app.theme()),
+        gauge(t("common.memory"), memory_value, *app.theme()),
+        gauge(t("mem.swap"), swap_value, *app.theme()),
     ]
     .spacing(12)
     .into()

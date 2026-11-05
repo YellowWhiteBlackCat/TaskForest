@@ -1,5 +1,6 @@
 //! Scoped System health rendering and ordinary SMART confirmation controls.
 use crate::app::FrontendTrack;
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::input::ShellInteractionApplied;
 use crate::palette::{UiPalette, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
@@ -13,7 +14,10 @@ use bevy::ecs::{
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
-use bevy::ui::{BackgroundColor, FlexDirection, Node, UiRect, percent, px, rem};
+use bevy::ui::{
+    BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection, Node, UiRect, Val,
+    percent, px, rem,
+};
 use bevy::ui_widgets::{Activate, Button};
 use taskforest_core::core::identity::DeviceGeneration;
 use taskforest_core::core::smart::SmartSelfTestKind;
@@ -101,7 +105,15 @@ pub(super) fn body(
             Box::new(bsn! { Text(line) TextLayout { linebreak: LineBreak::WordOrCharacter } TextRole(Role::Body) }) as Box<dyn Scene>
         }).collect::<Vec<_>>();
         let title = group.title;
-        Box::new(bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, flex_shrink: 0.0, row_gap: px(space_8()), padding: UiRect::all(px(space_8())) } BackgroundColor({palette.panel_fill}) Children [ Text(title) TextRole(Role::Body) -- { rows } ] }) as Box<dyn Scene>
+        let GlassPanelMaterial {
+            fill,
+            edge,
+            shadows,
+            edge_width_rem,
+            radius_rem,
+            grain,
+        } = card_material(palette);
+        Box::new(bsn! { Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, flex_shrink: 0.0, row_gap: px(space_8()), padding: UiRect::all(px(space_8())), border: UiRect::all(Val::Rem(edge_width_rem)), border_radius: BorderRadius::all(Val::Rem(radius_rem)) } BackgroundColor({ fill }) BorderColor::all(edge) BoxShadow({ shadows }) Children [ @{grain} -- Text(title) TextRole(Role::Body) -- { rows } ] }) as Box<dyn Scene>
     }).collect();
     for disk in disks {
         for kind in [SmartSelfTestKind::Short, SmartSelfTestKind::Extended] {

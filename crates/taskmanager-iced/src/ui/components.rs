@@ -4,6 +4,7 @@
 //! several Iced pages. Page modules keep their projections and interaction
 //! decisions; they compose these components instead of rebuilding the same
 //! panel, state, key/value, or outer-page structure.
+use taskmanager_ui_contract::presentation::vocabulary::BOTTOM_SAFETY_BAND;
 
 use iced::advanced::text::IntoFragment;
 use iced::widget::{column, container, row, text};
@@ -46,7 +47,7 @@ pub(crate) fn page_scaffold<'a>(
         // The gap between the page content and the bottom bar IS the bottom
         // safety band: the last row keeps that distance from the edge in
         // every viewport (ICED-053).
-        .spacing(crate::ui::responsive::BOTTOM_SAFETY_BAND)
+        .spacing(BOTTOM_SAFETY_BAND)
         .padding(10)
         .width(Length::Fill)
         .height(Length::Fill)
@@ -74,7 +75,7 @@ pub(crate) fn page_scaffold_with_rail<'a>(
     ]
     // The gap between the page content and the bottom bar IS the bottom
     // safety band (ICED-053).
-    .spacing(crate::ui::responsive::BOTTOM_SAFETY_BAND)
+    .spacing(BOTTOM_SAFETY_BAND)
     .padding(10)
     .width(Length::Fill)
     .height(Length::Fill)
@@ -91,6 +92,20 @@ pub(crate) fn card_surface(theme_snapshot: &Theme) -> iced::widget::container::S
     theme::card_style(theme_snapshot)
 }
 
+/// Inline charts retain the card material without casting overlapping shadows.
+pub(crate) fn chart_surface(theme_snapshot: &Theme) -> container::Style {
+    let mut style = card_surface(theme_snapshot);
+    style.shadow = iced::Shadow::default();
+    style
+}
+
+pub(crate) fn chart_inset(theme_snapshot: &Theme) -> f32 {
+    theme::scaled_radius(
+        theme_snapshot,
+        tokens::rounded_content_inset(theme_snapshot.palette().panel_radius),
+    )
+}
+
 /// A titled card for page-local facts and compact detail groups. Geometry is
 /// token-bound: SPACE_* padding and title/body gutter, the body role's type
 /// size for the title, and the palette's panel radius through
@@ -101,12 +116,39 @@ pub(crate) fn titled_card<'a>(
     title: impl IntoFragment<'a>,
     body: impl Into<IcedElement<'a>>,
 ) -> IcedElement<'a> {
+    titled_surface(theme_snapshot, title, body, false)
+}
+
+pub(crate) fn titled_chart_card<'a>(
+    theme_snapshot: &'a Theme,
+    title: impl IntoFragment<'a>,
+    body: impl Into<IcedElement<'a>>,
+) -> IcedElement<'a> {
+    titled_surface(theme_snapshot, title, body, true)
+}
+
+fn titled_surface<'a>(
+    theme_snapshot: &'a Theme,
+    title: impl IntoFragment<'a>,
+    body: impl Into<IcedElement<'a>>,
+    chart: bool,
+) -> IcedElement<'a> {
     container(
         column![text(title).size(f32::from(tokens::FONT_BODY)), body.into()]
             .spacing(f32::from(tokens::SPACE_6)),
     )
-    .style(move |_| card_surface(theme_snapshot))
-    .padding(f32::from(tokens::SPACE_10))
+    .style(move |_| {
+        if chart {
+            chart_surface(theme_snapshot)
+        } else {
+            card_surface(theme_snapshot)
+        }
+    })
+    .padding(if chart {
+        chart_inset(theme_snapshot).max(f32::from(tokens::SPACE_10))
+    } else {
+        f32::from(tokens::SPACE_10)
+    })
     .width(Length::Fill)
     .into()
 }

@@ -32,6 +32,7 @@ use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::DiskPartitionFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
 use taskmanager_test_support::pin_english;
+use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
 #[derive(Default)]
 struct RenderedGpuPageText(Vec<(String, Rectangle)>);
@@ -137,12 +138,9 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
     ];
     // The layout derives from the typed chart inventory (both frame axes),
     // never from a local compact flag.
-    let standard = projection::GpuChartLayout::for_inventory(
-        crate::ui::responsive::PerformanceChartInventory::Full,
-    );
-    let compact = projection::GpuChartLayout::for_inventory(
-        crate::ui::responsive::PerformanceChartInventory::AggregateOnly,
-    );
+    let standard = projection::GpuChartLayout::for_inventory(PerformanceChartInventory::Full);
+    let compact =
+        projection::GpuChartLayout::for_inventory(PerformanceChartInventory::AggregateOnly);
     assert_eq!(standard, projection::GpuChartLayout::AggregateWithEngines);
     assert_eq!(compact, projection::GpuChartLayout::AggregateOnly);
     assert_eq!(

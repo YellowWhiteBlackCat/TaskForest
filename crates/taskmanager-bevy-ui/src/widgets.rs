@@ -15,6 +15,7 @@
 //! `foo.rs` module shape per STANDARDS §1; menus are the frontend-local action
 //! surface and confirmation panels are owned by `crate::confirmation`.
 
+pub(crate) mod bounded_text;
 pub mod chart;
 pub mod controls;
 pub(crate) mod easing;

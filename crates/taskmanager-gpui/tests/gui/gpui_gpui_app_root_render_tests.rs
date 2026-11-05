@@ -5,6 +5,7 @@ use gpui::{
 };
 use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
+use taskmanager_ui_contract::IconId;
 
 struct FocusTargetHarness {
     focus_handle: Option<FocusHandle>,
@@ -40,6 +41,28 @@ fn cursor_refresh_is_coalesced_until_the_next_frame() {
         false,
         CursorRefreshState::Idle
     ));
+}
+
+#[test]
+fn shell_feedback_severity_keeps_a_semantic_icon() {
+    use taskmanager_shell::FeedbackSeverity;
+
+    assert_eq!(
+        super::transients::feedback_severity_icon(FeedbackSeverity::Info),
+        IconId::Health
+    );
+    assert_eq!(
+        super::transients::feedback_severity_icon(FeedbackSeverity::Success),
+        IconId::CircleCheck
+    );
+    assert_eq!(
+        super::transients::feedback_severity_icon(FeedbackSeverity::Warning),
+        IconId::TriangleAlert
+    );
+    assert_eq!(
+        super::transients::feedback_severity_icon(FeedbackSeverity::Error),
+        IconId::Alert
+    );
 }
 
 #[test]
@@ -373,4 +396,215 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
             "System mode must never raise an outcome notice"
         );
     });
+}
+
+/// Feedback occupies the CSD titlebar's outer side slot, leaving the title,
+/// navigation strip and page geometry untouched at normal and compact sizes.
+#[gpui::test]
+async fn feedback_overlay_does_not_move_the_body_and_stays_inside_the_viewport(
+    cx: &mut TestAppContext,
+) {
+    use gpui::{VisualTestContext, px, size};
+    use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+
+    for (width, height) in [(1180.0, 780.0), (720.0, 480.0)] {
+        let win =
+            cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
+        cx.simulate_window_resize(win.into(), size(px(width), px(height)));
+        win.update(cx, |view, _window, cx| {
+            view.decorations_override = Some(false);
+            view.mark_telemetry_frame_ready();
+            cx.notify();
+        })
+        .unwrap();
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .unwrap();
+
+        let body_before = {
+            let mut visual = VisualTestContext::from_window(win.into(), cx);
+            visual
+                .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+                .expect("the ready body must render before feedback")
+        };
+
+        win.update(cx, |view, _window, cx| {
+            view.shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Success,
+                FeedbackLifecycle::TIMED_SHORT,
+                format!(
+                    "Current window saved: /run/media/{}/very-long-workspace/target/host-wayland-diagnostic/runs/{}/capture.png (1180x780)",
+                    "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9"
+                ),
+            );
+            cx.notify();
+        })
+        .unwrap();
+        cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+            .unwrap();
+
+        let mut visual = VisualTestContext::from_window(win.into(), cx);
+        let body_after = visual
+            .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+            .expect("the ready body must remain rendered with feedback");
+        let titlebar = visual
+            .debug_bounds("tm-feedback-titlebar")
+            .expect("the client titlebar must render");
+        let title = visual
+            .debug_bounds("tm-window-title")
+            .expect("the centered window title must render");
+        let navigation = visual
+            .debug_bounds("tm-navigation-strip")
+            .expect("the navigation strip must render");
+        let overlay = visual
+            .debug_bounds("tm-feedback-overlay")
+            .expect("feedback must mount in the deferred titlebar slot");
+
+        assert_eq!(
+            body_after, body_before,
+            "mounting feedback must not move or resize the page body"
+        );
+        assert!(
+            overlay.origin.x >= px(0.0) && overlay.right() <= px(width),
+            "the feedback overlay must stay inside the viewport: {overlay:?}"
+        );
+        assert!(
+            overlay.origin.y >= titlebar.origin.y && overlay.bottom() <= titlebar.bottom(),
+            "the one-line feedback card must fit the titlebar: card={overlay:?}, bar={titlebar:?}"
+        );
+        let overlaps_title = overlay.origin.x < title.right()
+            && overlay.right() > title.origin.x
+            && overlay.origin.y < title.bottom()
+            && overlay.bottom() > title.origin.y;
+        assert!(
+            !overlaps_title,
+            "feedback must stay clear of the centered window title: card={overlay:?}, title={title:?}"
+        );
+        assert!(
+            overlay.bottom() <= navigation.origin.y,
+            "feedback must not cover the navigation strip: card={overlay:?}, nav={navigation:?}"
+        );
+    }
+}
+
+/// Native-decorated windows use the app navigation strip as the available
+/// chrome slot; the toast must finish above the page body there as well.
+#[gpui::test]
+async fn feedback_overlay_stays_in_native_navigation_chrome(cx: &mut TestAppContext) {
+    use gpui::{VisualTestContext, px, size};
+    use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+
+    let win = cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
+    cx.simulate_window_resize(win.into(), size(px(1180.0), px(780.0)));
+    win.update(cx, |view, _window, cx| {
+        view.decorations_override = Some(true);
+        view.mark_telemetry_frame_ready();
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .unwrap();
+    let body_before = {
+        let mut visual = VisualTestContext::from_window(win.into(), cx);
+        visual
+            .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+            .expect("the ready body must render before feedback")
+    };
+
+    win.update(cx, |view, _window, cx| {
+        view.shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Success,
+            FeedbackLifecycle::TIMED_SHORT,
+            "Current window saved: /workspace/archive/capture.png",
+        );
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .unwrap();
+
+    let mut visual = VisualTestContext::from_window(win.into(), cx);
+    let body_after = visual
+        .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+        .expect("the ready body must remain rendered with feedback");
+    let navigation = visual
+        .debug_bounds("tm-navigation-strip")
+        .expect("the navigation strip must render");
+    let overlay = visual
+        .debug_bounds("tm-feedback-overlay")
+        .expect("feedback must mount in the native navigation slot");
+
+    assert_eq!(
+        body_after, body_before,
+        "mounting feedback must not move or resize the page body"
+    );
+    assert!(
+        overlay.origin.y >= navigation.origin.y
+            && overlay.bottom() <= navigation.bottom()
+            && overlay.bottom() <= body_after.origin.y,
+        "native-window feedback must stay in chrome above the page body: card={overlay:?}, nav={navigation:?}, body={body_after:?}"
+    );
+}
+
+/// A compact native-window rail has no horizontal titlebar slot. In that
+/// layout feedback collapses to its severity indicator inside the rail.
+#[gpui::test]
+async fn feedback_indicator_stays_inside_native_vertical_navigation_rail(cx: &mut TestAppContext) {
+    use gpui::{VisualTestContext, px, size};
+    use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+    use taskmanager_ui_contract::navigation::NavOrientation;
+
+    let win = cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
+    cx.simulate_window_resize(win.into(), size(px(720.0), px(480.0)));
+    win.update(cx, |view, _window, cx| {
+        view.decorations_override = Some(true);
+        view.nav_orientation = NavOrientation::Vertical;
+        view.mark_telemetry_frame_ready();
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .unwrap();
+    let body_before = {
+        let mut visual = VisualTestContext::from_window(win.into(), cx);
+        visual
+            .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+            .expect("the ready body must render before feedback")
+    };
+
+    win.update(cx, |view, _window, cx| {
+        view.shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Success,
+            FeedbackLifecycle::TIMED_SHORT,
+            "Current window saved: /workspace/archive/capture.png",
+        );
+        cx.notify();
+    })
+    .unwrap();
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear(cx))
+        .unwrap();
+
+    let mut visual = VisualTestContext::from_window(win.into(), cx);
+    let body_after = visual
+        .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+        .expect("the ready body must remain rendered with feedback");
+    let rail = visual
+        .debug_bounds("tm-navigation-rail")
+        .expect("the vertical navigation rail must render");
+    let overlay = visual
+        .debug_bounds("tm-feedback-overlay")
+        .expect("the feedback indicator must mount in the navigation rail");
+
+    assert_eq!(
+        body_after, body_before,
+        "mounting feedback must not move or resize the page body"
+    );
+    assert!(
+        overlay.origin.x >= rail.origin.x
+            && overlay.right() <= rail.right()
+            && overlay.right() <= body_after.origin.x,
+        "feedback must remain inside the rail and clear of the page body: indicator={overlay:?}, rail={rail:?}, body={body_after:?}"
+    );
 }

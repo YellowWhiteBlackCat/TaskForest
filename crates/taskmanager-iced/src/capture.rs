@@ -12,7 +12,7 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::AppPage;
 
 use crate::app::PerfDevice;
-use crate::ui::responsive::PerformancePageBudget;
+use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 
 pub(crate) fn persisted_history_requested() -> bool {
     std::env::var("TM_ICED_CAPTURE_DEVICE").is_ok_and(|target| {
@@ -70,6 +70,12 @@ pub(crate) fn process_context_menu_marker_line(identity: ProcessLiveKey) -> Stri
     )
 }
 
+/// Build the mounted-surface line emitted by the production tooltip widget.
+#[must_use]
+pub(crate) fn tooltip_overlay_marker_line() -> &'static str {
+    "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=tooltip-overlay\n"
+}
+
 /// Build a readiness line from the logical client viewport received by the
 /// app, including the typed Performance allocation derived from that frame.
 #[must_use]
@@ -78,15 +84,19 @@ pub(crate) fn performance_viewport_marker_line(
     viewport: Size,
     page_viewport: Size,
     budget: PerformancePageBudget,
+    resolution: Option<&str>,
 ) -> String {
     format!(
-        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device={target} width={:.2} height={:.2} page_width={:.2} page_height={:.2} rung={:?} inventory={:?}\n",
+        "ICED_CAPTURE_MARKER event=viewport_ready mode=demo page=performance device={target} width={:.2} height={:.2} page_width={:.2} page_height={:.2} rung={:?} inventory={:?}{}\n",
         viewport.width,
         viewport.height,
         page_viewport.width,
         page_viewport.height,
         budget.vertical,
         budget.chart_inventory,
+        resolution
+            .map(|value| format!(" {value}"))
+            .unwrap_or_default(),
     )
 }
 
@@ -206,6 +216,17 @@ pub(crate) fn append_process_context_menu_marker(path: &Path, identity: ProcessL
     let _ = file.write_all(process_context_menu_marker_line(identity).as_bytes());
 }
 
+/// Append the tooltip surface marker from the widget that actually mounted it.
+pub(crate) fn append_tooltip_overlay_marker(path: &Path) {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = file.write_all(tooltip_overlay_marker_line().as_bytes());
+}
+
 /// Append the actual received client viewport and its Performance budget.
 pub(crate) fn append_performance_viewport_marker(
     path: &Path,
@@ -213,6 +234,7 @@ pub(crate) fn append_performance_viewport_marker(
     viewport: Size,
     page_viewport: Size,
     budget: PerformancePageBudget,
+    resolution: Option<&str>,
 ) {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -221,7 +243,8 @@ pub(crate) fn append_performance_viewport_marker(
         return;
     };
     let _ = file.write_all(
-        performance_viewport_marker_line(target, viewport, page_viewport, budget).as_bytes(),
+        performance_viewport_marker_line(target, viewport, page_viewport, budget, resolution)
+            .as_bytes(),
     );
 }
 

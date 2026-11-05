@@ -121,6 +121,7 @@ fn row_context(theme: &Theme) -> RowRender {
         hidden_columns: std::rc::Rc::new(HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
         open_menu_identity: None,
+        tooltip_capture_marker: None,
     }
 }
 

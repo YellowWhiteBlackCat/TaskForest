@@ -637,13 +637,13 @@ capture_one() {
   case "$device" in
   applications|services|startup|users|system|app-history) page="$device" ;;
   users-session-confirmation) page=users ;;
-  process-context-menu) page=applications ;;
+  process-context-menu|tooltip-overlay|feedback-overlay) page=applications ;;
   cpu-facts) page=performance ;;
   application-history-replay) page=app-history ;;
   system-hardware|system-dashboard|history-60m|sensor-center|storage-health) page=system ;;
   service-details|service-details-logs|services-search-highlight) page=services ;;
   process-selection|saved-view-presets) page=applications ;;
-  process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-group-expanded|apps-zero-gray|apps-identity-matrix|keyboard-focus|vertical-nav) page=applications ;;
+  process-details|process-properties-performance|process-insights|process-command|process-affinity|process-end-confirm|process-force-kill|process-tree-confirm|process-batch-confirm|apps-search-highlight|process-memory-pss-swap|process-network-details|process-gpu-details|process-resource-limits|process-isolation|apps-group-expanded|apps-zero-gray|apps-identity-matrix|tooltip-overlay|keyboard-focus|vertical-nav) page=applications ;;
   startup-impact|startup-failure-evidence|startup-boot-markers) page=startup ;;
   about|settings|containers|alerts|first-run|run-task|disk-smart|smart-self-test-confirm|system-about|active-alert|alert-rules-manager|telemetry-paused|sidebar-hidden|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|history-replay|battery-fan-performance|battery-live-performance|device-hotplug|sidebar-edit|settings-permission-center|event-center) page=performance ;;
   esac
@@ -721,6 +721,8 @@ capture_one() {
           && grep -q "ICED_CAPTURE_MARKER event=target_ready mode=demo page=$page device=$device" "$markers" 2>/dev/null \
           && { [ "$device" != "process-context-menu" ] \
             || grep -Eq '^ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=process-context-menu pid=[1-9][0-9]* start_token=[1-9][0-9]*$' "$markers" 2>/dev/null; } \
+          && { [ "$device" != "tooltip-overlay" ] \
+            || grep -q "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications surface=tooltip-overlay" "$markers" 2>/dev/null; } \
           && { [ "$device" != "cpu-facts" ] \
             || grep -q "ICED_CAPTURE_MARKER event=cpu_facts_ready mode=demo page=performance device=cpu-facts rail=stats-end core_breakdown=6/8/2 cache_kib=64/64/1024/16384 base_frequency_mhz=2400 core_counts=16/22 virtualization=VT-x core_temperature_c=55/59" "$markers" 2>/dev/null; } \
           && { [ "$page" != "performance" ] \

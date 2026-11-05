@@ -172,7 +172,9 @@ def validate_markers(
             "process-force-kill", "process-tree-confirm", "process-batch-confirm",
             "process-memory-pss-swap", "process-network-details", "process-gpu-details",
             "process-resource-limits", "process-isolation", "apps-group-expanded",
-            "apps-zero-gray", "apps-identity-matrix", "keyboard-focus", "vertical-nav",
+            "apps-zero-gray", "apps-identity-matrix", "tooltip-overlay",
+            "feedback-overlay",
+            "keyboard-focus", "vertical-nav",
         }
         else device
         if device in {"applications", "services", "startup", "users", "system", "app-history"}
@@ -211,6 +213,15 @@ def validate_markers(
             raise EvidenceError(f"Process context-menu identity is malformed in {path}") from error
         if set(identity) != {"pid", "start_token"} or min(identity.values()) <= 0:
             raise EvidenceError(f"Process context-menu identity is incomplete in {path}")
+    if device == "tooltip-overlay":
+        surface = (
+            "ICED_CAPTURE_MARKER event=surface_ready mode=demo page=applications "
+            "surface=tooltip-overlay"
+        )
+        if lines.count(surface) != 1:
+            raise EvidenceError(
+                f"expected one mounted aggregate tooltip surface marker in {path}"
+            )
     if device == "cpu-facts":
         facts = (
             "ICED_CAPTURE_MARKER event=cpu_facts_ready mode=demo page=performance "

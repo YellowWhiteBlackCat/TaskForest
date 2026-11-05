@@ -25,6 +25,12 @@ The pinned GPUI snapshot owns the protocol role and configure/ack
 lifecycle; unavailable protocols follow the explicit standalone fallback. Iced
 and Bevy retain their independent host adapters.
 
+The locked GPUI snapshot exposes no sampleable lower composite or generic
+backdrop primitive, so the production binding reports
+`OpticalGlassCapability::UNSUPPORTED`; glass surfaces remain the shared painted
+fallback. Optical glass is not claimed on this frontend until a released
+upstream API passes the P0 gate without vendor, fork or local patches.
+
 `taskforest-g --demo` uses shared deterministic fixtures and bounded in-memory
 history. It does not load user configuration, persist history, spawn a tray or
 execute host actions. First Run opens through Settings or a user setup action;

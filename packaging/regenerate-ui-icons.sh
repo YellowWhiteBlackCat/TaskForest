@@ -53,6 +53,7 @@ ICONS=(
     "icons/podman.svg icons-podman"
     "icons/lock.svg icons-lock"
     "icons/globe.svg icons-globe"
+    "icons/panel-left.svg icons-panel-left"
 )
 
 mkdir -p "$ASSET_DIR"

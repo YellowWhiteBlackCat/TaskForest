@@ -6,10 +6,9 @@
 //! expressions are the oracle.
 
 use super::{
-    ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
-    PageLayoutBudget, PerformanceChartInventory, PerformanceDetailsPresentation,
-    PerformancePageBudget, SystemPageBudget, SystemSurfacePresentation, VerticalSpace,
-    layout_profile, nav_rail_width, vertical_space,
+    chrome_presentation_for_width, layout_profile, nav_rail_width, page_layout_for_frame,
+    page_layout_for_viewport, performance_budget_for_perf_frame,
+    performance_budget_from_page_layout, vertical_space,
 };
 use crate::app::Message;
 use iced::Size;
@@ -18,6 +17,12 @@ use taskmanager_shell::SortCol;
 use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::navigation::NavOrientation;
+use taskmanager_ui_contract::presentation::budget::{PageLayoutBudget, SystemPageBudget};
+use taskmanager_ui_contract::presentation::vocabulary::{
+    ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
+    PerformanceChartInventory, PerformanceDetailsPresentation, SystemSurfacePresentation,
+    VerticalSpace,
+};
 use zhuge_ui_core::virtual_list::DEFAULT_OVERSCAN;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 
@@ -27,11 +32,11 @@ fn frame(width: f32, height: f32) -> Size {
 
 #[test]
 fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
-    let ultra = PageLayoutBudget::for_viewport(frame(720.0, 480.0));
+    let ultra = page_layout_for_viewport(frame(720.0, 480.0));
     assert_eq!(ultra.profile, LayoutProfile::UltraCompact);
     assert_eq!(ultra.vertical_space, VerticalSpace::Constrained);
     assert_eq!(ultra.navigation, NavigationPresentation::IconOnly);
-    let ultra_performance = PerformancePageBudget::from_page_layout(ultra);
+    let ultra_performance = performance_budget_from_page_layout(ultra);
     assert_eq!(
         ultra_performance.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -49,12 +54,12 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
         SystemSurfacePresentation::SingleColumn
     );
 
-    let standard = PageLayoutBudget::for_viewport(frame(1180.0, 780.0));
+    let standard = page_layout_for_viewport(frame(1180.0, 780.0));
     assert_eq!(standard.profile, LayoutProfile::Standard);
     assert_eq!(standard.vertical_space, VerticalSpace::Standard);
     assert_eq!(standard.page_padding, 16.0);
     assert_eq!(
-        PerformancePageBudget::from_page_layout(standard).chart_inventory,
+        performance_budget_from_page_layout(standard).chart_inventory,
         PerformanceChartInventory::Full
     );
     assert_eq!(
@@ -64,11 +69,11 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
 
     // A panoramic but short window must retain wide horizontal composition
     // while independently collapsing height-hungry graph inventory.
-    let wide_short = PageLayoutBudget::for_viewport(frame(2048.0, 540.0));
+    let wide_short = page_layout_for_viewport(frame(2048.0, 540.0));
     assert_eq!(wide_short.profile, LayoutProfile::Wide);
     assert_eq!(wide_short.vertical_space, VerticalSpace::Constrained);
     assert_eq!(wide_short.navigation, NavigationPresentation::Labeled);
-    let wide_short_performance = PerformancePageBudget::from_page_layout(wide_short);
+    let wide_short_performance = performance_budget_from_page_layout(wide_short);
     assert_eq!(
         wide_short_performance.device_navigation,
         DeviceNavigationPresentation::Sidebar
@@ -84,17 +89,16 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
 
     // The converse: a tall but narrow window earns generous vertical capacity
     // without buying any horizontal profile.
-    let tall_narrow = PageLayoutBudget::for_viewport(frame(720.0, 1200.0));
+    let tall_narrow = page_layout_for_viewport(frame(720.0, 1200.0));
     assert_eq!(tall_narrow.profile, LayoutProfile::UltraCompact);
     assert_eq!(tall_narrow.vertical_space, VerticalSpace::Generous);
 
     assert_eq!(layout_profile(frame(900.0, 1200.0)), LayoutProfile::Compact);
 
-    let vertical = PageLayoutBudget::for_frame(frame(900.0, 1200.0), NavOrientation::Vertical);
-    assert_eq!(vertical.profile, LayoutProfile::Compact);
+    let vertical = page_layout_for_frame(frame(900.0, 1200.0), NavOrientation::Vertical);
+    assert_eq!(vertical.profile, LayoutProfile::UltraCompact);
     assert_eq!(vertical.navigation, NavigationPresentation::IconOnly);
-    let vertical_standard =
-        PageLayoutBudget::for_frame(frame(1180.0, 780.0), NavOrientation::Vertical);
+    let vertical_standard = page_layout_for_frame(frame(1180.0, 780.0), NavOrientation::Vertical);
     assert_eq!(vertical_standard.profile, LayoutProfile::Compact);
     assert_eq!(
         vertical_standard.navigation,
@@ -146,30 +150,32 @@ fn vertical_nav_subtraction_earns_the_body_profile_after_the_rail() {
     assert_eq!(nav_rail_width(NavigationPresentation::Labeled), 144.0);
 
     // The labeled rail is earned only once the body keeps the UltraCompact
-    // floor after subtracting the full rail: 984 - 144 == 840.
-    let icon_only = PageLayoutBudget::for_frame(frame(983.9, 1200.0), NavOrientation::Vertical);
+    // floor after subtracting the full rail AND the Compact page padding
+    // (the padding/profile fold): 1008 - 144 - 24 == 840.
+    let icon_only = page_layout_for_frame(frame(983.9, 1200.0), NavOrientation::Vertical);
     assert_eq!(icon_only.navigation, NavigationPresentation::IconOnly);
-    let labeled = PageLayoutBudget::for_frame(frame(984.0, 1200.0), NavOrientation::Vertical);
+    let labeled = page_layout_for_frame(frame(1008.0, 1200.0), NavOrientation::Vertical);
     assert_eq!(labeled.navigation, NavigationPresentation::Labeled);
 
     // Rail presentation and page profile are separate facts: 900px needs the
-    // icon rail (900 - 144 < 840) while the remaining 846px body still earns
-    // Compact. The 894px window is the exact-floor case (894 - 54 == 840).
-    let narrow = PageLayoutBudget::for_frame(frame(900.0, 1200.0), NavOrientation::Vertical);
+    // icon rail (900 - 144 < 840). The 846px body loses Compact to its own
+    // padding fold (846 - 24 < 840), so the exact 840 body floor (894 - 54)
+    // still folds down to UltraCompact as well.
+    let narrow = page_layout_for_frame(frame(900.0, 1200.0), NavOrientation::Vertical);
     assert_eq!(narrow.navigation, NavigationPresentation::IconOnly);
-    assert_eq!(narrow.profile, LayoutProfile::Compact);
-    let floor = PageLayoutBudget::for_frame(frame(894.0, 1200.0), NavOrientation::Vertical);
+    assert_eq!(narrow.profile, LayoutProfile::UltraCompact);
+    let floor = page_layout_for_frame(frame(894.0, 1200.0), NavOrientation::Vertical);
     assert_eq!(floor.navigation, NavigationPresentation::IconOnly);
-    assert_eq!(floor.profile, LayoutProfile::Compact);
-    let tiny = PageLayoutBudget::for_frame(frame(800.0, 1200.0), NavOrientation::Vertical);
+    assert_eq!(floor.profile, LayoutProfile::UltraCompact);
+    let tiny = page_layout_for_frame(frame(800.0, 1200.0), NavOrientation::Vertical);
     assert_eq!(tiny.navigation, NavigationPresentation::IconOnly);
     assert_eq!(tiny.profile, LayoutProfile::UltraCompact);
 
     // A horizontal nav consumes no body width: the frame budget equals the
     // full-viewport allocation.
     assert_eq!(
-        PageLayoutBudget::for_frame(frame(1180.0, 780.0), NavOrientation::Horizontal),
-        PageLayoutBudget::for_viewport(frame(1180.0, 780.0))
+        page_layout_for_frame(frame(1180.0, 780.0), NavOrientation::Horizontal),
+        page_layout_for_viewport(frame(1180.0, 780.0))
     );
 }
 
@@ -191,9 +197,11 @@ fn every_profile_and_vertical_pair_has_one_explicit_page_allocation() {
                 vertical_space: vertical_capacity,
                 page_padding: 16.0,
                 navigation: NavigationPresentation::Labeled,
-                chrome: ChromePresentation::SingleRow,
+                chrome: Some(ChromePresentation::SingleRow),
+                content_width: 0.0,
+                content_height: 0.0,
             };
-            let performance = PerformancePageBudget::from_page_layout(layout);
+            let performance = performance_budget_from_page_layout(layout);
             assert_eq!(
                 performance.device_navigation,
                 match profile {
@@ -243,7 +251,7 @@ fn chrome_presentation_matches_the_pre_port_single_row_breakpoint() {
     let mut width = 240.0;
     while width <= 2200.0 {
         assert_eq!(
-            ChromePresentation::for_width(width).is_wrapped(),
+            chrome_presentation_for_width(width).is_wrapped(),
             width < 1320.0,
             "chrome flip must stay exact at {width}"
         );
@@ -251,7 +259,7 @@ fn chrome_presentation_matches_the_pre_port_single_row_breakpoint() {
     }
     for width in [1319.0, 1319.999, 1320.0, 1320.001] {
         assert_eq!(
-            ChromePresentation::for_width(width).is_wrapped(),
+            chrome_presentation_for_width(width).is_wrapped(),
             width < 1320.0,
             "the 1320 boundary itself must not drift at {width}"
         );
@@ -261,13 +269,13 @@ fn chrome_presentation_matches_the_pre_port_single_row_breakpoint() {
     // and a vertical rail never changes the window-width chrome decision.
     for height in [300.0, 480.0, 540.0, 700.0, 780.0, 960.0, 1200.0] {
         for width in [240.0, 720.0, 900.0, 1180.0, 1319.0, 1320.0, 1600.0, 2048.0] {
-            let expected = ChromePresentation::for_width(width);
+            let expected = Some(chrome_presentation_for_width(width));
             assert_eq!(
-                PageLayoutBudget::for_viewport(frame(width, height)).chrome,
+                page_layout_for_viewport(frame(width, height)).chrome,
                 expected
             );
             assert_eq!(
-                PageLayoutBudget::for_frame(frame(width, height), NavOrientation::Vertical).chrome,
+                page_layout_for_frame(frame(width, height), NavOrientation::Vertical).chrome,
                 expected
             );
         }
@@ -294,7 +302,7 @@ fn device_navigation_follows_the_frame_budget_slot_authority() {
         (1000.0, 500.0, true, false),
     ];
     for (width, height, sidebar_visible, expected_strip) in cases {
-        let budget = PerformancePageBudget::for_perf_frame(frame(width, height), sidebar_visible);
+        let budget = performance_budget_for_perf_frame(frame(width, height), sidebar_visible);
         let actual_strip = budget.device_navigation == DeviceNavigationPresentation::Strip;
         assert_eq!(
             actual_strip, expected_strip,
@@ -489,21 +497,25 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
     // 1. Root chrome single-row convergence at wide viewports (>= 1320px width and non-compact height)
     let wide_viewport = frame(1440.0, 900.0);
     assert!(!crate::app::motion::viewport_compact(wide_viewport));
-    let wide_budget = PageLayoutBudget::for_viewport(wide_viewport);
-    assert_eq!(wide_budget.chrome, ChromePresentation::SingleRow);
-    assert!(!wide_budget.chrome.is_wrapped());
+    let wide_budget = page_layout_for_viewport(wide_viewport);
+    assert_eq!(wide_budget.chrome, Some(ChromePresentation::SingleRow));
+    assert!(!wide_budget.chrome.is_some_and(|chrome| chrome.is_wrapped()));
 
     // At narrow viewports (e.g. 720x480) and wide-short viewports (e.g. 2048x540):
     // Root chrome presentation must wrap onto dedicated bounded strips so actions don't push off-screen.
     let narrow_viewport = frame(720.0, 480.0);
     assert!(crate::app::motion::viewport_compact(narrow_viewport));
-    let narrow_budget = PageLayoutBudget::for_viewport(narrow_viewport);
-    assert_eq!(narrow_budget.chrome, ChromePresentation::Wrapped);
-    assert!(narrow_budget.chrome.is_wrapped());
+    let narrow_budget = page_layout_for_viewport(narrow_viewport);
+    assert_eq!(narrow_budget.chrome, Some(ChromePresentation::Wrapped));
+    assert!(
+        narrow_budget
+            .chrome
+            .is_some_and(|chrome| chrome.is_wrapped())
+    );
 
     let wide_short_viewport = frame(2048.0, 540.0);
     assert!(crate::app::motion::viewport_compact(wide_short_viewport));
-    let ws_budget = PageLayoutBudget::for_viewport(wide_short_viewport);
+    let ws_budget = page_layout_for_viewport(wide_short_viewport);
     assert_eq!(ws_budget.vertical_space, VerticalSpace::Constrained);
 
     // 2. Presets Ribbon convergence:
@@ -567,17 +579,20 @@ fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
 fn elastic_layout_playbook_stats_rails_and_detail_slots_under_narrow_and_wide_short() {
     use super::super::perf_layout::{bounded_heading, bounded_stat_text};
     use super::{
-        PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH,
-        PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_STACK_HEIGHT,
-        PerformanceDetailsPresentation, PerformanceVerticalRunway,
+        PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH, PERFORMANCE_STATS_MIN_WIDTH,
+        PERFORMANCE_STATS_STACK_HEIGHT,
+    };
+    use taskmanager_ui_contract::presentation::vocabulary::{
+        PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_RUNWAY_CORE_FLOOR, PerformanceDetailsPresentation,
+        PerformanceVerticalRunway,
     };
 
-    assert_eq!(super::PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);
+    assert_eq!(PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);
 
     // 1. Narrow viewport (720x480):
     // Device navigation collapses to Strip (width 0), stats rail is pinned or stacked with clamped width,
     // and vertical runway degrades to Floor (aggregate only), protecting bottom and right edges.
-    let narrow_budget = PerformancePageBudget::for_perf_frame(frame(720.0, 480.0), true);
+    let narrow_budget = performance_budget_for_perf_frame(frame(720.0, 480.0), true);
     assert_eq!(
         narrow_budget.device_navigation,
         DeviceNavigationPresentation::Strip,
@@ -616,7 +631,7 @@ fn elastic_layout_playbook_stats_rails_and_detail_slots_under_narrow_and_wide_sh
     // 2. Stacked details fallback under very narrow width (e.g. 480x800):
     // When width cannot carry main + pinned stats side-by-side, stats moves to Stacked below
     // the main viewport (fixed 220px height) instead of starving the primary graph horizontally.
-    let stacked_budget = PerformancePageBudget::for_perf_frame(frame(480.0, 800.0), true);
+    let stacked_budget = performance_budget_for_perf_frame(frame(480.0, 800.0), true);
     assert_eq!(
         stacked_budget.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -631,7 +646,7 @@ fn elastic_layout_playbook_stats_rails_and_detail_slots_under_narrow_and_wide_sh
     // 3. Wide-short viewport (2048x540):
     // Width is generous (admitting Sidebar and Pinned stats), but height is constrained (540 - 128 = 412).
     // Core runway is carried, but full chart inventory is collapsed to AggregateOnly to protect bottom edge.
-    let wide_short_budget = PerformancePageBudget::for_perf_frame(frame(2048.0, 540.0), true);
+    let wide_short_budget = performance_budget_for_perf_frame(frame(2048.0, 540.0), true);
     assert_eq!(
         wide_short_budget.device_navigation,
         DeviceNavigationPresentation::Sidebar,

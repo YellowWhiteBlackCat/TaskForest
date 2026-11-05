@@ -14,10 +14,7 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Query, ResMut};
 use bevy::scene::{Scene, bsn};
 use bevy::ui::UiSystems;
-use bevy::ui::prelude::{
-    BackgroundColor, BorderRadius, ComputedNode, FlexDirection, FlexWrap, Node, UiRect, Val,
-    percent,
-};
+use bevy::ui::prelude::{ComputedNode, FlexDirection, FlexWrap, Node, UiRect, Val, percent};
 use bevy::ui::widget::Text;
 use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::SmbiosMemorySnapshot;
@@ -25,6 +22,7 @@ use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskforest_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_ui_contract::IconId;
 
 use super::paint::SystemPaint;
 use super::privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
@@ -179,24 +177,28 @@ fn tiles_row(
         .map_or_else(missing_value, |count| count.to_string());
     let mut tiles = vec![
         Box::new(kpi_tile_scene(
+            IconId::Cpu,
             t("common.cpu").to_owned(),
             summary.cpu.clone(),
             cpu_note,
             palette,
         )) as Box<dyn Scene>,
         Box::new(kpi_tile_scene(
+            IconId::Memory,
             t("common.memory").to_owned(),
             summary.memory.clone(),
             mem_note,
             palette,
         )) as Box<dyn Scene>,
         Box::new(kpi_tile_scene(
+            IconId::Process,
             t("dashboard.processes").to_owned(),
             proc_value,
             t("tab.apps").to_owned(),
             palette,
         )) as Box<dyn Scene>,
         Box::new(kpi_tile_scene(
+            IconId::Alert,
             t("dashboard.active_alerts").to_owned(),
             summary.active_alerts.to_string(),
             t("tab.alerts").to_owned(),
@@ -205,6 +207,7 @@ fn tiles_row(
     ];
     if let Some(health) = summary.health.as_ref() {
         tiles.push(Box::new(kpi_tile_scene(
+            IconId::Health,
             t("system.health_score").to_owned(),
             health.clone(),
             t("system.health_score").to_owned(),
@@ -254,9 +257,7 @@ pub(crate) fn system_body_scene(
             Node {
                 width: percent(100),
                 padding: UiRect::all(Val::Px(space_12())),
-                border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
             }
-            BackgroundColor({ palette.panel_fill })
             Children [
                  Text({ t("common.waiting_inventory").to_owned() }) TextRole(Role::Body)
             ]

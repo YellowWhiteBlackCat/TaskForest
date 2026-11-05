@@ -3,12 +3,14 @@
 use super::{
     PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_STACK_HEIGHT, PERFORMANCE_STATS_TRAILING_INSET,
 };
-use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px};
-use taskmanager_theme::Theme;
+use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px, rems};
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
+use taskmanager_ui::theme_binding::rem_length;
 
 /// Canonical Performance page split: a shrinkable main column and a pinned,
 /// non-scrolling statistics column.
@@ -45,8 +47,6 @@ pub(super) fn performance_stack(theme: &Theme, left: Div, stats: Div, stats_widt
         .w_full()
         .h(PERFORMANCE_STATS_STACK_HEIGHT)
         .max_h(PERFORMANCE_STATS_STACK_HEIGHT)
-        .border_t_1()
-        .border_color(hsla(theme.border))
         .pt(definite_length(tokens::SPACE_10))
         .debug_selector(|| "tm-perf-stats-surface".to_string());
     div()
@@ -93,15 +93,12 @@ pub(super) fn performance_stats_surface(
         .min_h(px(0.0))
         .overflow_hidden()
         .pr(PERFORMANCE_STATS_TRAILING_INSET)
-        // The split is one continuous workspace. A real divider plus padding on
-        // the stats surface replaces a transparent parent gap that exposed the
-        // window background as a visual crack between sibling components.
-        .bg(fill(theme.window_bg));
+        .rounded(rem_length(tokens::card_radius(theme)))
+        .border(rems(GlassTier::Card.edge_width_rem()))
+        .border_color(hsla(theme.glass_card().edge))
+        .bg(glass_fill(theme, GlassTier::Card));
     if pinned {
-        surface = surface
-            .border_l_1()
-            .border_color(hsla(theme.border))
-            .pl(definite_length(tokens::SPACE_16));
+        surface = surface.pl(definite_length(tokens::SPACE_16));
     }
     surface.child(stats)
 }

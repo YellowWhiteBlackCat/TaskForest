@@ -1,4 +1,3 @@
-use super::super::startup::FONT_TOKEN_SYSTEM;
 use super::*;
 use std::collections::HashSet;
 use taskforest_core::core::alerts::NotificationPolicy;
@@ -16,10 +15,14 @@ use taskforest_core::core::config::{
     TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE,
     WINDOW_DECORATIONS_SYSTEM,
 };
+use taskforest_core::core::config::{DENSITY_COMFORTABLE, DENSITY_COMPACT};
 use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_shell::saved_views::{filter_from_token, preset_from_config};
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
-use taskmanager_theme::{Skin, Theme};
+use taskmanager_theme::{
+    FONT_MISANS_VF, FONT_ROBOTO_MONO, FONT_TOKEN_SYSTEM, FontAvailability, FontChoice,
+    FontPreference, Skin, Theme,
+};
 
 #[gpui::test]
 fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut TestAppContext) {
@@ -136,71 +139,86 @@ fn config_projection_round_trips_sidebar_order_and_device_overrides(cx: &mut Tes
     );
 }
 
+/// The persisted font vocabulary is the theme owner's codec (ADR-063), which is
+/// exactly what `config_from_view` writes: the bundled choice names the role's
+/// own face, the host choice uses the explicit marker, and `""` stays reserved
+/// for "never chosen".
 #[test]
 fn font_tokens_round_trip_system_and_bundled_choices() {
-    // System everywhere -> the EXPLICIT "system" token ("" is reserved
-    // for "never chosen", which the loader resolves to the bundled
-    // product faces).
-    let (ui, mono) = font_tokens(FontPreference {
-        ui: FontChoice::System,
-        mono: FontChoice::System,
-    });
-    assert_eq!(ui, FONT_TOKEN_SYSTEM);
-    assert_eq!(mono, FONT_TOKEN_SYSTEM);
+    assert_eq!(
+        FontPreference {
+            ui: FontChoice::System,
+            mono: FontChoice::System,
+        }
+        .config_tokens(),
+        (FONT_TOKEN_SYSTEM, FONT_TOKEN_SYSTEM)
+    );
+    assert_eq!(
+        FontPreference::default().config_tokens(),
+        (FONT_MISANS_VF, FONT_ROBOTO_MONO)
+    );
+    assert_eq!(
+        FontPreference {
+            ui: FontChoice::Bundled,
+            mono: FontChoice::System,
+        }
+        .config_tokens(),
+        (FONT_MISANS_VF, FONT_TOKEN_SYSTEM)
+    );
+    assert_eq!(
+        FontPreference {
+            ui: FontChoice::Custom("Fira Sans"),
+            mono: FontChoice::Custom("Cascadia Code"),
+        }
+        .config_tokens(),
+        ("Fira Sans", "Cascadia Code")
+    );
 
-    // The default preference is bundled-first: UI persists MiSans VF and
-    // the mono role persists Roboto Mono.
-    let (ui, mono) = font_tokens(FontPreference::default());
-    assert_eq!(ui, FONT_MISANS_VF);
-    assert_eq!(mono, FONT_ROBOTO_MONO);
-
-    // Bundled choices -> the exact family names the loader expects.
-    let (ui, mono) = font_tokens(FontPreference {
-        ui: FontChoice::Bundled,
-        mono: FontChoice::Bundled,
-    });
-    assert_eq!(ui, FONT_MISANS_VF);
-    assert_eq!(mono, FONT_ROBOTO_MONO);
-
-    // Mixed per-role.
-    let (ui, mono) = font_tokens(FontPreference {
-        ui: FontChoice::Bundled,
-        mono: FontChoice::System,
-    });
-    assert_eq!(ui, FONT_MISANS_VF);
-    assert_eq!(mono, FONT_TOKEN_SYSTEM);
-
-    let (ui, mono) = font_tokens(FontPreference {
-        ui: FontChoice::Custom("Fira Sans"),
-        mono: FontChoice::Custom("Cascadia Code"),
-    });
-    assert_eq!(ui, "Fira Sans");
-    assert_eq!(mono, "Cascadia Code");
+    // And back again: a config written by any product resolves to the same
+    // faces here.
+    let availability = FontAvailability::from_installed_families([
+        FONT_MISANS_VF,
+        FONT_ROBOTO_MONO,
+        "Fira Sans",
+        "Cascadia Code",
+    ]);
+    assert_eq!(
+        FontPreference::from_config_tokens(FONT_ROBOTO_MONO, FONT_TOKEN_SYSTEM, &availability),
+        FontPreference {
+            ui: FontChoice::Bundled,
+            mono: FontChoice::System,
+        }
+    );
+    assert_eq!(
+        FontPreference::from_config_tokens("Fira Sans", "Cascadia Code", &availability),
+        FontPreference {
+            ui: FontChoice::Custom("Fira Sans"),
+            mono: FontChoice::Custom("Cascadia Code"),
+        }
+    );
 }
 
+/// Row density persists through the theme's token pair; an unknown token is
+/// ignored instead of fabricating a geometry.
 #[test]
 fn density_tokens_round_trip_and_unknown_tokens_are_ignored() {
     use taskmanager_theme::tokens::RowDensity;
 
-    // Both densities map to their stable tokens.
-    assert_eq!(density_token(RowDensity::Comfortable), DENSITY_COMFORTABLE);
-    assert_eq!(density_token(RowDensity::Compact), DENSITY_COMPACT);
-
-    // Tokens parse back; the empty sentinel (old configs) resolves to the
-    // built-in comfortable default.
+    assert_eq!(RowDensity::Comfortable.config_token(), DENSITY_COMFORTABLE);
+    assert_eq!(RowDensity::Compact.config_token(), DENSITY_COMPACT);
     assert_eq!(
-        density_from_token(DENSITY_COMFORTABLE),
+        RowDensity::from_config_token(DENSITY_COMFORTABLE),
         Some(RowDensity::Comfortable)
     );
     assert_eq!(
-        density_from_token(DENSITY_COMPACT),
+        RowDensity::from_config_token(DENSITY_COMPACT),
         Some(RowDensity::Compact)
     );
-    assert_eq!(density_from_token(""), Some(RowDensity::Comfortable));
-
-    // An unknown token (newer version) is ignored — never a panic, never
-    // a fabricated geometry.
-    assert_eq!(density_from_token("UltraCompact"), None);
+    assert_eq!(
+        RowDensity::from_config_token(""),
+        Some(RowDensity::Comfortable)
+    );
+    assert_eq!(RowDensity::from_config_token("UltraCompact"), None);
 }
 
 fn custom_preset() -> SavedViewPreset {

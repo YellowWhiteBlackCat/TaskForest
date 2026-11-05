@@ -2,12 +2,19 @@
 //!
 //! Process CPU affinity editor modal behavior over the shell's renderer-neutral lifecycle.
 
+use bevy::MinimalPlugins;
+use bevy::app::App;
+use bevy::asset::AssetPlugin;
+use bevy::ecs::query::With;
+use bevy::scene::{ScenePlugin, WorldSceneExt};
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::tokens::UiSize;
 
 use super::affinity::{ProcessAffinityModalState, affinity_modal_scene};
+use crate::glass::OpticalGlassCard;
 use taskmanager_theme::Theme;
 
 fn dummy_identity(pid: u32, name: &str) -> FrozenProcessIdentity {
@@ -72,5 +79,18 @@ fn affinity_modal_scene_renders_without_panic() {
 
     let theme = Theme::default();
     let palette = crate::palette::ui_palette(&theme, UiSize::Standard);
-    let _scene = affinity_modal_scene(&session, &palette);
+    let scene = affinity_modal_scene(&session, &palette);
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    let world = app.world_mut();
+    world
+        .spawn_scene(scene)
+        .expect("the affinity modal scene resolves without app resources");
+    let card = world
+        .query_filtered::<&OpticalGlassCard, With<bevy::ui::Node>>()
+        .single(world)
+        .expect("the affinity modal is an optical glass candidate");
+    assert!(card.enabled && card.tier == GlassTier::Modal);
 }

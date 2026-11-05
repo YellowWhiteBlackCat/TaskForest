@@ -6,9 +6,8 @@ use taskmanager_theme::Theme;
 use taskmanager_ui::{layout::PageScaffold, primitives::button::ButtonState};
 
 use super::{Hover, RootView, elements, i18n};
-use crate::gpui_app::{
-    root::responsive::PageLayoutBudget, services_view, startup_view, users_view,
-};
+use crate::gpui_app::{services_view, startup_view, users_view};
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 
 impl RootView {
     pub(super) fn render_services_page(

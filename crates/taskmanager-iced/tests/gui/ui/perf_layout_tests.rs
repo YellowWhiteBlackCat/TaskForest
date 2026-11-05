@@ -1,20 +1,82 @@
 use super::{bounded_heading, bounded_stat_text, geometry_contract};
 use crate::ui::device_chart::{DEVICE_CHART_HEIGHT, primary_graph_height};
 use crate::ui::responsive::{
-    DeviceNavigationPresentation, PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH,
-    PERFORMANCE_STATS_MIN_WIDTH, PerformanceDetailsPresentation, PerformancePageBudget,
+    PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH, PERFORMANCE_STATS_MIN_WIDTH,
+    performance_budget_for_perf_frame,
 };
 use iced::{Length, Size};
+use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::vocabulary::{
+    DeviceNavigationPresentation, PERFORMANCE_MAIN_MIN_WIDTH, PerformanceChartInventory,
+    PerformanceDetailsPresentation,
+};
 
 #[test]
-fn geometry_contract_keeps_explicit_title_sizes() {
+fn device_sidebar_gap_has_no_resize_cursor_and_keeps_both_slots_bounded() {
+    use iced::advanced::Layout;
+    use iced::advanced::layout::Limits;
+    use iced::advanced::renderer::Headless;
+    use iced::advanced::widget::Tree;
+    use iced::{Point, Rectangle, mouse};
+
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        crate::theme_binding::BUNDLED_UI_FONT,
+        iced::Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer");
+
+    for viewport in [Size::new(1280.0, 720.0), Size::new(1920.0, 540.0)] {
+        let mut app = crate::IcedApp::demo();
+        let _ = app.update(crate::app::Message::WindowResized(viewport));
+        let mut page = crate::ui::performance::performance_page(&app);
+        let mut tree = Tree::new(&page);
+        let node =
+            page.as_widget_mut()
+                .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, viewport));
+        let children = node.children();
+        assert_eq!(children.len(), 3, "the wide page has three slots");
+        let sidebar = children[0].bounds();
+        let gap = children[1].bounds();
+        let detail = children[2].bounds();
+        assert!(sidebar.x + sidebar.width <= gap.x);
+        assert!(gap.x + gap.width <= detail.x);
+        assert!(detail.x + detail.width <= viewport.width);
+
+        let cursor = mouse::Cursor::Available(Point::new(
+            gap.x + gap.width / 2.0,
+            node.bounds().y + node.bounds().height / 2.0,
+        ));
+        assert_eq!(
+            page.as_widget().mouse_interaction(
+                &tree,
+                Layout::new(&node),
+                cursor,
+                &Rectangle::new(Point::ORIGIN, viewport),
+                &renderer,
+            ),
+            mouse::Interaction::None,
+            "the non-resizable gap must not advertise a resize action"
+        );
+    }
+}
+
+#[test]
+fn geometry_contract_titles_come_from_the_public_type_scale() {
     let desktop = geometry_contract(false);
     let compact = geometry_contract(true);
-    assert_eq!(desktop.title_size, 24.0);
+    // The device-detail heading keeps the GPUI perf-page rung and the strip
+    // frame steps one rung down: both sizes and the weight are theme tokens,
+    // never numbers this frontend invents (ADR-063).
+    assert_eq!(desktop.title_size, tokens::FONT_26);
+    assert_eq!(desktop.title_weight, tokens::FONT_WEIGHT_EXTRA_BOLD);
     assert!(!desktop.compact);
-    assert_eq!(compact.title_size, 19.0);
+    assert_eq!(compact.title_size, tokens::FONT_20);
+    assert_eq!(compact.title_weight, tokens::FONT_WEIGHT_EXTRA_BOLD);
     assert!(compact.compact);
     assert!(compact.title_size < desktop.title_size);
+    assert_eq!(compact.subtitle_size, tokens::FONT_12);
+    assert_eq!(desktop.subtitle_size, tokens::FONT_15);
 }
 
 #[test]
@@ -58,7 +120,7 @@ fn frame_budget_allocates_the_three_semantic_slots_like_gpui() {
     // A wide desktop frame with the sidebar visible: Sidebar navigation, a
     // Pinned statistics rail clamped to the shared ceiling, and a readable
     // main viewport.
-    let wide = PerformancePageBudget::for_perf_frame(Size::new(1920.0, 1080.0), true);
+    let wide = performance_budget_for_perf_frame(Size::new(1920.0, 1080.0), true);
     assert_eq!(
         wide.device_navigation,
         DeviceNavigationPresentation::Sidebar
@@ -71,13 +133,13 @@ fn frame_budget_allocates_the_three_semantic_slots_like_gpui() {
     assert_eq!(wide.sidebar_width, PERFORMANCE_SIDEBAR_MIN_WIDTH);
     assert_eq!(wide.stats_width, PERFORMANCE_STATS_MAX_WIDTH);
     assert!(
-        wide.main_width >= crate::ui::responsive::PERFORMANCE_MAIN_MIN_WIDTH,
+        wide.main_width >= PERFORMANCE_MAIN_MIN_WIDTH,
         "the main viewport keeps its readable floor"
     );
 
     // A hidden sidebar collapses navigation to the strip at ANY width — the
     // devices stay reachable (GPUI F9 parity), never a bare detail page.
-    let hidden = PerformancePageBudget::for_perf_frame(Size::new(1920.0, 1080.0), false);
+    let hidden = performance_budget_for_perf_frame(Size::new(1920.0, 1080.0), false);
     assert_eq!(
         hidden.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -86,13 +148,13 @@ fn frame_budget_allocates_the_three_semantic_slots_like_gpui() {
     // A mid-width frame that cannot carry rail + stats + main together keeps
     // the devices on the strip; the statistics rail still pins beside the
     // graphs when the main floor survives.
-    let mid = PerformancePageBudget::for_perf_frame(Size::new(800.0, 900.0), true);
+    let mid = performance_budget_for_perf_frame(Size::new(800.0, 900.0), true);
     assert_eq!(mid.device_navigation, DeviceNavigationPresentation::Strip);
     assert_eq!(mid.details, PerformanceDetailsPresentation::Pinned);
 
     // A narrow frame with no room for a pinned rail STACKS the statistics
     // below the main viewport instead of hiding the facts (GPUI parity).
-    let narrow = PerformancePageBudget::for_perf_frame(Size::new(480.0, 900.0), true);
+    let narrow = performance_budget_for_perf_frame(Size::new(480.0, 900.0), true);
     assert_eq!(
         narrow.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -105,20 +167,20 @@ fn frame_budget_allocates_the_three_semantic_slots_like_gpui() {
     assert!(narrow.stats_width >= PERFORMANCE_STATS_MIN_WIDTH);
 
     // Only an extremely narrow frame hides the statistics rail entirely.
-    let tiny = PerformancePageBudget::for_perf_frame(Size::new(300.0, 900.0), true);
+    let tiny = performance_budget_for_perf_frame(Size::new(300.0, 900.0), true);
     assert_eq!(tiny.details, PerformanceDetailsPresentation::Hidden);
 }
 
 #[test]
 fn frame_budget_types_the_vertical_ladder_from_the_content_height() {
-    use crate::ui::responsive::PerformanceVerticalRunway;
+    use taskmanager_ui_contract::presentation::vocabulary::PerformanceVerticalRunway;
     // A tall window composes the full chart inventory …
-    let tall = PerformancePageBudget::for_perf_frame(Size::new(1920.0, 1080.0), true);
+    let tall = performance_budget_for_perf_frame(Size::new(1920.0, 1080.0), true);
     assert_eq!(tall.vertical, PerformanceVerticalRunway::Charts);
     // … a short-but-WIDE window keeps its sidebar and pinned stats while the
     // ladder drops the header band and summaries (the old compact flag would
     // have collapsed the whole page to the strip).
-    let short_wide = PerformancePageBudget::for_perf_frame(Size::new(1280.0, 420.0), true);
+    let short_wide = performance_budget_for_perf_frame(Size::new(1280.0, 420.0), true);
     assert_eq!(
         short_wide.device_navigation,
         DeviceNavigationPresentation::Sidebar,
@@ -133,16 +195,16 @@ fn frame_budget_types_the_vertical_ladder_from_the_content_height() {
     assert!(!short_wide.vertical.carries_core_stack());
     assert_eq!(
         short_wide.chart_inventory,
-        crate::ui::responsive::PerformanceChartInventory::AggregateOnly,
+        PerformanceChartInventory::AggregateOnly,
         "the Floor rung admits only the aggregate chart"
     );
     // … and the Charts rung requires BOTH axes.
-    let core = PerformancePageBudget::for_perf_frame(Size::new(1280.0, 560.0), true);
+    let core = performance_budget_for_perf_frame(Size::new(1280.0, 560.0), true);
     assert_eq!(core.vertical, PerformanceVerticalRunway::Core);
     assert!(core.vertical.carries_core_stack());
     assert_eq!(
         core.chart_inventory,
-        crate::ui::responsive::PerformanceChartInventory::AggregateOnly,
+        PerformanceChartInventory::AggregateOnly,
         "the Core rung still drops secondary charts"
     );
 }

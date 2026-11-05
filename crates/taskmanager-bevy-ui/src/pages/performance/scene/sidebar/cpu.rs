@@ -4,48 +4,16 @@ use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
 use crate::pages::performance::metrics::battery_sidebar_title;
-use crate::pages::performance::sidebar_editor::{self, SidebarAction, SidebarState};
+use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 use bevy::ui_widgets::ScrollArea;
 
-fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-        }
-        Children [
-
-                Node {
-                    width: percent(100),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_8()),
-                }
-                Children [
-                     Text(t("common.cpu")) TextRole(Role::Heading) --
-                     Node { flex_grow: 1.0 } --
-
-                        Text(cpu_field_text(shell, CpuField::Brand))
-                        TextRole(Role::Body)
-                        DynText(DynField::Cpu(CpuField::Brand))
-
-                ]
-            --
-             Text(t("cpu.utilization_over_60s")) TextRole(Role::Caption)
-        ]
-    }
-}
-
 fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let compact_metrics: Vec<Box<dyn Scene>> = [
+    let metrics: Vec<Box<dyn Scene>> = [
         (t("common.utilization"), CpuField::Usage),
         (t("cpu.frequency"), CpuField::Frequency),
         (t("common.temperature"), CpuField::Temperature),
         (t("common.power"), CpuField::Power),
-        (t("perf.stall"), CpuField::Pressure),
-        (t("system.load_normalized"), CpuField::Load),
     ]
     .into_iter()
     .map(|(label, field)| {
@@ -57,36 +25,6 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         )) as Box<dyn Scene>
     })
     .collect();
-    // Composite diagnostics are deliberately full-width rows. Treating a
-    // topology or power-policy sentence as a shrinkable peer of a scalar
-    // made flex allocate it a tiny intrinsic slot and let the text paint
-    // through the panel edge in the real Niri capture.
-    let detail_metrics: Vec<Box<dyn Scene>> = [
-        (t("cpu.topology"), CpuField::Topology),
-        (t("cpu.idle_states"), CpuField::IdleStates),
-        (t("cpu.power_limits"), CpuField::PowerLimits),
-        (t("cpu.interrupts"), CpuField::Interrupts),
-        (t("cpu.thermal_throttle"), CpuField::ThermalThrottle),
-        (t("cpu.thermal_status"), CpuField::ThermalStatus),
-        (t("common.l1_data_cache"), CpuField::L1dCache),
-        (t("common.l1_instruction_cache"), CpuField::L1iCache),
-        (t("common.l2_cache"), CpuField::L2Cache),
-        (t("common.l3_cache"), CpuField::L3Cache),
-        (t("cpu.performance_cores"), CpuField::PerformanceCores),
-        (t("cpu.efficiency_cores"), CpuField::EfficiencyCores),
-        (t("cpu.low_power_cores"), CpuField::LowPowerCores),
-    ]
-    .into_iter()
-    .map(|(label, field)| {
-        Box::new(super::cpu_metric_full_row_scene(
-            label.to_owned(),
-            cpu_field_text(shell, field),
-            field,
-        )) as Box<dyn Scene>
-    })
-    .collect();
-    let mut metrics = compact_metrics;
-    metrics.extend(detail_metrics);
     bsn! {
         Node {
             width: percent(100),
@@ -261,6 +199,8 @@ pub(crate) fn cpu_main_scene(
         .iter()
         .map(|&curve| Box::new(curve_card_scene(curve, shell, palette)) as Box<dyn Scene>)
         .collect();
+    let selector = metric_selector_scene(shell, palette);
+    let headers = super::headers::all_device_headers_scene(shell);
 
     let cpu_container = bsn! {
         Node {
@@ -271,7 +211,6 @@ pub(crate) fn cpu_main_scene(
         }
         DeviceViewCategory(DeviceCategoryKind::Cpu)
         Children [
-             @cpu_header_scene(shell) --
              @cpu_metric_strip_scene(shell, palette) --
              @cpu_core_grid_scene(shell, palette)
         ]
@@ -370,11 +309,19 @@ pub(crate) fn cpu_main_scene(
         }
         Children [
              @compact_device_pills_scene(shell, palette, preferences) --
-             @metric_selector_scene(shell, palette) --
-             @sidebar_editor::button("Edit devices".into(), SidebarAction::Open, palette) --
+             @{ selector } --
+             { headers } --
 
                 Node {
                     width: percent(100),
+                    // The hero chart is the elastic primary region: it absorbs
+                    // the column's surplus height down to the strip's own rem
+                    // floor, so the lower detail card hugs the bottom edge
+                    // instead of leaving dead background under a short group.
+                    flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    min_height: px(0.0),
+                    flex_basis: px(0.0),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(space_2()),
                 }
@@ -388,11 +335,15 @@ pub(crate) fn cpu_main_scene(
             // from it.
             Node {
                 width: percent(100),
-                min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
+                // The lower group takes its content height and shrinks (then
+                // scrolls) only when the column runs out of room, so a short
+                // group never leaves dead space and a tall group never
+                // breaches the viewport edge.
+                min_height: px(0.0), flex_grow: 0.0, flex_shrink: 1.0,
                 flex_direction: FlexDirection::Column,
             }
             Children [
-                Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0), flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: { lane } }
+                Node { width: percent(100), min_height: px(0.0), flex_grow: 1.0, flex_shrink: 1.0, flex_direction: FlexDirection::Column, overflow: Overflow::scroll_y(), padding: { lane } }
                 ScrollArea PerformanceDeviceBody Children [
                     @{ cpu_container } -- @{ memory_container } -- @{ disk_container } --
                     @{ network_container } -- @{ gpu_container } -- @{ battery_container } --

@@ -14,7 +14,7 @@ pub(crate) mod hover;
 pub(crate) mod painter;
 
 pub(crate) use geometry::ChartSegment;
-pub(crate) use geometry::{MAX_CHART_POINTS, line_segments};
+pub(crate) use geometry::{MAX_CHART_POINTS, line_segments, line_segments_in};
 pub(crate) use hover::{ChartHoverLabel, ChartPointer};
 pub(crate) use painter::{
     ChartCanvas, ChartContent, ChartPaintState, ChartStyle, chart_canvas_scene,
@@ -95,6 +95,7 @@ pub(crate) fn paint_curve_at_size(
         content: ChartContent::Samples {
             values: samples.to_vec(),
             ceiling,
+            capacity: samples.len(),
         },
         style: ChartStyle {
             line: color,

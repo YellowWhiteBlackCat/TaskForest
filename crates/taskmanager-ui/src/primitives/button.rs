@@ -13,9 +13,9 @@ use std::rc::Rc;
 use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, BoxShadow, ClickEvent, Context, ElementId, Entity, Fill, FocusHandle, InteractiveElement,
-    IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
-    Styled, Window, div, linear_color_stop, linear_gradient, point, px,
+    AbsoluteLength, App, BoxShadow, ClickEvent, Context, ElementId, Entity, Fill, FocusHandle,
+    InteractiveElement, IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString,
+    StatefulInteractiveElement, Styled, Window, div, linear_color_stop, linear_gradient, point, px,
 };
 use taskmanager_theme::Color;
 
@@ -105,7 +105,7 @@ pub struct Button {
     variant: ButtonVariant,
     label: Option<SharedString>,
     icon_id: Option<IconId>,
-    radius: f32,
+    radius: Option<f32>,
     on_activate: OptEventCallback<ButtonEvent>,
 }
 
@@ -118,7 +118,7 @@ impl Button {
             variant: ButtonVariant::Primary,
             label: None,
             icon_id: None,
-            radius: 6.0,
+            radius: None,
             on_activate: None,
         }
     }
@@ -144,10 +144,10 @@ impl Button {
         self
     }
 
-    /// Corner radius override (default 6px).
+    /// Corner radius override in pixels (default is the theme's control radius).
     #[must_use]
     pub fn radius(mut self, radius: f32) -> Self {
-        self.radius = radius;
+        self.radius = Some(radius);
         self
     }
 
@@ -190,6 +190,10 @@ impl RenderOnce for Button {
             .state
             .read_with(cx, |state, _| (state.enabled, state.focus_handle.clone()));
         let palette = self.palette;
+        let radius: AbsoluteLength = self.radius.map_or_else(
+            || crate::theme_binding::rem_length(palette.control_radius).into(),
+            |radius| px(radius).into(),
+        );
 
         // Primary fills paint the Mission Center accent gradient
         // (gradient_from → gradient_to, 90° top-light); hover/active lift or
@@ -242,7 +246,7 @@ impl RenderOnce for Button {
             .gap(crate::theme_binding::definite_length(tokens::SPACE_6))
             .px(crate::theme_binding::definite_length(tokens::SPACE_12))
             .h(px(28.0))
-            .rounded(px(self.radius))
+            .rounded(radius)
             .bg(fill)
             .text_color(crate::theme_binding::hsla(text))
             .text_sm()

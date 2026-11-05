@@ -41,7 +41,7 @@ use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
     ProcessStatusFilter, ShellApp, SortCol,
 };
-use taskmanager_theme::{FontChoice, HighContrast, LightDark, Skin, Theme};
+use taskmanager_theme::{HighContrast, LightDark, ModePreference, Theme};
 use taskmanager_ui_contract::SemanticSnapshot;
 
 mod accessors;
@@ -112,7 +112,7 @@ pub use motion::{ModalAppear, PageNav, WarmupSpin};
 pub use preferences::PresentationPreferences;
 pub use process_menu::ProcessMenuAction;
 pub use service_details::ServiceDetailsSnapshot;
-pub use settings_types::{DetailsSection, DeviceKind, ModeChoice, SettingsChange};
+pub use settings_types::{DetailsSection, DeviceKind, SettingsChange};
 // Session-local process-table column sizing (drag overrides + the open drag
 // session), reduced by `update::columns`.
 pub(crate) use surface::{
@@ -122,8 +122,8 @@ pub(crate) use surface::{
 pub(crate) use update::columns::keyboard_resize_width;
 pub(crate) use update::columns::{ColumnWidthOverrides, ProcessColumnSizing};
 
-use crate::i18n::Language;
 use crate::keys::IcedKey;
+use taskmanager_application::i18n::Language;
 
 const EVENT_POLL: Duration = Duration::from_millis(100);
 /// The iced frontend's message loop.

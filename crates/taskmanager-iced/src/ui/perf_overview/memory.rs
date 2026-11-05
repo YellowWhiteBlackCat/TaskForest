@@ -9,6 +9,7 @@ use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::theme;
+use crate::ui::components::segmented_fill_style;
 use taskmanager_shell::memory::MemSegment;
 use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_shell::memory::SwapBreakdown;
@@ -100,18 +101,21 @@ fn composition_bar(
     let sum: u64 = drawn.iter().map(|(_, bytes)| *bytes).sum();
     let track = crate::theme_binding::color(theme.shade);
     let mut bar = row![].height(Length::Fill).width(Length::Fill);
-    for (color, bytes) in drawn {
+    let count = drawn.len();
+    for (index, (color, bytes)) in drawn.into_iter().enumerate() {
         let portion = (((bytes as f64 / sum.max(1) as f64) * 1000.0).round() as u16).max(1);
+        let starts_track = index == 0;
+        let ends_track = index + 1 == count;
         bar = bar.push(
             container(column![])
                 .width(Length::FillPortion(portion))
                 .height(Length::Fill)
-                .style(move |_| theme::fill_style(color)),
+                .style(move |_| segmented_fill_style(color, 5.0, starts_track, ends_track)),
         );
     }
     container(bar)
         .height(Length::Fixed(10.0))
-        .style(move |_| theme::fill_style(track))
+        .style(move |_| segmented_fill_style(track, 5.0, true, true))
         .into()
 }
 
@@ -201,7 +205,7 @@ fn swap_bar_view(
             container(column![])
                 .width(Length::FillPortion(used_portion))
                 .height(Length::Fill)
-                .style(move |_| theme::fill_style(used_color)),
+                .style(move |_| segmented_fill_style(used_color, 3.0, true, free_portion == 0)),
         );
     }
     if free_portion > 0 {
@@ -210,7 +214,7 @@ fn swap_bar_view(
             container(column![])
                 .width(Length::FillPortion(free_portion))
                 .height(Length::Fill)
-                .style(move |_| theme::fill_style(free_color)),
+                .style(move |_| segmented_fill_style(free_color, 3.0, used_portion == 0, true)),
         );
     }
     column![

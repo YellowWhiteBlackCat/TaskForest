@@ -14,6 +14,7 @@ use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use taskforest_core::core::SmartSelfTestKind;
 use taskforest_core::core::identity::DeviceGeneration;
@@ -53,6 +54,8 @@ pub(super) enum CaptureDataTarget {
     #[default]
     General,
     ApplicationsAggregate,
+    TooltipOverlay,
+    FeedbackOverlay,
     PerformanceHistory,
     ApplicationHistory,
     MemoryInventory,
@@ -105,6 +108,8 @@ impl CaptureState {
 pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
     app.capture.data_target = match target {
         "apps-group-expanded" => CaptureDataTarget::ApplicationsAggregate,
+        "tooltip-overlay" => CaptureDataTarget::TooltipOverlay,
+        "feedback-overlay" => CaptureDataTarget::FeedbackOverlay,
         "history-replay" => CaptureDataTarget::PerformanceHistory,
         "application-history-replay" => CaptureDataTarget::ApplicationHistory,
         "system-hardware" => CaptureDataTarget::MemoryInventory,
@@ -142,6 +147,19 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
 
         _ => CaptureDataTarget::General,
     };
+    if target == "feedback-overlay" {
+        app.shell.application.active_page = AppPage::Applications;
+        app.shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Success,
+            FeedbackLifecycle::UntilReplaced,
+            format!(
+                "Current window saved: /run/media/{}/very-long-workspace/target/capture/runs/{}/capture.png (1180x780)",
+                "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9",
+            ),
+        );
+        return;
+    }
     if matches!(target, "storage-health" | "sensor-center") {
         prepare_health_capture(app, target);
         return;
@@ -314,7 +332,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "apps-search-highlight" {
         app.shell.application.active_page = AppPage::Applications;
         app.shell.query = "zed".into();
-    } else if target == "apps-group-expanded" {
+    } else if target == "apps-group-expanded" || target == "tooltip-overlay" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(root) = seed_shell_process_tree_with_partial_aggregate(&mut app.shell) {
             app.shell.clear_process_selection();
@@ -351,6 +369,15 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         return false;
     }
     true
+}
+
+impl IcedApp {
+    /// Capture-only marker consumed by the one real aggregate tooltip.
+    pub(crate) fn tooltip_capture_marker(&self) -> Option<PathBuf> {
+        (self.capture.data_target == CaptureDataTarget::TooltipOverlay)
+            .then(|| self.capture.marker.clone())
+            .flatten()
+    }
 }
 
 fn apply_capture_user_and_process_targets(app: &mut IcedApp, target: &str) -> bool {

@@ -13,6 +13,8 @@
 //! compile-target guess — and an inventory that has not arrived yet is the
 //! honest waiting state, not zeros.
 
+use crate::glass::{GlassPanelMaterial, card_material};
+use crate::icons::icon_scene;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::lifecycle::Add;
@@ -20,8 +22,8 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    BackgroundColor, BorderRadius, FlexDirection, FlexWrap, Node, Overflow, UiRect, Val, percent,
-    px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection, FlexWrap,
+    JustifyContent, Node, Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use taskforest_core::core::hardware::HardwareInfo;
@@ -30,6 +32,7 @@ use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::SystemProjectionStore;
 use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_ui_contract::IconId;
 
 pub(crate) mod dashboard;
 mod hardware;
@@ -62,7 +65,6 @@ use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::health_score_summary;
 use taskmanager_shell::presentation::smbios_memory_inventory_rows;
-
 /// The KPI tile's flex basis, in rem: the width one tile asks for before the
 /// row wraps the next one beside it.
 const KPI_TILE_FLEX_BASIS_REM: f32 = 12.5;
@@ -310,23 +312,59 @@ pub(crate) fn fact_row_scene(row: &SystemFactRow, palette: &UiPalette) -> impl S
 }
 
 pub(crate) fn kpi_tile_scene(
+    icon: IconId,
     title: String,
     value: String,
     note: String,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
+    let icon_leaf = icon_scene(icon, palette, palette.dim_color);
+    let icon_badge = bsn! {
+        Node {
+            width: rem(palette.control_height_rem),
+            height: rem(palette.control_height_rem),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            flex_shrink: 0.0,
+            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+        }
+        BackgroundColor({ palette.nav_bg })
+        Children [ @{ icon_leaf } ]
+    };
     bsn! {
         Node {
             flex_grow: 1.0,
             flex_basis: rem(KPI_TILE_FLEX_BASIS_REM),
             min_width: rem(KPI_TILE_MIN_WIDTH_REM),
-            flex_direction: FlexDirection::Column,
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_12())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
         Children [
+             @{ grain } --
+             @{ icon_badge } --
+             Node {
+                 flex_direction: FlexDirection::Column,
+                 row_gap: Val::Px(space_2()),
+                 flex_grow: 1.0,
+                 min_width: px(0.0),
+             }
+             Children [
              Text(title) TextRole(Role::Caption) --
 
                 Node {
@@ -341,6 +379,7 @@ pub(crate) fn kpi_tile_scene(
                     overflow: Overflow::clip_x(),
                 }
                 Children [  Text(note) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
+             ]
 
         ]
     }
@@ -358,6 +397,14 @@ pub(crate) fn section_card_scene(
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let basis = width.map_or(Val::Auto, px);
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
         Node {
             flex_grow: 1.0,
@@ -367,11 +414,15 @@ pub(crate) fn section_card_scene(
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::all(Val::Px(space_12())),
-            border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
+            border: UiRect::all(Val::Rem(edge_width_rem)),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
-        BackgroundColor({ palette.panel_fill })
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
         SystemFactCard
         Children [
+             @{ grain } --
              Text(title) TextRole(Role::Body) --
             { rows }
         ]

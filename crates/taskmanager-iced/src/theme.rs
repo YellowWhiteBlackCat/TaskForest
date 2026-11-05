@@ -14,13 +14,11 @@
 //! hardcoding a terminal/desktop literal.
 
 use crate::theme_binding::color;
-use iced::widget::{button, container, scrollable};
+use iced::widget::{button, container, progress_bar, scrollable};
 use taskmanager_theme::color::mix;
+use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{Color, Theme, tokens};
-use zhuge_ui_kit_iced::surface::{SurfaceGeometry, rgba, surface_style};
-use zhuge_ui_tokens::surface::SurfaceColors;
-
+use taskmanager_theme::{Color, GlassTier, Length, Theme, tokens};
 /// The iced theme for one neutral theme snapshot: `Theme::custom` with the
 /// skin's backdrop/text/accent/status tokens. Widget default styles then
 /// inherit the skin's semantic colors; explicit styles read the same tokens
@@ -41,47 +39,128 @@ pub fn iced_theme(theme: &Theme) -> iced::Theme {
     )
 }
 
-/// Panel surface style (dialog/tooltip/card family): the skin's elevated
-/// surface fill with the skin's border and corner radius.
+/// Project the theme's glass sheen into Iced's native gradient fill.
 #[must_use]
-pub fn panel_style(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    surface_style(
-        SurfaceColors {
-            background: rgba(color(palette.surface)),
-            border: rgba(color(palette.border)),
-            foreground: Some(rgba(color(palette.fg))),
-        },
-        SurfaceGeometry {
-            radius: f32::from(palette.panel_radius).into(),
-            border_width: 1.0,
-            shadow: iced::Shadow::default(),
-        },
-    )
+fn glass_fill(theme: &Theme, tier: GlassTier) -> iced::Background {
+    let [top, bottom] = theme.glass_gradient(tier);
+    iced::Background::Gradient(iced::Gradient::Linear(
+        iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
+            .add_stop(0.0, color(top))
+            .add_stop(1.0, color(bottom)),
+    ))
 }
 
-/// The modal-scrim fill: the window backdrop darkened toward black so the
-/// panel reads as the elevated layer above a dimmed page. Token-derived
-/// (ADR-017 — a blend of existing tokens, never a literal).
+fn rem(theme: &Theme, value: f32) -> f32 {
+    value * theme.root_rem_size
+}
+
+pub(crate) fn scaled_radius(theme: &Theme, radius: Length) -> f32 {
+    rem(theme, f32::from(radius) / STANDARD_ROOT_REM_SIZE)
+}
+
+fn glass_border(theme: &Theme, tier: GlassTier) -> iced::Border {
+    let palette = theme.palette();
+    iced::Border {
+        color: color(theme.glass_layer(tier).edge),
+        width: rem(theme, tier.edge_width_rem()),
+        radius: rem(
+            theme,
+            f32::from(palette.panel_radius) / STANDARD_ROOT_REM_SIZE,
+        )
+        .into(),
+    }
+}
+
+fn glass_shadow_opacity(tier: GlassTier) -> f32 {
+    match tier {
+        GlassTier::Sidebar => 0.45,
+        GlassTier::Card => 0.7,
+        GlassTier::Modal => 1.0,
+        GlassTier::Scrim => 0.0,
+    }
+}
+
+fn glass_shadow_with(
+    theme: &Theme,
+    tier: GlassTier,
+    (offset, blur_radius): (f32, f32),
+    opacity_scale: f32,
+) -> iced::Shadow {
+    let shadow = theme.glass_layer(tier).shadow;
+    let opacity = glass_shadow_opacity(tier) * opacity_scale;
+    iced::Shadow {
+        color: color(shadow.with_alpha(shadow.a * opacity)),
+        offset: iced::Vector::new(0.0, rem(theme, offset)),
+        blur_radius: rem(theme, blur_radius),
+    }
+}
+
+/// Collapse the theme's ambient and contact shadow layers into the one shadow
+/// quad Iced can paint. Alpha-weighted geometry preserves both token
+/// dimensions without claiming a second layer the toolkit cannot draw.
+fn glass_shadow(theme: &Theme, tier: GlassTier) -> iced::Shadow {
+    let ambient = glass_shadow_with(theme, tier, tier.ambient_shadow_rem(), 0.6);
+    let contact = glass_shadow_with(theme, tier, tier.contact_shadow_rem(), 1.0);
+    let ambient_alpha = ambient.color.a;
+    let contact_alpha = contact.color.a;
+    let total_alpha = ambient_alpha + contact_alpha;
+    if total_alpha <= f32::EPSILON {
+        return iced::Shadow {
+            color: iced::Color::TRANSPARENT,
+            ..iced::Shadow::default()
+        };
+    }
+    let combine = |ambient_value: f32, contact_value: f32| {
+        (ambient_value * ambient_alpha + contact_value * contact_alpha) / total_alpha
+    };
+    iced::Shadow {
+        color: iced::Color {
+            a: 1.0 - (1.0 - ambient_alpha) * (1.0 - contact_alpha),
+            ..ambient.color
+        },
+        offset: iced::Vector::new(0.0, combine(ambient.offset.y, contact.offset.y)),
+        blur_radius: combine(ambient.blur_radius, contact.blur_radius),
+    }
+}
+
+/// Panel surface style (dialog/tooltip/card family): the theme's card glass
+/// fill, specular edge, radius, and two-layer shadow. This is the shared
+/// floating-surface contract, not an opaque fallback.
+#[must_use]
+pub fn panel_style(theme: &Theme) -> container::Style {
+    card_glass_style(theme)
+}
+
+/// Persistent navigation chrome: the sidebar glass layer with its own edge
+/// and quieter depth. The toolbar inside the band uses ordinary control
+/// surfaces, so the chrome remains one material layer.
+#[must_use]
+pub fn chrome_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    container::Style {
+        background: Some(glass_fill(theme, GlassTier::Sidebar)),
+        border: glass_border(theme, GlassTier::Sidebar),
+        shadow: glass_shadow(theme, GlassTier::Sidebar),
+        text_color: Some(color(palette.fg)),
+        ..container::Style::default()
+    }
+}
+
+/// The modal-scrim fill: the theme's own depth-wash tier so the panel reads
+/// as the elevated layer above a dimmed page.
 #[must_use]
 pub fn scrim_style(theme: &Theme) -> container::Style {
     scrim_style_with(theme, 1.0)
 }
 
-/// [`scrim_style`] with the modal-entrance progress (0..1): the darkening
-/// blends from transparent to its full token value as the modal appears.
+/// [`scrim_style`] with the modal-entrance progress (0..1): the depth wash
+/// fades from transparent to its full tier alpha as the modal appears.
 #[must_use]
 pub fn scrim_style_with(theme: &Theme, appear: f32) -> container::Style {
     let appear = appear.clamp(0.0, 1.0);
+    let scrim = theme.glass_scrim().fill;
     container::Style {
-        background: Some(
-            color(mix(
-                theme.palette().window_backdrop,
-                Color::BLACK,
-                0.45 * appear,
-            ))
-            .into(),
-        ),
+        background: Some(color(scrim.with_alpha(scrim.a * appear)).into()),
         ..container::Style::default()
     }
 }
@@ -94,28 +173,37 @@ pub fn scrim_style_with(theme: &Theme, appear: f32) -> container::Style {
 /// contract); the color derives from the neutral black token.
 #[must_use]
 pub fn elevated_style(theme: &Theme) -> container::Style {
-    elevated_style_with(theme, 1.0)
+    elevated_glass_style(theme)
 }
 
 /// [`elevated_style`] with the modal-entrance progress (0..1): the panel
 /// background fades in and the shadow softens until fully visible.
 #[must_use]
 pub fn elevated_style_with(theme: &Theme, appear: f32) -> container::Style {
+    // GLASS-01: entrance scales the modal's shadow rather than switching to an
+    // opaque interim fill, so the settled state and the final animation frame
+    // honor the same glass contract.
     let appear = appear.clamp(0.0, 1.0);
-    let mut style = panel_style(theme);
-    style.background = style.background.map(|background| match background {
-        iced::Background::Color(mut color) => {
-            color.a *= appear;
-            iced::Background::Color(color)
-        }
-        other => other,
-    });
-    style.shadow = iced::Shadow {
-        color: color(Color::BLACK.with_alpha(0.30 * appear)),
-        offset: iced::Vector::new(0.0, 6.0),
-        blur_radius: 18.0,
-    };
+    let mut style = elevated_glass_style(theme);
+    style.shadow.color = style.shadow.color.scale_alpha(appear);
     style
+}
+
+/// The Iced modal glass: the neutral modal layer plus the elevated depth.
+/// The toolkit has no per-element backdrop blur, so the window-level
+/// appearance plus the translucent fill provide the platform's best frosted
+/// read; the token keeps one authority across renderers.
+#[must_use]
+pub fn elevated_glass_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let fill = glass_fill(theme, GlassTier::Modal);
+    container::Style {
+        background: Some(fill),
+        border: glass_border(theme, GlassTier::Modal),
+        shadow: glass_shadow(theme, GlassTier::Modal),
+        text_color: Some(color(palette.fg)),
+        ..container::Style::default()
+    }
 }
 
 /// Card surface style: [`panel_style`] plus a subtle shadow — the quiet lift
@@ -124,13 +212,30 @@ pub fn elevated_style_with(theme: &Theme, appear: f32) -> container::Style {
 /// still read as the highest elevation.
 #[must_use]
 pub fn card_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let fill = glass_fill(theme, GlassTier::Card);
     container::Style {
-        shadow: iced::Shadow {
-            color: color(Color::BLACK.with_alpha(0.16)),
-            offset: iced::Vector::new(0.0, 4.0),
-            blur_radius: 12.0,
-        },
-        ..panel_style(theme)
+        background: Some(fill),
+        border: glass_border(theme, GlassTier::Card),
+        shadow: glass_shadow(theme, GlassTier::Card),
+        text_color: Some(color(palette.fg)),
+        snap: true,
+    }
+}
+
+/// The Iced card glass: the neutral card layer plus the product's quiet
+/// depth. Used by floating panels and page cards that sit above a translucent
+/// backdrop; dense table rows stay on opaque row tokens.
+#[must_use]
+pub fn card_glass_style(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    let fill = glass_fill(theme, GlassTier::Card);
+    container::Style {
+        background: Some(fill),
+        border: glass_border(theme, GlassTier::Card),
+        shadow: glass_shadow(theme, GlassTier::Card),
+        text_color: Some(color(palette.fg)),
+        ..container::Style::default()
     }
 }
 
@@ -149,7 +254,7 @@ pub fn inset_panel_style(theme: &Theme) -> container::Style {
         border: iced::Border {
             color: color(palette.border),
             width: 1.0,
-            radius: f32::from(palette.small_radius).into(),
+            radius: scaled_radius(theme, palette.small_radius).into(),
         },
         ..container::Style::default()
     }
@@ -286,7 +391,7 @@ pub fn button_style_status(
         border: iced::Border {
             color: iced::Color::TRANSPARENT,
             width: 0.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: scaled_radius(theme, palette.control_radius).into(),
         },
         ..button::Style::default()
     }
@@ -311,7 +416,7 @@ pub fn ghost_button_style(theme: &Theme, status: button::Status) -> button::Styl
         border: iced::Border {
             color: color(palette.border),
             width: 1.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: scaled_radius(theme, palette.control_radius).into(),
         },
         ..button::Style::default()
     }
@@ -348,7 +453,7 @@ pub fn device_row_button_style(
                 iced::Color::TRANSPARENT
             },
             width: if selected { 1.0 } else { 0.0 },
-            radius: f32::from(palette.control_radius).into(),
+            radius: scaled_radius(theme, palette.control_radius).into(),
         },
         ..button::Style::default()
     }
@@ -374,7 +479,7 @@ pub fn header_button_style(theme: &Theme, status: button::Status, active: bool) 
         border: iced::Border {
             color: iced::Color::TRANSPARENT,
             width: 0.0,
-            radius: f32::from(palette.control_radius).into(),
+            radius: scaled_radius(theme, palette.control_radius).into(),
         },
         ..button::Style::default()
     }
@@ -387,30 +492,22 @@ pub fn muted_text_color(theme: &Theme) -> iced::Color {
     color(theme.palette().fg_muted)
 }
 
-/// The Performance pinned statistics rail: transparent surface with the
-/// left divider separating it from the main viewport (GPUI
-/// `performance_stats_surface` parity — one continuous workspace, not a
-/// floating card).
+/// The Performance statistics rail uses the same card tier in both layouts.
 #[must_use]
-pub fn rail_divider_left(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    container::Style {
-        background: None,
-        text_color: Some(color(palette.fg)),
-        border: iced::Border {
-            color: color(palette.border),
-            width: 1.0,
-            radius: 0.0.into(),
-        },
-        ..container::Style::default()
-    }
+pub fn stats_rail_style(theme: &Theme) -> container::Style {
+    card_glass_style(theme)
 }
 
-/// The Performance stacked statistics rail: the same divider grammar on the
-/// top edge for the below-viewport fallback.
-#[must_use]
-pub fn rail_divider_top(theme: &Theme) -> container::Style {
-    rail_divider_left(theme)
+pub(crate) fn progress_style(theme: &Theme) -> progress_bar::Style {
+    let palette = theme.palette();
+    progress_bar::Style {
+        background: color(palette.border).into(),
+        bar: color(palette.accent).into(),
+        border: iced::Border {
+            radius: scaled_radius(theme, palette.control_radius).into(),
+            ..iced::Border::default()
+        },
+    }
 }
 
 /// Status tint for health/state text: the skin's semantic status token for

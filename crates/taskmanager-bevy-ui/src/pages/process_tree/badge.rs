@@ -54,6 +54,20 @@ pub(super) fn aggregate_badge_scene(label: String, palette: &UiPalette) -> Box<d
     })
 }
 
+/// The runtime chip of a container group header.
+pub(super) fn container_badge_scene(label: String, palette: &UiPalette) -> Box<dyn Scene> {
+    let chip = chip_scene(label.clone(), palette.selection_bg, palette);
+    Box::new(bsn! {
+        Node {
+            flex_shrink: 0.0,
+            align_items: AlignItems::Center,
+        }
+        TreeAggregateBadge({ label })
+        Pickable::IGNORE
+        Children [@{ chip }]
+    })
+}
+
 /// The zombie marker chip of a defunct process row.
 pub(super) fn zombie_badge_scene(palette: &UiPalette) -> Box<dyn Scene> {
     let muted = palette.scrim.with_alpha(ZOMBIE_BADGE_ALPHA);

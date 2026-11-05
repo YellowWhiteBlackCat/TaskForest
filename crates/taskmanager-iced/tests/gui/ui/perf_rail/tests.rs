@@ -16,8 +16,10 @@ use taskforest_core::core::sensors::{
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::record_demo_history_frame;
+use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::presentation::trend::cpu_usage_percent;
 use taskmanager_shell::presentation::trend::memory_usage_percent;
+use taskmanager_shell::presentation::trend::window;
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_test_support::DiskMetricsFixtureBuilder;
 use taskmanager_test_support::NetworkMetricsFixtureBuilder;
@@ -325,6 +327,10 @@ fn battery_and_fan_captions_read_capacity_rpm_and_badges() {
 fn rail_rows_project_every_visible_device_from_its_own_window() {
     pin_english();
     let mut shell = demo_app();
+    // The demo seed now warms the bounded authority with its own history
+    // depth; measure it instead of pinning a frame count so the assertion
+    // tracks "seed depth + three added frames on one authority".
+    let seeded_gpu_len = window(&shell.history, TrendSeries::GpuUsagePercent).len();
     let snapshot = shell
         .projection()
         .snapshot
@@ -379,7 +385,7 @@ fn rail_rows_project_every_visible_device_from_its_own_window() {
     }
     assert_eq!(
         &*rows[4].samples,
-        &[18.0, 18.0, 18.0, 18.0],
+        &vec![18.0; seeded_gpu_len + 3],
         "the demo seed and three added frames share one bounded authority"
     );
     assert_eq!(rows[0].max, 100.0);

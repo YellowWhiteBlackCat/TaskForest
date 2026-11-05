@@ -241,7 +241,7 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
     }
     root = root.child(body);
     if let Some((pos, text)) = graph_hover(&props.hover_slot) {
-        root = root.child(elements::tooltip_overlay(props.theme, &text, pos));
+        root = root.child(elements::graph_tooltip_overlay(props.theme, &text, pos));
     }
     root
 }

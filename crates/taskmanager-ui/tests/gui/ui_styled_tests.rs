@@ -1,4 +1,5 @@
 use super::{active_fill, blend, disabled_fg, hover_fill, scrim};
+use crate::primitives::card_surface::CardSurface;
 use taskmanager_theme::Palette;
 use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{Color, Theme};
@@ -48,12 +49,24 @@ fn disabled_fg_is_muted_relative_to_fg() {
 }
 
 #[test]
-fn scrim_is_derived_from_surface() {
+fn scrim_is_derived_from_the_glass_depth_token() {
     let p = palette();
     let s = scrim(&p, 0.5);
-    assert_eq!(s.r, p.surface.r);
+    let depth = p.theme.glass_scrim().fill;
+    assert_eq!((s.r, s.g, s.b), (depth.r, depth.g, depth.b));
     assert!((s.a - 0.5).abs() < 1e-4);
     // Alpha clamps.
     assert_eq!(scrim(&p, 2.0).a, 1.0);
     assert_eq!(scrim(&p, -1.0).a, 0.0);
+}
+
+#[test]
+fn explicit_card_fill_is_opaque_and_default_card_fill_is_glass() {
+    let p = palette();
+    let glass = CardSurface::new(p);
+    assert_eq!(glass.fill(&p), p.theme.glass_card().fill);
+
+    let custom = CardSurface::new(p).background(p.surface);
+    assert_eq!(custom.fill(&p), p.surface);
+    assert_eq!(custom.fill(&p).a, 1.0);
 }

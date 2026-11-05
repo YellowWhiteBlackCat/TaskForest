@@ -15,11 +15,13 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Alignment, Border, Element, Length};
+use std::path::PathBuf;
 use taskmanager_theme::color::on_accent;
 use taskmanager_theme::{Color, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 
 use super::IcedElement;
+use super::{Tooltip, TooltipTrigger};
 use crate::theme;
 use zhuge_ui_kit_iced::surface::{self, BadgeGeometry};
 
@@ -137,8 +139,8 @@ pub(crate) fn progress<'a>(
     let track_fill = crate::theme_binding::color(palette.border);
     let stripe_fill = crate::theme_binding::color(palette.fg_muted);
     let value_fill = crate::theme_binding::color(tone.fill(theme));
-    let radius = f32::from(palette.xsmall_radius);
     let bar_height = f32::from(tokens::SPACE_6);
+    let radius = bar_height / 2.0;
 
     let bar: IcedElement<'a> = match progress_fill(value) {
         ProgressFill::Determinate(ratio) => {
@@ -198,10 +200,7 @@ pub(crate) fn tooltip<'a>(
         .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
         .style(move |_| theme::panel_style(surface))
         .into();
-    iced::widget::tooltip(content, hint, iced::widget::tooltip::Position::FollowCursor)
-        .snap_within_viewport(true)
-        .gap(f32::from(tokens::SPACE_4))
-        .into()
+    Tooltip::new(content, hint, TooltipTrigger::Hover).into()
 }
 
 /// Owned variant for row projections whose detail string is created during
@@ -212,6 +211,26 @@ pub(crate) fn tooltip_owned(
     theme: Theme,
     content: IcedElement<'static>,
     tip: String,
+) -> IcedElement<'static> {
+    tooltip_owned_with_capture(theme, content, tip, None)
+}
+
+/// Capture-only form of [`tooltip_owned`]: the same production tooltip
+/// component stays open and publishes its mounted surface after layout.
+pub(crate) fn tooltip_owned_for_capture(
+    theme: Theme,
+    content: IcedElement<'static>,
+    tip: String,
+    marker: PathBuf,
+) -> IcedElement<'static> {
+    tooltip_owned_with_capture(theme, content, tip, Some(marker))
+}
+
+fn tooltip_owned_with_capture(
+    theme: Theme,
+    content: IcedElement<'static>,
+    tip: String,
+    marker: Option<PathBuf>,
 ) -> IcedElement<'static> {
     let tip_fg = crate::theme_binding::color(theme.palette().fg);
     let surface = theme;
@@ -225,10 +244,13 @@ pub(crate) fn tooltip_owned(
     .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
     .style(move |_| theme::panel_style(&surface))
     .into();
-    iced::widget::tooltip(content, hint, iced::widget::tooltip::Position::FollowCursor)
-        .snap_within_viewport(true)
-        .gap(f32::from(tokens::SPACE_4))
-        .into()
+    if let Some(marker) = marker {
+        Tooltip::new(content, hint, TooltipTrigger::Hover)
+            .open_for_capture(marker)
+            .into()
+    } else {
+        Tooltip::new(content, hint, TooltipTrigger::Hover).into()
+    }
 }
 
 /// The four-state grammar every centered state surface speaks, aligned with
@@ -326,6 +348,26 @@ fn container_style(fill: iced::Color, radius: iced::border::Radius) -> container
         },
         ..container::Style::default()
     }
+}
+
+/// Round only the outer ends of a filled segment in a connected track.
+pub(crate) fn segmented_fill_style(
+    fill: iced::Color,
+    radius: f32,
+    starts_track: bool,
+    ends_track: bool,
+) -> container::Style {
+    let start = if starts_track { radius } else { 0.0 };
+    let end = if ends_track { radius } else { 0.0 };
+    container_style(
+        fill,
+        iced::border::Radius {
+            top_left: start,
+            top_right: end,
+            bottom_right: end,
+            bottom_left: start,
+        },
+    )
 }
 
 /// [`container_style`] plus a 1px border in `border_color`.

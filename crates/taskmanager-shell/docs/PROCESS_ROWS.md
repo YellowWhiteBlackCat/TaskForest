@@ -6,6 +6,11 @@
 - `ProcessTreeRow` is the sole cacheable category/tree structure: shell owns
   row order, depth, parentage, expansion, identity, and availability-bearing
   group aggregates; frontends only adapt it to their renderer.
+- `ProcessTreeRow::Container` is a structural, observed Linux container bucket
+  emitted before category rows. `container_expansion_key` owns the
+  locale-neutral expansion token; member process rows use depth 1 and carry no
+  container-parent process identity. Container aggregates expose only observed
+  CPU and resident memory—other metrics remain explicitly unavailable.
 - `ProcessControlAvailability` is the sole action-surface projection for
   process-control target scope, exact live count, identity readiness and
   explicit capability failure. `process_control_intent` freezes the matching

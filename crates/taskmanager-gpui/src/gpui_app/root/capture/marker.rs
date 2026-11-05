@@ -20,6 +20,19 @@ pub(super) fn emit_theme_marker(scenario: Option<CaptureScenario>, theme: &Theme
     );
 }
 
+/// Emit the resolved presentation facts of the frame that is being captured.
+///
+/// The text carries the shared contract's own field set, so a validator can
+/// re-derive every value and prove the capture painted the resolution the
+/// contract mandates (ADR-064).
+pub(crate) fn emit_resolution_marker(scenario: Option<CaptureScenario>, resolution: &str) {
+    tracing::info!(
+        target: "taskmanager::capture",
+        "CAPTURE_MARKER event=presentation_ready scenario={} {resolution}",
+        scenario.map(CaptureScenario::token).unwrap_or("standard")
+    );
+}
+
 const fn theme_token(skin: Skin, mode: LightDark) -> &'static str {
     match (skin, mode) {
         (Skin::Gnome, LightDark::Light) => "gnome-light",

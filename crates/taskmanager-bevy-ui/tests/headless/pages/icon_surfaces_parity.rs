@@ -483,11 +483,11 @@ fn the_alarm_wash_is_a_raised_theme_surface_not_a_hand_picked_color() {
     let palette = palette();
     let wash = alarm_wash(&palette);
     let srgba = wash.to_srgba();
-    assert_eq!(
-        srgba.alpha, 1.0,
-        "the wash is composed over the card's fill, so the row is a raised surface"
-    );
     let card = palette.panel_fill.to_srgba();
+    assert_eq!(
+        srgba.alpha, card.alpha,
+        "the wash inherits the glass card's translucency instead of adding another veil"
+    );
     assert_ne!(
         (srgba.red, srgba.green, srgba.blue),
         (card.red, card.green, card.blue),

@@ -84,6 +84,7 @@ pub(crate) fn section(shell: &ShellApp, palette: &UiPalette) -> Option<Box<dyn S
     let content = ChartContent::Samples {
         values: samples,
         ceiling,
+        capacity: shell.history.capacity(),
     };
     let style = ChartStyle {
         line: palette.warning_color,
@@ -204,6 +205,7 @@ pub(crate) fn paint_npu_power(
         canvas.content = ChartContent::Samples {
             values: samples.clone(),
             ceiling,
+            capacity: track.shell().history.capacity(),
         };
     }
     for mut node in &mut sections {

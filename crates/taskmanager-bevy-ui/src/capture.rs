@@ -35,6 +35,9 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "perf-battery" => Some("perf-battery"),
         "process-force-kill" => Some("process-force-kill"),
         "process-selection" => Some("process-selection"),
+        "process-context-menu" => Some("process-context-menu"),
+        "feedback-overlay" => Some("feedback-overlay"),
+        "tooltip-overlay" => Some("tooltip-overlay"),
         "process-tree-confirm" => Some("process-tree-confirm"),
         "process-batch-confirm" => Some("process-batch-confirm"),
         "users-session-confirmation" => Some("users-session-confirmation"),
@@ -51,6 +54,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "services-search-highlight" => Some("services-search-highlight"),
         "apps-search-highlight" => Some("apps-search-highlight"),
         "apps-group-expanded" => Some("apps-group-expanded"),
+        "apps-container-group" | "apps-container-group-compact" => Some("apps-container-group"),
         "telemetry-paused" => Some("telemetry-paused"),
         "sidebar-hidden" => Some("sidebar-hidden"),
         "about" => Some("about"),
@@ -153,6 +157,8 @@ pub(crate) fn capture_page() -> Option<Page> {
         "storage-health" | "sensor-center" => Some(Page::System),
         "applications"
         | "process-selection"
+        | "process-context-menu"
+        | "feedback-overlay"
         | "processes"
         | "process-force-kill"
         | "process-tree-confirm"
@@ -165,6 +171,8 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "process-isolation"
         | "apps-search-highlight"
         | "apps-group-expanded"
+        | "apps-container-group"
+        | "apps-container-group-compact"
         | "apps-identity-matrix"
         | "apps-zero-gray"
         | "saved-view-presets"

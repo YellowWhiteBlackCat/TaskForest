@@ -42,23 +42,6 @@ pub(crate) fn resolve_os_color_scheme(mode: iced::theme::Mode) -> OsColorScheme 
     }
 }
 
-/// Resolve the persisted color-mode token against one observation: explicit
-/// choices win absolutely; `System` follows the observation and falls back to
-/// Dark before the first platform event arrives (the pre-provider default
-/// this frontend has always shipped).
-#[must_use]
-pub(crate) fn resolve_color_mode_with(
-    mode: ModeChoice,
-    observed: Option<OsColorScheme>,
-) -> LightDark {
-    match mode {
-        ModeChoice::Light => LightDark::Light,
-        ModeChoice::Dark => LightDark::Dark,
-        ModeChoice::EyeForest => LightDark::EyeForest,
-        ModeChoice::System => observed.map_or(LightDark::Dark, OsColorScheme::light_dark),
-    }
-}
-
 impl IcedApp {
     /// Apply one observed OS color scheme (the subscription event or the boot
     /// query). The observation is always stored; the theme rebuild happens
@@ -73,7 +56,9 @@ impl IcedApp {
         }
         self.configuration.set_observed_color_scheme(Some(scheme));
         let config = self.config_draft();
-        if ModeChoice::from_token(config.mode.as_str()) != ModeChoice::System {
+        // Only a follow-native preference may rebuild: an explicit
+        // Light/Dark/EyeForest choice is never displaced (GPUI parity).
+        if !ModePreference::from_config_token(&config.mode).follows_native() {
             return;
         }
         // Re-commit the UNCHANGED draft: the coordinator reports `NoChange`

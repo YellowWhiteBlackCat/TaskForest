@@ -156,6 +156,7 @@ fn choice_widgets(entries: Vec<ChoiceEntry>, palette: &UiPalette) -> Vec<Box<dyn
                 SettingsField::PauseTelemetry
                     | SettingsField::HistoryPersistence(_)
                     | SettingsField::GrayZeroValues(_)
+                    | SettingsField::HighContrast(_)
             );
             match (boolean, selected) {
                 (true, true) => Box::new(checked_switch_shape(switch_key(&field), field, palette))

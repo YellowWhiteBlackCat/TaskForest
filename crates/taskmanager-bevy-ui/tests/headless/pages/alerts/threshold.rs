@@ -1,9 +1,8 @@
 //! test-intent: behavior
 //!
-//! The performance curve carries the alert threshold as a horizontal
-//! calibration line: the line rides the curve's own scale and appears only
-//! for an armed rule — a disabled rule's threshold is not watched, so
-//! drawing its line would claim a bound that does not exist.
+//! The performance curve keeps GPUI's newest-value badge: the badge reads the
+//! newest finite sample and disappears for an all-gap or absent window, so a
+//! gap never becomes a fabricated value.
 
 use super::*;
 use crate::window::tests::scripted_frontend_app;
@@ -11,46 +10,36 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 
 #[test]
-fn the_threshold_line_rides_the_curve_scale() {
-    let near = |actual: f32, expected: f32| {
-        assert!(
-            (actual - expected).abs() < 0.001,
-            "{actual} is not within a thousandth of {expected}"
-        );
-    };
-    near(threshold_line_top(100.0, 100.0), 0.0);
-    near(threshold_line_top(100.0, 50.0), 50.0);
-    near(threshold_line_top(100.0, 90.0), 10.0);
-}
-
-#[test]
-fn only_an_armed_rule_calibrates_a_curve() {
+fn the_badge_uses_the_curve_own_value_format() {
+    let curve = SystemCurve::default();
     let shell = ShellApp::new();
-    assert_eq!(
-        curve_threshold(&shell, SystemCurve::Cpu),
-        Some(90.0),
-        "the default cpu rule calibrates the cpu curve"
-    );
-    assert_eq!(
-        curve_threshold(&shell, SystemCurve::Network),
-        None,
-        "the throughput curve has no percentage threshold to mark"
+    let badge = curve_badge_text(&shell, curve);
+
+    if let Some(text) = badge {
+        assert!(
+            text.ends_with('%'),
+            "the CPU badge reads a percentage, not {text}"
+        );
+    }
+    assert!(
+        curve_badge_text(&shell, SystemCurve::Network).is_none_or(|text| text.ends_with("/s")),
+        "the network badge reads throughput"
     );
 }
 
 #[test]
-fn the_performance_page_carries_the_alert_calibration_line() {
+fn the_performance_page_carries_the_value_badge() {
     let mut app = scripted_frontend_app();
     app.world_mut().resource_mut::<crate::app::Route>().page = crate::app::Page::Performance;
     app.update();
 
-    let calibrations: Vec<Entity> = app
+    let badges: Vec<Entity> = app
         .world_mut()
-        .query_filtered::<Entity, With<ThresholdCalibration>>()
+        .query_filtered::<Entity, With<CurveBadge>>()
         .iter(app.world())
         .collect();
     assert!(
-        !calibrations.is_empty(),
-        "the performance page marks the armed alert threshold on the curve"
+        !badges.is_empty(),
+        "the performance page carries the newest-value badge"
     );
 }

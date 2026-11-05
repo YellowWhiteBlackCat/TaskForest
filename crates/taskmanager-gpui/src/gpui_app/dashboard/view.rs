@@ -24,9 +24,7 @@ use crate::gpui_app::elements;
 use crate::gpui_app::graph::{
     GraphCacheHandle, GraphHover, GraphHoverElement, GraphOpts, graph_element_hover,
 };
-use crate::gpui_app::root::responsive::{
-    DashboardBudget, SystemPageBudget, SystemSurfacePresentation,
-};
+use crate::gpui_app::root::responsive::DashboardBudget;
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
 use crate::gpui_app::timeline::GraphTimelineSeries;
@@ -34,8 +32,10 @@ use taskforest_core::core::AlertEvent;
 use taskmanager_application::i18n;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{Color, GlassTier, Theme};
 use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui_contract::presentation::budget::SystemPageBudget;
+use taskmanager_ui_contract::presentation::vocabulary::SystemSurfacePresentation;
 
 mod history_grid;
 use history_grid::render_history_grid;
@@ -241,7 +241,7 @@ fn summary_card(
     entity: Entity<RootView>,
 ) -> Stateful<Div> {
     CardSurface::new(theme.palette())
-        .background(theme.sidebar_card_bg)
+        .glass(GlassTier::Card)
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(true)
@@ -283,7 +283,6 @@ fn summary_card(
         .hover(|style| style.bg(fill(theme.accent.with_alpha(0.08))))
         .flex_1()
         .min_w(px(132.0))
-        .shadow(elements::card_shadow(theme))
         .on_click(move |_event, _window, cx| {
             entity.update(cx, |view, cx| {
                 destination.apply(view);

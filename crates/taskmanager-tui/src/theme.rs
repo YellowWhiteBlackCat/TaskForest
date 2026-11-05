@@ -13,7 +13,9 @@
 
 use taskforest_core::core::appearance::DesktopAppearance;
 use taskmanager_theme::color::mix;
-use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::{
+    AppearanceOverride, Color, HighContrast, LightDark, ModePreference, ResolvedFonts, Skin, Theme,
+};
 
 use crate::TuiApp;
 use crate::TuiTerminalProfile;
@@ -61,20 +63,16 @@ impl ThemeParams {
         hc: bool,
         appearance: Option<DesktopAppearance>,
     ) -> Self {
-        let skin = Skin::ALL
-            .into_iter()
-            .find(|candidate| candidate.label().eq_ignore_ascii_case(skin))
-            .unwrap_or(Skin::Gnome);
-        let mode = match mode {
-            "System" | "" => match appearance.map(|app| app.color_scheme) {
-                Some(PreferredColorScheme::Light) => LightDark::Light,
-                _ => LightDark::Dark,
-            },
-            "Light" => LightDark::Light,
-            "Dark" => LightDark::Dark,
-            "EyeForest" => LightDark::EyeForest,
-            _ => LightDark::Dark,
+        // The axis codec is the theme owner's (ADR-063): the terminal spells no
+        // token of its own, so a preference written by any product reads back as
+        // the same skin and the same mode here.
+        let skin = Skin::from_config_token(skin).unwrap_or(Skin::Gnome);
+        let observed = match appearance.map(|app| app.color_scheme) {
+            Some(PreferredColorScheme::Light) => Some(LightDark::Light),
+            Some(PreferredColorScheme::Dark) => Some(LightDark::Dark),
+            Some(PreferredColorScheme::Unknown) | None => None,
         };
+        let mode = ModePreference::from_config_token(mode).resolve(observed);
         let hc = hc
             || appearance
                 .and_then(|app| app.high_contrast)
@@ -93,55 +91,23 @@ impl ThemeParams {
     }
 }
 
-/// Parse the shared testing/developer appearance override GPUI owns
-/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
-/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
-/// `None` for an unset or syntactically invalid value, so an invalid request
-/// never forces a wrong skin. This is the SAME vocabulary (and env name) GPUI's
-/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
-/// vocabulary would let the capture harness and the frontends drift.
-#[must_use]
-pub(crate) fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
-    let (skin_token, mode_token) = value.split_once('-')?;
-    let skin = match skin_token.to_ascii_lowercase().as_str() {
-        "gnome" => Skin::Gnome,
-        "kde" => Skin::Kde,
-        "win" | "windows" => Skin::Windows,
-        "mac" | "macos" => Skin::Macos,
-        _ => return None,
-    };
-    let mode = match mode_token.to_ascii_lowercase().as_str() {
-        "dark" => LightDark::Dark,
-        "light" => LightDark::Light,
-        "eyeforest" | "eye-forest" => LightDark::EyeForest,
-        _ => return None,
-    };
-    Some((skin, mode))
-}
-
-/// Resolve the demo/capture theme parameters from the shared `TM_SKIN`
-/// override plus the optional `TM_SKIN_HC` contrast flag. The override is a
-/// FALLBACK: an explicit configuration/preference (the production
-/// `from_config_tokens_with_appearance` path) is never displaced because it
-/// does not consult the environment. `None` when the variable is unset or
-/// invalid, which keeps the demo default exactly as it is today.
-#[must_use]
-pub(crate) fn forced_theme_params(value: Option<&str>, high_contrast: bool) -> Option<ThemeParams> {
-    let (skin, mode) = parse_tm_skin(value?)?;
-    Some(ThemeParams {
-        skin,
-        mode,
-        hc: high_contrast,
-    })
+/// Project the theme owner's forced appearance onto the terminal's own
+/// parameters. The override is a FALLBACK: an explicit configuration/preference
+/// (the production [`ThemeParams::from_config_tokens_with_appearance`] path) is
+/// never displaced because it does not consult the environment.
+impl From<AppearanceOverride> for ThemeParams {
+    fn from(forced: AppearanceOverride) -> Self {
+        let (skin, mode, hc) = forced.axes();
+        Self { skin, mode, hc }
+    }
 }
 
 /// Read the shared `TM_SKIN`/`TM_SKIN_HC` override from the process
-/// environment for the demo/capture boot.
+/// environment for the demo/capture boot. `None` when the variable is unset or
+/// invalid, which keeps the demo default exactly as it is today.
 #[must_use]
 pub(crate) fn forced_theme_params_from_env() -> Option<ThemeParams> {
-    let value = std::env::var("TM_SKIN").ok();
-    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
-    forced_theme_params(value.as_deref(), high_contrast)
+    AppearanceOverride::from_env().map(ThemeParams::from)
 }
 
 /// The TUI's resolved terminal palette, derived once per app construction
@@ -277,7 +243,7 @@ impl TuiApp {
     pub fn apply_desktop_appearance(&mut self, appearance: DesktopAppearance) {
         self.observed_appearance = Some(appearance);
         let config = self.config_draft.clone();
-        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+        if ModePreference::from_config_token(&config.mode).follows_native() {
             self.theme_params = ThemeParams::from_config_tokens_with_appearance(
                 &config.skin,
                 &config.mode,

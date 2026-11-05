@@ -29,14 +29,16 @@ use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::{
     ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
 };
+use taskmanager_application::PendingConfirmation;
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens::UiSize;
 
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
+use taskmanager_shell::{ProcessStatusFilter, ShellApp};
 use taskmanager_theme::Theme;
 
 use super::details::ProcessDetailsRoot;
+use super::toolbar::{ProcessEndTaskButton, ProcessFilterButton, ProcessKillTaskButton};
 use super::{
     ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
     ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, centered_scroll_top, content,
@@ -570,7 +572,10 @@ fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
         "the identity change publishes exactly one refresh signal"
     );
 
-    // The selected wrapper wears the palette's selected fill; the others none.
+    // The selected wrapper wears the theme's selection tint; an odd unselected
+    // wrapper wears the zebra stripe; an even one stays open so the page
+    // canvas reads through the table. A solid fill on every row would flatten
+    // the whole table into one panel and erase the stripe.
     let palette = ui_palette(&Theme::dark(), UiSize::Standard);
     let fills = app
         .world_mut()
@@ -580,7 +585,9 @@ fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
         .collect::<Vec<_>>();
     for (index, fill) in fills {
         let expected = if index == 1 {
-            palette.nav_active_bg
+            palette.selection_bg
+        } else if index % 2 == 1 {
+            palette.zebra_bg
         } else {
             bevy::color::Color::NONE
         };
@@ -886,7 +893,6 @@ fn wheel_scrolls_map_to_signed_rows_by_unit() {
 use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
-use taskmanager_application::PendingConfirmation;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
 use taskmanager_ui_contract::IconId;
@@ -1123,5 +1129,73 @@ fn process_properties_modal_opens_and_dismisses_via_button_and_escape() {
             .shell
             .process_properties_target()
             .is_none()
+    );
+}
+
+#[test]
+fn toolbar_status_filters_and_end_task_buttons_mount_and_activate() {
+    let mut shell = ShellApp::new();
+    let p1 = test_proc(1, "alpha");
+    let p2 = test_proc(2, "beta");
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![p1, p2]);
+    });
+    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
+    assert!(shell.select_row(0));
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let mut app = headless_page_app(palette, shell);
+
+    let filter_count = app
+        .world_mut()
+        .query::<&ProcessFilterButton>()
+        .iter(app.world())
+        .count();
+    assert_eq!(filter_count, 6, "six status filter pills mounted");
+
+    let running_pill = app
+        .world_mut()
+        .query::<(Entity, &ProcessFilterButton)>()
+        .iter(app.world())
+        .find(|(_, b)| b.0 == ProcessStatusFilter::Running)
+        .map(|(e, _)| e)
+        .expect("running filter pill entity");
+
+    app.world_mut().trigger(bevy::ui_widgets::Activate {
+        entity: running_pill,
+    });
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .process_status_filter,
+        ProcessStatusFilter::Running,
+        "clicking filter pill sets shell process_status_filter"
+    );
+
+    let end_btn = app
+        .world_mut()
+        .query_filtered::<Entity, With<ProcessEndTaskButton>>()
+        .iter(app.world())
+        .next()
+        .expect("end task button entity");
+
+    let _kill_btn = app
+        .world_mut()
+        .query_filtered::<Entity, With<ProcessKillTaskButton>>()
+        .iter(app.world())
+        .next()
+        .expect("kill task button entity");
+
+    app.world_mut()
+        .trigger(bevy::ui_widgets::Activate { entity: end_btn });
+    assert!(
+        matches!(
+            app.world()
+                .non_send::<FrontendTrack>()
+                .shell
+                .pending_confirmation(),
+            Some(PendingConfirmation::EndTask(_))
+        ),
+        "clicking end task button arms EndTask confirmation"
     );
 }

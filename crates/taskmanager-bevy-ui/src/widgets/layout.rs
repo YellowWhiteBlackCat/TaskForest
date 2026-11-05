@@ -8,11 +8,44 @@
 /// device-detail layout: icon rail + device pills + one main graph.
 pub(crate) const COMPACT_BREAKPOINT_PX: f32 = 860.0;
 
-/// Wide-layout column widths. The main column owns the remaining width and
-/// is always allowed to shrink to zero before a child is permitted to
-/// overflow.
-pub(crate) const WIDE_DEVICE_SIDEBAR_WIDTH_PX: f32 = 256.0;
-pub(crate) const WIDE_STATS_WIDTH_PX: f32 = 320.0;
+/// Wide-layout statistics rail width. It matches the reference surface's
+/// pinned ceiling, so both frontends agree on the detail column.
+pub(crate) const WIDE_STATS_WIDTH_PX: f32 = 280.0;
+
+/// Device-sidebar budget bounds. The preferred width is NOT a frontend
+/// constant: it is the persisted `taskforest-core` config value (one fact,
+/// one authority), and these bounds only keep the main column and the
+/// statistics rail above their own floors.
+pub(crate) const PERFORMANCE_SIDEBAR_MIN_WIDTH_PX: f32 = 220.0;
+pub(crate) const PERFORMANCE_SIDEBAR_MAX_WIDTH_PX: f32 = 460.0;
+/// Smallest statistics rail that still reads, and the gap between slots.
+pub(crate) const PERFORMANCE_STATS_MIN_WIDTH_PX: f32 = 236.0;
+pub(crate) const PERFORMANCE_SLOT_GAP_PX: f32 = 12.0;
+
+/// Resolve the device-sidebar width from the shared budget law.
+///
+/// `preferred` is the persisted config width; `workspace_width` is the page
+/// content the root budget hands down. The sidebar may claim surplus only
+/// after the main column and the statistics rail keep their floors, so a wide
+/// window never lets the sidebar starve the graph and a narrow window clamps
+/// the preference instead of clipping a child.
+#[must_use]
+pub(crate) fn performance_sidebar_width(preferred: f32, workspace_width: f32) -> f32 {
+    let capacity = workspace_width
+        - PERFORMANCE_STATS_MIN_WIDTH_PX
+        - MAIN_GRAPH_MIN_WIDTH_PX
+        - PERFORMANCE_SLOT_GAP_PX;
+    let max_width = capacity.clamp(
+        PERFORMANCE_SIDEBAR_MIN_WIDTH_PX,
+        PERFORMANCE_SIDEBAR_MAX_WIDTH_PX,
+    );
+    let wanted = if preferred.is_finite() {
+        preferred
+    } else {
+        PERFORMANCE_SIDEBAR_MIN_WIDTH_PX
+    };
+    wanted.clamp(PERFORMANCE_SIDEBAR_MIN_WIDTH_PX, max_width)
+}
 
 /// The minimum useful width of the CPU graph column. A page must switch to
 /// compact mode before this bound is violated; it must not squeeze labels or
@@ -22,6 +55,7 @@ pub(crate) const MAIN_GRAPH_MIN_WIDTH_PX: f32 = 360.0;
 /// this threshold the whole optional group is hidden, so a short capture can
 /// never paint a partial final row at the window edge.
 pub(crate) const CPU_CORE_GRID_MIN_WINDOW_HEIGHT_PX: f32 = 920.0;
+pub(crate) const MEMORY_LEGEND_MIN_WINDOW_HEIGHT_PX: f32 = 750.0;
 
 /// The height of one performance chart slot, in rem.
 ///
@@ -59,6 +93,11 @@ pub(crate) const fn performance_layout_mode(content_width: f32) -> PerformanceLa
 #[must_use]
 pub(crate) const fn cpu_core_grid_visible(window_height: f32) -> bool {
     window_height >= CPU_CORE_GRID_MIN_WINDOW_HEIGHT_PX
+}
+
+#[must_use]
+pub(crate) const fn memory_legend_visible(window_height: f32) -> bool {
+    window_height >= MEMORY_LEGEND_MIN_WINDOW_HEIGHT_PX
 }
 
 #[cfg(test)]

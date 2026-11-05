@@ -1,4 +1,5 @@
 //! Pure typed-observation projection for Performance device view models.
+use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
 use taskforest_core::core::metrics::{
     DiskMetrics, DiskPartition, GpuEngine, GpuMetrics, NetworkMetrics,
@@ -18,14 +19,10 @@ pub(super) enum GpuChartLayout {
 
 impl GpuChartLayout {
     #[must_use]
-    pub(super) const fn for_inventory(
-        inventory: super::super::responsive::PerformanceChartInventory,
-    ) -> Self {
+    pub(super) const fn for_inventory(inventory: PerformanceChartInventory) -> Self {
         match inventory {
-            super::super::responsive::PerformanceChartInventory::AggregateOnly => {
-                Self::AggregateOnly
-            }
-            super::super::responsive::PerformanceChartInventory::Full => Self::AggregateWithEngines,
+            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
+            PerformanceChartInventory::Full => Self::AggregateWithEngines,
         }
     }
 

@@ -1,6 +1,7 @@
 //! Mounted rule controls edit the shared authority through explicit access sets.
 use super::{metric_label, metric_unit, severity_label};
 use crate::app::{FrontendTrack, RouteChanged};
+use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::text_selection::ClipboardPort;
 use crate::widgets::controls::{ControlTone, ControlVisual};
@@ -19,8 +20,8 @@ use bevy::scene::{Scene, bsn, on};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
 use bevy::ui::{
-    AlignItems, BackgroundColor, BorderRadius, Checked, FlexDirection, FlexWrap, Node,
-    PositionType, UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, Checked, FlexDirection,
+    FlexWrap, Node, PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui_widgets::{
     Activate, Button, Checkbox, Slider, SliderOrientation, SliderPrecision, SliderRange,
@@ -622,9 +623,21 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
             bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())), flex_shrink: 0.0 } Checkbox super::AlertRuleToggleTarget(Option::Some({id.clone()})) ControlVisual(ControlTone::Surface, false) Children [ Text(enabled) TextRole(Role::Caption) Pickable::IGNORE ] },
         )
     };
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        edge_width_rem,
+        radius_rem,
+        grain,
+    } = card_material(palette);
     bsn! {
-        Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(px(space_8())), flex_shrink: 0.0 }
+        Node { width: percent(100), min_width: px(0.0), flex_direction: FlexDirection::Column, row_gap: px(space_4()), padding: UiRect::all(px(space_8())), flex_shrink: 0.0, border: UiRect::all(Val::Rem(edge_width_rem)), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
+        BackgroundColor({ fill })
+        BorderColor::all(edge)
+        BoxShadow({ shadows })
         Children [
+            @{ grain } --
             Text(title) TextLayout { linebreak: LineBreak::WordOrCharacter } TextRole(Role::Body) --
             Node { width: percent(100), flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: px(space_8()), row_gap: px(space_4()) }
                 Children [ @{ threshold } -- @{ duration } -- @{ hysteresis } ] --
