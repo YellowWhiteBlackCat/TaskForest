@@ -13,28 +13,11 @@ use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::sidebar::SelectedDevice;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::{Alert, AlertMetric, AlertSeverity, SystemSnapshot};
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-
-fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => i18n::t("common.cpu"),
-        AlertMetric::MemoryUsagePercent => i18n::t("common.memory"),
-        AlertMetric::DiskTemperatureC => i18n::t("alert.disk_temperature"),
-        AlertMetric::SmartPercentUsed => i18n::t("alert.smart_wear"),
-        AlertMetric::SmartCriticalWarning => i18n::t("alert.smart_critical"),
-    }
-}
-
-fn severity_label(severity: AlertSeverity) -> &'static str {
-    match severity {
-        AlertSeverity::Info => i18n::t("alert.info"),
-        AlertSeverity::Warning => i18n::t("alert.warning"),
-        AlertSeverity::Critical => i18n::t("alert.critical"),
-    }
-}
 
 fn alert_target_device(alert: &Alert, snapshot: &SystemSnapshot) -> Option<SelectedDevice> {
     match alert.metric {
@@ -85,7 +68,7 @@ pub fn render_banner(
     let value = match alert.metric {
         AlertMetric::DiskTemperatureC => format!("{:.0} °C", alert.value),
         AlertMetric::SmartCriticalWarning => i18n::t("alert.triggered").to_string(),
-        _ => format!("{:.0}%", alert.value),
+        _ => percent_text(alert.value),
     };
     let suffix = if count > 1 {
         format!(" · +{}", count - 1)
@@ -94,8 +77,8 @@ pub fn render_banner(
     };
     let text = format!(
         "{} · {} — {} {}{}",
-        severity_label(alert.severity),
-        metric_label(alert.metric),
+        i18n::alert_severity_label(alert.severity),
+        i18n::alert_metric_label(alert.metric),
         alert.target,
         value,
         suffix

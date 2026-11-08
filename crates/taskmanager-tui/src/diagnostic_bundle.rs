@@ -6,6 +6,7 @@ use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_preview_text,
@@ -22,31 +23,12 @@ pub(crate) struct DiagnosticBundleTargetView {
     pub(crate) scroll: usize,
 }
 
-#[derive(Debug, Default)]
-pub(crate) enum TuiDiagnosticRuntime {
-    #[default]
-    Unavailable,
-    Active(DiagnosticBundleSession<DiagnosticBundleClient>),
-}
-
-impl TuiDiagnosticRuntime {
-    fn active_mut(&mut self) -> Option<&mut DiagnosticBundleSession<DiagnosticBundleClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-
-    pub(crate) fn close(&mut self) {
-        if let Some(session) = self.active_mut() {
-            session.close();
-        }
-    }
-}
+pub(crate) type TuiDiagnosticRuntime = SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>;
 
 impl TuiApp {
     pub(crate) fn install_diagnostic_bundle_client(&mut self, client: DiagnosticBundleClient) {
-        self.diagnostics = TuiDiagnosticRuntime::Active(DiagnosticBundleSession::new(client));
+        self.diagnostics
+            .install_with(|| DiagnosticBundleSession::new(client));
     }
 
     pub(crate) fn open_diagnostic_bundle(&mut self) {

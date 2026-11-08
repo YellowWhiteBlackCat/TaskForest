@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use taskforest_core::core::process::ProcessItem;
 use taskmanager_app_host::SnapshotExportClient;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::snapshot_export::{
     SnapshotExportPayload, SnapshotExportSession, SnapshotExportState, SnapshotExportSubmitError,
     SnapshotExportTarget,
@@ -13,29 +14,13 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 use super::IcedApp;
 use taskmanager_application::i18n::t;
 
-#[derive(Debug, Default)]
-pub(super) enum IcedSnapshotExportRuntime {
-    #[default]
-    Unavailable,
-    Active(SnapshotExportSession<SnapshotExportClient>),
-}
-
-impl IcedSnapshotExportRuntime {
-    pub(super) fn install(&mut self, client: SnapshotExportClient) {
-        *self = Self::Active(SnapshotExportSession::new(client));
-    }
-
-    fn active_mut(&mut self) -> Option<&mut SnapshotExportSession<SnapshotExportClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(super) type IcedSnapshotExportRuntime =
+    SessionSlot<SnapshotExportSession<SnapshotExportClient>>;
 
 impl IcedApp {
     pub(crate) fn install_snapshot_export_client(&mut self, client: SnapshotExportClient) {
-        self.snapshot_export.install(client);
+        self.snapshot_export
+            .install_with(|| SnapshotExportSession::new(client));
     }
 
     pub(super) fn request_snapshot_export(&mut self) {

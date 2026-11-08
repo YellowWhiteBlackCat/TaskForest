@@ -1,9 +1,9 @@
 //! Per-window graph presentation cache.
 
-use super::graph_capacity;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
+use taskmanager_shell::presentation::graph_window_samples;
 
 use gpui::{Bounds, Path, Pixels, Rgba};
 
@@ -50,7 +50,7 @@ impl GraphPresentationCache {
         data_points: usize,
         sliding: bool,
     ) -> Rc<[f32]> {
-        let limit = graph_capacity(data_points).saturating_add(if sliding { 1 } else { 0 });
+        let limit = graph_window_samples(data_points).saturating_add(if sliding { 1 } else { 0 });
         if samples.len() <= limit {
             return samples;
         }

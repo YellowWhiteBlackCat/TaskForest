@@ -1,10 +1,11 @@
-use super::{ProcessDetailsSection, RootView};
+use super::RootView;
 use super::{ProcessInsightsErrorKind, ProcessInsightsLifecycle, ProcessInsightsRenderState};
 use gpui::{AppContext, TestAppContext};
 use taskforest_core::core::ScalarObservation;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProjectedProcessInsights;
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,

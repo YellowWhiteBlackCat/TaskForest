@@ -1,6 +1,7 @@
 //! Formatter helpers for Bevy Process Insights cards.
 
 use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 use taskforest_core::core::process_telemetry::ThreadWaitKind;
 use taskforest_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, IsolationKind,
@@ -14,6 +15,7 @@ use taskmanager_shell::presentation::network_connection_counters_summary;
 use taskmanager_shell::presentation::sandbox_details_summary;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, format_open_files_saturation};
 use taskmanager_shell::presentation::{capabilities_summary, process_resource_rows};
+use taskmanager_shell::presentation::{format_engine_cycles, format_engine_time};
 
 #[derive(Clone, Copy)]
 pub(crate) enum InsightDetail {
@@ -60,7 +62,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
         .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}s"));
     let cpu_percent = thread
         .cpu_percent
-        .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}%"));
+        .map_or_else(|| MISSING_VALUE.to_owned(), precise_percent_text);
     let mut line = format!(
         "{}  {}  {}  {}  {}",
         thread.tid,
@@ -208,7 +210,7 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot, detail: InsightDetail) -> St
     for device in gpu.devices.iter().take(detail.limit(2)) {
         let util = device
             .utilization_pct
-            .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}%"));
+            .map_or_else(|| MISSING_VALUE.to_owned(), percent_text);
         let vram = device
             .memory_bytes
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes);
@@ -229,7 +231,7 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot, detail: InsightDetail) -> St
         let usage = engine
             .usage_pct
             .current_value()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}%"));
+            .map_or_else(|| MISSING_VALUE.to_owned(), |v| percent_text(*v));
         let cumulative = engine
             .engine_time_ns
             .current_value()
@@ -248,21 +250,6 @@ pub(crate) fn gpu_summary(gpu: &ProcessGpuSnapshot, detail: InsightDetail) -> St
     }
 
     lines.join("\n")
-}
-
-fn format_engine_time(nanoseconds: u64) -> String {
-    let seconds = nanoseconds as f64 / 1_000_000_000.0;
-    format!("{seconds:.1}s")
-}
-
-fn format_engine_cycles(cycles: u64) -> String {
-    if cycles >= 1_000_000_000 {
-        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
-    } else if cycles >= 1_000_000 {
-        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
-    } else {
-        format!("{cycles} cycles")
-    }
 }
 
 pub(crate) fn resources_summary(resources: &ProcessResourceSnapshot) -> String {

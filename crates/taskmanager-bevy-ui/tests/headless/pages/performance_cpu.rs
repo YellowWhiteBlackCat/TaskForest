@@ -71,7 +71,7 @@ fn cpu_cache_topology_heterogeneous_cores_and_core_frequency_render_correctly() 
     );
     assert_eq!(
         cpu_field_text(&folded.shell, CpuField::Core(0)),
-        "12.0% · 3.6 GHz"
+        "12% · 3.6 GHz"
     );
     assert_eq!(cpu_field_text(&folded.shell, CpuField::Power), "65.0 W");
 }

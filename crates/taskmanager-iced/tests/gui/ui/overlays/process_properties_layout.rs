@@ -1,12 +1,12 @@
 //! Normal selectors and measured dense property bounds with product fonts.
 use super::*;
-use crate::app::DetailsSection;
 use crate::keys::IcedKey;
 use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::{Focusable, Scrollable};
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Pixels, Rectangle, Size, Vector};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{AppPage, KeyCode, Modifiers};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::ShellKeyEvent;
@@ -27,7 +27,11 @@ impl Operation for Bounds {
         use crate::app::FocusTarget;
         let fixed = [FocusTarget::ModalClose, FocusTarget::DetailsRefresh]
             .into_iter()
-            .chain(DetailsSection::ALL.into_iter().map(FocusTarget::DetailsTab))
+            .chain(
+                ProcessDetailsSection::ALL
+                    .into_iter()
+                    .map(FocusTarget::DetailsTab),
+            )
             .chain(
                 ProcessInsightFacet::ALL
                     .into_iter()
@@ -122,10 +126,10 @@ fn properties_use_normal_selectors_and_one_measured_body_with_fixed_actions() {
             pss.iter()
                 .any(|(label, value)| label == t("proc.swap") && value == "64.0 MiB")
         );
-        for section in DetailsSection::ALL {
+        for section in ProcessDetailsSection::ALL {
             let _ = app.update(Message::SelectDetailsSection(section));
             for facet in ProcessInsightFacet::ALL {
-                if section == DetailsSection::Insights {
+                if section == ProcessDetailsSection::Insights {
                     let _ = app.update(Message::SelectInsightsFacet(facet));
                 }
                 assert_eq!(app.shell.process_properties_target(), Some(&target));
@@ -147,7 +151,7 @@ fn properties_use_normal_selectors_and_one_measured_body_with_fixed_actions() {
                 );
                 assert_eq!(
                     bounds.controls.len(),
-                    if section == DetailsSection::Insights {
+                    if section == ProcessDetailsSection::Insights {
                         13
                     } else {
                         5
@@ -164,7 +168,7 @@ fn properties_use_normal_selectors_and_one_measured_body_with_fixed_actions() {
                         "{section:?}/{facet:?} control {control:?} outside {size:?}"
                     );
                 }
-                if section != DetailsSection::Insights {
+                if section != ProcessDetailsSection::Insights {
                     break;
                 }
             }

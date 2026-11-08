@@ -3,7 +3,10 @@
 use crate::presentation::{MISSING_VALUE, bytes};
 use taskforest_core::LimitValue;
 use taskforest_core::ProcessItem;
+use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 use taskforest_core::core::process::{format_ancestor_lineage, process_ancestor_lineage};
+use taskforest_core::core::process_telemetry::OpenFileEntry;
 use taskforest_core::core::process_telemetry::ProcessResourceSnapshot;
 use taskmanager_application::{ProcessInsightFacet, i18n, i18n::t, project_process_resources};
 
@@ -22,6 +25,17 @@ pub fn process_ancestor_lineage_summary(
 /// Count live processes in Linux's uninterruptible `D` state. The count is
 /// derived from the shared process projection so a missing snapshot remains
 /// distinguishable from a measured zero.
+/// Whether the process table's swap column earns its place.
+///
+/// Only a **measured zero** swap total proves the host has no swap device;
+/// unknown telemetry (and the absence of a snapshot) keeps the column
+/// visible, so absence is never fabricated into a hidden column. Every
+/// frontend renders the processes table with the same answer.
+#[must_use]
+pub fn swap_column_visible(snapshot: Option<&SystemSnapshot>) -> bool {
+    snapshot.is_none_or(|snapshot| snapshot.memory.current_swap_total_bytes() != Some(0))
+}
+
 #[must_use]
 pub fn uninterruptible_process_count(processes: Option<&[ProcessItem]>) -> Option<usize> {
     processes.map(|items| {
@@ -51,16 +65,20 @@ pub fn uninterruptible_process_ratio(processes: Option<&[ProcessItem]>) -> Optio
 pub fn uninterruptible_process_summary(processes: Option<&[ProcessItem]>) -> Option<String> {
     let count = uninterruptible_process_count(processes)?;
     let ratio = uninterruptible_process_ratio(processes)?;
-    Some(format!("{} {count} · {ratio:.1}%", i18n::t("proc.d_state")))
+    Some(format!(
+        "{} {count} · {}",
+        i18n::t("proc.d_state"),
+        precise_percent_text(ratio)
+    ))
 }
 
 /// Format the open-file descriptor count against the process's soft/hard limits
 /// from the shared resource projection.
 ///
 /// When limits are available, formats:
-/// - Both finite & differing: `"{count} / {soft} ({pct:.0}%) [max {hard}]"`
-/// - Both finite & equal: `"{count} / {soft} ({pct:.0}%)"`
-/// - Soft finite, hard unlimited: `"{count} / {soft} ({pct:.0}%) [max {unlimited_label}]"`
+/// - Both finite & differing: `"{count} / {soft} ({pct}%) [max {hard}]"`
+/// - Both finite & equal: `"{count} / {soft} ({pct}%)"`
+/// - Soft finite, hard unlimited: `"{count} / {soft} ({pct}%) [max {unlimited_label}]"`
 /// - Soft unlimited: `"{count} / {unlimited_label}"`
 ///
 /// Returns `None` if neither soft nor hard limit is available.
@@ -77,20 +95,24 @@ pub fn format_open_files_saturation(
         (Some(LimitValue::Value(soft_val)), Some(LimitValue::Value(hard_val))) => {
             let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
             if soft_val == hard_val {
-                Some(format!("{count} / {soft_val} ({pct:.0}%)"))
+                Some(format!("{count} / {soft_val} ({})", percent_text(pct)))
             } else {
-                Some(format!("{count} / {soft_val} ({pct:.0}%) [max {hard_val}]"))
+                Some(format!(
+                    "{count} / {soft_val} ({}) [max {hard_val}]",
+                    percent_text(pct)
+                ))
             }
         }
         (Some(LimitValue::Value(soft_val)), Some(LimitValue::Unlimited)) => {
             let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
             Some(format!(
-                "{count} / {soft_val} ({pct:.0}%) [max {unlimited_label}]"
+                "{count} / {soft_val} ({}) [max {unlimited_label}]",
+                percent_text(pct)
             ))
         }
         (Some(LimitValue::Value(soft_val)), None) => {
             let pct = (count as f64 / soft_val.max(1) as f64) * 100.0;
-            Some(format!("{count} / {soft_val} ({pct:.0}%)"))
+            Some(format!("{count} / {soft_val} ({})", percent_text(pct)))
         }
         (None, Some(LimitValue::Value(hard_val))) => Some(format!("{count} [max {hard_val}]")),
         (None, Some(LimitValue::Unlimited)) => Some(format!("{count} [max {unlimited_label}]")),
@@ -132,7 +154,7 @@ pub fn process_resource_rows(resources: &ProcessResourceSnapshot) -> Vec<(String
         .memory_limit
         .and_then(|limit| limit.usage_percent(projection.memory_usage_bytes))
         .map_or(memory.clone(), |percent| {
-            memory.map(|value| format!("{value} ({percent:.0}%)"))
+            memory.map(|value| format!("{value} ({})", percent_text(percent)))
         });
     let cpu_quota = match (
         projection.cpu_time_quota_micros,
@@ -140,8 +162,8 @@ pub fn process_resource_rows(resources: &ProcessResourceSnapshot) -> Vec<(String
     ) {
         (Some(LimitValue::Unlimited), _) => Some("CPU ∞".to_owned()),
         (Some(LimitValue::Value(quota)), Some(period)) if period > 0 => Some(format!(
-            "CPU {:.0}%",
-            (quota as f64 / period as f64) * 100.0
+            "CPU {}",
+            percent_text((quota as f64 / period as f64) * 100.0)
         )),
         (Some(LimitValue::Value(quota)), _) => Some(format!("CPU {quota}µs")),
         (None, _) => None,
@@ -164,7 +186,7 @@ pub fn process_resource_rows(resources: &ProcessResourceSnapshot) -> Vec<(String
         .process_limit
         .and_then(|limit| limit.usage_percent(projection.process_count))
         .map_or(pids.clone(), |percent| {
-            pids.map(|value| format!("{value} ({percent:.0}%)"))
+            pids.map(|value| format!("{value} ({})", percent_text(percent)))
         });
     let resource_group = projection.resource_group.map(ToOwned::to_owned);
 
@@ -182,4 +204,68 @@ pub fn process_resource_rows(resources: &ProcessResourceSnapshot) -> Vec<(String
         )
     })
     .collect()
+}
+
+/// Format a single process item as tab-separated values (TSV).
+#[must_use]
+pub fn process_to_tsv(process: &ProcessItem) -> String {
+    let user = process
+        .current_user()
+        .unwrap_or_else(|| MISSING_VALUE.to_owned());
+    let cpu = process
+        .current_cpu_percentage()
+        .map_or_else(|| MISSING_VALUE.to_owned(), precise_percent_text);
+    let memory = process
+        .current_memory_bytes()
+        .map_or_else(|| MISSING_VALUE.to_owned(), bytes);
+    format!(
+        "{}\t{}\t{}\t{}\t{}\t{}",
+        process.pid,
+        process.name,
+        cpu,
+        memory,
+        if user.is_empty() { "—" } else { &user },
+        process.status,
+    )
+}
+
+/// Format multiple processes as multi-row TSV with a header.
+#[must_use]
+pub fn processes_to_tsv(processes: &[ProcessItem]) -> String {
+    let mut output = String::from("PID\tName\tCPU\tMemory\tUser\tStatus\n");
+    for proc in processes {
+        output.push_str(&process_to_tsv(proc));
+        output.push('\n');
+    }
+    output
+}
+
+/// Render one open-file descriptor row: `fd {fd} [{kind}] → {target}`.
+///
+/// This is the SINGLE open-file row spelling (ADR-020): the GPUI Properties
+/// dialog, the TUI Insights preview, and the Iced Insights facet must not
+/// disagree about how the same descriptor reads. The `fd` prefix names the
+/// number's meaning, the bracketed kind is the typed handle class, and the
+/// arrow separates the descriptor from its resolved path.
+///
+/// A descriptor whose readlink failed keeps its row: the target falls back to
+/// the caller's typed unreadable marker, never a blank cell and never a
+/// fabricated path. A deleted descriptor keeps its target and gains the
+/// `[deleted]` marker, so the row stays honest about what the host reported.
+#[must_use]
+pub fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> String {
+    let target = entry
+        .target
+        .clone()
+        .unwrap_or_else(|| unreadable.to_string());
+    if entry.deleted {
+        format!(
+            "fd {} [{}] → {} [deleted]",
+            entry.fd,
+            entry.resolved_kind(),
+            target
+        )
+    } else {
+        format!("fd {} [{}] → {}", entry.fd, entry.resolved_kind(), target)
+    }
 }

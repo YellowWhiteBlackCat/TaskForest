@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_assets::product::GPUI_NAME;
+use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product::GPUI_NAME, product_tray_icon_data};
 
 #[test]
 fn action_ids_map_to_the_expected_intents() {
@@ -16,7 +16,7 @@ fn action_ids_map_to_the_expected_intents() {
 
 #[test]
 fn branded_icon_has_visible_pixels_and_the_expected_shape() {
-    let icon = tray_icon_pixels().expect("embedded product bitmap is valid");
+    let icon = product_tray_icon_data().expect("embedded product bitmap is valid");
     assert_eq!(icon.width(), PRODUCT_TRAY_ICON_SIZE);
     assert_eq!(icon.height(), PRODUCT_TRAY_ICON_SIZE);
     assert_eq!(

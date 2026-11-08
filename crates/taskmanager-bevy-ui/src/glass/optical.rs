@@ -31,9 +31,11 @@ const OPTICAL_GLASS_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("cbbc6713-31a6-4b99-95d6-5f4c1193832c");
 
 mod capability;
-pub(crate) use capability::optical_glass_capability;
+pub(crate) use capability::{OPTICAL_GLASS_MAX_BLUR_PX, optical_glass_capability};
 mod scene;
 pub(crate) use scene::{OpticalBackdropSource, OpticalGlassCard};
+
+use super::optical_wesl::OpticalGlassParams;
 
 /// A physical-pixel placement for one glass node in the captured backdrop.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -100,14 +102,17 @@ impl OpticalGlassRaster {
 
 /// GPU-aligned projection of [`OpticalGlassSpec`] plus its resolved geometry.
 ///
-/// Six lanes keep every field 16-byte aligned and avoid backend-specific
-/// packing rules:
+/// Six aligned lanes keep every field 16-byte aligned and avoid
+/// backend-specific packing rules:
 /// - `optics`: blur radius, refraction strength, refraction width, dispersion;
 /// - `finish`: specular width, specular intensity, frost opacity, quality;
 /// - `tint`: linear RGB plus tint mix alpha;
 /// - `grain`: linear ink RGB plus strength;
 /// - `element`: origin XY, size XY;
 /// - `viewport`: target XY, corner radius, device scale factor.
+///
+/// The trailing `ior` scalar carries the deep refraction's index of
+/// refraction, clamped and admitted by [`OpticalGlassParams`] before upload.
 #[derive(Clone, Copy, Debug, PartialEq, ShaderType)]
 pub(crate) struct OpticalGlassUniform {
     pub(crate) optics: Vec4,
@@ -116,13 +121,15 @@ pub(crate) struct OpticalGlassUniform {
     pub(crate) grain: Vec4,
     pub(crate) element: Vec4,
     pub(crate) viewport: Vec4,
+    pub(crate) ior: f32,
 }
 
 impl OpticalGlassUniform {
     /// Project the theme-owned spec and resolved geometry into stable lanes.
     ///
     /// Invalid raster placement fails closed before a malformed value reaches
-    /// the GPU. The spec/geometry are produced by
+    /// the GPU, and so does a blur radius the proven ceiling never admitted.
+    /// The spec/geometry are produced by
     /// [`OpticalGlassSpec::resolve`](taskmanager_theme::OpticalGlassSpec::resolve)
     /// and remain the only source of material values.
     pub(crate) fn project(
@@ -133,12 +140,14 @@ impl OpticalGlassUniform {
         if !raster.is_valid() {
             return None;
         }
+        let params =
+            OpticalGlassParams::from_spec(spec, geometry).admitted(OPTICAL_GLASS_MAX_BLUR_PX)?;
         Some(Self {
             optics: Vec4::new(
                 geometry.blur_radius_px,
                 geometry.refraction_strength_px,
                 geometry.refraction_width_px,
-                spec.chromatic_dispersion,
+                params.dispersion,
             ),
             finish: Vec4::new(
                 geometry.specular_width_px,
@@ -165,6 +174,7 @@ impl OpticalGlassUniform {
                 geometry.corner_radius_px,
                 raster.device_scale_factor,
             ),
+            ior: params.ior,
         })
     }
 }

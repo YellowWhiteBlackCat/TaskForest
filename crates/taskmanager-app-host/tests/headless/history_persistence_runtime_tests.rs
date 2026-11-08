@@ -1,5 +1,7 @@
 use std::sync::{Arc, Barrier};
+use std::time::SystemTime;
 use std::time::{Duration, Instant};
+use taskforest_core::core::time::unix_millis;
 
 use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskforest_core::{HistoricalSample, HistoryRecordSink};
@@ -306,7 +308,7 @@ fn replay_during_writer_flush_never_poisons_the_later_complete_read() {
     let sink = coordinator.record_sink();
     let monitor = coordinator.monitor();
     let key = HistorySeriesKey::system(HistoryMetric::CpuUsagePct);
-    let base_ms = super::unix_now_ms();
+    let base_ms = unix_millis(SystemTime::now());
     for revision in 1..=500u64 {
         sink.record_sample(
             key.clone(),

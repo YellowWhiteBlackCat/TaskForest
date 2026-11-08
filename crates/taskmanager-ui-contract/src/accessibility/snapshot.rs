@@ -15,6 +15,7 @@ use crate::{
     SemanticNode, SemanticNodeId, SemanticNumericValue, SemanticRole, SemanticSnapshot,
     SemanticSnapshotError, SemanticState,
 };
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 
 /// One process rendered as a table row with name, CPU, and memory cells.
 ///
@@ -137,7 +138,11 @@ impl GraphSummary {
     /// Frontend-neutral spoken summary, e.g. `"Latest 18%, peak 72%"`.
     #[must_use]
     pub fn to_value_text(self) -> String {
-        format!("Latest {:.0}%, peak {:.0}%", self.current, self.peak)
+        format!(
+            "Latest {}, peak {}",
+            percent_text(self.current),
+            percent_text(self.peak)
+        )
     }
 }
 
@@ -608,7 +613,7 @@ impl SemanticSnapshotBuilder {
 fn format_optional_percent(value: Option<f64>) -> String {
     value
         .filter(|value| value.is_finite())
-        .map_or_else(|| "Unavailable".to_owned(), |value| format!("{value:.1}%"))
+        .map_or_else(|| "Unavailable".to_owned(), precise_percent_text)
 }
 
 #[cfg(test)]

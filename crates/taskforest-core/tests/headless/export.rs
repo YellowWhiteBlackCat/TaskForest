@@ -372,7 +372,7 @@ fn html_does_not_export_legacy_cpu_usage_after_typed_failure() {
     let html = processes_to_html(&snapshot, &[]);
 
     assert!(html.contains("<th>CPU</th><td>— &middot; — global</td>"));
-    assert!(!html.contains("88.0% global"));
+    assert!(!html.contains("88% global"));
 }
 
 #[test]
@@ -444,7 +444,7 @@ fn html_contains_document_structure_and_snapshot_stats() {
     assert!(!html.contains("<link"));
     assert!(!html.contains("src=\""));
     assert!(html.contains("Test CPU"));
-    assert!(html.contains("&middot; 42.0% global"));
+    assert!(html.contains("&middot; 42% global"));
     assert!(html.contains("<th>Processes</th><td>3</td>"));
     assert!(html.contains("<th>Threads</th><td>7</td>"));
     assert!(html.contains("<th>Uptime</th><td>99s</td>"));

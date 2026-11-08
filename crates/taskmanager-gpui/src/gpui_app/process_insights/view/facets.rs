@@ -17,6 +17,7 @@ use taskmanager_application::{
 };
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::definite_length;
+use zhuge_ui_core::row_page::{RowPage, page_of, rows_per_page};
 
 pub(super) fn render_projection(
     props: &ProcessInsightsViewProps<'_>,
@@ -144,9 +145,10 @@ fn facet<T>(
         }
         ProcessInsightFacetState::Current(data) => {
             let total = count(data);
-            let first = props
-                .first
-                .min(total.saturating_sub(1) / MAX_INSIGHT_CARD_ROWS * MAX_INSIGHT_CARD_ROWS);
+            // The shared page axis clamps the request: a stale offset left over
+            // from a larger collection lands on the last real page, never past it.
+            let rows = rows_per_page(MAX_INSIGHT_CARD_ROWS);
+            let first = RowPage::page(total, rows, page_of(props.first, rows)).first();
             div()
                 .w_full()
                 .flex()

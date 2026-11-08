@@ -1,7 +1,9 @@
 //! Stateless System dashboard backed by typed, RootView-owned UI state.
 
 use std::collections::HashSet;
+use std::time::SystemTime;
 use taskforest_core::core::alerts::AlertRuleTransferError;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::AlertEventSeed;
 use taskmanager_application::AlertRuleEditResult;
 use taskmanager_application::ManagedAlertRuleEdit;
@@ -189,10 +191,9 @@ impl RootView {
             return Ok(result);
         }
         let snapshot = self.system_snapshot().clone();
-        let evaluation = self.shell.evaluate_alerts(
-            &snapshot,
-            crate::gpui_app::root::platform_submission_time_ms(),
-        );
+        let evaluation = self
+            .shell
+            .evaluate_alerts(&snapshot, unix_millis(SystemTime::now()));
         let projection = self.shell.projection();
         let revision = projection
             .alert_row_projection_generation(AlertRowFamily::Active)
@@ -214,7 +215,7 @@ impl RootView {
         let Some(platform) = self.platform.as_mut() else {
             return;
         };
-        let now_ms = crate::gpui_app::root::platform_submission_time_ms();
+        let now_ms = unix_millis(SystemTime::now());
         for request in requests {
             let title = format!(
                 "{} — {}",

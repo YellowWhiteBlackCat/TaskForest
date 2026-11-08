@@ -6,6 +6,7 @@
 //! immutable config publications; the renderer never performs I/O.
 
 use std::time::Duration;
+use taskmanager_shell::saved_views::{sort_from_legacy_token, sort_token};
 
 use crate::TuiApp;
 use crate::theme::ThemeParams;
@@ -13,61 +14,15 @@ use crate::ui::settings::SettingsForm;
 use taskforest_core::core::config::Config;
 use taskmanager_application::i18n::t;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::process_category_projection::default_category_expansions;
 use taskmanager_application::{AppPage, TelemetryInterval};
 use taskmanager_application::{
     ConfigBootstrap, ConfigClient, ConfigDrain, ConfigPublication, ConfigPublicationOutcome,
-    ConfigRecovery, ConfigRecoveryNotice, ConfigRevision, ConfigStoreErrorKind,
-    ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
+    ConfigRecoveryNotice, ConfigRevision, ConfigSubmissionStatus, DEFAULT_CONFIG_INITIAL_WAIT,
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
 use taskmanager_theme::ModePreference;
-
-/// Stable token for one shell [`SortCol`], compatible with the GPUI frontend's
-/// persisted tokens (`"PID"` / `"Name"` / `"CPU"` / …) so a shared config file
-/// round-trips the sort across shapes. Columns GPUI does not know (`PSS`,
-/// `State`) use their own tokens; the GPUI loader ignores unknown tokens.
-fn sort_token(column: SortCol) -> &'static str {
-    match column {
-        SortCol::Pid => "PID",
-        SortCol::Name => "Name",
-        SortCol::Cpu => "CPU",
-        SortCol::Memory => "Memory",
-        SortCol::Pss => "MemoryPss",
-        SortCol::Swap => "Swap",
-        SortCol::User => "User",
-        SortCol::State => "Status",
-        SortCol::Threads => "Threads",
-        SortCol::CpuTime => "CPUTime",
-        SortCol::DiskRead => "DiskRead",
-        SortCol::DiskWrite => "DiskWrite",
-        SortCol::Network => "Network",
-        SortCol::StartTime => "StartTime",
-        SortCol::Fds => "FDs",
-        SortCol::Nice => "Nice",
-    }
-}
-
-fn sort_from_token(token: &str) -> Option<SortCol> {
-    match token {
-        "PID" => Some(SortCol::Pid),
-        "Name" => Some(SortCol::Name),
-        "CPU" => Some(SortCol::Cpu),
-        "Memory" => Some(SortCol::Memory),
-        "MemoryPss" | "PSS" => Some(SortCol::Pss),
-        "Swap" => Some(SortCol::Swap),
-        "User" => Some(SortCol::User),
-        "Status" | "State" => Some(SortCol::State),
-        "Threads" => Some(SortCol::Threads),
-        "CPUTime" => Some(SortCol::CpuTime),
-        "DiskRead" => Some(SortCol::DiskRead),
-        "DiskWrite" => Some(SortCol::DiskWrite),
-        "Network" => Some(SortCol::Network),
-        "StartTime" => Some(SortCol::StartTime),
-        "FDs" => Some(SortCol::Fds),
-        "Nice" => Some(SortCol::Nice),
-        _ => None,
-    }
-}
+use taskmanager_ui_contract::presentation::settings::{CAPACITY_CHOICES, REFRESH_CHOICES_MS};
 
 /// The applied renderer preferences (mirrors of the persisted `Config` fields
 /// the TUI renders). The `Config` type stays opaque to this crate; the
@@ -178,7 +133,7 @@ impl TuiApp {
                 &config.density,
                 (config.notify_enabled, config.notify_quiet_hours),
             );
-            self.settings_form.refresh = crate::ui::settings::REFRESH_MS
+            self.settings_form.refresh = REFRESH_CHOICES_MS
                 .iter()
                 .position(|ms| *ms == config.refresh_ms)
                 .unwrap_or(1);
@@ -203,7 +158,7 @@ impl TuiApp {
                 config.network_use_base2,
             ];
             self.settings_form.gray_zero = config.gray_zero_values;
-            self.settings_form.graph_points = crate::ui::settings::GRAPH_POINTS
+            self.settings_form.graph_points = CAPACITY_CHOICES
                 .iter()
                 .position(|points| *points == config.graph_data_points as usize)
                 .unwrap_or(1);
@@ -271,12 +226,12 @@ impl TuiApp {
         // deserialization has already normalized recognized historical mode
         // tokens at the application boundary; no mode value enters TUI state.
         if startup {
-            self.expanded_groups = crate::default_category_expansions();
+            self.expanded_groups = default_category_expansions();
         }
         let hidden: std::collections::HashSet<SortCol> = config
             .process_hidden_columns
             .iter()
-            .filter_map(|token| sort_from_token(token))
+            .filter_map(|token| sort_from_legacy_token(token))
             // PID/Name are always-visible identity columns; a hand-edited
             // config listing them is normalized away.
             .filter(|column| !matches!(column, SortCol::Pid | SortCol::Name))
@@ -284,7 +239,7 @@ impl TuiApp {
         if config.process_hidden_columns_configured || !hidden.is_empty() {
             self.hidden_columns = hidden;
         }
-        if let Some(column) = sort_from_token(&config.process_sort_col) {
+        if let Some(column) = sort_from_legacy_token(&config.process_sort_col) {
             self.process_sort = (
                 column,
                 if config.process_sort_asc {
@@ -391,7 +346,7 @@ impl TuiApp {
                     FeedbackSource::Settings,
                     FeedbackSeverity::Warning,
                     FeedbackLifecycle::UntilReplaced,
-                    config_recovery_message("Configuration refresh failed", *recovery),
+                    recovery.message_with_prefix("Configuration refresh failed"),
                 );
             }
             outcome => self.report_config_recovery(outcome),
@@ -452,7 +407,7 @@ impl TuiApp {
             FeedbackSource::Settings,
             severity,
             FeedbackLifecycle::UntilReplaced,
-            config_recovery_message("Configuration recovered", recovery),
+            recovery.message_with_prefix("Configuration recovered"),
         );
     }
 
@@ -613,7 +568,7 @@ impl TuiApp {
             &config.density,
             (config.notify_enabled, config.notify_quiet_hours),
         );
-        self.settings_form.refresh = crate::ui::settings::REFRESH_MS
+        self.settings_form.refresh = REFRESH_CHOICES_MS
             .iter()
             .position(|ms| *ms == config.refresh_ms)
             .unwrap_or(1);
@@ -638,7 +593,7 @@ impl TuiApp {
             config.network_use_base2,
         ];
         self.settings_form.gray_zero = config.gray_zero_values;
-        self.settings_form.graph_points = crate::ui::settings::GRAPH_POINTS
+        self.settings_form.graph_points = CAPACITY_CHOICES
             .iter()
             .position(|points| *points == config.graph_data_points as usize)
             .unwrap_or(1);
@@ -651,17 +606,4 @@ impl TuiApp {
         };
         self.dismiss_local_surface_kind(crate::TuiSurfaceKind::Settings);
     }
-}
-
-fn config_recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
-    format!(
-        "{prefix}: source={:?}, primary={}, backup={}",
-        recovery.source(),
-        recovery
-            .primary_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-        recovery
-            .backup_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-    )
 }

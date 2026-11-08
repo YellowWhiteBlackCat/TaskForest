@@ -98,7 +98,7 @@ fn on_command(command: On<FirstRunCommand>, mut access: SetupCommandAccess) {
         access.commands.trigger(WindowSurfaceCommand::FirstRun);
         return;
     }
-    if !matches!(access.surface.0, Some(WindowSurface::FirstRun)) {
+    if !matches!(access.surface.active(), Some(WindowSurface::FirstRun)) {
         return;
     }
     match command {

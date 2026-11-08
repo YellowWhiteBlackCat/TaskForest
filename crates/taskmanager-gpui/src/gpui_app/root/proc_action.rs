@@ -6,8 +6,9 @@ use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessLiveKey, ProcessSignal,
 };
 use taskmanager_application::ProcessControlRequest;
+use taskmanager_application::ProcessDetailsSection;
 
-use super::{Hover, ProcMenuAction, ProcessDetailsSection, RootView};
+use super::{Hover, ProcMenuAction, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
 use crate::gpui_app::root::process_feedback::ProcessControlAction;
 
@@ -48,12 +49,13 @@ fn menu_control_submission(
 
 impl RootView {
     pub(crate) fn show_local_feedback(&mut self, msg: impl Into<String>, cx: &mut Context<Self>) {
-        use taskmanager_ui::overlays::toast::{ToastEvent, ToastKind, ToastState};
+        use taskmanager_ui::overlays::toast::{ToastEvent, ToastState};
+        use zhuge_ui_tokens::StatusKind;
         let msg = msg.into();
         let kind = if msg.starts_with("\u{26a0} ") {
-            ToastKind::Danger
+            StatusKind::Danger
         } else {
-            ToastKind::Info
+            StatusKind::Info
         };
         self.local_feedback_seq += 1;
         let toast = cx.new(|cx| ToastState::new(self.local_feedback_seq, msg, kind, cx));

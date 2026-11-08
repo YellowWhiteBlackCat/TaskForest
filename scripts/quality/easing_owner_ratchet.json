@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "gate": {
+    "source": "zhuge-ui-kit:crates/zhuge-ui-core/tools/check_easing_owner.py",
+    "sha256": "f04e63addc3e409e6df4ede08f1716e79f6fa2d4d3c039f84afa08c2b4c26d68"
+  },
+  "entries": {}
+}

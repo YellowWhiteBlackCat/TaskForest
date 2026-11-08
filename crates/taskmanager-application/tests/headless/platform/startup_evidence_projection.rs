@@ -5,7 +5,7 @@ use taskforest_core::{
 
 use super::{
     StartupEvidenceProjection, StartupEvidenceProjectionApplyResult, StartupEvidenceRevision,
-    StartupEvidenceUnavailable,
+    StartupEvidenceUnavailable, critical_chain_summary, failed_units_summary,
 };
 
 fn current(now_ms: u64) -> StartupBootEvidenceSnapshot {
@@ -191,5 +191,62 @@ fn recovery_replaces_retained_values_and_clears_transport_failure() {
     assert_eq!(
         recovered.snapshot.critical_chain_state.last_success_ms,
         Some(30)
+    );
+}
+
+#[test]
+fn failed_units_summary_caps_names_and_keeps_every_typed_state_honest() {
+    let mut evidence = current(10);
+    evidence.failed_units = (0..3)
+        .map(|index| StartupFailedUnit {
+            unit: format!("unit{index}.service"),
+            load_state: "loaded".into(),
+            active_state: "failed".into(),
+            sub_state: "failed".into(),
+            description: String::new(),
+        })
+        .collect();
+    assert_eq!(
+        failed_units_summary(&evidence),
+        "3 · unit0.service · unit1.service"
+    );
+
+    evidence.failed_units.clear();
+    assert_eq!(failed_units_summary(&evidence), "0");
+
+    evidence.failed_units_failure = Some(StartupEvidenceFailure::TimedOut);
+    assert_eq!(
+        failed_units_summary(&evidence),
+        crate::i18n::t("startup.evidence_unavailable")
+    );
+}
+
+#[test]
+fn critical_chain_summary_totals_measured_nodes_and_dashes_when_all_untimed() {
+    let mut evidence = current(10);
+    evidence.critical_chain = vec![
+        StartupCriticalChainNode {
+            unit: "head.service".into(),
+            activated_at_ms: Some(0),
+            duration_ms: Some(120),
+        },
+        StartupCriticalChainNode {
+            unit: "tail.service".into(),
+            activated_at_ms: Some(120),
+            duration_ms: None,
+        },
+    ];
+    assert_eq!(
+        critical_chain_summary(&evidence, "—"),
+        "120 ms · head.service"
+    );
+
+    evidence.critical_chain[0].duration_ms = None;
+    assert_eq!(critical_chain_summary(&evidence, "—"), "—");
+
+    evidence.critical_chain_failure = Some(StartupEvidenceFailure::TimedOut);
+    assert_eq!(
+        critical_chain_summary(&evidence, "—"),
+        crate::i18n::t("startup.evidence_unavailable")
     );
 }

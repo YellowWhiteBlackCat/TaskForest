@@ -154,7 +154,7 @@ mod projection_render_tests {
             .expect("draw");
         let text = terminal.backend().to_string();
 
-        assert!(text.contains("37.4%"));
+        assert!(text.contains("37%"));
         assert!(!text.contains("CPU 0.0%"));
     }
 }

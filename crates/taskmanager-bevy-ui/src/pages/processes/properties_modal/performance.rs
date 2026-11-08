@@ -2,6 +2,7 @@
 
 use crate::widgets::chart::MAX_CHART_POINTS;
 use std::sync::Arc;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use taskmanager_application::i18n::t;
@@ -80,7 +81,7 @@ pub(super) fn performance_curves(
             || MISSING_VALUE.to_owned(),
             |value| {
                 if metric == ProcessDetailsField::Cpu {
-                    format!("{value:.1}%")
+                    precise_percent_text(value)
                 } else {
                     format_quantity_f64(f64::from(value), family, rate, &UnitPreferences::default())
                 }

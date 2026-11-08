@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use taskmanager_application::ServiceAttemptId;
 
 use taskmanager_app_host::DiagnosticBundleClient;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 
 use taskforest_contract::RequestId;
@@ -38,12 +39,7 @@ pub(crate) enum ServiceLogExportNotice {
     Failed(String),
 }
 
-#[derive(Debug, Default)]
-enum ServiceLogExportRuntime {
-    #[default]
-    Unavailable,
-    Active(DiagnosticBundleSession<DiagnosticBundleClient>),
-}
+type ServiceLogExportRuntime = SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>;
 
 #[derive(Debug, Clone)]
 pub struct ServiceDetailsSnapshot {
@@ -78,7 +74,8 @@ impl ServiceDetailsState {
     }
 
     pub(crate) fn install_export_client(&mut self, client: DiagnosticBundleClient) {
-        self.export = ServiceLogExportRuntime::Active(DiagnosticBundleSession::new(client));
+        self.export
+            .install_with(|| DiagnosticBundleSession::new(client));
     }
 
     pub fn select(&mut self, service_id: &ServiceId) -> bool {
@@ -98,7 +95,7 @@ impl ServiceDetailsState {
     pub(crate) fn close(&mut self) {
         self.stream.close();
         self.snapshot_request_id = None;
-        if let ServiceLogExportRuntime::Active(session) = &mut self.export {
+        if let Some(session) = self.export.active_mut() {
             session.close();
         }
     }
@@ -133,9 +130,7 @@ impl ServiceDetailsState {
     }
 
     pub(crate) fn poll_export(&mut self) -> Option<ServiceLogExportNotice> {
-        let ServiceLogExportRuntime::Active(session) = &mut self.export else {
-            return None;
-        };
+        let session = self.export.active_mut()?;
         let result = session.drain().into_iter().next()?;
         Some(match result.result {
             Ok(()) => ServiceLogExportNotice::Exported(result.destination),
@@ -174,7 +169,7 @@ impl ServiceDetailsState {
     pub(crate) fn reject_stream(&mut self, attempt_id: ServiceAttemptId, failure: FailureKind) {
         let failure = ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
-            i18n::t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}")),
+            i18n::service_log_rejection_detail(failure),
         );
         self.stream.reject_attempt(attempt_id, failure);
     }
@@ -231,7 +226,7 @@ impl ServiceDetailsState {
         self.snapshot_request_id = None;
         self.logs = ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
-            i18n::t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}")),
+            i18n::service_log_rejection_detail(failure),
         ));
         self.copy_feedback = None;
     }
@@ -312,7 +307,7 @@ impl ServiceDetailsState {
             })
             .collect();
         let file_name = format!("taskmanager-{safe_name}-logs.json");
-        let ServiceLogExportRuntime::Active(session) = &mut self.export else {
+        let Some(session) = self.export.active_mut() else {
             return Some(ServiceLogExportNotice::Failed(
                 DiagnosticBundleErrorKind::Unavailable.stable_code().into(),
             ));

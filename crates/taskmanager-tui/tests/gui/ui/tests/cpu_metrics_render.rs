@@ -20,7 +20,7 @@ fn cpu_page_shows_every_headline_fact_and_per_core_without_a_selector() {
     let app = cpu_app();
     let text = frame_text(&app, 120, 40);
     for expected in [
-        "Utilization 37.4%",
+        "Utilization 37%",
         "Temperature 54°C",
         "Frequency 3284 MHz",
         "Power —",

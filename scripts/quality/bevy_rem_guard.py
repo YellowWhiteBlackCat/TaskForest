@@ -34,13 +34,30 @@ documentation examples cannot satisfy or trip the rules accidentally.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from bevy_bsn_guard import mask_rust
+
+def load_shared_scene_owner():
+    """Import the vendored zhuge-ui-kit scene executor beside this guard."""
+
+    owner_path = Path(__file__).with_name("bevy_scene_gate.py")
+    spec = importlib.util.spec_from_file_location("bevy_scene_gate", owner_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load shared scene executor: {owner_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+scene_owner = load_shared_scene_owner()
+mask_noncode = scene_owner.mask_noncode
+matching_paren = scene_owner.matching_paren
 
 
 # The palette's px derivations: pure math only, never a layout length source.
@@ -108,18 +125,6 @@ def matching_brace(masked: str, opening: int) -> int | None:
             depth -= 1
             if depth == 0:
                 return index + 1
-    return None
-
-
-def matching_paren(masked: str, opening: int) -> int | None:
-    depth = 0
-    for index in range(opening, len(masked)):
-        if masked[index] == "(":
-            depth += 1
-        elif masked[index] == ")":
-            depth -= 1
-            if depth == 0:
-                return index
     return None
 
 
@@ -289,7 +294,7 @@ def px_source(expression: str, bindings: dict[str, int]) -> str | None:
 
 def scan_file(path: Path, repository: Path) -> list[Violation]:
     original = path.read_text(encoding="utf-8")
-    masked = mask_rust(original)
+    masked = mask_noncode(original)
     bindings = px_derived_bindings(masked)
     functions = functions_of(masked)
     relative = path.relative_to(repository).as_posix()
@@ -352,13 +357,13 @@ def scan_call_flow(
     violations: list[Violation] = []
     definitions: dict[str, list[Function]] = {}
     for original in files.values():
-        masked = mask_rust(original)
+        masked = mask_noncode(original)
         for function in functions_of(masked):
             if function.length_parameters:
                 definitions.setdefault(function.name, []).append(function)
 
     for path, original in files.items():
-        masked = mask_rust(original)
+        masked = mask_noncode(original)
         if not PX_DERIVATION.search(masked):
             continue
         bindings = px_derived_bindings(masked)

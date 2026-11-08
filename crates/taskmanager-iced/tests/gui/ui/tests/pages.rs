@@ -10,8 +10,7 @@ use super::super::system_table::{
     hardware_info_rows, hardware_list_state, npu_device_view_models, telemetry_rows,
 };
 use super::super::tables::{
-    ListState, service_action_label, service_description, service_heading, service_list_state,
-    service_rows,
+    ListState, service_description, service_heading, service_list_state, service_rows,
 };
 use super::super::*;
 use super::filtered_services;
@@ -22,6 +21,7 @@ use crate::ui::applications::{
 };
 use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::services::{ServiceAction, ServiceStatus};
+use taskmanager_application::i18n::service_action_label;
 use taskmanager_shell::PageHelp;
 use taskmanager_shell::presentation::{bytes, duration};
 
@@ -187,9 +187,9 @@ fn unit_matrix_preference_switches_bytes_bits_and_base() {
 
 #[test]
 fn unavailable_performance_metrics_do_not_become_zero_percent() {
-    assert_eq!(percent_text("CPU", None), "CPU —");
-    // GPUI gauge parity: integer percent, space before the unit.
-    assert_eq!(percent_text("CPU", Some(0.0)), "CPU 0 %");
+    assert_eq!(gauge_caption("CPU", None), "CPU —");
+    // The shared percent spelling: a whole percent, no space before the unit.
+    assert_eq!(gauge_caption("CPU", Some(0.0)), "CPU 0%");
 }
 
 /// The composition-bar segment color is the iced-specific edge of the shared

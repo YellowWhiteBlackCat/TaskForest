@@ -14,55 +14,18 @@ use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, channel};
 
 use bevy::ecs::resource::Resource;
-use taskforest_contract::TrayController;
+use taskforest_contract::{TrayController, TrayControllerTarget, sync_tray_pause_checkmark};
 use taskforest_core::core::tray::{
-    TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
-    TraySpecError,
+    TRAY_ACTION_PAUSE, TRAY_ACTION_QUIT, TRAY_ACTION_SHOW, TrayEvent, TrayMenuItem, TrayMenuSpec,
+    TraySpec, TraySpecError,
 };
 use taskmanager_app_host::spawn_tray;
 use taskmanager_application::i18n::t;
-use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
-
-/// Stable tray action identifiers shared with other frontends.
-pub const TRAY_ACTION_SHOW: TrayActionId = 1;
-pub const TRAY_ACTION_PAUSE: TrayActionId = 2;
-pub const TRAY_ACTION_QUIT: TrayActionId = 3;
-
-/// Frontend intent behind a tray activation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TrayIntent {
-    /// Restore and foreground the main Bevy window.
-    Show,
-    /// Toggle the telemetry refresh pause state.
-    TogglePause,
-    /// Close the process and release resources.
-    Quit,
-}
-
-/// Pure mapping from a native action id to a Bevy UI tray intent.
-#[must_use]
-pub fn resolve_tray_action(id: TrayActionId) -> Option<TrayIntent> {
-    match id {
-        TRAY_ACTION_SHOW => Some(TrayIntent::Show),
-        TRAY_ACTION_PAUSE => Some(TrayIntent::TogglePause),
-        TRAY_ACTION_QUIT => Some(TrayIntent::Quit),
-        _ => None,
-    }
-}
-
-/// Deterministic 22x22 RGBA tray icon. The native adapters all consume the
-/// same validated bytes, so frontends do not drift visually.
-pub fn tray_icon_pixels() -> Result<TrayIconData, TrayIconError> {
-    TrayIconData::from_rgba(
-        product_tray_icon_rgba().to_vec(),
-        PRODUCT_TRAY_ICON_SIZE,
-        PRODUCT_TRAY_ICON_SIZE,
-    )
-}
+use taskmanager_assets::{product, product_tray_icon_data};
 
 /// Build the localized Bevy tray spec. `paused` seeds the refresh checkmark.
 pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
-    let icon = tray_icon_pixels().map_err(TraySpecError::Icon)?;
+    let icon = product_tray_icon_data().map_err(TraySpecError::Icon)?;
     let menu = TrayMenuSpec::from_items(vec![
         TrayMenuItem::Action {
             id: TRAY_ACTION_SHOW,
@@ -92,21 +55,9 @@ pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
     )
 }
 
-/// Target that can provide an optional reference to a [`TrayController`].
-pub trait TrayControllerTarget {
-    fn controller(&self) -> Option<&dyn TrayController>;
-}
-
 impl TrayControllerTarget for TrayResource {
     fn controller(&self) -> Option<&dyn TrayController> {
         self.controller.as_deref()
-    }
-}
-
-/// Update the pause checkmark state on the tray controller.
-pub fn sync_tray_pause_checkmark<T: TrayControllerTarget + ?Sized>(target: &T, paused: bool) {
-    if let Some(controller) = target.controller() {
-        let _ = controller.set_item_checked(TRAY_ACTION_PAUSE, paused);
     }
 }
 

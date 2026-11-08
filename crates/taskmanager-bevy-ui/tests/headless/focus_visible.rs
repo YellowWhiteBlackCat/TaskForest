@@ -19,8 +19,9 @@ use bevy::ui::{Node, Outline};
 use bevy::ui_widgets::Button;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_ui_contract::InputModality;
 
-use super::{FocusRingVisible, InputModality, InputModalityState};
+use super::{FocusRingVisible, InputModalityState};
 use crate::palette::ui_palette;
 use crate::window::WindowPalette;
 

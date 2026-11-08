@@ -18,10 +18,7 @@ use taskforest_core::core::config::Config;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ConfigDrain;
 use taskmanager_application::ConfigPublicationOutcome;
-use taskmanager_application::ConfigRecovery;
-use taskmanager_application::ConfigRecoveryNotice;
 use taskmanager_application::ConfigRevision;
-use taskmanager_application::ConfigStoreErrorKind;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
@@ -213,46 +210,16 @@ pub(super) fn drain_config_publications(
             ConfigPublicationOutcome::SaveFailed { error, .. } => Some(
                 i18n::t("settings.config_not_saved").replace("{kind}", error.kind().stable_code()),
             ),
-            ConfigPublicationOutcome::RefreshFailed(recovery) => Some(config_recovery_message(
-                i18n::t("settings.config_refresh_failed"),
-                *recovery,
-            )),
-            ConfigPublicationOutcome::Refreshed(recovery) => {
-                initial_config_recovery_message(*recovery)
+            ConfigPublicationOutcome::RefreshFailed(recovery) => {
+                Some(recovery.message_with_prefix(i18n::t("settings.config_refresh_failed")))
             }
+            ConfigPublicationOutcome::Refreshed(recovery) => recovery.initial_message(),
             _ => None,
         };
         if let Some(feedback) = feedback {
             let _ = weak.update(cx, |view, cx| view.show_local_feedback(feedback, cx));
         }
     }
-}
-
-pub(super) fn initial_config_recovery_message(recovery: ConfigRecovery) -> Option<String> {
-    match recovery.initial_notice() {
-        ConfigRecoveryNotice::None => None,
-        ConfigRecoveryNotice::Recovered => Some(config_recovery_message(
-            i18n::t("settings.config_recovered"),
-            recovery,
-        )),
-        ConfigRecoveryNotice::Failed => Some(config_recovery_message(
-            i18n::t("settings.config_load_failed"),
-            recovery,
-        )),
-    }
-}
-
-pub(super) fn config_recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
-    format!(
-        "{prefix}: source={:?}, primary={}, backup={}",
-        recovery.source(),
-        recovery
-            .primary_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-        recovery
-            .backup_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-    )
 }
 
 #[cfg(test)]

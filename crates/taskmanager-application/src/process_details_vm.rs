@@ -73,6 +73,7 @@
 use crate::i18n;
 use std::path::Path;
 
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskforest_core::core::time::LocalTimeRulesObservation;
@@ -406,7 +407,9 @@ pub fn process_details_rows_with_local_time(
             value: text(item.current_memory_anon_huge_pages_bytes().map(|bytes| {
                 let value = format_memory(bytes, units);
                 item.current_memory_anon_huge_pages_ratio()
-                    .map_or(value.clone(), |ratio| format!("{value} ({ratio:.1}% RSS)"))
+                    .map_or(value.clone(), |ratio| {
+                        format!("{value} ({} RSS)", percent_text(ratio))
+                    })
             })),
         },
         ProcessDetailsRowVm {
@@ -528,9 +531,10 @@ pub fn detail_value(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) ->
         .map_or(&DetailValue::MISSING, |row| &row.value)
 }
 
-/// `{:.1}%` — the majority CPU spelling (alignment padding stays a layout concern).
+/// The precise percent spelling — the majority CPU spelling (alignment
+/// padding stays a layout concern).
 fn format_cpu_percent(cpu: f32) -> String {
-    format!("{cpu:.1}%")
+    precise_percent_text(cpu)
 }
 
 /// `+10` / `0` / `-5` — the majority niceness spelling, pinned to the

@@ -191,11 +191,16 @@ pub fn bytes_to_gib(bytes: u64) -> f64 {
     split_units(bytes, 1024 * 1024 * 1024)
 }
 
+/// One mebibyte in bytes — the binary unit the MiB/s → bytes/s presentation
+/// conversions lift rates with (`rate_mib_per_second * BYTES_PER_MIB`), so
+/// every surface multiplies by the same fact instead of re-deriving 1024².
+pub const BYTES_PER_MIB: u64 = 1024 * 1024;
+
 /// Convert bytes to binary mebibytes without first rounding the complete byte
 /// count to `f64`.
 #[must_use]
 pub fn bytes_to_mib(bytes: u64) -> f64 {
-    split_units(bytes, 1024 * 1024)
+    split_units(bytes, BYTES_PER_MIB)
 }
 
 /// Percentage share of `used` within `total`. A missing/zero denominator is

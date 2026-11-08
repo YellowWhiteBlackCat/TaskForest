@@ -1,6 +1,37 @@
 use super::*;
 
 #[test]
+fn history_windows_carry_one_catalog_key_and_one_compact_token_each() {
+    let windows = HistoryWindow::ALL;
+    let keys: Vec<_> = windows.iter().map(|window| window.i18n_key()).collect();
+    let tokens: Vec<_> = windows
+        .iter()
+        .map(|window| window.compact_token())
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "perf.replay.window.1h",
+            "perf.replay.window.24h",
+            "perf.replay.window.7d",
+        ]
+    );
+    assert_eq!(tokens, ["1h", "24h", "7d"]);
+    let unique_keys: std::collections::HashSet<_> = keys.iter().collect();
+    let unique_tokens: std::collections::HashSet<_> = tokens.iter().collect();
+    assert_eq!(
+        unique_keys.len(),
+        windows.len(),
+        "catalog keys must be unique: {keys:?}"
+    );
+    assert_eq!(
+        unique_tokens.len(),
+        windows.len(),
+        "compact tokens must be unique: {tokens:?}"
+    );
+}
+
+#[test]
 fn metric_slugs_round_trip_and_stay_unique() {
     let mut slugs = Vec::new();
     for metric in HistoryMetric::ALL {

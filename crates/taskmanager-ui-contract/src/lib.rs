@@ -52,7 +52,9 @@ pub use feature_coverage::{
     classify, feature_coverage_drift, feature_coverage_findings, feature_coverage_report,
     feature_platform_cell_findings, feature_platform_gate_findings, feature_platform_report,
 };
-pub use focus::{FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, ModalFocusPolicy};
+pub use focus::{
+    FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, InputModality, ModalFocusPolicy,
+};
 pub use functional::{
     ContractLayer, FrontendFunctionalDeclaration, FunctionalEntry, FunctionalFinding,
     FunctionalFindingKind, FunctionalStatus, IntentFamily, IntentLifecycle, ProductIntent,
@@ -69,7 +71,9 @@ pub use navigation::{
     PageDescriptor, page_descriptor, page_descriptors, page_key_chord, page_shortcut,
 };
 pub use overlay::{
-    OverlayDismissCause, OverlayDismissContext, OverlayDismissOutcome, OverlayKind, dismiss_outcome,
+    OverlayDismissCause, OverlayDismissContext, OverlayDismissOutcome, OverlayEvent, OverlayKind,
+    OverlayKindOf, OverlaySlot, OverlaySlotCommand, OverlaySlotOutcome, OverlayTransition,
+    dismiss_outcome, tooltip_dismisses,
 };
 pub use text_edit::{
     TextEditState, TextMotion, char_boundary_at_or_before, line_range, word_range,

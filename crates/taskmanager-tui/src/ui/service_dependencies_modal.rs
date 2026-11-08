@@ -12,6 +12,7 @@ use taskmanager_ui_contract::IconId;
 use super::containers::{KeyHint, Modal};
 use crate::{ServiceDependenciesTarget, TuiApp, TuiTheme};
 use taskforest_core::core::target::ServiceId;
+use zhuge_ui_core::row_page::clamped_first;
 
 /// Render the service dependencies modal overlay.
 pub(super) fn render_service_dependencies_at(
@@ -78,9 +79,9 @@ pub(super) fn render_service_dependencies_at(
 
     let total_lines = lines.len();
     let visible_height = usize::from(body.height);
-    let scroll = target
-        .scroll
-        .min(total_lines.saturating_sub(visible_height));
+    // The shared row-page owner clamps the stored scroll, so a list that
+    // shrank while the modal stayed open never skips past its own tail.
+    let scroll = clamped_first(total_lines, visible_height, target.scroll);
     let visible_lines = lines
         .into_iter()
         .skip(scroll)

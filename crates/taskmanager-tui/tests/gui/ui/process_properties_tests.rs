@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process::process_ancestor_lineage;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField, detail_value};
 

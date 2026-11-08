@@ -5,6 +5,7 @@ use taskmanager_shell::SortCol;
 
 use gpui::{App, FocusHandle, Pixels};
 use taskforest_core::core::process::ProcessLiveKey;
+use taskmanager_application::process_category_projection::default_category_expansions;
 
 use crate::gpui_app::{processes_view, services_view, startup_view};
 
@@ -72,7 +73,7 @@ impl Default for ProcessesState {
     fn default() -> Self {
         Self {
             collapsed: HashSet::new(),
-            expanded_apps: processes_view::default_category_expansions(),
+            expanded_apps: default_category_expansions(),
             affinity_editor: ProcessAffinityEditorState::default(),
             hidden_cols: HashSet::from([
                 SortCol::Threads,

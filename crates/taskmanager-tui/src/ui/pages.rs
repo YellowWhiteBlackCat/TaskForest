@@ -18,12 +18,12 @@ use super::containers::{
 };
 use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
-use taskforest_core::core::session::SessionControlAction;
-use taskforest_core::core::startup::{StartupEntry, StartupImpactEvidence, StartupScope};
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::i18n;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{InfoSortCol, SortDir};
+use zhuge_ui_core::row_page::RowPage;
 
 mod service_details;
 mod service_log;
@@ -208,30 +208,6 @@ pub(super) fn users_page_layout(app: &TuiApp, area: Rect) -> UsersPageLayout {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct SystemFactViewport {
-    start: usize,
-    end: usize,
-    total: usize,
-}
-
-impl SystemFactViewport {
-    fn resolve(total: usize, requested: usize, area: Rect) -> Self {
-        let rows = usize::from(area.height.saturating_sub(2));
-        let visible = total.min(rows);
-        let start = requested.min(total.saturating_sub(visible));
-        Self {
-            start,
-            end: start.saturating_add(visible),
-            total,
-        }
-    }
-
-    const fn is_windowed(self) -> bool {
-        self.end.saturating_sub(self.start) < self.total
-    }
-}
-
 pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     if app.system_section == SystemPageSection::Dashboard {
         super::system_dashboard::render(frame, app, theme, area);
@@ -263,14 +239,20 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: true });
     let rendered_rows = paragraph.line_count(area.width.saturating_sub(2));
-    let viewport = SystemFactViewport::resolve(rendered_rows, app.system_scroll, area);
-    let title = if viewport.is_windowed() {
+    // The shared row-page owner owns the window: the panel's row capacity and
+    // the requested scroll top go in, one in-bounds page comes back.
+    let viewport = RowPage::pin(
+        rendered_rows,
+        usize::from(area.height.saturating_sub(2)),
+        app.system_scroll,
+    );
+    let title = if viewport.len() < rendered_rows {
         format!(
             "{} · ↑/↓ {}–{} / {}",
             t("page.system_help"),
-            viewport.start.saturating_add(1),
-            viewport.end,
-            viewport.total,
+            viewport.first().saturating_add(1),
+            viewport.last(),
+            rendered_rows,
         )
     } else {
         t("page.system_help").to_owned()
@@ -279,9 +261,9 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
         format!(
             "{} · ↑/↓ {}–{} / {}",
             t("system.title"),
-            viewport.start.saturating_add(1),
-            viewport.end,
-            viewport.total,
+            viewport.first().saturating_add(1),
+            viewport.last(),
+            rendered_rows,
         )
     } else {
         title
@@ -289,7 +271,7 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
     frame.render_widget(
         paragraph
             .block(panel(&title, theme))
-            .scroll((u16::try_from(viewport.start).unwrap_or(u16::MAX), 0)),
+            .scroll((u16::try_from(viewport.first()).unwrap_or(u16::MAX), 0)),
         area,
     );
 }
@@ -413,42 +395,7 @@ pub(super) fn render_startup(
     }
 }
 
-/// The source column with its scope suffix (GPUI parity: the row reads
-/// `Desktop Entry · User` instead of the bare provider label).
-pub(super) fn startup_source_text(entry: &StartupEntry) -> String {
-    format!(
-        "{} · {}",
-        entry.source.as_str(),
-        startup_scope_text(entry.scope)
-    )
-}
-
-fn startup_scope_text(scope: StartupScope) -> &'static str {
-    match scope {
-        StartupScope::User => t("startup.scope_user"),
-        StartupScope::System => t("startup.scope_system"),
-        StartupScope::Session => t("startup.scope_session"),
-        StartupScope::Unknown => t("startup.scope_unknown"),
-    }
-}
-
-/// The impact column with its evidence (GPUI parity: `Low · 42 ms` for a
-/// measured boot impact, `Low · unmeasured` when the provider could not
-/// instrument it — never a fabricated duration).
-pub(super) fn startup_impact_text(entry: &StartupEntry) -> String {
-    match entry.impact_evidence {
-        StartupImpactEvidence::Measured { duration_ms } => {
-            format!("{} · {duration_ms} ms", t(entry.impact.i18n_key()))
-        }
-        StartupImpactEvidence::Unknown { .. } => {
-            format!(
-                "{} · {}",
-                t(entry.impact.i18n_key()),
-                t("startup.impact_unmeasured")
-            )
-        }
-    }
-}
+pub(super) use taskmanager_shell::presentation::{startup_impact_text, startup_source_text};
 
 pub(super) fn render_users(
     frame: &mut Frame<'_>,
@@ -546,10 +493,7 @@ pub(super) fn render_users(
 fn session_feedback_line(app: &TuiApp, theme: TuiTheme) -> Option<Line<'static>> {
     let outcome = app.shell.projection().session_control_feedback.as_ref()?;
     let target = outcome.identity.session_id.to_string();
-    let action = match outcome.action {
-        SessionControlAction::Disconnect => t("users.disconnect"),
-        SessionControlAction::Lock => t("users.lock"),
-    };
+    let action = i18n::session_control_action_label(outcome.action);
     match &outcome.result {
         Ok(()) => Some(Line::from(Span::styled(
             t("feedback.session_request_accepted")

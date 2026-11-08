@@ -6,11 +6,13 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use taskforest_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
+use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::{TuiApp, TuiTheme};
+use taskforest_core::core::percent::percent_text;
 
 pub(super) fn render_npu_section(
     frame: &mut Frame<'_>,
@@ -81,7 +83,7 @@ pub(super) fn render_npu_section(
         let util_text = device
             .utilization_pct
             .current_value()
-            .map_or_else(missing_value, |pct| format!("{pct:>5.1}%"));
+            .map_or_else(missing_value, |pct| format!("{:>5}", percent_text(*pct)));
         lines.push(Line::from(vec![
             Span::styled(
                 format!("  {}: ", t("common.utilization")),
@@ -132,18 +134,11 @@ pub(super) fn render_npu_section(
                 Style::default().fg(theme.dim),
             )]));
             for engine in &device.engines {
-                let label = match engine.kind {
-                    NpuEngineKind::Compute => t("npu.engine_compute"),
-                    NpuEngineKind::Matrix => t("npu.engine_matrix"),
-                    NpuEngineKind::Vector => t("npu.engine_vector"),
-                    NpuEngineKind::Video => t("npu.engine_video"),
-                    NpuEngineKind::Copy => t("npu.engine_copy"),
-                    NpuEngineKind::Unknown => t("npu.engine_unknown"),
-                };
+                let label = i18n::npu_engine_kind_label(engine.kind);
                 let eng_pct = engine
                     .utilization_pct
                     .current_value()
-                    .map_or_else(missing_value, |pct| format!("{pct:>5.1}%"));
+                    .map_or_else(missing_value, |pct| format!("{:>5}", percent_text(*pct)));
                 lines.push(Line::from(vec![
                     Span::styled(format!("    {label}: "), Style::default().fg(theme.dim)),
                     Span::raw(eng_pct),

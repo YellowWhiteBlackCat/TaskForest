@@ -27,6 +27,9 @@ use taskforest_core::core::process_telemetry::{
 };
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, ContainerQuotaState, container_quota_view, quota_readout,
+};
 
 const GIB: u64 = 1024 * 1024 * 1024;
 
@@ -244,7 +247,7 @@ fn an_overrun_stays_visible_and_is_never_clamped() {
     );
     assert_eq!(
         quota_readout(&view),
-        "150.0%",
+        "150%",
         "the row shows the overrun as the percentage it reached"
     );
 }
@@ -318,7 +321,7 @@ fn overlay_buffer(containers: Vec<ContainerSummary>) -> Terminal<TestBackend> {
     let mut terminal = Terminal::new(backend).expect("test terminal");
     terminal
         .draw(|frame| {
-            super::super::containers_support::render_containers_overlay(
+            super::containers_support::render_containers_overlay(
                 frame,
                 &app,
                 crate::TuiTheme::default(),
@@ -366,11 +369,11 @@ fn the_overlay_paints_the_declared_quota_and_never_an_invented_limit() {
     ]);
     let text = terminal.backend().to_string();
     assert!(
-        text.contains("150.0%"),
+        text.contains("150%"),
         "the overrun paints the share it actually reached: {text}"
     );
     assert!(
-        !text.contains("100.0%"),
+        !text.contains("100%"),
         "an overrun never reads as exactly the declared ceiling: {text}"
     );
     assert!(
@@ -431,7 +434,7 @@ fn the_quota_readout_never_paints_past_the_panel_border() {
             .map(|cell| cell.symbol())
             .collect();
         if readout_column.is_none()
-            && let Some(position) = row.find("150.0%")
+            && let Some(position) = row.find("150%")
         {
             readout_column = Some(position);
         }
@@ -444,7 +447,7 @@ fn the_quota_readout_never_paints_past_the_panel_border() {
     let readout_column = readout_column.expect("the quota readout paints");
     let border_column = border_column.expect("the overlay paints a bordered panel");
     assert!(
-        readout_column + "150.0%".len() <= border_column,
+        readout_column + "150%".len() <= border_column,
         "the quota readout stays inside the panel: {readout_column} >= {border_column}"
     );
     let text = terminal.backend().to_string();

@@ -49,31 +49,28 @@ fn replacement_and_stale_dismiss_preserve_one_owner() {
         }
     );
     assert_eq!(
-        state.reduce(WindowSurfaceEvent::Dismiss {
-            expected: WindowSurfaceKind::Settings,
-            reason: WindowSurfaceDismissReason::CloseButton,
-        }),
+        state.reduce(WindowSurfaceEvent::Dismiss(
+            WindowSurfaceKind::Settings,
+            WindowSurfaceDismissReason::CloseButton,
+        )),
         WindowSurfaceTransition::Unchanged
     );
     assert_eq!(state.kind(), Some(WindowSurfaceKind::Help));
     assert_eq!(
-        state.reduce(WindowSurfaceEvent::Dismiss {
-            expected: WindowSurfaceKind::Settings,
-            reason: WindowSurfaceDismissReason::Cancel,
-        }),
+        state.reduce(WindowSurfaceEvent::Dismiss(
+            WindowSurfaceKind::Settings,
+            WindowSurfaceDismissReason::Cancel,
+        )),
         WindowSurfaceTransition::Unchanged,
         "a stale close branch cannot consume the current surface"
     );
     assert_eq!(state.kind(), Some(WindowSurfaceKind::Help));
     assert!(matches!(
-        state.reduce(WindowSurfaceEvent::Dismiss {
-            expected: WindowSurfaceKind::Help,
-            reason: WindowSurfaceDismissReason::Cancel,
-        }),
-        WindowSurfaceTransition::Dismissed {
-            surface: WindowSurfaceKind::Help,
-            ..
-        }
+        state.reduce(WindowSurfaceEvent::Dismiss(
+            WindowSurfaceKind::Help,
+            WindowSurfaceDismissReason::Cancel,
+        )),
+        WindowSurfaceTransition::Dismissed(WindowSurfaceKind::Help, _)
     ));
     assert_eq!(state.kind(), None);
 }

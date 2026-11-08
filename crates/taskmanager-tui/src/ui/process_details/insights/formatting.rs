@@ -2,10 +2,13 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::process_telemetry::{ProcessGpuDevice, ProcessGpuEngineUsage};
 use taskmanager_application::ProjectedProcessResources;
 use taskmanager_application::i18n::t;
+pub(crate) use taskmanager_shell::presentation::format_open_file_row;
 use taskmanager_shell::presentation::{bytes, format_open_files_saturation, missing_value};
+pub(crate) use taskmanager_shell::presentation::{format_engine_cycles, format_engine_time};
 
 use crate::TuiTheme;
 
@@ -14,7 +17,7 @@ pub(crate) fn format_gpu_device_row(device: &ProcessGpuDevice) -> String {
     let vram = device.memory_bytes.map_or_else(missing_value, bytes);
     let util = device
         .utilization_pct
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
+        .map_or_else(missing_value, percent_text);
     format!(
         "{} #{} {} · {} {}",
         t("common.gpu"),
@@ -23,23 +26,6 @@ pub(crate) fn format_gpu_device_row(device: &ProcessGpuDevice) -> String {
         t("gpu.vram_in_use"),
         vram,
     )
-}
-
-/// Format one engine's cumulative busy time as seconds.
-pub(crate) fn format_engine_time(nanoseconds: u64) -> String {
-    let seconds = nanoseconds as f64 / 1_000_000_000.0;
-    format!("{seconds:.1}s")
-}
-
-/// Format a cumulative cycle counter (xe fdinfo) as a compact count.
-pub(crate) fn format_engine_cycles(cycles: u64) -> String {
-    if cycles >= 1_000_000_000 {
-        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
-    } else if cycles >= 1_000_000 {
-        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
-    } else {
-        format!("{cycles} cycles")
-    }
 }
 
 /// Compact per-engine line: `name  usage%  cumulative`. The current usage is a
@@ -51,7 +37,7 @@ pub(crate) fn format_engine_usage_line(engine: &ProcessGpuEngineUsage) -> String
     let usage = engine
         .usage_pct
         .current_value()
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
+        .map_or_else(missing_value, |value| percent_text(*value));
     let cumulative = engine
         .engine_time_ns
         .current_value()
@@ -142,31 +128,13 @@ pub(crate) fn capabilities_preview_lines_with_limit(
 }
 
 use taskforest_core::core::process_telemetry::{
-    OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
+    ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
 };
-/// Compact open-file row: `fd [kind] → target`. A descriptor whose readlink failed
-/// (`target: None`) surfaces the typed unreadable marker, never a blank or a
-/// fabricated path.
-pub(crate) fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| unreadable.to_string());
-    if entry.deleted {
-        format!(
-            "{} [{}] → {} [deleted]",
-            entry.fd,
-            entry.resolved_kind(),
-            target
-        )
-    } else {
-        format!("{} [{}] → {}", entry.fd, entry.resolved_kind(), target)
-    }
-}
-
 /// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
-/// marker when readlink failed for any descriptor), then the first
-/// `limit` `fd → target` rows and an honest "…" when more remain.
+/// marker when readlink failed for any descriptor), then the first `limit`
+/// shared `fd {fd} [{kind}] → target` rows (see
+/// [`taskmanager_shell::presentation::format_open_file_row`]) and an honest
+/// "…" when more remain.
 pub(crate) fn open_files_preview_lines_with_limit(
     open_files: &ProcessOpenFiles,
     resources: Option<&ProjectedProcessResources>,

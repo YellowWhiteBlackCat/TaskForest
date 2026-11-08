@@ -77,7 +77,7 @@ fn full_fact_strip_keeps_every_current_gpu_scalar_together() {
     pin_english();
     let text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
     for fact in [
-        "55.0%",
+        "55%",
         "63°C",
         "1800 MHz",
         "2100 MHz",
@@ -88,7 +88,7 @@ fn full_fact_strip_keeps_every_current_gpu_scalar_together() {
         "160.0 GB/s",
         "Queue depth 3",
         "165.0 W",
-        "74.0%",
+        "74%",
         "1.0 GiB",
         "8.0 GiB",
         "512.0 MiB",
@@ -105,7 +105,7 @@ fn compact_fact_strip_keeps_primary_values_in_two_rows() {
     let lines = gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Compact);
     assert_eq!(lines.len(), 2);
     let text = joined(&lines);
-    for fact in ["55.0%", "63°C", "1800 MHz", "120.0 W", "74.0%"] {
+    for fact in ["55%", "63°C", "1800 MHz", "120.0 W", "74%"] {
         assert!(
             text.contains(fact),
             "compact fact strip lost primary value {fact:?}:\n{text}"
@@ -294,8 +294,8 @@ fn standard_engine_projection_includes_live_and_pmu_rows() {
         GpuEngineRowsPresentation::Active(&pmu.engines),
     );
     let text = joined(&lines);
-    assert!(text.contains("Render/3D") && text.contains("42.0%"));
-    assert!(text.contains("Render Ring") && text.contains("43.0%"));
+    assert!(text.contains("Render/3D") && text.contains("42%"));
+    assert!(text.contains("Render Ring") && text.contains("43%"));
 }
 
 #[test]
@@ -313,7 +313,7 @@ fn engine_without_history_is_an_honest_placeholder() {
         .map(line_text)
         .find(|line| line.contains("Render/3D"))
         .expect("engine row");
-    assert!(engine.contains("42.0%"));
+    assert!(engine.contains("42%"));
     assert!(engine.contains('·'));
     assert!(!engine.contains('█'));
 }
@@ -474,12 +474,26 @@ fn unavailable_selected_family_keeps_the_honest_dash_projection() {
 
 #[test]
 fn gpu_line_viewport_clamps_navigation_and_reaches_the_tail() {
-    assert_eq!(
-        GpuLineViewport::resolve(17, usize::MAX, 4),
-        GpuLineViewport {
-            start: 13,
-            end: 17,
-            total: 17
-        }
+    // The window arithmetic is owned by `zhuge-ui-core::row_page`; this proves
+    // the GPU panel wires it: a request past the end still paints the tail.
+    let lines: Vec<Line<'static>> = (0..17)
+        .map(|row| Line::from(format!("engine {row}")))
+        .collect();
+    let backend = TestBackend::new(60, 6);
+    let mut terminal = Terminal::new(backend).expect("test terminal");
+    terminal
+        .draw(|frame| {
+            let area = frame.area();
+            render_gpu_engine_viewport(frame, TuiTheme::default(), area, &lines, usize::MAX);
+        })
+        .expect("draw");
+    let text = terminal.backend().to_string();
+    assert!(
+        text.contains("engine 16") && text.contains("engine 13"),
+        "a request past the end pins to the last four engine lines:\n{text}"
+    );
+    assert!(
+        !text.contains("engine 12"),
+        "the pinned page never reaches back past its own first line:\n{text}"
     );
 }

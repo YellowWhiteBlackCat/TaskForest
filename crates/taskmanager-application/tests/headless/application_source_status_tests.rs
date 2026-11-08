@@ -209,3 +209,27 @@ fn truncation_respects_char_boundaries_and_limits() {
     assert_eq!(truncate_text("任务管理器任务", 5), "任务管理…");
     assert_eq!(truncate_text("任务", 5), "任务");
 }
+
+#[test]
+fn source_state_kind_banner_title_key_maps_expected_strings() {
+    assert_eq!(
+        SourceStateKind::Degraded.banner_title_key(),
+        "source.partial_title"
+    );
+    assert_eq!(
+        SourceStateKind::Failed.banner_title_key(),
+        "source.unavailable_title"
+    );
+    assert_eq!(
+        SourceStateKind::Stale.banner_title_key(),
+        "source.unavailable_title"
+    );
+    assert_eq!(
+        SourceStateKind::Ok.banner_title_key(),
+        "source.unavailable_title"
+    );
+    assert_eq!(
+        SourceStateKind::Unknown.banner_title_key(),
+        "source.unavailable_title"
+    );
+}

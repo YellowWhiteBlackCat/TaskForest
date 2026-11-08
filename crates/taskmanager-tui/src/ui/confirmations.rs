@@ -7,10 +7,11 @@ use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 
 use super::containers::{KeyHint, KeyHintTone, Modal};
-use super::{service_menu, session_menu};
+use super::session_menu;
 use crate::TuiApp;
 use crate::TuiTheme;
 use taskforest_core::core::process::ProcessBatchIntent;
@@ -87,7 +88,7 @@ pub(super) fn render_service_control_confirmation_at(
     popup: Rect,
 ) {
     let inner = Modal::alert(theme, theme.danger, t("confirm.service_title")).render(frame, popup);
-    let action_label = service_menu::action_label(pending.action);
+    let action_label = i18n::service_action_label(pending.action);
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(Span::styled(

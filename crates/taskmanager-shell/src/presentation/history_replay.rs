@@ -14,3 +14,15 @@ pub fn row_heading(key: &HistorySeriesKey) -> String {
     }
     heading
 }
+
+/// Format a peak value according to standard scale rules.
+#[must_use]
+pub fn format_peak(peak: f64) -> String {
+    if peak.abs() >= 100.0 {
+        format!("{peak:.0}")
+    } else if peak.abs() >= 1.0 {
+        format!("{peak:.1}")
+    } else {
+        format!("{peak:.3}")
+    }
+}

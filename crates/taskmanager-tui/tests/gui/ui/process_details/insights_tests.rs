@@ -200,7 +200,7 @@ fn format_engine_usage_line_keeps_cold_start_honest() {
     };
     let warm = format_engine_usage_line(&warm_engine);
     let gap = format_engine_usage_line(&gap_engine);
-    assert!(warm.contains("video") && warm.contains("12.5%") && warm.contains("2.5s"));
+    assert!(warm.contains("video") && warm.contains("13%") && warm.contains("2.5s"));
     assert!(
         gap.contains("render") && gap.contains("—") && !gap.contains("0.0%"),
         "a cold-start engine must show a dash, got: {gap}"
@@ -238,7 +238,7 @@ fn format_gpu_device_row_renders_device_id_and_vram() {
     };
     let line = format_gpu_device_row(&device);
     assert!(line.contains("GPU #0"), "{line}");
-    assert!(line.contains("42.0%"), "{line}");
+    assert!(line.contains("42%"), "{line}");
     assert!(line.contains("1.0 GiB"), "{line}");
 }
 
@@ -640,10 +640,10 @@ fn insights_lines_renders_environment_and_gpu_facets() {
     assert!(text.contains("VAR_A=val_a"), "{text}");
     assert!(text.contains("VAR_B=val_b"), "{text}");
     assert!(text.contains("GPU #0"), "{text}");
-    assert!(text.contains("55.0%"), "{text}");
+    assert!(text.contains("55%"), "{text}");
     assert!(text.contains("2.0 GiB"), "{text}");
     assert!(text.contains("3d"), "{text}");
-    assert!(text.contains("22.0%"), "{text}");
+    assert!(text.contains("22%"), "{text}");
     assert!(text.contains("1.5s"), "{text}");
 }
 
@@ -725,7 +725,7 @@ fn format_gpu_device_row_partial_observations_render_dashes_honestly() {
     };
     let line1 = format_gpu_device_row(&util_only);
     assert!(line1.contains("GPU #card0"), "{line1}");
-    assert!(line1.contains("78.4%"), "{line1}");
+    assert!(line1.contains("78%"), "{line1}");
     assert!(
         line1.contains("· VRAM in use —"),
         "missing VRAM must show dash: {line1}"
@@ -778,7 +778,7 @@ fn format_engine_usage_line_precedence_and_missing_counters() {
     };
     let line = format_engine_usage_line(&both_present);
     assert!(line.contains("compute"), "{line}");
-    assert!(line.contains("50.0%"), "{line}");
+    assert!(line.contains("50%"), "{line}");
     assert!(
         line.contains("3.0s"),
         "engine_time_ns must take precedence: {line}"
@@ -796,7 +796,7 @@ fn format_engine_usage_line_precedence_and_missing_counters() {
         engine_cycles: ScalarObservation::default(),
     };
     let line2 = format_engine_usage_line(&usage_only);
-    assert!(line2.contains("copy  10.0%  —"), "{line2}");
+    assert!(line2.contains("copy  10%  —"), "{line2}");
 
     // 3. When cold-start and cycles in millions are observed
     let cycles_m = ProcessGpuEngineUsage {

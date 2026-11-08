@@ -13,6 +13,7 @@ use iced::widget::{canvas, column, container, row, text};
 use iced::{Element, Length};
 use taskforest_core::core::history::{HistoryMetric, HistoryWindow};
 use taskmanager_application::i18n::t;
+pub(crate) use taskmanager_shell::presentation::format_peak;
 use taskmanager_shell::presentation::history_replay::row_heading;
 
 use taskmanager_theme::tokens;
@@ -32,20 +33,6 @@ fn history_window_label(window: HistoryWindow) -> &'static str {
         HistoryWindow::TwentyFourHours => "perf.replay.window.24h",
         HistoryWindow::SevenDays => "perf.replay.window.7d",
     })
-}
-
-/// Peak formatting keeps the persisted unit-free axis honest (GPUI parity):
-/// three significant decimals, no invented unit suffix — series carry their
-/// unit in the metric slug.
-#[must_use]
-pub(crate) fn format_peak(peak: f64) -> String {
-    if peak.abs() >= 100.0 {
-        format!("{peak:.0}")
-    } else if peak.abs() >= 1.0 {
-        format!("{peak:.1}")
-    } else {
-        format!("{peak:.3}")
-    }
 }
 
 /// Curve color follows the series' device family, mirroring the live

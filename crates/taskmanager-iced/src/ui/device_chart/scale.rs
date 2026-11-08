@@ -3,7 +3,7 @@
 //! finite-peak policy in one testable seam.
 
 use super::*;
-use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::{graph_summary_text, missing_value};
 
 /// The Y-axis scaling rule AND unit family for a per-device mini-graph,
 /// decoupled from the system-wide [`MetricSeries`] identity because the
@@ -76,7 +76,7 @@ impl From<TrendSeries> for DeviceMetricScale {
 #[must_use]
 pub(crate) fn series_max(scale: impl Into<DeviceMetricScale>, samples: &[f32]) -> f32 {
     match scale.into() {
-        DeviceMetricScale::Percent => PERCENT_MAX,
+        DeviceMetricScale::Percent => MAX_PERCENT,
         DeviceMetricScale::AutoPeak
         | DeviceMetricScale::Bytes { .. }
         | DeviceMetricScale::BytesPerSecond { .. }
@@ -150,13 +150,7 @@ pub(crate) fn device_readout_text(
 
 pub(crate) fn mini_graph_summary(scale: DeviceMetricScale, samples: &[f32]) -> Option<String> {
     let summary = graph_summary(samples)?;
-    Some(format!(
-        "{} {} · {} {} · {} {}",
-        t("common.latest"),
-        summary_value(scale, summary.latest),
-        t("common.avg"),
-        summary_value(scale, summary.average),
-        t("common.peak"),
-        summary_value(scale, summary.maximum),
-    ))
+    Some(graph_summary_text(&summary, None, " · ", |value| {
+        summary_value(scale, value)
+    }))
 }

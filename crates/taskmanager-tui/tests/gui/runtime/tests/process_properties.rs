@@ -11,6 +11,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::KeyModifiers;
 use taskmanager_application::AppPage;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::i18n::{Language, set_language};
 
 use crate::render;
@@ -184,7 +185,7 @@ fn tab_key_advances_to_performance_tab_with_peak_content() {
         .expect("modal stays open after tab switch");
     assert_eq!(
         target.section,
-        crate::ProcessDetailsSection::Performance,
+        ProcessDetailsSection::Performance,
         "Tab must advance to the Performance section"
     );
 
@@ -210,10 +211,10 @@ fn right_arrow_cycles_through_all_four_tabs() {
     );
     // Right arrow walks Overview → Performance → Command → Insights → Overview.
     for expected in [
-        crate::ProcessDetailsSection::Performance,
-        crate::ProcessDetailsSection::Command,
-        crate::ProcessDetailsSection::Insights,
-        crate::ProcessDetailsSection::Overview,
+        ProcessDetailsSection::Performance,
+        ProcessDetailsSection::Command,
+        ProcessDetailsSection::Insights,
+        ProcessDetailsSection::Overview,
     ] {
         let _ = handle_key(
             &mut app,
@@ -252,7 +253,7 @@ fn command_tab_renders_command_line_or_honest_dash() {
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Tab, KeyModifiers::NONE),
     );
     let target = app.process_properties().expect("modal stays open");
-    assert_eq!(target.section, crate::ProcessDetailsSection::Command);
+    assert_eq!(target.section, ProcessDetailsSection::Command);
 
     // The Command tab renders the "Command line" label (modal-localized kv
     // label); the value is the frozen row's cmdline or an honest dash.
@@ -284,7 +285,7 @@ fn insights_tab_shows_collecting_when_no_projection_is_seeded() {
         );
     }
     let target = app.process_properties().expect("modal stays open");
-    assert_eq!(target.section, crate::ProcessDetailsSection::Insights);
+    assert_eq!(target.section, ProcessDetailsSection::Insights);
 
     let text = frame_text(&app, 140, 48);
     assert!(
@@ -360,7 +361,7 @@ fn insights_tab_renders_thread_list_when_projection_is_present() {
     }
     assert_eq!(
         app.process_properties().unwrap().section,
-        crate::ProcessDetailsSection::Insights
+        ProcessDetailsSection::Insights
     );
 
     let _ = handle_key(
@@ -400,7 +401,7 @@ fn back_tab_and_left_arrow_reverse_through_the_tabs() {
     }
     assert_eq!(
         app.process_properties().unwrap().section,
-        crate::ProcessDetailsSection::Insights
+        ProcessDetailsSection::Insights
     );
     let _ = handle_key(
         &mut app,
@@ -411,7 +412,7 @@ fn back_tab_and_left_arrow_reverse_through_the_tabs() {
     );
     assert_eq!(
         app.process_properties().unwrap().section,
-        crate::ProcessDetailsSection::Command,
+        ProcessDetailsSection::Command,
         "BackTab must reverse to the Command section"
     );
     // Left arrow reverses again to Performance.
@@ -421,7 +422,7 @@ fn back_tab_and_left_arrow_reverse_through_the_tabs() {
     );
     assert_eq!(
         app.process_properties().unwrap().section,
-        crate::ProcessDetailsSection::Performance,
+        ProcessDetailsSection::Performance,
         "Left must reverse to the Performance section"
     );
 }
@@ -572,7 +573,7 @@ fn e_on_insights_tab_yields_the_shared_network_escalation_effect() {
     }
     assert_eq!(
         app.process_properties().unwrap().section,
-        crate::ProcessDetailsSection::Insights
+        ProcessDetailsSection::Insights
     );
 
     let effect = handle_key(

@@ -127,19 +127,6 @@ pub(crate) fn segment_origin(index: usize, count: usize, size: Size) -> Point {
     Point::new(size.width * index as f32 / count as f32, 0.0)
 }
 
-/// The finite positive peak across `samples` — the auto-scale `max` for a
-/// non-percentage (bytes/sec) trend series so its line rises with traffic
-/// instead of clamping flat. `0.0` when every sample is empty/zero/non-finite
-/// (idle), which [`series_point_runs_for`] renders as a flat baseline.
-#[must_use]
-pub(crate) fn finite_peak(samples: &[f32]) -> f32 {
-    samples
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite() && *value > 0.0)
-        .fold(0.0_f32, f32::max)
-}
-
 impl canvas::Program<Message> for TrendStrip {
     type State = TrendStripState;
 

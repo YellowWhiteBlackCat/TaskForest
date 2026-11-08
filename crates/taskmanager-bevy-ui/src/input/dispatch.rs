@@ -103,6 +103,8 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     selections: &'a InventorySelections<'n>,
     /// Search text-editing state (absent before the page resources mount).
     text_state: &'a mut Option<ResMut<'t, TextInputState>>,
+    /// The installed snapshot-export session, absent in minimal compositions.
+    snapshot_export: Option<&'a mut crate::snapshot_export::BevySnapshotExportRuntime>,
     /// Read-only text selection state.
     text_selection: Option<&'a mut crate::text_selection::TextSelectionState>,
     /// Clipboard port resource.
@@ -533,8 +535,10 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         {
             return false;
         }
-        let mut runtime = crate::snapshot_export::BevySnapshotExportRuntime::default();
-        runtime.request_snapshot_export(self.shell);
+        let Some(runtime) = self.snapshot_export.as_deref_mut() else {
+            return false;
+        };
+        crate::snapshot_export::request_snapshot_export(&mut runtime.0, self.shell);
         self.applied = true;
         true
     }
@@ -698,6 +702,8 @@ pub(crate) struct KeyboardDispatchOutputs<'w, 's> {
     clipboard: Option<ResMut<'w, crate::text_selection::ClipboardPort>>,
     /// Deferred commands (observer triggers).
     commands: Commands<'w, 's>,
+    /// The installed snapshot-export session, absent in minimal compositions.
+    snapshot_export: Option<ResMut<'w, crate::snapshot_export::BevySnapshotExportRuntime>>,
 }
 
 /// The `Update` keyboard adapter: normalize every just-pressed Bevy key and
@@ -735,6 +741,10 @@ pub(crate) fn keyboard_dispatch_system(
             perf_device_focus: inputs.perf_device_focus.as_deref(),
             surface: inputs.surface.as_deref(),
             setup: inputs.setup.as_deref(),
+            snapshot_export: outputs
+                .snapshot_export
+                .as_deref_mut()
+                .map(|slot| &mut *slot),
             native_text_focused: inputs.native_editing.is_some_and(|native| native.0)
                 && inputs
                     .focus

@@ -11,6 +11,7 @@ use iced::{Element, Length};
 use taskforest_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::smart::self_test_intent;
@@ -24,6 +25,8 @@ use crate::ui::components::{key_value_rows, styled_scrollable};
 use taskforest_core::core::SmartSelfTestKind;
 use taskforest_core::core::SmartSelfTestPhase;
 use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::percent::percent_text;
+use taskforest_core::core::storage_health::is_nvme_wear_critical;
 
 pub(crate) mod alerts;
 pub(crate) use alerts::*;
@@ -144,7 +147,7 @@ pub(super) fn smart_overlay<'a>(
                         if let Some(r) = report {
                             let mut report_info = format!("{:?}", r.phase);
                             if let Some(pct) = r.progress_pct {
-                                report_info.push_str(&format!(" ({pct:.0}%)"));
+                                report_info.push_str(&format!(" ({})", percent_text(pct)));
                             }
                             test_column = test_column.push(
                                 text(report_info).size(f32::from(tokens::FONT_11)).style(
@@ -198,19 +201,27 @@ fn smart_rows(disk: &DiskMetrics) -> Vec<(String, String)> {
         ));
     }
     if let Some(percent) = disk.smart_percent_used {
-        let value = if percent >= 100.0 {
-            format!("{percent:.0}% ⚠ {}", t("disk.exceeded_rated_life"))
+        let value = if is_nvme_wear_critical(percent) {
+            format!(
+                "{} ⚠ {}",
+                percent_text(percent),
+                t("disk.exceeded_rated_life")
+            )
         } else {
-            format!("{percent:.0}%")
+            percent_text(percent)
         };
         rows.push((t("disk.endurance_used").to_owned(), value));
     }
     if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
-        let value = if spare <= threshold {
-            format!("{spare:.0}% ⚠ (warning ≤ {threshold:.0}%)")
+        let threshold = disk.smart_spare_warning_threshold_pct();
+        let value = if disk.smart_spare_pool_needs_warning() {
+            format!(
+                "{} ⚠ (warning ≤ {})",
+                percent_text(spare),
+                percent_text(threshold)
+            )
         } else {
-            format!("{spare:.0}%")
+            percent_text(spare)
         };
         rows.push((t("disk.available_spare").to_owned(), value));
     }
@@ -339,7 +350,7 @@ fn suggestion_row<'a>(
     shell: &ShellApp,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
-        text(metric_label(metric)).width(Length::Fixed(190.0)),
+        text(i18n::alert_metric_label(metric)).width(Length::Fixed(190.0)),
         text(suggestion_text(metric, shell)).width(Length::Fill),
     ]
     .spacing(8)
@@ -359,7 +370,7 @@ pub(crate) fn suggestion_text(metric: AlertMetric, shell: &ShellApp) -> String {
         } => format!(
             "Suggested {:.1}{} · clear ±{hysteresis:.1} · {} · n={sample_count}",
             threshold,
-            metric_unit(metric),
+            metric.unit_suffix(),
             confidence_label(confidence),
         ),
         SuggestedThreshold::Insufficient {
@@ -370,26 +381,6 @@ pub(crate) fn suggestion_text(metric: AlertMetric, shell: &ShellApp) -> String {
             "Insufficient · {} ({sample_count}/{required})",
             insufficient_reason_label(reason)
         ),
-    }
-}
-
-pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => t("alerts.metric_cpu"),
-        AlertMetric::MemoryUsagePercent => t("alerts.metric_memory"),
-        AlertMetric::DiskTemperatureC => t("alerts.metric_disk_temperature"),
-        AlertMetric::SmartPercentUsed => t("alerts.metric_smart_used"),
-        AlertMetric::SmartCriticalWarning => t("alerts.metric_smart_critical"),
-    }
-}
-
-fn metric_unit(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => "%",
-        AlertMetric::DiskTemperatureC => "°C",
-        AlertMetric::SmartCriticalWarning => "",
     }
 }
 

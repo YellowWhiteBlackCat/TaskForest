@@ -8,9 +8,10 @@ use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use std::rc::Rc;
 use taskforest_core::core::startup::{
-    StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupImpact,
-    StartupImpactEvidence, StartupScope, StartupSource,
+    StartupBootEvidenceSnapshot, StartupControlPolicy, StartupImpact, StartupImpactEvidence,
+    StartupScope, StartupSource,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppPage, RefreshRequest};
 use zhuge_ui_core::virtual_list::VirtualWindow;
@@ -30,6 +31,7 @@ use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
 use taskmanager_application::StartupControlRequest;
+use taskmanager_application::{critical_chain_summary, failed_units_summary};
 use taskmanager_theme::Theme;
 
 mod timeline;
@@ -478,13 +480,13 @@ pub(super) fn startup_impact_text(row: &StartupRow) -> String {
         StartupImpactEvidence::Measured { duration_ms } => {
             format!(
                 "{} · {}",
-                t(row.impact.i18n_key()),
+                i18n::startup_impact_label(row.impact),
                 format_impact_time(duration_ms)
             )
         }
         StartupImpactEvidence::Unknown { .. } => format!(
             "{} · {}",
-            t(row.impact.i18n_key()),
+            i18n::startup_impact_label(row.impact),
             t("startup.impact_unmeasured")
         ),
     }
@@ -494,25 +496,12 @@ pub(super) fn startup_source_text(row: &StartupRow) -> String {
     format!(
         "{} · {}",
         row.source.as_str(),
-        startup_scope_text(row.scope)
+        i18n::startup_scope_label(row.scope)
     )
 }
 
-fn startup_scope_text(scope: StartupScope) -> &'static str {
-    match scope {
-        StartupScope::User => t("startup.scope_user"),
-        StartupScope::System => t("startup.scope_system"),
-        StartupScope::Session => t("startup.scope_session"),
-        StartupScope::Unknown => t("startup.scope_unknown"),
-    }
-}
-
 pub(super) fn startup_control_text(row: &StartupRow) -> &'static str {
-    match row.control_policy {
-        StartupControlPolicy::Direct => t("startup.control_direct"),
-        StartupControlPolicy::UserOverride => t("startup.control_user_override"),
-        StartupControlPolicy::Unsupported => t("startup.control_unsupported"),
-    }
+    i18n::startup_control_policy_label(row.control_policy)
 }
 
 /// Whether the selected row may carry a live enable/disable toggle. An
@@ -531,9 +520,6 @@ fn startup_control_actionable(row: &StartupRow) -> bool {
 // ("boot evidence unavailable"), a true empty set reads "0" — never a
 // fabricated zero or a silent absence.
 
-/// Up to this many failed-unit names appear in the summary pill.
-const MAX_FAILED_UNIT_NAMES: usize = 2;
-
 /// The projected strip contents; `failed_units_danger` marks a populated
 /// failed-units set so the renderer can wear the theme's danger token.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -549,51 +535,8 @@ fn boot_evidence_strip_data(
     evidence: Option<&StartupBootEvidenceSnapshot>,
 ) -> Option<BootEvidenceStrip> {
     let evidence = evidence?;
-    let failed_units = if evidence.failed_units_failure.is_some() {
-        t("startup.evidence_unavailable").to_string()
-    } else if evidence.failed_units.is_empty() {
-        "0".to_string()
-    } else {
-        let names = evidence
-            .failed_units
-            .iter()
-            .take(MAX_FAILED_UNIT_NAMES)
-            .map(|unit| unit.unit.as_str())
-            .collect::<Vec<_>>()
-            .join(" · ");
-        format!("{} · {names}", evidence.failed_units.len())
-    };
-    let critical_chain = if evidence.critical_chain_failure.is_some() {
-        t("startup.evidence_unavailable").to_string()
-    } else {
-        // Total measured boot time across the chain's nodes plus the head
-        // unit; untimed nodes contribute nothing, an all-untimed chain is an
-        // honest dash (a measured zero stays a real value).
-        let measured: Vec<&StartupCriticalChainNode> = evidence
-            .critical_chain
-            .iter()
-            .filter(|node| node.duration_ms.is_some())
-            .collect();
-        if measured.is_empty() {
-            missing_value()
-        } else {
-            let total_ms = measured.iter().fold(0_u64, |sum, node| {
-                sum.saturating_add(node.duration_ms.unwrap_or(0))
-            });
-            let head = measured
-                .first()
-                .map(|node| node.unit.as_str())
-                .unwrap_or("");
-            format!(
-                "{total_ms} ms{}",
-                if head.is_empty() {
-                    String::new()
-                } else {
-                    format!(" · {head}")
-                }
-            )
-        }
-    };
+    let failed_units = failed_units_summary(evidence);
+    let critical_chain = critical_chain_summary(evidence, &missing_value());
     Some(BootEvidenceStrip {
         failed_units,
         failed_units_danger: !evidence.failed_units.is_empty(),

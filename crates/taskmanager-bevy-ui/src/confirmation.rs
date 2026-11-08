@@ -40,6 +40,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskmanager_application::first_run::FirstRunController;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
 use taskmanager_shell::fixture::setup::setup_script_info;
@@ -162,7 +163,7 @@ impl PendingConfirmationView {
             }
             PendingConfirmation::ServiceControl(target) => {
                 let headline = t("confirm.action_headline")
-                    .replace("{action}", service_action_label(target.action))
+                    .replace("{action}", i18n::service_action_label(target.action))
                     .replace("{target}", target.service_id.as_str());
                 Some(Self {
                     kind: ConfirmationKind::ServiceControl,
@@ -202,10 +203,7 @@ impl PendingConfirmationView {
                 })
             }
             PendingConfirmation::SessionControl(pending) => {
-                let action_label = match pending.action {
-                    SessionControlAction::Disconnect => t("users.disconnect"),
-                    SessionControlAction::Lock => t("users.lock"),
-                };
+                let action_label = i18n::session_control_action_label(pending.action);
                 let headline = t("confirm.session_headline")
                     .replace("{action}", action_label)
                     .replace("{id}", pending.session.id.as_str())
@@ -255,30 +253,9 @@ fn service_action_token_session(action: SessionControlAction) -> &'static str {
     }
 }
 
-/// The shared action word for one service verb (the same `svc.*` fold the
-/// TUI's action menu uses).
-#[must_use]
-pub(crate) fn service_action_label(action: ServiceAction) -> &'static str {
-    match action {
-        ServiceAction::Start => t("svc.start"),
-        ServiceAction::Stop => t("svc.stop"),
-        ServiceAction::Restart => t("svc.restart"),
-        ServiceAction::Enable => t("svc.enable"),
-        ServiceAction::Disable => t("svc.disable"),
-        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
-    }
-}
-
 /// Stable token for the verb inside a target key.
 fn service_action_token(action: ServiceAction) -> &'static str {
-    match action {
-        ServiceAction::Start => "start",
-        ServiceAction::Stop => "stop",
-        ServiceAction::Restart => "restart",
-        ServiceAction::Enable => "enable",
-        ServiceAction::Disable => "disable",
-        ServiceAction::ReloadDaemon => "reload-daemon",
-    }
+    action.stable_token()
 }
 
 /// Stable, order-independent key over the frozen target set.

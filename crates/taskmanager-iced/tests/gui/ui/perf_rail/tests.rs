@@ -300,7 +300,7 @@ fn battery_and_fan_captions_read_capacity_rpm_and_badges() {
     assert_eq!(battery_rail_heading(&battery, 0), "Battery 0");
     assert_eq!(battery_rail_subtitle(&battery), "DELL 1P6KD");
     assert_eq!(
-        battery_rail_caption(&battery),
+        battery_caption(&battery),
         ("85%".to_string(), "Discharging".to_string())
     );
 
@@ -318,7 +318,7 @@ fn battery_and_fan_captions_read_capacity_rpm_and_badges() {
     .with_device_generation(DeviceGeneration::new(1));
     assert_eq!(fan_rail_heading(0), "Fan 0");
     assert_eq!(
-        fan_rail_caption(&fan),
+        fan_caption(&fan),
         ("1200 RPM".to_string(), "CPU Fan".to_string())
     );
 }

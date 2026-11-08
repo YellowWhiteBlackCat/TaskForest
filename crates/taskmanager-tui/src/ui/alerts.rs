@@ -23,6 +23,7 @@ use taskforest_core::core::alerts::{
     SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
 use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
@@ -102,7 +103,7 @@ pub(crate) fn metric_line(
     theme: TuiTheme,
 ) -> Line<'static> {
     let label = Span::styled(
-        super::text::pad_cells(metric_label(row), 18),
+        super::text::pad_cells(i18n::alert_metric_label(row), 18),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     );
     match suggestion {
@@ -122,7 +123,7 @@ pub(crate) fn metric_line(
                 label,
                 Span::raw(" "),
                 Span::styled(
-                    format!("{}{}", format_threshold(threshold), metric_unit(row)),
+                    format!("{}{}", format_threshold(threshold), row.unit_suffix()),
                     Style::new().fg(value_color).add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
@@ -153,29 +154,6 @@ pub(crate) fn metric_line(
                 Span::styled(marker, Style::new().fg(color)),
             ])
         }
-    }
-}
-
-pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => t("alerts.metric_cpu"),
-        AlertMetric::MemoryUsagePercent => t("alerts.metric_memory"),
-        AlertMetric::DiskTemperatureC => t("alerts.metric_disk_temperature"),
-        AlertMetric::SmartPercentUsed => t("alerts.metric_smart_used"),
-        AlertMetric::SmartCriticalWarning => t("alerts.metric_smart_critical"),
-    }
-}
-
-/// Unit suffix appended to a suggested threshold value. The binary
-/// SMART-warning metric never reaches the suggested branch, so it carries no
-/// unit.
-pub(crate) fn metric_unit(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => "%",
-        AlertMetric::DiskTemperatureC => "°C",
-        AlertMetric::SmartCriticalWarning => "",
     }
 }
 
@@ -228,14 +206,14 @@ pub(crate) fn managed_rule_line(
     Line::from(vec![
         Span::styled(prefix, prefix_style),
         Span::styled(
-            super::text::pad_cells(metric_label(managed.rule.metric), 18),
+            super::text::pad_cells(i18n::alert_metric_label(managed.rule.metric), 18),
             metric_style,
         ),
         Span::styled(
             format!(
                 " {:.1}{} · {}",
                 managed.rule.threshold,
-                metric_unit(managed.rule.metric),
+                managed.rule.metric.unit_suffix(),
                 state
             ),
             state_style,
@@ -256,9 +234,9 @@ pub(crate) fn alert_event_line(event: &AlertEvent, theme: TuiTheme) -> Line<'sta
         }
         AlertEventKind::Cleared => (t("events.cleared"), theme.good),
     };
-    let unit = metric_unit(event.alert.metric);
+    let unit = event.alert.metric.unit_suffix();
     let target = if event.alert.target.is_empty() {
-        metric_label(event.alert.metric)
+        i18n::alert_metric_label(event.alert.metric)
     } else {
         event.alert.target.as_str()
     };
@@ -278,7 +256,7 @@ pub(crate) fn alert_event_line(event: &AlertEvent, theme: TuiTheme) -> Line<'sta
         Span::styled(
             format!(
                 "· {} {:.1}{} (thresh: {:.1}{})",
-                metric_label(event.alert.metric),
+                i18n::alert_metric_label(event.alert.metric),
                 event.alert.value,
                 unit,
                 event.alert.threshold,

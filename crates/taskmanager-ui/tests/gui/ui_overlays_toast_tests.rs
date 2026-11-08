@@ -1,4 +1,4 @@
-use super::{Toast, ToastEvent, ToastKind, ToastState};
+use super::{Toast, ToastEvent, ToastState};
 use gpui::{
     AppContext, Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
     Styled, TestAppContext, Window, div, px, size,
@@ -7,13 +7,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 use taskmanager_theme::Theme;
+use zhuge_ui_tokens::{StatusColors, StatusKind};
+
 #[test]
 fn toast_kind_colors_are_palette_derived() {
     let palette = Theme::dark().palette();
-    assert_eq!(ToastKind::Success.color(&palette), palette.success);
-    assert_eq!(ToastKind::Warning.color(&palette), palette.warning);
-    assert_eq!(ToastKind::Danger.color(&palette), palette.danger);
-    assert_eq!(ToastKind::Info.color(&palette), palette.accent);
+    let colors = StatusColors {
+        accent: palette.accent,
+        success: palette.success,
+        warning: palette.warning,
+        danger: palette.danger,
+    };
+    assert_eq!(colors.resolve(StatusKind::Success), palette.success);
+    assert_eq!(colors.resolve(StatusKind::Warning), palette.warning);
+    assert_eq!(colors.resolve(StatusKind::Danger), palette.danger);
+    assert_eq!(colors.resolve(StatusKind::Info), palette.accent);
 }
 
 /// Arm records the duration; the auto-dismiss timer is driven by the
@@ -21,7 +29,7 @@ fn toast_kind_colors_are_palette_derived() {
 /// the emitter below).
 #[gpui::test]
 async fn auto_dismiss_arms_duration(cx: &mut TestAppContext) {
-    let toast = cx.new(|cx| ToastState::new(7, "done", ToastKind::Success, cx));
+    let toast = cx.new(|cx| ToastState::new(7, "done", StatusKind::Success, cx));
     toast.update(cx, |toast, cx| {
         toast.arm_auto_dismiss(Duration::from_millis(10), cx);
         assert_eq!(toast.auto_dismiss(), Some(Duration::from_millis(10)));
@@ -35,7 +43,7 @@ async fn auto_dismiss_arms_duration(cx: &mut TestAppContext) {
 /// payload. The timer-driven production path is covered separately below.
 #[gpui::test]
 async fn synthetic_dismissed_event_reaches_subscribers_with_the_toast_id(cx: &mut TestAppContext) {
-    let toast = cx.new(|cx| ToastState::new(9, "bye", ToastKind::Danger, cx));
+    let toast = cx.new(|cx| ToastState::new(9, "bye", StatusKind::Danger, cx));
     let received = Rc::new(RefCell::new(None::<ToastEvent>));
     let sink = received.clone();
     cx.update(|cx| {
@@ -62,7 +70,7 @@ async fn synthetic_dismissed_event_reaches_subscribers_with_the_toast_id(cx: &mu
 /// the TestDispatcher's virtual clock does not advance `smol::Timer`.
 #[gpui::test]
 async fn auto_dismiss_timer_emits_dismissed_event_with_its_toast_id(cx: &mut TestAppContext) {
-    let toast = cx.new(|cx| ToastState::new(14, "later", ToastKind::Warning, cx));
+    let toast = cx.new(|cx| ToastState::new(14, "later", StatusKind::Warning, cx));
     let events = Rc::new(RefCell::new(Vec::<ToastEvent>::new()));
     let event_sink = events.clone();
     cx.update(|cx| {
@@ -99,7 +107,7 @@ async fn auto_dismiss_timer_emits_dismissed_event_with_its_toast_id(cx: &mut Tes
 async fn dismiss_control_accepts_pointer_click_without_emitting_auto_dismiss(
     cx: &mut TestAppContext,
 ) {
-    let toast = cx.new(|cx| ToastState::new(12, "done", ToastKind::Success, cx));
+    let toast = cx.new(|cx| ToastState::new(12, "done", StatusKind::Success, cx));
     let dismissals = Rc::new(RefCell::new(0));
     let events = Rc::new(RefCell::new(Vec::<ToastEvent>::new()));
     let event_sink = events.clone();
@@ -133,7 +141,7 @@ async fn dismiss_control_accepts_pointer_click_without_emitting_auto_dismiss(
 
 #[gpui::test]
 async fn dismiss_control_is_a_keyboard_tab_stop_and_activates_with_enter(cx: &mut TestAppContext) {
-    let toast = cx.new(|cx| ToastState::new(13, "done", ToastKind::Info, cx));
+    let toast = cx.new(|cx| ToastState::new(13, "done", StatusKind::Info, cx));
     let dismissals = Rc::new(RefCell::new(0));
     let events = Rc::new(RefCell::new(Vec::<ToastEvent>::new()));
     let event_sink = events.clone();
@@ -181,7 +189,7 @@ async fn long_receipt_wraps_inside_the_toast_card(cx: &mut TestAppContext) {
         "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9"
     );
     let message = format!("Current window saved: {path} (1180\u{00d7}780)");
-    let toast = cx.new(|cx| ToastState::new(15, message, ToastKind::Success, cx));
+    let toast = cx.new(|cx| ToastState::new(15, message, StatusKind::Success, cx));
     let window = cx.add_window(|_window, _cx| ToastHarness {
         toast: toast.clone(),
         dismissals: Rc::new(RefCell::new(0)),
@@ -218,7 +226,7 @@ async fn single_line_receipt_stays_inside_a_compact_chrome_slot(cx: &mut TestApp
         "capture-user", "977f44d34-bc94-4c7d-9d89-0f6a6b0a62e9"
     );
     let message = format!("Current window saved: {path} (1180\u{00d7}780)");
-    let toast = cx.new(|cx| ToastState::new(16, message, ToastKind::Success, cx));
+    let toast = cx.new(|cx| ToastState::new(16, message, StatusKind::Success, cx));
     let window = cx.add_window(|_window, _cx| ToastHarness {
         toast: toast.clone(),
         dismissals: Rc::new(RefCell::new(0)),
@@ -253,7 +261,7 @@ async fn indicator_toast_fits_a_compact_navigation_rail(cx: &mut TestAppContext)
         ToastState::new(
             17,
             "Current window saved: /workspace/archive/capture.png",
-            ToastKind::Success,
+            StatusKind::Success,
             cx,
         )
     });

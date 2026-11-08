@@ -16,6 +16,7 @@ use gpui::{
 };
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::NetworkEscalationState;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
 use taskmanager_shell::presentation::command_identity_summary;
@@ -127,7 +128,7 @@ pub fn top_bar(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(px(6.0))
+                .gap(definite_length(tokens::SPACE_6))
                 .child(brand_logo_image().w(px(16.0)).h(px(16.0)))
                 .child(
                     div()
@@ -262,42 +263,6 @@ fn kv_label_value(label_key: &'static str, value: &str) -> String {
         .replace("{value}", value)
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ProcessDetailsSection {
-    #[default]
-    Overview,
-    Performance,
-    Command,
-    Insights,
-}
-
-impl ProcessDetailsSection {
-    const ALL: [Self; 4] = [
-        Self::Overview,
-        Self::Performance,
-        Self::Command,
-        Self::Insights,
-    ];
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::Overview => i18n::t("prop.overview"),
-            Self::Performance => i18n::t("prop.performance"),
-            Self::Command => i18n::t("prop.command"),
-            Self::Insights => i18n::t("prop.insights"),
-        }
-    }
-
-    fn id(self) -> &'static str {
-        match self {
-            Self::Overview => "properties-overview",
-            Self::Performance => "properties-performance",
-            Self::Command => "properties-command",
-            Self::Insights => "properties-insights",
-        }
-    }
-}
-
 fn details_section_tabs(
     t: &Theme,
     active: ProcessDetailsSection,
@@ -313,8 +278,8 @@ fn details_section_tabs(
         let click_entity = entity.clone();
         row = row.child(elements::pill(
             t,
-            section.id(),
-            section.label(),
+            format!("properties-{}", section.token()),
+            i18n::process_details_section_label(section),
             section == active,
             false,
             move |_window, cx| {

@@ -9,7 +9,8 @@
 //! cross-shape matrix checkable: the same function on the same bands must give
 //! the same verdict for every shape.
 
-use crate::presentation::thresholds::LayoutBands;
+use crate::keybindings::FrontendShape;
+use crate::presentation::thresholds::{LayoutBands, bands};
 use crate::presentation::vocabulary::{
     ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
     PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_SIDEBAR_MAX_WIDTH, PERFORMANCE_SLOT_GAP,
@@ -236,6 +237,17 @@ pub struct PerformancePageBudget {
 }
 
 impl PerformancePageBudget {
+    /// The coarse Performance verdict for one measured page layout under one
+    /// registered shape's bands.
+    ///
+    /// The shape selects the bands and the layout carries the measured
+    /// capacity: both are contract facts, so a frontend resolves the fold by
+    /// naming its shape instead of re-binding the bands locally.
+    #[must_use]
+    pub fn for_page_layout(layout: PageLayoutBudget, shape: FrontendShape) -> Self {
+        Self::coarse(layout, &bands(shape))
+    }
+
     /// The coarse, profile-only allocation: no pixel width is known, so the
     /// slot forms follow the buckets alone and the legacy vertical
     /// classification maps Constrained to the Core runway.

@@ -3,15 +3,17 @@
 use super::graph_options::normalize_graph_data_points;
 use super::{
     ConfigClient, Duration, PlatformClient, RefreshRequest, RootView, TelemetryStore, Theme,
-    TopPage, apply_process_config, config_from_view, i18n, platform_submission_time_ms,
+    TopPage, apply_process_config, config_from_view, i18n,
 };
 use crate::gpui_app::theme::{detect, forced_skin_from_env};
 use gpui::{AnyWindowHandle, App, AsyncApp, SharedString, WeakEntity, WindowDecorations};
+use std::time::SystemTime;
 use taskforest_contract::InstanceEvent;
 use taskforest_contract::InstanceGuard;
 use taskforest_contract::InstanceRole;
 use taskforest_core::core::config::Config;
 use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskforest_core::core::time::unix_millis;
 use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_app_host::HistoryFrontendConnector;
@@ -58,8 +60,7 @@ pub(super) use config_tokens::{page_token, text_rendering_mode_from_token};
 
 mod config_sync;
 use config_sync::{
-    apply_root_persisted_projection, drain_config_publications, initial_config_recovery_message,
-    persist_config_if_due,
+    apply_root_persisted_projection, drain_config_publications, persist_config_if_due,
 };
 
 mod window;
@@ -141,9 +142,7 @@ fn read_initial_config(config_client: &mut ConfigClient) -> InitialConfig {
     match config_client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT) {
         ConfigBootstrap::Published(publication) => {
             let notice = match publication.outcome() {
-                ConfigPublicationOutcome::Loaded(recovery) => {
-                    initial_config_recovery_message(*recovery)
-                }
+                ConfigPublicationOutcome::Loaded(recovery) => recovery.initial_message(),
                 _ => None,
             };
             InitialConfig {
@@ -314,7 +313,7 @@ fn spawn_update_loop(
                     poll_window_systems(view, cx);
                 });
                 let _ = weak.update(cx, |view, _cx| {
-                    view.run_scheduled_refresh(platform_submission_time_ms());
+                    view.run_scheduled_refresh(unix_millis(SystemTime::now()));
                 });
             }
             drain_config_publications(&weak, cx, &mut config_client, &mut applied_config_revision);
@@ -491,7 +490,7 @@ pub fn init<E>(
         font_availability,
         local_time_rules,
     };
-    let _ = platform.request_refresh(RefreshRequest::Dashboard, platform_submission_time_ms());
+    let _ = platform.request_refresh(RefreshRequest::Dashboard, unix_millis(SystemTime::now()));
     let surface_role = crate::window_presentation::surface_role(&presentation);
     let (daemon_worker, daemon_rx) =
         if !capture_mode && NativeAppHost::production().is_daemon_connected() {

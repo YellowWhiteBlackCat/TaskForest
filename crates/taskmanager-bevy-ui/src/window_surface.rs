@@ -41,6 +41,7 @@ use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
 use taskmanager_theme::GlassTier;
+use taskmanager_ui_contract::{OverlayKindOf, OverlaySlot};
 
 /// The modal surface's maximum width, in rem: the widest a shell surface
 /// (the sidebar editor, the event center, the about box) may grow before it
@@ -84,17 +85,49 @@ impl WindowSurface {
         }
     }
 }
-#[derive(Resource, Default)]
-pub(crate) struct WindowSurfaceState(pub(crate) Option<WindowSurface>);
+
+impl OverlayKindOf for WindowSurface {
+    type Kind = WindowSurfaceKind;
+
+    fn kind(&self) -> Self::Kind {
+        self.kind()
+    }
+}
+
+#[derive(Resource, Default, Debug)]
+pub(crate) struct WindowSurfaceState(pub(crate) OverlaySlot<WindowSurface>);
+
+impl std::ops::Deref for WindowSurfaceState {
+    type Target = OverlaySlot<WindowSurface>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for WindowSurfaceState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl WindowSurfaceState {
+    pub(crate) fn active(&self) -> Option<&WindowSurface> {
+        self.0.active()
+    }
+
+    pub(crate) fn is_kind(&self, kind: WindowSurfaceKind) -> bool {
+        self.0.kind() == Some(kind)
+    }
+
     pub(crate) fn diagnostic(&self) -> Option<&DiagnosticBundleUiState> {
-        match &self.0 {
+        match self.0.active() {
             Some(WindowSurface::Diagnostic(state)) => Some(state),
             _ => None,
         }
     }
     pub(crate) fn diagnostic_mut(&mut self) -> Option<&mut DiagnosticBundleUiState> {
-        match &mut self.0 {
+        match self.0.active_mut() {
             Some(WindowSurface::Diagnostic(state)) => Some(state),
             _ => None,
         }
@@ -221,7 +254,7 @@ fn close_menu<Ctx: ActionMenuContext>(
 }
 pub(crate) fn show(access: &mut SurfaceAccess, commands: &mut Commands, surface: WindowSurface) {
     if let Some(runtime) = access.diagnostic.as_mut() {
-        runtime.close();
+        runtime.0.close();
     }
     close_menu(
         access.process_menu.as_deref_mut(),
@@ -249,7 +282,7 @@ pub(crate) fn show(access: &mut SurfaceAccess, commands: &mut Commands, surface:
         track.shell.dismiss_informational_overlay();
         track.shell.close_search();
     }
-    access.state.0 = Some(surface);
+    access.state.open(surface);
     commands.trigger(WindowSurfaceChanged);
     commands.trigger(ShellInteractionApplied);
 }
@@ -258,18 +291,12 @@ pub(crate) fn close(
     commands: &mut Commands,
     expected: WindowSurfaceKind,
 ) {
-    if !access
-        .state
-        .0
-        .as_ref()
-        .is_some_and(|surface| surface.kind() == expected)
-    {
+    if access.state.dismiss_expected(expected).is_none() {
         return;
     }
     if let Some(runtime) = access.diagnostic.as_mut() {
-        runtime.close();
+        runtime.0.close();
     }
-    access.state.0 = None;
     commands.trigger(WindowSurfaceChanged);
 }
 fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePaint>) {
@@ -293,13 +320,13 @@ fn paint_surface(mut render: SurfaceRender) {
     let Ok(root) = render.roots.single() else {
         return;
     };
-    if !render.paint.dirty && !(render.state.0.is_some() && render.overlays.is_empty()) {
+    if !render.paint.dirty && !(render.state.is_open() && render.overlays.is_empty()) {
         return;
     }
     let Some(palette) = render.palette.as_ref().map(|palette| &palette.inner) else {
         return;
     };
-    let scene: Option<Box<dyn Scene>> = match &render.state.0 {
+    let scene: Option<Box<dyn Scene>> = match render.state.active() {
         Some(WindowSurface::ProcessTree) => render.track.as_ref().map(|track| {
             Box::new(crate::pages::process_tree::scene(
                 &track.shell,

@@ -3,6 +3,7 @@
 use crate::ui::system_dashboard::SystemDashboardMessage;
 use std::path::PathBuf;
 use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;
@@ -33,8 +34,7 @@ use taskmanager_shell::presentation::smart::self_test_intent;
 use super::capture_fixtures::*;
 pub(super) use super::capture_fixtures::{capture_device_from_name, capture_page_from_name};
 use super::{
-    AlertsMessage, DetailsSection, FocusTarget, IcedApp, LocalSurface, Message, PerfDevice,
-    SettingsChange,
+    AlertsMessage, FocusTarget, IcedApp, LocalSurface, Message, PerfDevice, SettingsChange,
 };
 use taskmanager_shell::app_tree_expansion_key_for_identity;
 use taskmanager_shell::fixture::process_tree::{
@@ -247,10 +247,10 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         ));
     } else if target == "process-details" {
         app.shell.application.active_page = AppPage::Applications;
-        seed_capture_process_details(app, DetailsSection::Overview);
+        seed_capture_process_details(app, ProcessDetailsSection::Overview);
     } else if target == "process-properties-performance" {
         app.shell.application.active_page = AppPage::Applications;
-        seed_capture_process_details(app, DetailsSection::Performance);
+        seed_capture_process_details(app, ProcessDetailsSection::Performance);
     } else if target == "process-insights"
         || target == "process-network-details"
         || target == "process-gpu-details"
@@ -258,7 +258,7 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         || target == "process-isolation"
     {
         app.shell.application.active_page = AppPage::Applications;
-        seed_capture_process_details(app, DetailsSection::Insights);
+        seed_capture_process_details(app, ProcessDetailsSection::Insights);
         app.process_presentation.insights_facet = match target {
             "process-gpu-details" => ProcessInsightFacet::Gpu,
             "process-resource-limits" => ProcessInsightFacet::Resources,
@@ -267,10 +267,10 @@ fn apply_capture_surface_and_process(app: &mut IcedApp, target: &str) -> bool {
         };
     } else if target == "process-memory-pss-swap" {
         app.shell.application.active_page = AppPage::Applications;
-        seed_capture_process_details(app, DetailsSection::Overview);
+        seed_capture_process_details(app, ProcessDetailsSection::Overview);
     } else if target == "process-command" {
         app.shell.application.active_page = AppPage::Applications;
-        seed_capture_process_details(app, DetailsSection::Command);
+        seed_capture_process_details(app, ProcessDetailsSection::Command);
     } else if target == "process-affinity" {
         app.shell.application.active_page = AppPage::Applications;
         if let Some(target_proc) = seed_capture_process_target(app) {

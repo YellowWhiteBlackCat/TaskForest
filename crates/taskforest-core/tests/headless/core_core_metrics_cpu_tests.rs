@@ -350,3 +350,18 @@ fn cpu_metrics_package_integration_and_wire_omission() {
     assert_eq!(decoded.packages.len(), 2);
     assert_eq!(decoded.packages, cpu.packages);
 }
+
+#[test]
+fn cpu_temperature_source_qualifier_note_key_reports_expected_keys() {
+    assert_eq!(
+        CpuTemperatureSource::PackageHwmon.qualifier_note_key(),
+        Some("cpu.temperature_source.package_hwmon")
+    );
+    assert_eq!(
+        CpuTemperatureSource::ThermalZone.qualifier_note_key(),
+        Some("cpu.temperature_source.thermal_zone")
+    );
+    assert_eq!(CpuTemperatureSource::Coretemp.qualifier_note_key(), None);
+    assert_eq!(CpuTemperatureSource::K10temp.qualifier_note_key(), None);
+    assert_eq!(CpuTemperatureSource::Zenpower.qualifier_note_key(), None);
+}

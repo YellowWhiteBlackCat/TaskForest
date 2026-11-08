@@ -23,6 +23,7 @@ use crate::TuiApp;
 use crate::TuiTheme;
 
 use super::units::memory_text_pref;
+use taskforest_core::core::percent::percent_text;
 
 /// Map a shared segment kind onto the terminal palette color. Every frontend
 /// derives these from the same `taskmanager-theme` tokens, so the bar matches
@@ -216,7 +217,10 @@ fn legend_line(
             Style::new().fg(theme.color(Color::White)),
         ),
         Span::raw("   "),
-        Span::styled(format!("{pct:>4.0}%"), Style::new().fg(theme.fg_dim)),
+        Span::styled(
+            format!("{:>4}", percent_text(pct)),
+            Style::new().fg(theme.fg_dim),
+        ),
         Span::raw("  "),
         Span::styled(
             memory_text_pref(seg.bytes, use_bytes, use_base2),
@@ -271,16 +275,14 @@ fn render_swap_bar(
     use_bytes: bool,
     use_base2: bool,
 ) {
-    let pct = if swap.total_bytes == 0 {
-        0.0
-    } else {
-        (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0).clamp(0.0, 100.0)
-    };
+    let pct = (swap.total_bytes > 0)
+        .then(|| (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0).clamp(0.0, 100.0));
     let mut label = format!(
-        "{}  {} / {}  ({pct:.0}%)",
+        "{}  {} / {}  ({})",
         t("mem.swap"),
         memory_text_pref(swap.used_bytes, use_bytes, use_base2),
         memory_text_pref(swap.total_bytes, use_bytes, use_base2),
+        pct.map_or_else(missing_value, percent_text),
     );
     if let Some(zram) = swap.zram_bytes.filter(|z| *z > 0) {
         label.push_str(&format!(

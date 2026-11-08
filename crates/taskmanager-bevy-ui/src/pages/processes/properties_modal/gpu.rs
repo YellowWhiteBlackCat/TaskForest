@@ -11,6 +11,7 @@ use bevy::ui::widget::Text;
 
 use crate::palette::{UiPalette, space_4, space_8, space_24};
 use crate::window::{Role, TextRole};
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_application::{ProcessInsightFacetState, ProjectedProcessInsights, i18n::t};
 use taskmanager_shell::presentation::bytes;
@@ -90,7 +91,7 @@ fn gpu_bars_of(gpu: &ProcessGpuSnapshot) -> Vec<GpuBar> {
             subject: format!("{} · {}", device.device_id, t("proc_insights.gpu_usage")),
             value: device
                 .utilization_pct
-                .map(|value| format!("{value:.1}%"))
+                .map(percent_text)
                 .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             share: device
                 .utilization_pct
@@ -103,7 +104,7 @@ fn gpu_bars_of(gpu: &ProcessGpuSnapshot) -> Vec<GpuBar> {
             kind: GpuBarKind::EngineUsage,
             subject: engine.name.clone(),
             value: rate
-                .map(|value| format!("{value:.1}%"))
+                .map(percent_text)
                 .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
             share: rate.map(|value| (value / 100.0).clamp(0.0, 1.0)),
         });

@@ -138,21 +138,17 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
     ];
     // The layout derives from the typed chart inventory (both frame axes),
     // never from a local compact flag.
-    let standard = projection::GpuChartLayout::for_inventory(PerformanceChartInventory::Full);
-    let compact =
-        projection::GpuChartLayout::for_inventory(PerformanceChartInventory::AggregateOnly);
-    assert_eq!(standard, projection::GpuChartLayout::AggregateWithEngines);
-    assert_eq!(compact, projection::GpuChartLayout::AggregateOnly);
+    let standard = PerformanceChartInventory::Full;
+    let compact = PerformanceChartInventory::AggregateOnly;
+    assert!(standard.includes_extended_charts());
+    assert!(!compact.includes_extended_charts());
     assert_eq!(
-        standard
-            .engine_charts(&gpu)
+        projection::engine_charts(standard, &gpu)
             .map(|engine| engine.name.as_str())
             .collect::<Vec<_>>(),
         ["Render", "Copy"]
     );
-    assert_eq!(compact.engine_charts(&gpu).count(), 0);
-    assert!(standard.shows_secondary_regions());
-    assert!(!compact.shows_secondary_regions());
+    assert_eq!(projection::engine_charts(compact, &gpu).count(), 0);
 }
 
 #[test]
@@ -438,7 +434,7 @@ fn battery_health_and_estimate_rows_follow_typed_availability() {
         ..Default::default()
     });
     let rows = battery_summary_lines(&battery);
-    assert_eq!(row_value(&rows, t("battery.health")), "87.5%");
+    assert_eq!(row_value(&rows, t("battery.health")), "88%");
     assert_eq!(row_value(&rows, t("battery.time_to_empty")), "01h 03m");
     // The status-gated twin and any missing fact stay absent rows.
     assert_eq!(

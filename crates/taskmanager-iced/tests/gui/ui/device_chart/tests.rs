@@ -7,6 +7,7 @@ use super::*;
 use crate::perf_chart::ReadoutColors;
 use iced::widget::canvas;
 use iced::{Color, Length, Point, Rectangle, Size, mouse};
+use taskforest_core::core::percent::MAX_PERCENT;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_theme::Theme;
@@ -254,18 +255,18 @@ fn device_mini_graph_factories_compose_with_hover_on_and_off() {
 /// clamps inside the frame, the ceiling does NOT grow.
 #[test]
 fn percentage_series_ceiling_is_one_hundred_regardless_of_samples() {
-    assert_eq!(series_max(TrendSeries::CpuUsagePercent, &[]), PERCENT_MAX);
+    assert_eq!(series_max(TrendSeries::CpuUsagePercent, &[]), MAX_PERCENT);
     assert_eq!(
         series_max(TrendSeries::GpuUsagePercent, &[200.0, 300.0]),
-        PERCENT_MAX
+        MAX_PERCENT
     );
     assert_eq!(
         series_max(TrendSeries::MemoryUsagePercent, &[12.0]),
-        PERCENT_MAX
+        MAX_PERCENT
     );
     assert_eq!(
         series_max(TrendSeries::DiskActiveTimePct, &[200.0]),
-        PERCENT_MAX,
+        MAX_PERCENT,
         "disk active time is percentage-typed: the ceiling stays 100"
     );
 }
@@ -297,10 +298,10 @@ fn bytes_per_sec_series_scales_to_its_finite_peak() {
 fn device_metric_scale_picks_the_ceiling_and_bridges_metric_series() {
     // Percent pins the frame ceiling at 100 regardless of the samples — a
     // 120% battery/GPU reading clamps inside the frame, the ceiling does NOT grow.
-    assert_eq!(series_max(DeviceMetricScale::Percent, &[]), PERCENT_MAX);
+    assert_eq!(series_max(DeviceMetricScale::Percent, &[]), MAX_PERCENT);
     assert_eq!(
         series_max(DeviceMetricScale::Percent, &[200.0, 300.0]),
-        PERCENT_MAX
+        MAX_PERCENT
     );
     // AutoPeak tracks the finite peak so fan RPM / bytes/sec rise with the
     // value; an empty/zero (idle) window yields 0.0 — a flat baseline.

@@ -28,7 +28,7 @@ use taskmanager_ui_contract::presentation::budget::{
     ContentSlot, PerformanceSlotRequest, vertical_space_for_height,
 };
 use taskmanager_ui_contract::presentation::budget::{PageLayoutBudget, PerformancePageBudget};
-use taskmanager_ui_contract::presentation::thresholds::{LayoutBands, bands};
+use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, LayoutBands, bands, number};
 use taskmanager_ui_contract::presentation::vocabulary::{
     ChromePresentation, LayoutProfile, NavigationPresentation, VerticalSpace,
     layout_profile_for_width,
@@ -38,21 +38,24 @@ fn shape_bands() -> LayoutBands {
     bands(FrontendShape::Iced)
 }
 
-pub const CONSTRAINED_CONTENT_HEIGHT: f32 = 700.0;
-pub const GENEROUS_CONTENT_HEIGHT: f32 = 960.0;
-pub const CHART_INVENTORY_MIN_CONTENT_HEIGHT: f32 = 650.0;
-pub const PERFORMANCE_STATS_STACK_HEIGHT: f32 = 220.0;
-pub const PERFORMANCE_VERTICAL_CHROME_RESERVE: f32 = 128.0;
-pub const PERFORMANCE_HORIZONTAL_CHROME_RESERVE: f32 = 20.0;
-pub const CHROME_SINGLE_ROW_MIN_WIDTH: f32 = 1320.0;
-pub const PERFORMANCE_STATS_MIN_WIDTH: f32 = 260.0;
-pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 320.0;
-pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 248.0;
-
-#[must_use]
-pub fn performance_budget_from_page_layout(layout: PageLayoutBudget) -> PerformancePageBudget {
-    PerformancePageBudget::coarse(layout, &shape_bands())
-}
+/// Iced's registered divergences resolve through the threshold registry, so
+/// every number below is stated once (ADR-064): a frontend binds the band it
+/// declared, it never restates it. The registry rows are the authority, and
+/// the boundary tests re-probe each band at its edges, so a declaration that
+/// stopped spending one of these axes fails a test instead of silently
+/// painting a fabricated zero.
+pub const PERFORMANCE_VERTICAL_CHROME_RESERVE: f32 =
+    number(FrontendShape::Iced, LayoutAxis::VerticalChromeReserve);
+pub const PERFORMANCE_HORIZONTAL_CHROME_RESERVE: f32 =
+    number(FrontendShape::Iced, LayoutAxis::HorizontalChromeReserve);
+pub const CHROME_SINGLE_ROW_MIN_WIDTH: f32 =
+    number(FrontendShape::Iced, LayoutAxis::RootChromeSingleRowWidth);
+pub const PERFORMANCE_STATS_MIN_WIDTH: f32 =
+    number(FrontendShape::Iced, LayoutAxis::PerformanceStatsMinWidth);
+pub const PERFORMANCE_STATS_MAX_WIDTH: f32 =
+    number(FrontendShape::Iced, LayoutAxis::PerformanceStatsMaxWidth);
+pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 =
+    number(FrontendShape::Iced, LayoutAxis::PerformanceSidebarMinWidth);
 
 #[must_use]
 pub fn performance_budget_for_perf_frame(

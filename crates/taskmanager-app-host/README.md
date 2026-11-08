@@ -43,6 +43,7 @@ src/presentation.rs              toolkit-neutral WindowPresentation contract (AD
 src/history_frontend.rs          HistoryFrontendSession (replay client + writer ownership)
 src/history_persistence_runtime.rs (+ health.rs)   bounded persistence generation
 src/history_replay_runtime.rs    read-only replay client
+src/frame_timing_sink.rs         the shared opt-in frame-timing sink (GPUI and Iced hooks)
 src/snapshot_export_runtime.rs  src/window_capture_runtime.rs
 src/process_termination.rs     src/diagnostic_bundle_runtime.rs
 src/worker_fault.rs              worker fault accounting

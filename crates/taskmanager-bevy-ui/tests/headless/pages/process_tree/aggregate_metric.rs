@@ -160,7 +160,7 @@ fn aggregate_metric_states_reach_the_production_row_scene_and_semantic_nodes() {
     );
     assert_eq!(
         cell_text(&uncategorized_key, ProcessTreeCellKind::Cpu),
-        format!("{}: 7.5%S1/2", t("common.cpu")),
+        format!("{}: 8%S1/2", t("common.cpu")),
         "stale displays its last-known value, coverage, and stale marker"
     );
     assert_eq!(

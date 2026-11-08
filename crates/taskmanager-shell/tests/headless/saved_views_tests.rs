@@ -94,3 +94,47 @@ fn saved_view_review_keeps_user_controls_first_without_changing_persisted_identi
         vec!["First", "Second"]
     );
 }
+
+#[test]
+fn the_canonical_inverse_is_strict_and_the_legacy_decoder_tolerates_history() {
+    // The canonical inverse stays strict: the saved-view import path must
+    // fail closed on a token it does not own.
+    assert_eq!(sort_from_token("MemoryPss"), Some(SortCol::Pss));
+    assert_eq!(sort_from_token("Status"), Some(SortCol::State));
+    assert_eq!(sort_from_token("PSS"), None);
+    assert_eq!(sort_from_token("State"), None);
+
+    // The config decode boundary additionally accepts the two historical
+    // spellings an older build wrote.
+    assert_eq!(sort_from_legacy_token("PSS"), Some(SortCol::Pss));
+    assert_eq!(sort_from_legacy_token("State"), Some(SortCol::State));
+    assert_eq!(sort_from_legacy_token("MemoryPss"), Some(SortCol::Pss));
+    assert_eq!(sort_from_legacy_token("Status"), Some(SortCol::State));
+    assert_eq!(sort_from_legacy_token("nonsense"), None);
+}
+
+#[test]
+fn every_canonical_token_round_trips_through_the_legacy_decoder() {
+    for column in [
+        SortCol::Pid,
+        SortCol::Name,
+        SortCol::Cpu,
+        SortCol::Memory,
+        SortCol::Pss,
+        SortCol::Swap,
+        SortCol::User,
+        SortCol::State,
+        SortCol::Threads,
+        SortCol::CpuTime,
+        SortCol::DiskRead,
+        SortCol::DiskWrite,
+        SortCol::Network,
+        SortCol::StartTime,
+        SortCol::Fds,
+        SortCol::Nice,
+    ] {
+        let token = sort_token(column);
+        assert_eq!(sort_from_token(token), Some(column), "{token}");
+        assert_eq!(sort_from_legacy_token(token), Some(column), "{token}");
+    }
+}

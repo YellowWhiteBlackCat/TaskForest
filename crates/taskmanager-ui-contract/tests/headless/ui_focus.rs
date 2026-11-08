@@ -1,6 +1,24 @@
 use super::*;
 
 #[test]
+fn only_keyboard_modality_paints_a_focus_ring() {
+    assert!(InputModality::Keyboard.shows_focus_ring());
+    assert!(!InputModality::Pointer.shows_focus_ring());
+    assert!(!InputModality::Programmatic.shows_focus_ring());
+}
+
+#[test]
+fn modality_starts_programmatic_and_reports_real_changes() {
+    let mut modality = InputModality::default();
+
+    assert_eq!(modality, InputModality::Programmatic);
+    assert!(modality.transition(InputModality::Keyboard));
+    assert!(!modality.transition(InputModality::Keyboard));
+    assert!(modality.transition(InputModality::Pointer));
+    assert_eq!(modality, InputModality::Pointer);
+}
+
+#[test]
 fn modal_entry_and_exit_have_explicit_semantic_targets() {
     let policy = ModalFocusPolicy::contained(512);
     let token = FocusRestoreToken::new(17);

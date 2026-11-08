@@ -37,23 +37,24 @@ use ratatui::widgets::{
     Block, Borders, Cell, Clear, HighlightSpacing, Paragraph, Row, Table, TableState,
 };
 use taskforest_core::core::process_telemetry::{ContainerRollup, IsolationKind};
-use taskmanager_application::container_row_window;
+use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_core::row_page::row_budget;
 
 use super::frame_plan::TablePanelProjection;
 use crate::TuiApp;
 
-mod quota;
-
-use quota::{container_quota_view, quota_readout};
+use taskmanager_shell::presentation::container_quota::{container_quota_view, quota_readout};
 
 #[cfg(test)]
 #[path = "../../tests/headless/ui/containers_support.rs"]
 pub(crate) mod containers_support;
 use crate::TuiTheme;
 use crate::ui::{DeviceHealth, classify_device_state};
+use taskforest_core::core::percent::precise_percent_text;
 use taskmanager_shell::SortDir;
 
 /// Shared bordered panel. It owns only its title frame; body geometry and
@@ -480,7 +481,10 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
         return;
     }
 
-    let (shown, hidden) = container_row_window(rollup.containers.len());
+    // The shared row-page owner splits the inventory; this frontend owns only
+    // the cap, so a truncated list always comes with its stated omission.
+    let budget = row_budget(rollup.containers.len(), MAX_CONTAINER_ROWS);
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     let mut rows: Vec<Row<'_>> = rollup.containers[..shown]
         .iter()
         .map(|container| {
@@ -510,7 +514,9 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
                         .cpu_percentage
                         .current_value()
                         .copied()
-                        .map_or_else(missing_value, |value| format!("{value:>6.1}%")),
+                        .map_or_else(missing_value, |value| {
+                            format!("{:>6}", precise_percent_text(value))
+                        }),
                 ),
                 Cell::from(
                     container
@@ -530,7 +536,7 @@ fn render_rollup(frame: &mut Frame<'_>, rollup: &ContainerRollup, theme: TuiThem
         .collect();
     if hidden > 0 {
         rows.push(Row::new([
-            Cell::from(more_rows_label(hidden)),
+            Cell::from(i18n::more_rows_label(hidden)),
             Cell::from(""),
             Cell::from(""),
             Cell::from(""),
@@ -615,10 +621,10 @@ fn kind_label(kind: &IsolationKind) -> &'static str {
     }
 }
 
-fn more_rows_label(hidden: usize) -> String {
-    t("common.more_rows").replace("{count}", &hidden.to_string())
-}
-
 #[cfg(test)]
 #[path = "../../tests/gui/ui/containers_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/containers_quota_tests.rs"]
+mod quota_tests;

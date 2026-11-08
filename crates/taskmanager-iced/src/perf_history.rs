@@ -29,17 +29,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 
 use taskforest_core::core::process::ProcessLiveKey;
-
-/// The upper bound for a persisted graph-data-points window (GPUI parity:
-/// `MAX_GRAPH_DATA_POINTS = 600`).
-pub const MAX_HISTORY_CAPACITY: usize = 600;
-
-/// The newest `capacity` samples of a provider history window (the trailing
-/// slice — a window longer than the ring keeps its most recent samples only).
-fn newest_tail(window: &[f32], capacity: usize) -> &[f32] {
-    let start = window.len().saturating_sub(capacity);
-    &window[start..]
-}
+use taskmanager_shell::presentation::{graph_window_samples, latest_samples};
 
 /// The per-process Performance-tab window (GPUI's `details_performance`
 /// parity): CPU%, memory bytes, and disk read/write rates for ONE tracked
@@ -85,7 +75,7 @@ impl ProcessPerfHistory {
             memory: VecDeque::new(),
             disk_read: VecDeque::new(),
             disk_write: VecDeque::new(),
-            capacity: capacity.clamp(2, MAX_HISTORY_CAPACITY),
+            capacity: graph_window_samples(capacity),
             revision: 0,
         }
     }
@@ -148,7 +138,7 @@ impl ProcessPerfHistory {
     /// Re-point the window AND resize the capacity in one step (the persisted
     /// graph-data-points preference changed while tracking a process).
     pub fn resize(&mut self, capacity: usize, identity: ProcessLiveKey) {
-        self.capacity = capacity.clamp(2, MAX_HISTORY_CAPACITY);
+        self.capacity = graph_window_samples(capacity);
         self.reset(identity);
     }
 
@@ -170,19 +160,19 @@ impl ProcessPerfHistory {
         disk_read: &[f32],
         disk_write: &[f32],
     ) {
-        self.capacity = capacity.clamp(2, MAX_HISTORY_CAPACITY);
+        self.capacity = graph_window_samples(capacity);
         self.reset(identity);
         let capacity = self.capacity;
-        for value in newest_tail(cpu, capacity) {
+        for value in latest_samples(cpu, capacity) {
             let _ = Self::push_one(&mut self.cpu, Some(*value), capacity);
         }
-        for value in newest_tail(memory, capacity) {
+        for value in latest_samples(memory, capacity) {
             let _ = Self::push_one(&mut self.memory, Some(*value), capacity);
         }
-        for value in newest_tail(disk_read, capacity) {
+        for value in latest_samples(disk_read, capacity) {
             let _ = Self::push_one(&mut self.disk_read, Some(*value), capacity);
         }
-        for value in newest_tail(disk_write, capacity) {
+        for value in latest_samples(disk_write, capacity) {
             let _ = Self::push_one(&mut self.disk_write, Some(*value), capacity);
         }
     }

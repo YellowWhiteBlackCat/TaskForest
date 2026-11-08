@@ -39,7 +39,8 @@ use taskmanager_shell::fixture::{
 };
 use taskmanager_shell::{ProcessRowId, ShellApp, ShellKeyEvent};
 
-use super::{DetailsSection, IcedApp, Message, PerfDevice};
+use super::{IcedApp, Message, PerfDevice};
+use taskmanager_application::ProcessDetailsSection;
 
 /// Add a deterministic typed CPU-facts capture profile matching the demo's
 /// documented 6P + 8E + 2LP-E topology; counts are fixture inputs, never
@@ -196,7 +197,7 @@ pub(super) fn seed_capture_multiple_process_targets(app: &IcedApp) -> Vec<Frozen
         .unwrap_or_default()
 }
 
-pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSection) {
+pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: ProcessDetailsSection) {
     seed_process_properties_history(&mut app.shell);
     if let Some(target) = seed_capture_process_target(app) {
         let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
@@ -204,7 +205,7 @@ pub(super) fn seed_capture_process_details(app: &mut IcedApp, section: DetailsSe
             Modifiers::NONE,
         ))));
         app.process_presentation.details_section = section;
-        if section == DetailsSection::Insights {
+        if section == ProcessDetailsSection::Insights {
             seed_capture_insights_fixture(app, &target);
         }
     }

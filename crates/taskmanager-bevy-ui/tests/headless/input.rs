@@ -22,8 +22,6 @@ use bevy::input::InputPlugin;
 use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
-use taskforest_core::core::metrics::ScalarObservation;
-use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_theme::tokens::UiSize;
 
 use taskmanager_shell::ShellApp;
@@ -35,8 +33,6 @@ use crate::app::{AppShellPlugin, ContentSlot, FrontendTrack, Page, Route};
 use crate::pages::history::HistoryProjectionResource;
 use crate::window::WindowPalette;
 use taskforest_core::core::process::ProcessBatchAction;
-use taskmanager_application::AppAction;
-use taskmanager_application::AppPage;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
@@ -47,28 +43,7 @@ use taskmanager_shell::QuitReason;
 
 // ---- fixtures -----------------------------------------------------------
 
-/// A process whose provider-native start token is available, so the shared
-/// gate can freeze an authoritative identity (`FrozenProcessIdentity`).
-fn token_process(pid: u32, name: &str) -> ProcessItem {
-    let mut process = ProcessItem::new(pid, name);
-    process.apply_scalar_observations(ProcessScalarObservations {
-        start_token: ScalarObservation::available(u64::from(pid) * 10_000, 1),
-        ..Default::default()
-    });
-    process
-}
-
-fn shell_with_selection() -> ShellApp {
-    let mut shell = ShellApp::new();
-    fixture::edit_processes(&mut shell, |processes| {
-        *processes = Some(vec![
-            token_process(100, "alpha"),
-            token_process(200, "beta"),
-        ])
-    });
-    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
-    shell
-}
+use crate::selection_fixture_support::shell_with_selection;
 
 /// The real `AppShellPlugin` composition (route, input adapter, mount chain)
 /// without any window. The content slot exists from `Startup` so the chained
@@ -1036,6 +1011,7 @@ fn setup_modal_consumes_modifier_chords_and_shift_r_without_running_setup() {
 #[test]
 fn x_snapshot_export_reports_the_unavailable_worker() {
     let mut app = input_app(fixture::demo_app());
+    app.init_resource::<crate::snapshot_export::BevySnapshotExportRuntime>();
     app.world_mut()
         .non_send_mut::<FrontendTrack>()
         .shell

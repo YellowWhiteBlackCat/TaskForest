@@ -1,29 +1,7 @@
 //! Pure CPU and memory observation view models for the Performance overview.
-use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
 use taskforest_core::core::metrics::{CpuMetrics, MemoryMetrics};
 use taskforest_core::core::metrics::{ResourcePressure, SystemSnapshot};
-
-/// Responsive CPU composition derived from the frame budget's typed chart
-/// inventory (GPUI `CpuChartLayout::for_inventory` parity). This is layout
-/// state, not user-selectable mode: the Full inventory adds the bounded
-/// context surfaces below the aggregate headline; AggregateOnly keeps the
-/// aggregate legible.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum CpuChartLayout {
-    AggregateWithPerCore,
-    AggregateOnly,
-}
-
-impl CpuChartLayout {
-    #[must_use]
-    pub(super) const fn for_inventory(inventory: PerformanceChartInventory) -> Self {
-        match inventory {
-            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
-            PerformanceChartInventory::Full => Self::AggregateWithPerCore,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct CpuObservation {

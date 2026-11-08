@@ -61,6 +61,8 @@ pub(crate) use frame_plan::{
     table_window,
 };
 
+pub use sparkline::{TuiSparklineCurve, TuiSparklineMode, braille16_sparkline, render_sparkline};
+
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};

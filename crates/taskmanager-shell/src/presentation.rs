@@ -14,21 +14,28 @@ use taskforest_core::core::services::{
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 pub mod about;
+pub mod chart_slots;
 mod constants;
+pub mod container_quota;
 mod cpu;
+pub mod device_caption;
 pub mod diagnostics;
 pub mod first_run;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
+pub mod graph_readout;
+pub mod graph_window;
 pub mod health_review;
 mod help;
 pub mod history_replay;
 mod network;
+mod percent;
 pub mod privilege_center;
 mod process;
 mod service_exit;
 pub mod smart;
 pub mod smart_tool;
+pub mod startup;
 mod storage;
 pub mod storage_health;
 pub mod system_information;
@@ -36,13 +43,22 @@ pub mod system_timeline;
 mod telemetry;
 pub mod trend;
 
+pub use chart_slots::ChartSlots;
 pub use constants::MISSING_VALUE;
 pub use cpu::*;
+pub use device_caption::{append_status_badge, battery_caption, fan_caption};
+pub use gpu_engine_rows::{format_engine_cycles, format_engine_time};
+pub use graph_readout::*;
+pub use graph_window::*;
 pub use help::*;
+pub use history_replay::format_peak;
 pub use network::*;
+pub use percent::{observed_percentage, observed_precise_percentage, scalar_text};
 pub use process::*;
+pub use startup::{startup_impact_text, startup_source_text};
 pub use storage::*;
 use taskforest_core::core::metrics::ResourcePressure;
+use taskforest_core::core::percent::precise_percent_text;
 use taskmanager_application::i18n;
 use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
 pub use telemetry::*;
@@ -76,19 +92,7 @@ pub fn service_cycle_members<'a>(
 /// Owned form of [`MISSING_VALUE`] for `String` readouts.
 #[must_use]
 pub fn bytes(value: u64) -> String {
-    const KIB: f64 = 1024.0;
-    const MIB: f64 = KIB * 1024.0;
-    const GIB: f64 = MIB * 1024.0;
-    let value = value as f64;
-    if value >= GIB {
-        format!("{:.1} GiB", value / GIB)
-    } else if value >= MIB {
-        format!("{:.1} MiB", value / MIB)
-    } else if value >= KIB {
-        format!("{:.1} KiB", value / KIB)
-    } else {
-        format!("{value:.0} B")
-    }
+    taskforest_core::core::units::format_quantity_with(value, true, true, false)
 }
 
 /// Format an optional resource value without collapsing an unavailable
@@ -120,9 +124,9 @@ pub fn format_resource_pressure(pressure: Option<&ResourcePressure>) -> String {
     let Some(pressure) = pressure else {
         return missing_value();
     };
-    let some = format!("{:.1}%", pressure.some.avg10);
+    let some = precise_percent_text(pressure.some.avg10);
     if let Some(full) = &pressure.full {
-        format!("some {some} · full {:.1}%", full.avg10)
+        format!("some {some} · full {}", precise_percent_text(full.avg10))
     } else {
         format!("some {some}")
     }
@@ -539,6 +543,33 @@ pub fn peak_of(samples: &[f32], current: Option<f32>) -> Option<f32> {
         }
     }
     peak.map(|value| value.max(0.0))
+}
+
+/// The greatest finite sample of a window, floored by `floor`.
+///
+/// This is the SINGLE dynamic-max fold (ADR-020): the GPUI throughput and
+/// temperature graphs, the GPUI history grid, the Iced trend strip, and the
+/// Bevy NPU power ceiling must not disagree about what "the peak of this
+/// window" is. A provider gap (a non-finite sample) is ignored, and an
+/// all-gap or empty window floors to the caller's neutral scale instead of a
+/// degenerate zero that would claim an idle device.
+#[must_use]
+pub fn finite_max_floored(floor: f32, samples: &[f32]) -> f32 {
+    samples
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .fold(floor, f32::max)
+}
+
+/// The greatest finite sample of a window, floored at zero.
+///
+/// [`finite_max_floored`] at the zero floor — the auto-scale peak of a
+/// non-percentage series (bytes/sec, RPM), where an idle series must read as
+/// a flat baseline rather than a degenerate scale.
+#[must_use]
+pub fn finite_peak(samples: &[f32]) -> f32 {
+    finite_max_floored(0.0, samples)
 }
 
 /// Localized `"{value} (peak {peak})"` join for the process Properties

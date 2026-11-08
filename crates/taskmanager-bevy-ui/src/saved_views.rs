@@ -294,7 +294,7 @@ fn sync_config(
     }
 }
 fn poll_import(surface: Res<WindowSurfaceState>, mut access: SavedViewsAccess) {
-    if !matches!(surface.0, Some(WindowSurface::SavedViews)) {
+    if !matches!(surface.active(), Some(WindowSurface::SavedViews)) {
         access.pending.0 = None;
         return;
     }

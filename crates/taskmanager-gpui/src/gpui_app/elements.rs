@@ -24,8 +24,7 @@ pub use graphs::{
 };
 pub(crate) use overlays::graph_tooltip_overlay;
 pub use overlays::{
-    dialog_overlay, dialog_overlay_width, more_rows_hint, more_rows_label, tooltip,
-    tooltip_overlay, truncated_text,
+    dialog_overlay, dialog_overlay_width, more_rows_hint, tooltip, tooltip_overlay, truncated_text,
 };
 pub(crate) use visual::sparkline;
 pub use visual::{

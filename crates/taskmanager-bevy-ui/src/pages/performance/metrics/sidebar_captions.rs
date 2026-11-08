@@ -1,31 +1,22 @@
 //! Device sidebar caption formatting across performance targets.
 
-use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkAdapterType, NetworkMetrics};
-use taskforest_core::core::power::BatteryInfo;
-use taskforest_core::core::sensors::SensorReading;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, bytes_percent};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
-    bytes, device_status_i18n_key, effective_smart_status, missing_value,
-    optional_wifi_signal_quality_percent, smart::smart_section_visible,
+    bytes, effective_smart_status, missing_value, optional_wifi_signal_quality_percent,
+    smart::smart_section_visible,
 };
 
 use super::cpu_sidebar_caption;
 use super::{batteries, disks, fans, gpu_devices, memory_metrics, network_devices};
 use crate::pages::performance::PerformanceDeviceTarget;
+use taskforest_core::core::percent::percent_text;
 
-pub(crate) fn append_status_badge(caption: &mut String, status: DeviceStatus) {
-    if status == DeviceStatus::Healthy {
-        return;
-    }
-    let key = device_status_i18n_key(status);
-    if !caption.is_empty() {
-        caption.push_str("  ·  ");
-    }
-    caption.push_str(t(key));
-}
+pub(crate) use taskmanager_shell::presentation::{
+    append_status_badge, battery_caption, fan_caption,
+};
 
 pub(crate) fn memory_sidebar_caption(shell: &ShellApp) -> (String, String) {
     if let Some(mem) = memory_metrics(shell) {
@@ -41,7 +32,7 @@ pub(crate) fn memory_sidebar_caption(shell: &ShellApp) -> (String, String) {
         let cap2 = mem
             .used_percentage_observed()
             .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.0}%"))
+            .map(percent_text)
             .unwrap_or_else(missing_value);
         (cap1, cap2)
     } else {
@@ -53,7 +44,7 @@ pub(crate) fn disk_sidebar_caption(disk: &DiskMetrics) -> (String, String) {
     let units = UnitPreferences::default();
     let active = disk
         .current_active_time_pct()
-        .map_or_else(missing_value, |value| format!("{value:.0}%"));
+        .map_or_else(missing_value, percent_text);
     let rate = match (
         disk.current_read_bytes_per_sec(),
         disk.current_write_bytes_per_sec(),
@@ -97,7 +88,7 @@ pub(crate) fn network_sidebar_caption(nic: &NetworkMetrics) -> (String, String) 
             parts.push(ssid.to_string());
         }
         if let Some(pct) = optional_wifi_signal_quality_percent(nic.current_signal_dbm()) {
-            parts.push(format!("{pct:.0}%"));
+            parts.push(percent_text(pct));
         }
     } else {
         parts.push((*nic.interface_name).to_owned());
@@ -165,13 +156,13 @@ pub(crate) fn gpu_sidebar_caption(gpu: &GpuMetrics) -> (String, String) {
     };
     let mut parts: Vec<String> = Vec::new();
     if let Some(utilization) = gpu.current_utilization_pct() {
-        parts.push(format!("{utilization:.0}%"));
+        parts.push(percent_text(utilization));
     }
     if let (Some(used), Some(total)) = vram(gpu)
         && total > 0
         && let Some(pct) = bytes_percent(used, total)
     {
-        parts.push(format!("VRAM {:.0}%", pct.min(100.0).round()));
+        parts.push(format!("VRAM {}", percent_text(pct.min(100.0))));
     }
     if let Some(temperature) = gpu.current_temperature_c() {
         parts.push(format!("{temperature:.0} °C"));
@@ -184,24 +175,6 @@ pub(crate) fn gpu_sidebar_caption(gpu: &GpuMetrics) -> (String, String) {
     }
     let mut cap2 = parts.join("  ·  ");
     append_status_badge(&mut cap2, gpu.device_state.status);
-    (cap1, cap2)
-}
-
-pub(crate) fn battery_sidebar_caption(battery: &BatteryInfo) -> (String, String) {
-    let cap1 = battery
-        .current_capacity_pct()
-        .map_or_else(missing_value, |value| format!("{value}%"));
-    let mut cap2 = battery.status.clone();
-    append_status_badge(&mut cap2, battery.device_state.status);
-    (cap1, cap2)
-}
-
-pub(crate) fn fan_sidebar_caption(reading: &SensorReading) -> (String, String) {
-    let cap1 = reading
-        .current_number()
-        .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
-    let mut cap2 = reading.label().to_owned();
-    append_status_badge(&mut cap2, reading.state().status);
     (cap1, cap2)
 }
 
@@ -226,12 +199,9 @@ pub(crate) fn device_sidebar_caption(
             .map_or_else(|| (missing_value(), missing_value()), gpu_sidebar_caption),
         PerformanceDeviceTarget::Battery(id) => batteries(shell)
             .and_then(|bats| bats.iter().find(|bat| &bat.id == id))
-            .map_or_else(
-                || (missing_value(), missing_value()),
-                battery_sidebar_caption,
-            ),
+            .map_or_else(|| (missing_value(), missing_value()), battery_caption),
         PerformanceDeviceTarget::Fan(id) => fans(shell)
             .and_then(|fans| fans.into_iter().find(|fan| fan.id() == id))
-            .map_or_else(|| (missing_value(), missing_value()), fan_sidebar_caption),
+            .map_or_else(|| (missing_value(), missing_value()), fan_caption),
     }
 }

@@ -1,12 +1,13 @@
 //! Pure CPU observation projection consumed by the CPU render tree.
 
-use crate::gpui_app::formatting;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskmanager_application::i18n;
+use taskmanager_shell::presentation::observed_percentage;
 
 use super::{
     cpu_frequency_readout_for_source, cpu_temperature_readout_for_source, per_core_cell_label,
 };
+use taskforest_core::core::percent::percent_text;
 
 pub(super) struct CpuCoreReadout {
     label: String,
@@ -62,8 +63,7 @@ impl CpuLiveStats {
 
         Self {
             cores,
-            utilization_readout: usage
-                .map_or_else(formatting::missing_value, |value| format!("{value:.0} %")),
+            utilization_readout: observed_percentage(usage),
             frequency_readout: frequency
                 .map(|value| cpu_frequency_readout_for_source(Some(value), cpu.frequency_source)),
             temperature_readout: temperature.map(|value| {
@@ -71,7 +71,7 @@ impl CpuLiveStats {
             }),
             power_readout: power.map(|value| format!("{value:.1} W")),
             details: CpuDetailsStats {
-                utilization: usage.map(|value| format!("{:.0}%", value.round())),
+                utilization: usage.map(percent_text),
                 speed: frequency.map(|value| {
                     cpu_frequency_readout_for_source(Some(value), cpu.frequency_source)
                 }),

@@ -1,6 +1,7 @@
 //! Sidebar CPU caption projection.
 
 use super::*;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::cpu_clock_readout;
 
 /// The sidebar CPU row's two GPUI-aligned captions: brand, then usage,
@@ -18,7 +19,7 @@ pub(crate) fn cpu_sidebar_caption(shell: &ShellApp) -> (String, String) {
     let usage = cpu
         .current_global_usage_pct()
         .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.0}%"));
+        .map_or_else(missing_value, percent_text);
     let frequency = cpu.current_frequency_mhz().map(cpu_clock_readout);
     let mut line2 = match (cpu.current_temperature_c(), frequency) {
         (Some(temperature), Some(frequency)) => {

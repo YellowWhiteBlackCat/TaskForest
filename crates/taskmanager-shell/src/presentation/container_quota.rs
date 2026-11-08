@@ -1,9 +1,10 @@
-//! The declared container quota and the page's over-limit state.
+//! The declared container quota and its over-limit state — one owner for all
+//! four frontends.
 //!
 //! A container runtime declares the ceilings it enforces for a workload in
 //! the control group that owns it. The shared contract carries those
-//! declarations ([`ContainerSummary::quota`]); this module is the page's ONLY
-//! consumer of them, and it never invents a ceiling of its own.
+//! declarations ([`ContainerSummary::quota`]); every frontend binds this owner
+//! and never invents a ceiling of its own.
 //!
 //! Honesty contract:
 //! - The only cap a row is compared against is the one the container
@@ -24,16 +25,17 @@
 //!   may fully use). A `cpu.max` that names no budget ("max") declares no
 //!   ceiling at all, so it can never produce an over-limit state.
 
+use super::{bytes, missing_value};
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_application::i18n::t;
-use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// The typed state of one container's declared quota.
 ///
 /// The default is the UNKNOWN state: a marker written without a payload must
 /// never claim that a declaration exists.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum ContainerQuotaState {
+pub enum ContainerQuotaState {
     /// The declarations could not be read: the quota is UNKNOWN.
     #[default]
     Unknown,
@@ -45,7 +47,7 @@ pub(crate) enum ContainerQuotaState {
 
 /// The declared dimension whose observation crossed the ceiling.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) enum ContainerQuotaBreach {
+pub enum ContainerQuotaBreach {
     /// The observed memory share reached the declared soft ceiling.
     Memory {
         /// The observed share of the declared soft ceiling, in percent.
@@ -74,7 +76,7 @@ impl ContainerQuotaBreach {
     ///
     /// `None` for a CPU-only breach: the CPU budget has no share of a
     /// memory ceiling to report.
-    pub(crate) fn share_percent(self) -> Option<f32> {
+    pub fn share_percent(self) -> Option<f32> {
         match self {
             Self::Memory { share_percent } | Self::MemoryAndCpu { share_percent, .. } => {
                 Some(share_percent)
@@ -88,30 +90,30 @@ impl ContainerQuotaBreach {
     /// The deeper overrun takes the heavier over-limit mark. The exact
     /// percentage stays in the row's readout, so the mark never has to carry
     /// the value.
-    pub(crate) fn is_deep_overrun(self) -> bool {
+    pub fn is_deep_overrun(self) -> bool {
         matches!(self.share_percent(), Some(share) if share >= 200.0)
     }
 }
 
 /// What the page knows about one container's declared quota.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ContainerQuotaView {
+pub struct ContainerQuotaView {
     /// The typed state of the declarations.
-    pub(crate) state: ContainerQuotaState,
+    pub state: ContainerQuotaState,
     /// The observed share of the declared soft memory ceiling, in percent.
     ///
     /// `None` when the declarations are unknown, when no soft ceiling is
     /// declared, or when the usage was not observed. A share above 100 is a
     /// real overrun and is never clamped.
-    pub(crate) memory_share_percent: Option<f32>,
+    pub memory_share_percent: Option<f32>,
     /// The declared soft memory ceiling, in bytes.
-    pub(crate) memory_soft_limit_bytes: Option<u64>,
+    pub memory_soft_limit_bytes: Option<u64>,
     /// The declared hard memory ceiling, in bytes.
-    pub(crate) memory_hard_limit_bytes: Option<u64>,
+    pub memory_hard_limit_bytes: Option<u64>,
     /// The declared CPU budget, in whole CPUs.
-    pub(crate) cpu_budget_cpus: Option<f64>,
+    pub cpu_budget_cpus: Option<f64>,
     /// The observed CPU load, in whole CPUs.
-    pub(crate) cpu_observed_cpus: Option<f64>,
+    pub cpu_observed_cpus: Option<f64>,
 }
 
 impl ContainerQuotaView {
@@ -134,7 +136,7 @@ impl ContainerQuotaView {
     }
 
     /// The declared dimension the observation crossed, if any.
-    pub(crate) fn breach(&self) -> Option<ContainerQuotaBreach> {
+    pub fn breach(&self) -> Option<ContainerQuotaBreach> {
         match (self.memory_breach(), self.cpu_breach()) {
             (Some(share_percent), Some((observed_cpus, budget_cpus))) => {
                 Some(ContainerQuotaBreach::MemoryAndCpu {
@@ -158,7 +160,7 @@ impl ContainerQuotaView {
 /// The page's only cap is the one the container DECLARED: nothing here
 /// derives a ceiling from the host, from the row's neighbours, or from the
 /// observed usage.
-pub(crate) fn container_quota_view(summary: &ContainerSummary) -> ContainerQuotaView {
+pub fn container_quota_view(summary: &ContainerSummary) -> ContainerQuotaView {
     let quota = &summary.quota;
     let observed_memory = summary.memory_bytes.current_value().copied();
     let observed_cpu = summary
@@ -194,7 +196,7 @@ fn quota_state(quota: &ContainerQuota) -> ContainerQuotaState {
 /// against it, and that share is never clamped: an overrun stays visible as
 /// the percentage it actually reached. The share keeps one decimal so a
 /// reading just below the ceiling never rounds itself up onto it.
-pub(crate) fn quota_readout(view: &ContainerQuotaView) -> String {
+pub fn quota_readout(view: &ContainerQuotaView) -> String {
     match view.state {
         ContainerQuotaState::Unknown => t("proc_insights.unknown").to_owned(),
         ContainerQuotaState::NotDeclared => t("proc_insights.not_declared").to_owned(),
@@ -206,7 +208,7 @@ pub(crate) fn quota_readout(view: &ContainerQuotaView) -> String {
 fn declared_readout(view: &ContainerQuotaView) -> String {
     let mut parts: Vec<String> = Vec::new();
     if let Some(share) = view.memory_share_percent {
-        parts.push(format!("{share:.1}%"));
+        parts.push(percent_text(share));
     }
     if let Some(budget) = view.cpu_budget_cpus {
         let observed = view
@@ -226,5 +228,5 @@ fn declared_readout(view: &ContainerQuotaView) -> String {
 }
 
 #[cfg(test)]
-#[path = "../../../tests/gui/gpui_gpui_app_containers_view_quota_tests.rs"]
+#[path = "../../tests/headless/presentation/container_quota_tests.rs"]
 mod tests;

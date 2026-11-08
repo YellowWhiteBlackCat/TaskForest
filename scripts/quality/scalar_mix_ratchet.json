@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "gate": {
+    "source": "zhuge-ui-kit:crates/zhuge-ui-core/tools/check_scalar_mix.py",
+    "sha256": "62b343f753363174d74ef776c3232ae50e6006420a8f3744c35cf115ec5235b9"
+  },
+  "entries": {}
+}

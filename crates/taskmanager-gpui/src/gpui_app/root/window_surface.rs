@@ -14,6 +14,7 @@ use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionReduction, PendingConfirmation, PlatformEffect,
     ServiceControlTarget, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
+use taskmanager_ui_contract::{OverlayEvent, OverlayKindOf, OverlaySlot, OverlayTransition};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowSurfaceKind {
@@ -63,7 +64,7 @@ pub(crate) enum WindowSurface {
 
 impl WindowSurface {
     #[must_use]
-    pub const fn kind(&self) -> WindowSurfaceKind {
+    pub fn kind(&self) -> WindowSurfaceKind {
         match self {
             Self::Settings => WindowSurfaceKind::Settings,
             Self::Help => WindowSurfaceKind::Help,
@@ -80,6 +81,14 @@ impl WindowSurface {
     }
 }
 
+impl OverlayKindOf for WindowSurface {
+    type Kind = WindowSurfaceKind;
+
+    fn kind(&self) -> Self::Kind {
+        WindowSurface::kind(self)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowSurfaceDismissReason {
     Cancel,
@@ -91,96 +100,33 @@ pub enum WindowSurfaceDismissReason {
     Completed,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum WindowSurfaceEvent {
-    Open(WindowSurface),
-    DismissCurrent(WindowSurfaceDismissReason),
-    Dismiss {
-        expected: WindowSurfaceKind,
-        reason: WindowSurfaceDismissReason,
-    },
-}
+pub(crate) type WindowSurfaceEvent =
+    OverlayEvent<WindowSurface, WindowSurfaceKind, WindowSurfaceDismissReason>;
+pub type WindowSurfaceTransition = OverlayTransition<WindowSurfaceKind, WindowSurfaceDismissReason>;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum WindowSurfaceTransition {
-    #[default]
-    Unchanged,
-    Opened(WindowSurfaceKind),
-    Replaced {
-        previous: WindowSurfaceKind,
-        current: WindowSurfaceKind,
-    },
-    Dismissed {
-        surface: WindowSurfaceKind,
-        reason: WindowSurfaceDismissReason,
-    },
-}
+#[derive(Debug, Default)]
+pub(crate) struct WindowSurfaceState(OverlaySlot<WindowSurface>);
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct WindowSurfaceState {
-    active: Option<WindowSurface>,
+impl std::ops::Deref for WindowSurfaceState {
+    type Target = OverlaySlot<WindowSurface>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for WindowSurfaceState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl WindowSurfaceState {
     #[must_use]
-    pub const fn initial(active: Option<WindowSurface>) -> Self {
-        Self { active }
-    }
-
-    #[must_use]
-    pub const fn active(&self) -> Option<&WindowSurface> {
-        self.active.as_ref()
-    }
-
-    #[must_use]
-    pub fn active_mut(&mut self) -> Option<&mut WindowSurface> {
-        self.active.as_mut()
-    }
-
-    #[must_use]
-    pub const fn kind(&self) -> Option<WindowSurfaceKind> {
-        match self.active.as_ref() {
-            Some(surface) => Some(surface.kind()),
-            None => None,
-        }
-    }
-
-    #[must_use]
-    pub const fn is_open(&self) -> bool {
-        self.active.is_some()
+    pub fn initial(active: Option<WindowSurface>) -> Self {
+        Self(OverlaySlot::initial(active))
     }
 
     pub fn reduce(&mut self, event: WindowSurfaceEvent) -> WindowSurfaceTransition {
-        match event {
-            WindowSurfaceEvent::Open(surface) => {
-                let current = surface.kind();
-                let previous = self.active.replace(surface).map(|value| value.kind());
-                previous.map_or(WindowSurfaceTransition::Opened(current), |previous| {
-                    WindowSurfaceTransition::Replaced { previous, current }
-                })
-            }
-            WindowSurfaceEvent::DismissCurrent(reason) => {
-                let Some(surface) = self.active.take() else {
-                    return WindowSurfaceTransition::Unchanged;
-                };
-                WindowSurfaceTransition::Dismissed {
-                    surface: surface.kind(),
-                    reason,
-                }
-            }
-            WindowSurfaceEvent::Dismiss { expected, reason } => {
-                if self.kind() != Some(expected) {
-                    return WindowSurfaceTransition::Unchanged;
-                }
-                let Some(surface) = self.active.take() else {
-                    return WindowSurfaceTransition::Unchanged;
-                };
-                WindowSurfaceTransition::Dismissed {
-                    surface: surface.kind(),
-                    reason,
-                }
-            }
-        }
+        self.0.apply(event)
     }
 }
 
@@ -203,28 +149,26 @@ pub enum GpuiSurfaceKind {
 
 impl super::RootView {
     #[must_use]
-    pub const fn window_surface_kind(&self) -> Option<WindowSurfaceKind> {
+    pub fn window_surface_kind(&self) -> Option<WindowSurfaceKind> {
         self.window_surface.kind()
     }
 
     #[must_use]
-    pub const fn window_surface_open(&self) -> bool {
+    pub fn window_surface_open(&self) -> bool {
         self.window_surface.is_open() || self.shell.interaction.is_open()
     }
 
     #[must_use]
-    pub const fn active_surface_kind(&self) -> Option<GpuiSurfaceKind> {
+    pub fn active_surface_kind(&self) -> Option<GpuiSurfaceKind> {
         if let Some(kind) = self.shell.interaction.kind() {
             Some(GpuiSurfaceKind::Shared(kind))
-        } else if let Some(kind) = self.window_surface.kind() {
-            Some(GpuiSurfaceKind::Local(kind))
         } else {
-            None
+            self.window_surface.kind().map(GpuiSurfaceKind::Local)
         }
     }
 
     #[must_use]
-    pub const fn input_scope(&self) -> GpuiInputScope {
+    pub fn input_scope(&self) -> GpuiInputScope {
         if self.telemetry_frame_state.is_collecting() {
             GpuiInputScope::TelemetryWarmup
         } else if let Some(kind) = self.active_surface_kind() {
@@ -374,8 +318,8 @@ impl super::RootView {
     ) -> WindowSurfaceTransition {
         let transition = self
             .window_surface
-            .reduce(WindowSurfaceEvent::Dismiss { expected, reason });
-        if let WindowSurfaceTransition::Dismissed { surface, .. } = transition {
+            .reduce(WindowSurfaceEvent::Dismiss(expected, reason));
+        if let WindowSurfaceTransition::Dismissed(surface, _) = transition {
             self.cleanup_closed_surface(surface);
         }
         transition
@@ -388,7 +332,7 @@ impl super::RootView {
         let transition = self
             .window_surface
             .reduce(WindowSurfaceEvent::DismissCurrent(reason));
-        if let WindowSurfaceTransition::Dismissed { surface, .. } = transition {
+        if let WindowSurfaceTransition::Dismissed(surface, _) = transition {
             self.cleanup_closed_surface(surface);
         }
         transition
@@ -444,7 +388,7 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub const fn process_properties_target(&self) -> Option<&FrozenProcessIdentity> {
+    pub fn process_properties_target(&self) -> Option<&FrozenProcessIdentity> {
         self.shell.interaction.process_properties()
     }
 
@@ -473,7 +417,7 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub const fn pending_confirmation(&self) -> Option<&PendingConfirmation> {
+    pub fn pending_confirmation(&self) -> Option<&PendingConfirmation> {
         self.shell.interaction.pending_confirmation()
     }
 

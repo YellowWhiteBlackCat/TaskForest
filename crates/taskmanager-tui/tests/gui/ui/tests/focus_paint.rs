@@ -13,14 +13,17 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
+use taskmanager_application::ProcessDetailsSection;
+use taskmanager_application::i18n::process_details_section_label;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::TuiTheme;
 use crate::ui::frame_plan::{TuiFocusControl, TuiFocusOrder, TuiFocusPlan, TuiFocusTarget};
-use crate::ui::process_properties::ProcessDetailsSection;
+
 use crate::{TuiSurfaceKind, demo_app};
 use taskmanager_application::SurfaceKind;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::{Language, set_language};
 
 /// Pin English and serialize against the language-flipping i18n test.
@@ -92,9 +95,8 @@ fn service_menu_highlights_only_the_plan_named_item() {
             unreachable!("open_service_menu stores a ServiceMenu surface");
         };
 
-        let first = crate::ui::service_menu::action_label(crate::ui::service_menu::MENU_ACTIONS[0]);
-        let second =
-            crate::ui::service_menu::action_label(crate::ui::service_menu::MENU_ACTIONS[1]);
+        let first = i18n::service_action_label(crate::ui::service_menu::MENU_ACTIONS[0]);
+        let second = i18n::service_action_label(crate::ui::service_menu::MENU_ACTIONS[1]);
 
         // The plan names item 0 while the frozen state still says 1: the
         // painted highlight follows the plan, not the surface state.
@@ -263,8 +265,14 @@ fn properties_modal_highlights_only_the_plan_named_tab() {
         );
         let target = app.process_properties().expect("properties target").clone();
 
-        let overview = format!(" {} ", t(ProcessDetailsSection::Overview.label_key()));
-        let performance = format!(" {} ", t(ProcessDetailsSection::Performance.label_key()));
+        let overview = format!(
+            " {} ",
+            process_details_section_label(ProcessDetailsSection::Overview)
+        );
+        let performance = format!(
+            " {} ",
+            process_details_section_label(ProcessDetailsSection::Performance)
+        );
         let render_under = |control| {
             render(96, 30, |frame, popup| {
                 crate::ui::process_properties::render_process_properties_at(

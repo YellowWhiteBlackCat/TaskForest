@@ -17,9 +17,11 @@
 //! can never prompt.
 
 use gpui::{Context, Div, InteractiveElement, ParentElement, Styled, div};
+use std::time::SystemTime;
 use taskforest_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::MsrReadoutSnapshot;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::MsrReadoutRequestFailure;
 use taskmanager_application::{
     MsrReadoutRequest, MsrReadoutState, i18n, request_submission_failure,
@@ -30,7 +32,6 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::root::platform_submission_time_ms;
 use taskmanager_theme::{Theme, tokens};
 
 const MAX_VISIBLE_MSR_ROWS: usize = 5;
@@ -199,7 +200,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_msr_readout(MsrReadoutRequest::Refresh, platform_submission_time_ms())
+                    .submit_msr_readout(MsrReadoutRequest::Refresh, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );
@@ -249,8 +250,7 @@ pub(super) fn render_msr_readouts_section(theme: &Theme, model: &MsrReadoutsMode
         if rows.len() > visible {
             col = col.child(dim_text(
                 theme,
-                &i18n::t("common.more_rows")
-                    .replace("{count}", &(rows.len() - visible).to_string()),
+                &i18n::more_rows_label(rows.len() - visible),
             ));
         }
     }

@@ -21,7 +21,11 @@ pub(super) fn run_direct_arms(
 /// Modifier policy per scope mirrors the historical hand-written systems
 /// exactly (the overlay toggles ignore chords; page commands refuse
 /// Ctrl/Alt; the resource digits also refuse the platform modifier).
-fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers) -> bool {
+pub(super) fn direct_scope_armed(
+    app: &TuiApp,
+    scope: TuiDirectScope,
+    modifiers: Modifiers,
+) -> bool {
     match scope {
         TuiDirectScope::SystemPage => app.page() == AppPage::System && modifiers == Modifiers::NONE,
         TuiDirectScope::SystemDashboard => {

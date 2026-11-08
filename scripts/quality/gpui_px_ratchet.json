@@ -1,0 +1,1219 @@
+{
+  "version": 1,
+  "gate": {
+    "sha256": "3627b51410009263bfb80067aefa6a1234423a894fae64a33237f8fda832995d"
+  },
+  "entries": [
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/about.rs",
+      "value": "38.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：38.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/about.rs",
+      "value": "430.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：430.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/about.rs",
+      "value": "94.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：94.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(12.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
+      "value": "13.0",
+      "count": 1,
+      "category": "spacing-debt",
+      "reason": "组件内间距 px(13.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
+      "value": "22.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(22.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
+      "value": "28.0",
+      "count": 5,
+      "category": "control-geometry",
+      "reason": "控件几何：高 28.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
+      "value": "46.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：46.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/containers_view.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/cpu_view/details_panel.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/panels.rs",
+      "value": "190.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：190.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/view.rs",
+      "value": "132.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：132.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/view.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/view/review.rs",
+      "value": "24.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 24.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/widget.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/dashboard/widget.rs",
+      "value": "24.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 24.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/actions.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/actions.rs",
+      "value": "13.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(13.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/graphs.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "圆角/描边几何：2.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/graphs.rs",
+      "value": "8.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：8.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/overlays.rs",
+      "value": "480.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：480.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/visual.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "阴影几何：2.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/elements/visual.rs",
+      "value": "26.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 26.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/graph/hover.rs",
+      "value": "3.0",
+      "count": 2,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 3.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/graph/hover.rs",
+      "value": "6.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "布局几何：6.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/graph/scene_cache.rs",
+      "value": "1.5",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：1.5（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/graph/scene_cache.rs",
+      "value": "2.0",
+      "count": 3,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 2.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/graph/scene_cache.rs",
+      "value": "4.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：4.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/help_overlay.rs",
+      "value": "88.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：88.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/list_view.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/list_view.rs",
+      "value": "14.0",
+      "count": 2,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/list_view.rs",
+      "value": "360.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：360.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/directory_usage.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/dynamic.rs",
+      "value": "460.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：460.0（perf 面板/卡片宽度上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/history_replay.rs",
+      "value": "72.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表/条形几何：72.0（perf_views 布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/layout.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表布局常量：12.0（perf_views 槽位几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/layout.rs",
+      "value": "320.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：320.0（perf 面板/卡片宽度上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/layout.rs",
+      "value": "72.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表布局常量：72.0（perf_views 槽位几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/layout.rs",
+      "value": "94.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表布局常量：94.0（perf_views 槽位几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "1.0",
+      "count": 2,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "10.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(10.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "34.0",
+      "count": 2,
+      "category": "geometry-math",
+      "reason": "分隔条几何：34.0（发丝线的承载高度/宽度）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "44.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表/条形几何：44.0（perf_views 布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/memory_composition.rs",
+      "value": "74.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表/条形几何：74.0（perf_views 布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/partition_stats.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/partition_stats.rs",
+      "value": "6.0",
+      "count": 1,
+      "category": "chart-geometry",
+      "reason": "图表/条形几何：6.0（perf_views 布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/perf_views/smart_dialog.rs",
+      "value": "360.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：360.0（模态对话框宽度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome.rs",
+      "value": "18.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：18.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：2.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome.rs",
+      "value": "56.0",
+      "count": 3,
+      "category": "surface-geometry",
+      "reason": "表面几何：56.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome/action_button.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome/render.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome/render.rs",
+      "value": "320.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 320.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "100.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：100.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "120.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：120.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "160.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 160.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "18.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：18.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "180.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 180.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "280.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 280.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "56.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：56.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows.rs",
+      "value": "640.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：640.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows/cells.rs",
+      "value": "56.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：56.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/processes_view/rows/cells.rs",
+      "value": "8.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：8.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/batch_process.rs",
+      "value": "150.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：150.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/batch_process.rs",
+      "value": "420.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：420.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/chrome.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：12.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/chrome.rs",
+      "value": "16.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：16.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/diagnostic_bundle.rs",
+      "value": "230.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：230.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/overlays.rs",
+      "value": "360.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：360.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/pages/performance.rs",
+      "value": "30.0",
+      "count": 2,
+      "category": "control-geometry",
+      "reason": "控件几何：高 30.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/surfaces.rs",
+      "value": "430.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：430.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
+      "value": "420.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：420.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
+      "value": "48.0",
+      "count": 1,
+      "category": "spacing-debt",
+      "reason": "组件内间距 px(48.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
+      "value": "6.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：6.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
+      "value": "640.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：640.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/resize.rs",
+      "value": "-1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线重叠几何：px(-1.0)（行边界对齐 hack）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/resize.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 1.0"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
+      "value": "1180.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：1180.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
+      "value": "18.0",
+      "count": 1,
+      "category": "spacing-debt",
+      "reason": "组件内间距 px(18.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
+      "value": "460.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：460.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
+      "value": "780.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：780.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/service_control.rs",
+      "value": "420.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：420.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/startup/demo.rs",
+      "value": "120.0",
+      "count": 1,
+      "category": "demo-fixture",
+      "reason": "演示窗口几何：origin 120.0（demo fixture，非生产布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/startup/demo.rs",
+      "value": "80.0",
+      "count": 1,
+      "category": "demo-fixture",
+      "reason": "演示窗口几何：origin 80.0（demo fixture，非生产布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/startup/window.rs",
+      "value": "120.0",
+      "count": 1,
+      "category": "demo-fixture",
+      "reason": "演示窗口几何：origin 120.0（demo fixture，非生产布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/startup/window.rs",
+      "value": "80.0",
+      "count": 1,
+      "category": "demo-fixture",
+      "reason": "演示窗口几何：origin 80.0（demo fixture，非生产布局）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/system_health.rs",
+      "value": "420.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：420.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/root/termination.rs",
+      "value": "420.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：420.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/services_view.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/services_view.rs",
+      "value": "280.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：280.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/services_view.rs",
+      "value": "400.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：400.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/services_view.rs",
+      "value": "80.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：80.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/services_view/details.rs",
+      "value": "430.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：430.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view.rs",
+      "value": "20.0",
+      "count": 1,
+      "category": "spacing-debt",
+      "reason": "组件内间距 px(20.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
+      "value": "16.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：16.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
+      "value": "180.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：180.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
+      "value": "3.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：3.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
+      "value": "42.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 42.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
+      "value": "7.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：7.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 28.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar.rs",
+      "value": "3.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：3.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar.rs",
+      "value": "8.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "布局常量：8.0（sidebar.rs 的具名几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar/edit.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar/row.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar/row.rs",
+      "value": "34.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 34.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/sidebar/row.rs",
+      "value": "58.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：58.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view.rs",
+      "value": "110.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：110.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view.rs",
+      "value": "140.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：140.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view.rs",
+      "value": "280.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：280.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view.rs",
+      "value": "400.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：400.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view.rs",
+      "value": "80.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：80.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view/boot_evidence.rs",
+      "value": "160.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：160.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view/boot_evidence.rs",
+      "value": "48.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：48.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view/boot_evidence.rs",
+      "value": "64.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：64.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view/boot_evidence.rs",
+      "value": "72.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：72.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/startup_view/boot_evidence.rs",
+      "value": "8.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "布局几何：8.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/system_health_view.rs",
+      "value": "118.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：118.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/system_health_view.rs",
+      "value": "120.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：120.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/system_view/cards.rs",
+      "value": "180.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：180.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/system_view/cards.rs",
+      "value": "6.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：6.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
+      "value": "100.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：100.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
+      "value": "120.0",
+      "count": 1,
+      "category": "column-width",
+      "reason": "表格列宽契约：120.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
+      "value": "140.0",
+      "count": 2,
+      "category": "column-width",
+      "reason": "表格列宽契约：140.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-gpui/src/gpui_app/users_view.rs",
+      "value": "80.0",
+      "count": 2,
+      "category": "column-width",
+      "reason": "表格列宽契约：80.0（TableColumn/contract_spec 默认或钳制）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table.rs",
+      "value": "12.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：12.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "row-height",
+      "reason": "行高契约：row_height = 28.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/columns.rs",
+      "value": "100.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：100.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/render.rs",
+      "value": "-1.0",
+      "count": 4,
+      "category": "hairline",
+      "reason": "发丝线重叠几何：px(-1.0)（行边界对齐 hack）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/render.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/render.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 28.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/resize.rs",
+      "value": "-1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线重叠几何：px(-1.0)（行边界对齐 hack）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/resize.rs",
+      "value": "1.0",
+      "count": 4,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 1.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/resize.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "布局常量：2.0（resize.rs 的具名几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/table/resize.rs",
+      "value": "20.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "布局几何：20.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/tree.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：12.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/tree.rs",
+      "value": "16.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：16.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/data/tree.rs",
+      "value": "24.0",
+      "count": 2,
+      "category": "row-height",
+      "reason": "行高契约：row_height = 24.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/checkbox.rs",
+      "value": "10.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(10.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/checkbox.rs",
+      "value": "18.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(18.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/checkbox.rs",
+      "value": "4.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "圆角/描边几何：4.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/search_input.rs",
+      "value": "14.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/select.rs",
+      "value": "26.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 26.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
+      "value": "-8.0",
+      "count": 1,
+      "category": "spacing-debt",
+      "reason": "组件内间距 px(-8.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
+      "value": "16.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(16.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "圆角/描边几何：2.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 28.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
+      "value": "4.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：4.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/switch.rs",
+      "value": "16.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标/指示点尺寸：size(px(16.0))（组件几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/switch.rs",
+      "value": "20.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 20.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/inputs/switch.rs",
+      "value": "36.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 36.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/layout/adaptive_grid.rs",
+      "value": "240.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：240.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/overlays/popup.rs",
+      "value": "12.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(12.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/overlays/popup.rs",
+      "value": "14.0",
+      "count": 2,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/overlays/popup.rs",
+      "value": "16.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "表面几何：16.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/overlays/popup.rs",
+      "value": "26.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 26.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/overlays/popup.rs",
+      "value": "360.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：360.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/badge.rs",
+      "value": "20.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 20.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/button.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/button.rs",
+      "value": "14.0",
+      "count": 2,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(14.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/button.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "阴影几何：2.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/button.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 28.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/icon_button.rs",
+      "value": "28.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：28.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/pill.rs",
+      "value": "24.0",
+      "count": 2,
+      "category": "control-geometry",
+      "reason": "控件几何：高 24.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/scrollbar/rail.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/section_header.rs",
+      "value": "1.0",
+      "count": 1,
+      "category": "hairline",
+      "reason": "发丝线：px(1.0) 分隔/描边"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/segmented.rs",
+      "value": "2.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "阴影几何：2.0"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/segmented.rs",
+      "value": "24.0",
+      "count": 1,
+      "category": "control-geometry",
+      "reason": "控件几何：高 24.0（按钮/行/输入高度契约）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/state_panel.rs",
+      "value": "22.0",
+      "count": 1,
+      "category": "icon-size",
+      "reason": "图标尺寸：size(px(22.0))（组件图标几何）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/state_panel.rs",
+      "value": "360.0",
+      "count": 2,
+      "category": "surface-geometry",
+      "reason": "表面几何：360.0（模态/面板/网格宽度或上限）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/state_panel.rs",
+      "value": "42.0",
+      "count": 1,
+      "category": "surface-geometry",
+      "reason": "布局几何：42.0（面契约，见调用点）"
+    },
+    {
+      "path": "crates/taskmanager-ui/src/primitives/tooltip.rs",
+      "value": "8.0",
+      "count": 1,
+      "category": "geometry-math",
+      "reason": "几何运算：阈值/钳制/锚点 8.0"
+    }
+  ]
+}

@@ -2,16 +2,18 @@
 
 use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div, px,
+    StatefulInteractiveElement, Styled, div,
 };
 use taskmanager_app_host::WindowCaptureClient;
 use taskmanager_application::i18n;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::window_capture::WindowCaptureSession;
 use taskmanager_application::window_capture::WindowCaptureState;
 use taskmanager_application::window_capture::{WindowCaptureSubmitError, WindowCaptureTarget};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::ICON_INLINE;
 use taskmanager_theme::tokens::SPACE_6;
 use taskmanager_theme::tokens::SPACE_8;
 use taskmanager_theme::tokens::control_radius;
@@ -27,27 +29,7 @@ use crate::gpui_app::elements;
 use super::Hover;
 use super::RootView;
 
-#[derive(Debug, Default)]
-pub(crate) enum WindowCaptureRuntime {
-    #[default]
-    Unavailable,
-    Active(WindowCaptureSession<WindowCaptureClient>),
-}
-
-impl WindowCaptureRuntime {
-    pub(crate) fn install(&mut self, client: WindowCaptureClient) {
-        {
-            *self = Self::Active(WindowCaptureSession::new(client));
-        }
-    }
-
-    fn active_mut(&mut self) -> Option<&mut WindowCaptureSession<WindowCaptureClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(crate) type WindowCaptureRuntime = SessionSlot<WindowCaptureSession<WindowCaptureClient>>;
 
 /// Cross-platform one-shot capture affordance. The click only submits a typed
 /// application request; the app-host owns native providers and PNG commit.
@@ -103,7 +85,7 @@ pub(crate) fn current_window_capture_btn(
             .flex()
             .items_center()
             .justify_center()
-            .child(icon(IconId::Export).size(px(16.0)))
+            .child(icon(IconId::Export).size(definite_length(ICON_INLINE)))
             .into_any_element();
     }
 

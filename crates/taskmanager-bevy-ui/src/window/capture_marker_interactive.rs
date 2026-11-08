@@ -7,7 +7,9 @@ use bevy::ecs::query::With;
 use bevy::ecs::system::{Query, SystemParam};
 use bevy::math::Vec2;
 use bevy::prelude::Visibility;
+use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, UiGlobalTransform};
+use taskmanager_application::i18n::t;
 
 #[derive(SystemParam)]
 pub(super) struct InteractiveCaptureAccess<'w, 's> {
@@ -49,5 +51,17 @@ pub(super) fn tooltip_mounted(access: &mut InteractiveCaptureAccess<'_, '_>) -> 
     // A hidden or zero-size overlay is not painted evidence.
     access.tooltips.iter().any(|(node, visibility)| {
         *visibility == Visibility::Visible && node.size().x > 0.0 && node.size().y > 0.0
+    })
+}
+
+pub(super) fn has_all_texts<'w, 's>(
+    query: &Query<'w, 's, (&'static Text, &'static ComputedNode)>,
+    labels: &[&'static str],
+) -> bool {
+    labels.iter().all(|l| {
+        let translated = t(l);
+        query
+            .iter()
+            .any(|(t, n)| (t.0 == *l || t.0 == translated) && n.size().x > 0.0 && n.size().y > 0.0)
     })
 }

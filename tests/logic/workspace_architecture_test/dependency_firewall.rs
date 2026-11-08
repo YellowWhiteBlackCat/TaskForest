@@ -415,7 +415,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-accessibility-linux",
             &["taskmanager-ui-contract"][..],
         ),
-        ("taskmanager-assets", &[][..]),
+        ("taskmanager-assets", &["taskforest-core"][..]),
         // ADR-031: the Windows ABI wrapper is an isolated trust root with no
         // workspace dependencies; only the Windows adapter may consume it.
         ("taskmanager-windows-api", &[][..]),

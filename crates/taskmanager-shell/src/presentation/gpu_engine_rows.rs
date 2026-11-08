@@ -125,6 +125,25 @@ const fn presentation_from_failure(kind: FailureKind) -> GpuEngineRowsPresentati
     }
 }
 
+/// Format one engine's cumulative busy time as seconds.
+#[must_use]
+pub fn format_engine_time(nanoseconds: u64) -> String {
+    let seconds = nanoseconds as f64 / 1_000_000_000.0;
+    format!("{seconds:.1}s")
+}
+
+/// Format a cumulative cycle counter (xe fdinfo) as a compact count.
+#[must_use]
+pub fn format_engine_cycles(cycles: u64) -> String {
+    if cycles >= 1_000_000_000 {
+        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
+    } else if cycles >= 1_000_000 {
+        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
+    } else {
+        format!("{cycles} cycles")
+    }
+}
+
 #[cfg(test)]
 #[path = "../../tests/headless/presentation_gpu_engine_rows.rs"]
 mod tests;

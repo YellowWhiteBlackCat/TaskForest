@@ -55,8 +55,8 @@ fn populated_open_files() -> ProcessOpenFiles {
 #[test]
 fn format_keeps_unreadable_target_honest() {
     let unreadable = "unreadable";
-    let ok_line = format_open_file(&populated_open_files().entries[0], unreadable);
-    let denied_line = format_open_file(&populated_open_files().entries[2], unreadable);
+    let ok_line = format_open_file_row(&populated_open_files().entries[0], unreadable);
+    let denied_line = format_open_file_row(&populated_open_files().entries[2], unreadable);
     assert!(ok_line.contains("/dev/null"));
     assert!(ok_line.contains("[file]"), "must classify handle type");
     assert!(
@@ -70,7 +70,7 @@ fn format_keeps_unreadable_target_honest() {
         target: Some("/tmp/deleted.log".into()),
         deleted: true,
     };
-    let deleted_line = format_open_file(&deleted_entry, unreadable);
+    let deleted_line = format_open_file_row(&deleted_entry, unreadable);
     assert!(
         deleted_line.contains("[file]"),
         "must classify type on deleted fd"

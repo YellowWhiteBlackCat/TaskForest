@@ -39,6 +39,7 @@ use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
 use crate::focus;
+use taskforest_core::core::percent::percent_text;
 
 /// The explicit dash for any value the source could not prove (a missing CPU
 /// counter, a cold-start rate gap, an unreadable readlink). Never a fabricated
@@ -222,7 +223,7 @@ fn gpu_devices_section<'a>(
                         device.device_id.clone(),
                         device
                             .utilization_pct
-                            .map(|v| format!("{:.0}%", v.round()))
+                            .map(percent_text)
                             .unwrap_or_else(missing_value),
                     ));
                     if let Some(vram) = device.memory_bytes {
@@ -290,7 +291,7 @@ pub(crate) fn resources_section<'a>(
                 let mem_str = resources
                     .memory_usage_percent()
                     .map_or(mem_str.clone(), |percent| {
-                        format!("{mem_str} ({percent:.0}%)")
+                        format!("{mem_str} ({})", percent_text(percent))
                     });
                 rows.push(kv_row(
                     theme_snapshot,
@@ -305,7 +306,7 @@ pub(crate) fn resources_section<'a>(
                         if let Some(period) = resources.cpu_time_period_micros
                             && period > 0
                         {
-                            format!("{:.0}%", (q as f64 / period as f64) * 100.0)
+                            percent_text((q as f64 / period as f64) * 100.0)
                         } else {
                             missing_value()
                         }
@@ -328,7 +329,7 @@ pub(crate) fn resources_section<'a>(
                 let pids_str = resources
                     .process_usage_percent()
                     .map_or(pids_str.clone(), |percent| {
-                        format!("{pids_str} ({percent:.0}%)")
+                        format!("{pids_str} ({})", percent_text(percent))
                     });
                 rows.push(kv_row(
                     theme_snapshot,

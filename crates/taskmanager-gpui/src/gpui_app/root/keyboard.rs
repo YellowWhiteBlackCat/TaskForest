@@ -1,10 +1,10 @@
 //! GPUI adapter for the toolkit-neutral command router.
 
-use super::{
-    ProcessDetailsSection, RefreshRequest, RootView, TopPage, services_view, startup_view,
-};
+use super::{RefreshRequest, RootView, TopPage, services_view, startup_view};
 use gpui::{App, Context, KeyDownEvent, ModifiersChangedEvent, Window};
+use taskforest_contract::sync_tray_pause_checkmark;
 use taskforest_core::core::process::ProcessBatchAction;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_shell::ProcessControlScope;
 
@@ -287,7 +287,7 @@ fn apply_app_action(
             let paused = view.telemetry_refresh_policy.is_manually_paused();
             view.telemetry_refresh_policy
                 .apply(TelemetryRefreshPolicyChange::SetPaused(!paused));
-            super::tray::sync_tray_pause_checkmark(view, !paused);
+            sync_tray_pause_checkmark(view, !paused);
         }
         AppAction::ToggleSidebar => view.sidebar_visible = !view.sidebar_visible,
         AppAction::ConfirmEndTask => confirm_active_surface(view, cx),

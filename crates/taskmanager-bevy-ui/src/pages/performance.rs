@@ -56,6 +56,7 @@ use taskmanager_ui_contract::navigation::NavOrientation;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
+use taskmanager_shell::presentation::GraphSummaryItem;
 use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::presentation::trend::TrendSeries;
@@ -89,6 +90,7 @@ use metrics::{
     curve_badge_text, curve_caption, curve_samples, curve_wanted, curve_warm, gpu_devices,
     gpu_fact_line, memory_metrics, network_devices, nic_fact_line, section_keys, segment_key,
 };
+use taskforest_core::core::percent::percent_text;
 
 // ---- marker components (this page's private dynamic-state vocabulary) ----
 //
@@ -319,18 +321,10 @@ pub(crate) enum SummaryField {
     NetSend,
 }
 
-/// One item of a chart's latest/avg/peak summary row.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SummaryItem {
-    Latest,
-    Average,
-    Maximum,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum DynField {
     Summary(SummaryField),
-    CurveCaptionItem(SystemCurve, SummaryItem),
+    CurveCaptionItem(SystemCurve, GraphSummaryItem),
     CurveBadge(SystemCurve),
     GpuMetricLabel(String),
     SmartStatus(String),
@@ -383,7 +377,7 @@ impl SystemCurve {
     fn format_value(self, value: f32) -> String {
         match self {
             Self::Network => format!("{}/s", bytes(value.max(0.0) as u64)),
-            _ => format!("{value:.0}%"),
+            _ => percent_text(value),
         }
     }
 

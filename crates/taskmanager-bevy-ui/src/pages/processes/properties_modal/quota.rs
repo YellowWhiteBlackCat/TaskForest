@@ -15,6 +15,7 @@ use crate::icons::icon_scene;
 use crate::palette::{UiPalette, space_4, space_8, space_24, theme_color};
 use crate::window::{Role, TextRole, WindowPalette};
 use taskforest_core::core::LimitValue;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::{
     ProcessInsightFacetState, ProjectedProcessInsights, ProjectedProcessResources, i18n::t,
     project_process_resources,
@@ -125,7 +126,7 @@ fn memory_fact(projected: &ProjectedProcessResources<'_>) -> QuotaFact {
     let share = share_of(limit, usage);
     let mut value = format!("{usage_text} / {limit_text}");
     if let Some(share) = share {
-        value = format!("{value} ({:.0}%)", share * 100.0);
+        value = format!("{value} ({})", percent_text(share * 100.0));
     }
     QuotaFact {
         label: t("common.memory").to_owned(),
@@ -146,7 +147,7 @@ fn cpu_fact(projected: &ProjectedProcessResources<'_>) -> QuotaFact {
     ) {
         (Some(LimitValue::Unlimited), _) => t("proc_insights.unlimited").to_owned(),
         (Some(LimitValue::Value(quota)), Some(period)) if period > 0 => {
-            format!("{:.0}%", quota as f64 / period as f64 * 100.0)
+            percent_text(quota as f64 / period as f64 * 100.0)
         }
         (Some(LimitValue::Value(quota)), _) => format!("{quota}µs"),
         (None, _) => undeclared_limit(),
@@ -174,7 +175,7 @@ fn pids_fact(projected: &ProjectedProcessResources<'_>) -> QuotaFact {
     let share = share_of(limit, count);
     let mut value = format!("{count_text} / {limit_text}");
     if let Some(share) = share {
-        value = format!("{value} ({:.0}%)", share * 100.0);
+        value = format!("{value} ({})", percent_text(share * 100.0));
     }
     QuotaFact {
         label: t("proc_insights.pids").to_owned(),

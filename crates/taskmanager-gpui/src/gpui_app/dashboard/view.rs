@@ -39,6 +39,7 @@ use taskmanager_ui_contract::presentation::vocabulary::SystemSurfacePresentation
 
 mod history_grid;
 use history_grid::render_history_grid;
+use taskforest_core::core::percent::percent_text;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SummaryDestination {
@@ -454,7 +455,7 @@ fn timeline_graph_options(sample_count: usize, max: f32) -> GraphOpts {
 /// (percent graphs read `"{:.0}%"`, rate graphs `"{:.1} MiB/s"`).
 fn metric_hover_format(unit: &str) -> impl Fn(f32) -> String + 'static {
     if unit == "%" {
-        |value| format!("{value:.0}%")
+        |value| percent_text(value)
     } else {
         |value| format!("{value:.1} MiB/s")
     }

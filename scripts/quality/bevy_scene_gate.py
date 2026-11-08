@@ -155,20 +155,13 @@ def mask_noncode(text: str) -> str:
             continue
 
         if text[index] == "'":
-            end = index + 1
-            escaped = False
-            while end < length and text[end] not in "\r\n":
-                current = text[end]
-                if current == "'" and not escaped:
-                    end += 1
-                    _blank(chars, index, end)
-                    index = end
-                    break
-                if current == "\\":
-                    escaped = not escaped
-                else:
-                    escaped = False
-                end += 1
+            literal = re.match(
+                r"'(?:\\(?:u\{[0-9a-fA-F_]+\}|x[0-9a-fA-F]{2}|.)|[^'\\\r\n])'",
+                text[index:],
+            )
+            if literal:
+                _blank(chars, index, index + literal.end())
+                index += literal.end()
             else:
                 index += 1
             continue
@@ -575,6 +568,16 @@ def self_test() -> int:
         (
             "comments and literals are masked",
             '// px(4.0) Node { } commands.spawn(Foo)\nlet doc = "px(4.0)";',
+            [],
+        ),
+        (
+            "a Rust lifetime is not a character literal",
+            "struct Service<'w> { access: &'w str }",
+            [],
+        ),
+        (
+            "a real character literal is still masked",
+            "let brace = '}';",
             [],
         ),
     ]

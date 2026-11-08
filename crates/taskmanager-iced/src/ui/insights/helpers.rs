@@ -14,9 +14,11 @@ use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
 use crate::theme;
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 
 pub(crate) use metrics::ScalarObservation;
 pub(crate) use process_telemetry::{OpenFileEntry, ProcessThreadInfo};
+pub(crate) use taskmanager_shell::presentation::format_open_file_row;
 
 pub(crate) const DASH: &str = MISSING_VALUE;
 
@@ -184,7 +186,12 @@ pub(crate) fn thread_rows_vm(threads: &[ProcessThreadInfo], cap: usize) -> Vec<T
 /// readlink kept as the typed unreadable marker.
 #[must_use]
 pub(crate) fn open_file_rows(entries: &[OpenFileEntry], cap: usize) -> Vec<String> {
-    entries.iter().take(cap).map(format_open_file_row).collect()
+    let unreadable = t("proc_insights.unreadable");
+    entries
+        .iter()
+        .take(cap)
+        .map(|entry| format_open_file_row(entry, unreadable))
+        .collect()
 }
 
 pub(crate) fn cpu_time_text(cpu: Option<f64>) -> String {
@@ -192,24 +199,7 @@ pub(crate) fn cpu_time_text(cpu: Option<f64>) -> String {
 }
 
 pub(crate) fn cpu_percent_text(cpu: Option<f32>) -> String {
-    cpu.map_or_else(|| DASH.to_string(), |value| format!("{value:.1}%"))
-}
-
-pub(crate) fn format_open_file_row(entry: &OpenFileEntry) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| t("proc_insights.unreadable").to_string());
-    if entry.deleted {
-        format!(
-            "fd {} [{}] → {} [deleted]",
-            entry.fd,
-            entry.resolved_kind(),
-            target
-        )
-    } else {
-        format!("fd {} [{}] → {}", entry.fd, entry.resolved_kind(), target)
-    }
+    cpu.map_or_else(|| DASH.to_string(), precise_percent_text)
 }
 
 pub(crate) fn format_engine_usage(
@@ -220,7 +210,7 @@ pub(crate) fn format_engine_usage(
 ) -> String {
     let usage = usage_pct
         .current_value()
-        .map_or_else(|| DASH.to_string(), |value| format!("{value:.1}%"));
+        .map_or_else(|| DASH.to_string(), |value| percent_text(*value));
     let cumulative = time_ns
         .current_value()
         .map(|nanos| duration(*nanos / 1_000_000_000))

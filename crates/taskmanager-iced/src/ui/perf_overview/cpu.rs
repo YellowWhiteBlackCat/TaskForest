@@ -11,8 +11,9 @@ use taskmanager_application::{
     MsrReadoutRequestFailure, MsrReadoutState, RaplPowerRequestFailure, RaplPowerState,
 };
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_shell::presentation::trend::TrendSeries;
-use taskmanager_shell::presentation::{graph_summary, pressure_summary};
+use taskmanager_shell::presentation::{graph_summary, graph_summary_text, pressure_summary};
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
@@ -20,6 +21,7 @@ use super::projection::{CpuHeadlineKind, CpuHeadlineMetric, CpuHeadlineValue};
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
@@ -47,7 +49,7 @@ pub(super) fn cpu_headline_label_value(
         CpuHeadlineKind::Utilization => (
             t("common.utilization").to_owned(),
             match metric.value {
-                Some(CpuHeadlineValue::UsagePercent(value)) => format!("{value:.0}%"),
+                Some(CpuHeadlineValue::UsagePercent(value)) => percent_text(value),
                 _ => missing(),
             },
         ),
@@ -98,17 +100,15 @@ pub(super) fn gauge(
             .into(),
         None => text(t("dashboard.unavailable")).into(),
     };
-    column![text(percent_text(title, value)), progress,]
+    column![text(gauge_caption(title, value)), progress,]
         .spacing(4)
         .width(Length::FillPortion(1))
         .into()
 }
 
-pub(crate) fn percent_text(title: &str, value: Option<f32>) -> String {
-    value.map_or_else(
-        || format!("{title} —"),
-        |value| format!("{title} {value:.0} %"),
-    )
+/// Titled gauge caption: the label plus the shared percent spelling.
+pub(crate) fn gauge_caption(title: &str, value: Option<f32>) -> String {
+    format!("{title} {}", observed_percentage(value))
 }
 
 pub(super) fn cpu_graph_summary_elements(
@@ -117,7 +117,7 @@ pub(super) fn cpu_graph_summary_elements(
     let mut lines = Vec::new();
     let cpu_series = app.cached_metric_series(TrendSeries::CpuUsagePercent);
     push_graph_summary(&mut lines, t("common.cpu"), &cpu_series, |value| {
-        format!("{value:.0}%")
+        percent_text(value)
     });
     lines
 }
@@ -146,7 +146,7 @@ pub(super) fn memory_graph_summary_elements(
     let mut lines = Vec::new();
     let memory_series = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
     push_graph_summary(&mut lines, t("common.memory"), &memory_series, |value| {
-        format!("{value:.0}%")
+        percent_text(value)
     });
     lines
 }
@@ -161,14 +161,11 @@ pub(crate) fn push_graph_summary(
         return;
     };
     lines.push(
-        text(format!(
-            "{label} · {} {} · {} {} · {} {}",
-            t("common.latest"),
-            format_value(summary.latest),
-            t("common.avg"),
-            format_value(summary.average),
-            t("common.peak"),
-            format_value(summary.maximum),
+        text(graph_summary_text(
+            &summary,
+            Some(label),
+            " · ",
+            format_value,
         ))
         .size(f32::from(tokens::FONT_12))
         .into(),

@@ -22,6 +22,7 @@ use taskmanager_application::i18n;
 use taskmanager_theme::{Color, GlassTier, Theme};
 
 use super::readouts::cpu_summary_readout;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_theme::tokens;
 
 /// Inputs for the compact desktop widget.
@@ -110,7 +111,7 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
             snapshot
                 .memory
                 .used_percentage_observed()
-                .map_or_else(formatting::missing_value, |value| format!("{value:.1}%")),
+                .map_or_else(formatting::missing_value, percent_text),
             theme.memory,
             IconId::Memory,
         ));

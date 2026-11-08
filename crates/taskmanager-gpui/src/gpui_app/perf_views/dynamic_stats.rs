@@ -1,5 +1,6 @@
 //! Pure stat-row projection for dynamic battery and sensor devices.
 
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::{
     BatteryInfo, SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
@@ -11,9 +12,7 @@ pub(super) fn battery_stats(battery: &BatteryInfo) -> Vec<StatRow> {
     let mut stats = vec![
         StatRow::text(
             i18n::t("battery.capacity"),
-            battery
-                .current_capacity_pct()
-                .map(|value| format!("{value}%")),
+            battery.current_capacity_pct().map(percent_text),
         ),
         StatRow::text(i18n::t("battery.status"), Some(battery.status.clone())),
     ];
@@ -41,7 +40,7 @@ pub(super) fn battery_stats(battery: &BatteryInfo) -> Vec<StatRow> {
     if let Some(health) = battery.current_health_pct() {
         stats.push(StatRow::text(
             i18n::t("battery.health"),
-            Some(format!("{health:.1}%")),
+            Some(percent_text(health)),
         ));
     }
     if let Some(secs) = battery.current_time_to_full_secs() {
@@ -82,10 +81,7 @@ pub(super) fn fan_stats(sensors: &SensorCenterSnapshot, fan: &SensorReading) -> 
         .filter(|reading| reading.device_id() == fan.device_id())
         .find_map(sensor_pwm_percent)
     {
-        stats.push(StatRow::text(
-            i18n::t("fan.pwm"),
-            Some(format!("{pwm:.0}%")),
-        ));
+        stats.push(StatRow::text(i18n::t("fan.pwm"), Some(percent_text(pwm))));
     }
     for temperature in sensors.readings.iter().filter(|reading| {
         reading.device_id() == fan.device_id() && reading.quantity() == &SensorQuantity::Temperature

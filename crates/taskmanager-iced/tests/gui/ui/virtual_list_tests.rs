@@ -1,4 +1,4 @@
-use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, VirtualWindow};
+use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, VirtualWindow, max_band_rows};
 use zhuge_ui_kit_iced::virtual_list::virtual_table_body;
 #[test]
 fn initial_window_is_bounded_for_a_ten_thousand_row_table() {
@@ -83,8 +83,7 @@ fn a_fifty_thousand_row_table_materializes_only_the_viewport_band() {
         (800.0_f32, 40.0_f32),
         (2_400.0_f32, 32.0_f32),
     ] {
-        let visible = (viewport_height / row_height).ceil() as usize;
-        let contract_bound = visible + 2 * DEFAULT_OVERSCAN + 1;
+        let contract_bound = max_band_rows(row_height, viewport_height, DEFAULT_OVERSCAN);
 
         for scroll_y in [0.0, 12_345.0, 1.9e6, f32::MAX] {
             let window =

@@ -91,3 +91,28 @@ fn filesystem_health_snapshot_serde_roundtrip() {
         FilesystemHealthStatus::Healthy
     );
 }
+
+/// Two surfaces used to compare the endurance reading against a bare `100.0`
+/// instead of calling this rule. Binding them must not move one answer, so the
+/// equivalence is exhaustive over the edge rather than asserted in prose —
+/// including the NaN edge, where a plain comparison and this rule agree by
+/// accident and would silently disagree if the rule ever grew a clamp.
+#[test]
+fn the_wear_critical_rule_answers_like_the_bare_ceiling_comparison() {
+    for tenths in -200..=2000_i32 {
+        let percent = tenths as f32 / 10.0;
+        assert_eq!(
+            is_nvme_wear_critical(percent),
+            percent >= 100.0,
+            "the rule disagreed with the ceiling at {percent}"
+        );
+    }
+    assert!(is_nvme_wear_critical(100.0), "the edge itself is exceeded");
+    assert!(is_nvme_wear_critical(100.1));
+    assert!(is_nvme_wear_critical(f32::INFINITY));
+    assert!(!is_nvme_wear_critical(f32::NEG_INFINITY));
+    // A NaN ordering is false for every `>=`, so an unobserved endurance never
+    // claims an exceeded life here either — the same answer the old bare
+    // comparison gave, without writing a NaN comparison the lint rejects.
+    assert!(!is_nvme_wear_critical(f32::NAN));
+}

@@ -67,3 +67,14 @@ fn accepted_session_payload_is_the_only_rendered_row_authority() {
         GpuEngineRowsPresentation::Active(rows) if rows.len() == 1 && rows[0].name == "Render"
     ));
 }
+
+#[test]
+fn format_engine_time_and_cycles_scale_properly() {
+    assert_eq!(format_engine_time(1_500_000_000), "1.5s");
+    assert_eq!(format_engine_cycles(0), "0 cycles");
+    assert_eq!(format_engine_cycles(999_999), "999999 cycles");
+    assert_eq!(format_engine_cycles(1_000_000), "1.0M cycles");
+    assert_eq!(format_engine_cycles(12_340_000), "12.3M cycles");
+    assert_eq!(format_engine_cycles(1_000_000_000), "1.00G cycles");
+    assert_eq!(format_engine_cycles(5_432_100_000), "5.43G cycles");
+}

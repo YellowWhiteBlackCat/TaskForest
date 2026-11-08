@@ -56,6 +56,12 @@ pub const PERFORMANCE_ULTRA_COMPACT_MAIN_MIN_WIDTH: f32 = 320.0;
 pub const PERFORMANCE_SLOT_GAP: f32 = 12.0;
 /// Ceiling for the persisted device-rail preference.
 pub const PERFORMANCE_SIDEBAR_MAX_WIDTH: f32 = 460.0;
+/// The height the statistics rail reserves when the Performance page stacks
+/// it BELOW the main viewport instead of pinning it beside the graphs. Both
+/// graphical shapes that stack a rail paint this same band, so it is one
+/// shared fact rather than a per-shape divergence: a stacked rail that is
+/// taller in one shape would push the bottom safety band out of the frame.
+pub const PERFORMANCE_STATS_STACK_HEIGHT: f32 = 220.0;
 /// Content height the Performance core stack needs: title row + header band
 /// (readouts / composition) + headline tier floor + summary row + shared gaps.
 /// Below this the page degrades to the [`PerformanceVerticalRunway::Floor`]
@@ -257,6 +263,15 @@ impl PerformanceChartInventory {
             "full" => Some(Self::Full),
             _ => None,
         }
+    }
+
+    /// Whether this inventory earns the extended chart composition beside the
+    /// aggregate graph: the per-core CPU matrix and the per-engine GPU
+    /// histories. `AggregateOnly` keeps the aggregate legible and drops every
+    /// secondary chart.
+    #[must_use]
+    pub const fn includes_extended_charts(self) -> bool {
+        matches!(self, Self::Full)
     }
 }
 

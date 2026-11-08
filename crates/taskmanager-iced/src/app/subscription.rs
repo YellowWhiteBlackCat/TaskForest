@@ -23,7 +23,7 @@ impl IcedApp {
         // capture first-frame marker, an unfinished modal entrance, or the
         // warm-up spinner. Otherwise iced idles between events — subscribing
         // unconditionally would rebuild the view tree every frame for nothing.
-        if self.frame_pump_active() {
+        if self.frame_pump_active() || super::frame_timing::active() {
             subscriptions.push(iced::window::frames().map(Message::Frame));
         }
         // A live process-column drag needs pointer tracking beyond the 6px

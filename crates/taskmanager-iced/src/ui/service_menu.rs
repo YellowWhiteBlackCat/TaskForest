@@ -9,6 +9,7 @@
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskforest_core::core::services::ServiceAction;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 
 use taskmanager_theme::{Theme, tokens};
@@ -37,7 +38,7 @@ pub(super) fn panel(
             focus::dynamic_button_owned(
                 theme_snapshot,
                 FocusTarget::ServiceMenuAction { index, action },
-                t(service_action_key(action)).to_owned(),
+                i18n::service_action_label(action).to_owned(),
                 Message::RequestServiceAction { index, action },
                 matches!(
                     action,
@@ -66,15 +67,4 @@ pub(super) fn panel(
     .style(move |_| theme::panel_style(&theme_snapshot))
     .width(Length::Shrink)
     .into()
-}
-
-fn service_action_key(action: ServiceAction) -> &'static str {
-    match action {
-        ServiceAction::Start => "svc.start",
-        ServiceAction::Stop => "svc.stop",
-        ServiceAction::Restart => "svc.restart",
-        ServiceAction::Enable => "svc.enable",
-        ServiceAction::Disable => "svc.disable",
-        ServiceAction::ReloadDaemon => "svc.reload_daemon",
-    }
 }

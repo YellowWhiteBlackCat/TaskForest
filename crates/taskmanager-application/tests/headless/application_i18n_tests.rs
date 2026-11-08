@@ -139,3 +139,90 @@ fn scoped_language_override_nests_and_keeps_language_changes_local() {
 fn detect_language_is_total() {
     let _ = detect_language();
 }
+
+/// Every typed product vocabulary resolves through exactly one owner, so the
+/// GPUI, Iced, TUI and Bevy surfaces cannot spell the same fact differently.
+/// The English and Chinese readings are pinned here because a frontend that
+/// forks the fold would silently drift away from these strings.
+#[test]
+fn typed_vocabulary_resolvers_read_one_wording_in_both_catalogs() {
+    use taskforest_core::core::alerts::AlertMetric;
+    use taskforest_core::core::npu::NpuEngineKind;
+    use taskforest_core::core::services::ServiceAction;
+    use taskforest_core::core::session::SessionControlAction;
+    use taskforest_core::core::startup::{StartupControlPolicy, StartupImpact, StartupScope};
+
+    set_language(Language::En);
+    assert_eq!(
+        alert_metric_label(AlertMetric::CpuUsagePercent),
+        "CPU usage"
+    );
+    assert_eq!(
+        alert_metric_label(AlertMetric::DiskTemperatureC),
+        "Disk temperature"
+    );
+    assert_eq!(
+        alert_metric_label(AlertMetric::SmartCriticalWarning),
+        "SMART critical warning"
+    );
+    assert_eq!(alert_severity_label(AlertSeverity::Critical), "Critical");
+    assert_eq!(
+        service_action_label(ServiceAction::ReloadDaemon),
+        "Reload unit files"
+    );
+    assert_eq!(
+        session_control_action_label(SessionControlAction::Disconnect),
+        "Disconnect"
+    );
+    assert_eq!(
+        session_control_action_label(SessionControlAction::Lock),
+        "Lock"
+    );
+    assert_eq!(
+        npu_engine_kind_label(NpuEngineKind::Unknown),
+        "Other engine"
+    );
+    assert_eq!(startup_impact_label(StartupImpact::High), "High");
+    assert_eq!(startup_scope_label(StartupScope::User), "User");
+    assert_eq!(
+        startup_control_policy_label(StartupControlPolicy::Direct),
+        "Direct"
+    );
+    assert_eq!(more_rows_label(3), "… 3 more");
+
+    set_language(Language::Zh);
+    assert_eq!(
+        alert_metric_label(AlertMetric::CpuUsagePercent),
+        "CPU 使用率"
+    );
+    assert_eq!(
+        alert_metric_label(AlertMetric::SmartCriticalWarning),
+        "SMART 严重警告"
+    );
+    assert_eq!(
+        session_control_action_label(SessionControlAction::Disconnect),
+        "断开"
+    );
+    assert_eq!(more_rows_label(3), "… 另有 3 项");
+
+    set_language(Language::En);
+}
+
+/// The count placeholder is always substituted: a bounded list that still
+/// shows `{count}` would read as a broken template instead of a real count.
+#[test]
+fn more_rows_label_never_leaves_the_placeholder_unsubstituted() {
+    set_language(Language::En);
+    for hidden in [0usize, 1, 12, 804] {
+        let label = more_rows_label(hidden);
+        assert!(
+            !label.contains("{count}"),
+            "unsubstituted placeholder: {label}"
+        );
+        assert!(
+            label.contains(&hidden.to_string()),
+            "missing count: {label}"
+        );
+    }
+    set_language(Language::En);
+}

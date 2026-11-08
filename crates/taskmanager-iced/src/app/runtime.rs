@@ -111,12 +111,6 @@ impl IcedRuntime {
         self.tray_controller.is_some()
     }
 
-    pub(crate) fn sync_tray_pause_checkmark(&self, action: u32, paused: bool) {
-        if let Some(controller) = self.tray_controller.as_ref() {
-            let _ = controller.set_item_checked(action, paused);
-        }
-    }
-
     pub(crate) fn request_activation(&mut self) {
         self.activation_request = ActivationRequest::Pending;
     }
@@ -173,6 +167,12 @@ impl IcedApp {
 
     pub(crate) fn take_activation_request(&mut self) -> bool {
         self.runtime.take_activation_request()
+    }
+}
+
+impl taskforest_contract::TrayControllerTarget for IcedRuntime {
+    fn controller(&self) -> Option<&dyn taskforest_contract::TrayController> {
+        self.tray_controller.as_deref()
     }
 }
 

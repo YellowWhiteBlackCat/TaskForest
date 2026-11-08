@@ -18,7 +18,6 @@ use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px, rems};
 use taskmanager_telemetry_store::TelemetryStore;
 
 use super::dynamic_stats::{battery_stats, fan_stats};
-use super::finite_series_peak_floored;
 use super::smart_status::status_footer;
 use super::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel};
 use crate::gpui_app::formatting::{GraphUnit, PerformanceSettings};
@@ -29,6 +28,7 @@ use crate::gpui_app::history_samples::{
 use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
 use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::finite_max_floored;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
@@ -106,7 +106,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
                     theme.accent,
                     GraphUnit::Watts,
                 )
-                .with_max(finite_series_peak_floored(1.0, &power_samples)),
+                .with_max(finite_max_floored(1.0, &power_samples)),
                 performance.graph,
                 budget.vertical,
                 hover_slot,
@@ -179,7 +179,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         fan.id(),
         fan.device_generation(),
     );
-    let max = finite_series_peak_floored(1000.0, &samples);
+    let max = finite_max_floored(1000.0, &samples);
     let temperature_reading = sensors.readings.iter().find(|reading| {
         reading.device_id() == fan.device_id() && reading.quantity() == &SensorQuantity::Temperature
     });
@@ -212,7 +212,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
                     theme.cpu,
                     GraphUnit::Temperature,
                 )
-                .with_max(finite_series_peak_floored(100.0, &temperature_samples)),
+                .with_max(finite_max_floored(100.0, &temperature_samples)),
                 performance.graph,
                 budget.vertical,
                 hover_slot,

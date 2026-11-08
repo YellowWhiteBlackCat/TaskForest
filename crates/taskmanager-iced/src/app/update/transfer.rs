@@ -13,6 +13,7 @@ use super::dispatch::UpdateDispatch;
 use crate::app::LocalSurface;
 use taskmanager_shell::SortDir;
 use taskmanager_shell::presentation::about::metadata;
+use taskmanager_shell::presentation::process_to_tsv;
 use taskmanager_shell::presentation::system_information::copy_all_text;
 
 impl IcedApp {
@@ -139,9 +140,7 @@ impl IcedApp {
             }
             Message::CopyProcessTsv => {
                 if let Some(process) = self.shell.visible_process_at(self.shell.selected) {
-                    task = Some(iced::clipboard::write(crate::export::process_to_tsv(
-                        process,
-                    )));
+                    task = Some(iced::clipboard::write(process_to_tsv(process)));
                 }
             }
             Message::CopyProcessJson => {

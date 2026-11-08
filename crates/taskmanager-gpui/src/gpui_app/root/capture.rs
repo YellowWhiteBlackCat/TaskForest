@@ -7,6 +7,7 @@
 //! capture preparation never invokes a destructive action.
 
 use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 
@@ -34,7 +35,7 @@ use taskmanager_telemetry_store::{
 };
 use taskmanager_theme::Theme;
 
-use super::{ProcessDetailsSection, TopPage};
+use super::TopPage;
 
 use taskmanager_shell::fixture::dashboard_history::seed_system_dashboard_history;
 mod dynamic_history;

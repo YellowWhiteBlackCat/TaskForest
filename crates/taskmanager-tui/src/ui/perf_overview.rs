@@ -22,11 +22,12 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, Gauge, GraphType, Paragraph, Wrap};
 use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::MsrReadoutState;
 use taskmanager_application::RaplPowerState;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::trend;
-use taskmanager_shell::presentation::{graph_summary, missing_value};
+use taskmanager_shell::presentation::{graph_summary, graph_summary_text, missing_value};
 
 /// Render the selected CPU or Memory overview through its dedicated layout.
 pub(super) fn render_perf_overview(
@@ -359,7 +360,7 @@ fn render_gauge(
     let bounded = value
         .filter(|value| value.is_finite())
         .map(|value| value.clamp(0.0, 100.0));
-    let label = bounded.map_or_else(missing_value, |value| format!("{value:.1}%"));
+    let label = bounded.map_or_else(missing_value, percent_text);
     frame.render_widget(
         Gauge::default()
             .block(panel(title, theme))
@@ -400,10 +401,8 @@ fn render_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
         .map(|(index, &value)| (index as f64, f64::from(value)))
         .collect();
     let summary = join_summary([
-        summary_line(t("common.cpu"), &cpu_values, |value| format!("{value:.0}%")),
-        summary_line(t("common.memory"), &memory_values, |value| {
-            format!("{value:.0}%")
-        }),
+        summary_line(t("common.cpu"), &cpu_values, percent_text),
+        summary_line(t("common.memory"), &memory_values, percent_text),
     ]);
     // The x domain spans the larger series so both lines share one axis;
     // clamped to two so a single sample cannot collapse it to zero width.
@@ -508,11 +507,9 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
     // no cursor the footer keeps the shared latest/avg/peak summary.
     let footer = cursor_index
         .and_then(|index| {
-            super::chart_cursor::readout_line(t("common.cpu"), &samples, index, |value| {
-                format!("{value:.0}%")
-            })
+            super::chart_cursor::readout_line(t("common.cpu"), &samples, index, percent_text)
         })
-        .or_else(|| summary_line(t("common.cpu"), &samples, |value| format!("{value:.0}%")));
+        .or_else(|| summary_line(t("common.cpu"), &samples, percent_text));
     let mut block = panel(title, theme);
     if let Some(footer) = footer {
         block = block.title_bottom(Line::from(Span::styled(footer, Style::new().fg(theme.dim))));
@@ -535,14 +532,11 @@ fn summary_line(
     format_value: impl Fn(f32) -> String,
 ) -> Option<String> {
     let summary = graph_summary(samples)?;
-    Some(format!(
-        "{label} · {} {} · {} {} · {} {}",
-        t("common.latest"),
-        format_value(summary.latest),
-        t("common.avg"),
-        format_value(summary.average),
-        t("common.peak"),
-        format_value(summary.maximum),
+    Some(graph_summary_text(
+        &summary,
+        Some(label),
+        " · ",
+        format_value,
     ))
 }
 

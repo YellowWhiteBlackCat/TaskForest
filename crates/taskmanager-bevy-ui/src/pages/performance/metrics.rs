@@ -4,15 +4,20 @@ use super::*;
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::NetworkAdapterType;
 use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::power::BatteryInfo;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::has_smart_fields;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_shell::presentation::trend::window;
 use taskmanager_shell::presentation::wifi_signal_quality_percent;
+use taskmanager_shell::presentation::{
+    GraphSummaryItem, graph_summary_item_label, graph_summary_text, graph_summary_value,
+};
 
 pub(super) mod battery;
 pub(super) mod cpu;
@@ -36,7 +41,7 @@ pub(super) use fan::{fan_fact_line, fans};
 pub(super) use gpu::gpu_fact_line;
 pub(super) use npu_power::{npu_power_fact, npu_power_samples};
 pub(super) use sidebar_captions::{
-    battery_sidebar_caption, device_sidebar_caption, disk_sidebar_caption, fan_sidebar_caption,
+    battery_caption, device_sidebar_caption, disk_sidebar_caption, fan_caption,
     gpu_sidebar_caption, memory_sidebar_caption, network_sidebar_caption,
 };
 pub(super) use smart::{smart_source_guidance, smart_source_status};
@@ -46,16 +51,6 @@ pub(super) use stat_rows::{
     gpu_stat_rows, memory_header_view_model, memory_section_summary, memory_segments_total,
     network_header_view_model, network_stat_rows, swap_bar_fractions,
 };
-
-/// Percent readout. There is no shared percent formatter in
-/// `shell::presentation` (the TUI keeps its own in `ui/units.rs`), so this
-/// page owns one with the same semantics: missing and non-finite observations
-/// render the shared dash, never a fabricated `0.0%`.
-pub(super) fn observed_percentage(value: Option<f32>) -> String {
-    value
-        .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.1}%"))
-}
 
 /// Read the correlated six-domain projection first. The complete shell
 /// snapshot is the honest fallback for demo/cold-start frames: it is already
@@ -179,9 +174,10 @@ pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
                     let pct = (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0)
                         .clamp(0.0, 100.0);
                     format!(
-                        "{} / {} ({pct:.0}%)",
+                        "{} / {} ({})",
                         bytes(swap.used_bytes),
-                        bytes(swap.total_bytes)
+                        bytes(swap.total_bytes),
+                        percent_text(pct)
                     )
                 })
         }
@@ -234,10 +230,11 @@ pub(super) fn gpu_vram_view_model(gpu: &GpuMetrics) -> Option<GpuVramViewModel> 
     let pct = (used as f32 / total as f32 * 100.0).clamp(0.0, 100.0);
     Some(GpuVramViewModel {
         label: format!(
-            "{}: {} / {} ({pct:.0}%)",
+            "{}: {} / {} ({})",
             t("npu.dedicated_memory"),
             bytes(used),
-            bytes(total)
+            bytes(total),
+            percent_text(pct)
         ),
         pct,
     })
@@ -247,7 +244,7 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
     let rate = |value: Option<u64>| value.map_or_else(missing_value, bytes);
     let mut parts = vec![
         disk.current_active_time_pct()
-            .map_or_else(missing_value, |value| format!("{value:.0}%")),
+            .map_or_else(missing_value, percent_text),
         rate(disk.current_read_bytes_per_sec()),
         rate(disk.current_write_bytes_per_sec()),
     ];
@@ -280,12 +277,20 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
         }
     }
     if let Some(pct) = disk.smart_percent_used.filter(|value| value.is_finite()) {
-        parts.push(format!("{} {pct:.0}%", t("disk.endurance_used")));
+        parts.push(format!(
+            "{} {}",
+            t("disk.endurance_used"),
+            percent_text(pct)
+        ));
     }
     if let Some(spare) = disk.smart_available_spare_pct {
         // The warning affordance is a semantic bitmap sibling in the scene;
         // keep this dynamic text free of decoration codepoints (the tofu law).
-        parts.push(format!("{} {spare:.0}%", t("disk.available_spare")));
+        parts.push(format!(
+            "{} {}",
+            t("disk.available_spare"),
+            percent_text(spare)
+        ));
     }
     if let Some(hours) = disk.smart_power_on_hours {
         let days = hours / 24;
@@ -335,17 +340,11 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
 }
 
 /// Whether the disk's observed spare pool crossed its typed warning level.
-/// The caller owns the warning icon; this predicate only folds facts and never
-/// treats an absent or non-finite SMART reading as a warning.
+/// The rule is the contract's (`DiskMetrics::smart_spare_pool_needs_warning`);
+/// this name stays because the caller owns the warning icon and asks the page's
+/// own question, not because the fold lives here.
 pub(super) fn disk_spare_warning(disk: &DiskMetrics) -> bool {
-    let Some(spare) = disk.smart_available_spare_pct else {
-        return false;
-    };
-    if !spare.is_finite() {
-        return false;
-    }
-    let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
-    threshold.is_finite() && spare <= threshold
+    disk.smart_spare_pool_needs_warning()
 }
 
 pub(super) fn disk_spare_warning_for(shell: &ShellApp, device_id: &str) -> bool {
@@ -393,7 +392,7 @@ pub(super) fn memory_summary(memory: Option<&MemoryMetrics>) -> String {
     let percentage = memory
         .used_percentage_observed()
         .filter(|value| value.is_finite())
-        .map(|value| format!("{value:.1}%"));
+        .map(percent_text);
     let line = format!(
         "{} / {}",
         used.unwrap_or_else(missing_value),
@@ -472,15 +471,7 @@ pub(crate) fn curve_caption(shell: &ShellApp, curve: SystemCurve) -> String {
         return t("perf.collecting_samples").to_owned();
     }
     graph_summary(&samples).map_or_else(missing_value, |summary| {
-        format!(
-            "{} {} · {} {} · {} {}",
-            t("common.latest"),
-            curve.format_value(summary.latest),
-            t("common.avg"),
-            curve.format_value(summary.average),
-            t("common.peak"),
-            curve.format_value(summary.maximum),
-        )
+        graph_summary_text(&summary, None, " · ", |value| curve.format_value(value))
     })
 }
 
@@ -490,28 +481,25 @@ pub(crate) fn curve_caption(shell: &ShellApp, curve: SystemCurve) -> String {
 pub(crate) fn curve_caption_item(
     shell: &ShellApp,
     curve: SystemCurve,
-    item: SummaryItem,
+    item: GraphSummaryItem,
 ) -> String {
     let samples = curve_samples(shell, curve);
     if !curve_warm(&samples) {
-        return if item == SummaryItem::Latest {
+        return if item == GraphSummaryItem::Latest {
             t("perf.collecting_samples").to_owned()
         } else {
             String::new()
         };
     }
     let Some(summary) = graph_summary(&samples) else {
-        return if item == SummaryItem::Latest {
+        return if item == GraphSummaryItem::Latest {
             missing_value()
         } else {
             String::new()
         };
     };
-    let (label, value) = match item {
-        SummaryItem::Latest => (t("common.latest"), summary.latest),
-        SummaryItem::Average => (t("common.avg"), summary.average),
-        SummaryItem::Maximum => (t("common.peak"), summary.maximum),
-    };
+    let label = graph_summary_item_label(item);
+    let value = graph_summary_value(&summary, item);
     format!("{} {}", label, curve.format_value(value))
 }
 
@@ -707,7 +695,7 @@ pub(crate) fn segment_bytes_value(shell: &ShellApp, kind: MemSegmentKind) -> Str
 pub(super) fn segment_line(segment: &MemSegment, total: Option<u64>) -> String {
     let share = total.filter(|total| *total > 0).map(|total| {
         let pct = (segment.bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
-        format!("{pct:.0}%")
+        percent_text(pct)
     });
     share.map_or_else(
         || bytes(segment.bytes),

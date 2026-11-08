@@ -24,7 +24,10 @@ use super::frame_plan::TablePanelProjection;
 use super::panel;
 use super::process_details;
 use super::sparkline;
-use taskmanager_shell::presentation::{process_anomaly_summary, uninterruptible_process_summary};
+use taskmanager_shell::presentation::{
+    process_anomaly_summary, swap_column_visible, uninterruptible_process_summary,
+};
+use zhuge_ui_core::row_page::RowPage;
 
 /// The minimum body width at which the per-row CPU sparkline column renders.
 /// Below this the trend column hides (mirroring `swap_visible`'s adaptivity):
@@ -107,7 +110,7 @@ pub(super) fn render_processes(
     // A confirmed zero swap total means the host has no swap device and the
     // Swap column is intentionally hidden. An unknown total keeps the column
     // visible so an unavailable value cannot be mistaken for an absent one.
-    let swap_visible = super::process_data::swap_column_visible(app.projection().snapshot.as_ref());
+    let swap_visible = swap_column_visible(app.projection().snapshot.as_ref());
     // The per-row CPU sparkline column adapts to terminal width the same way
     // `swap_visible` adapts to swap presence: hidden below a comfortable
     // threshold so the 54×16 minimum frame never regresses and the wide case
@@ -221,22 +224,21 @@ pub(super) fn render_processes(
                 .map(|column| Constraint::Length(app.column_width(*column))),
         );
         // Fail-closed re-bound of the plan's committed window against the
-        // cached id slice (the same math the render boundary has always
-        // applied), restated as the shared primitive's typed input so the
-        // window is never recomputed inside the table paint.
-        let start = table.window.start.min(ids.len());
-        let end = table.window.end.clamp(start, ids.len());
-        let selected = table
-            .window
-            .selected
-            .min(end.saturating_sub(start).saturating_sub(1));
+        // cached id slice. The shared row-page owner pins it, so a row space
+        // that shrank under one page still paints a full page instead of an
+        // empty tail, and the window is never recomputed inside the paint.
+        let committed_rows = table.window.end.saturating_sub(table.window.start);
+        let rebound = RowPage::pin(ids.len(), committed_rows, table.window.start);
+        let cursor_row = table.window.start.saturating_add(table.window.selected);
         let bounded = TablePanelProjection {
             area: table.area,
             total: table.total,
             window: super::TableWindow {
-                start,
-                end,
-                selected,
+                start: rebound.first(),
+                end: rebound.last(),
+                selected: rebound
+                    .offset_of(cursor_row)
+                    .min(rebound.len().saturating_sub(1)),
             },
         };
         // The Applications empty state is a search question, not a source

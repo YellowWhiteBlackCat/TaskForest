@@ -1,6 +1,7 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_shell::presentation::latest_samples;
 
 use super::test_support::ascii_device_trend;
 use super::test_support::device_trend;
@@ -62,7 +63,7 @@ fn rising_series_renders_ascending_ramp_blocks() {
 fn empty_series_renders_empty_and_window_stays_bounded() {
     assert_eq!(sparkline_in(TuiGlyphMode::Unicode, &[]), "");
     let long: Vec<f32> = (0..128).map(|i| i as f32).collect();
-    let windowed = recent_window_with(&long, SPARKLINE_MAX_SAMPLES);
+    let windowed = latest_samples(&long, SPARKLINE_MAX_SAMPLES);
     assert_eq!(windowed.len(), SPARKLINE_MAX_SAMPLES);
     assert_eq!(
         sparkline_in(TuiGlyphMode::Unicode, windowed)
@@ -599,4 +600,88 @@ fn ascii_ladder_vocabulary_is_single_cell_ascii_and_distinct() {
         SPARKLINE_BLOCKS.len(),
         "the ASCII ladder carries the same level count as the Unicode ramp"
     );
+}
+
+/// The new typed mode is opt-in: its Unicode and ASCII branches delegate to
+/// the original one-cell ramps, so existing trends cannot change accidentally.
+#[test]
+fn sparkline_mode_preserves_the_legacy_unicode_and_ascii_ramps() {
+    let samples = [0.0, 1.0, 2.0, 3.0];
+    let unicode = render_sparkline(TuiSparklineMode::Unicode, &samples);
+    let ascii = render_sparkline(TuiSparklineMode::Ascii, &samples);
+    assert_eq!(
+        unicode,
+        TuiSparklineCurve::Single(sparkline_in(TuiGlyphMode::Unicode, &samples,))
+    );
+    assert_eq!(
+        ascii,
+        TuiSparklineCurve::Single(sparkline_in(TuiGlyphMode::Ascii, &samples,))
+    );
+    assert_eq!(unicode.lower(), None);
+    assert_eq!(ascii.lower(), None);
+}
+
+fn braille_offsets(row: &str) -> Vec<u32> {
+    row.chars()
+        .map(|cell| u32::from(cell).wrapping_sub(0x2800))
+        .collect()
+}
+
+#[test]
+fn braille16_empty_curve_keeps_two_zero_width_rows() {
+    let curve = render_sparkline(TuiSparklineMode::Braille16, &[]);
+    let TuiSparklineCurve::Braille16 { upper, lower } = curve else {
+        panic!("Braille16 must select the two-row path");
+    };
+    assert!(upper.is_empty());
+    assert!(lower.is_empty());
+    assert_eq!(upper.chars().count(), lower.chars().count());
+}
+
+#[test]
+fn braille16_constant_series_uses_the_shared_mid_level() {
+    let curve = braille16_sparkline(&[5.0, 5.0]);
+    let TuiSparklineCurve::Braille16 { upper, lower } = curve else {
+        unreachable!();
+    };
+    assert_eq!(braille_offsets(&upper), vec![0xc0]);
+    assert_eq!(braille_offsets(&lower), vec![0x00]);
+    assert_eq!(upper.chars().count(), 1);
+    assert_eq!(lower.chars().count(), 1);
+}
+
+#[test]
+fn braille16_maps_extreme_levels_to_the_exact_dot_pairs() {
+    let curve = braille16_sparkline(&[0.0, 7.0]);
+    let TuiSparklineCurve::Braille16 { upper, lower } = curve else {
+        unreachable!();
+    };
+    // Level 7 is the top-right dot of the upper cell (dot 4, 0x08), while
+    // level 0 is the bottom-left dot of the lower cell (dot 7, 0x40).
+    assert_eq!(braille_offsets(&upper), vec![0x08]);
+    assert_eq!(braille_offsets(&lower), vec![0x40]);
+}
+
+#[test]
+fn braille16_rising_series_preserves_both_cells_and_horizontal_density() {
+    let curve = braille16_sparkline(&(0..8).map(|value| value as f32).collect::<Vec<_>>());
+    let TuiSparklineCurve::Braille16 { upper, lower } = curve else {
+        unreachable!();
+    };
+    assert_eq!(braille_offsets(&upper), vec![0x00, 0x00, 0x60, 0x0a]);
+    assert_eq!(braille_offsets(&lower), vec![0x60, 0x0a, 0x00, 0x00]);
+    assert_eq!(upper.chars().count(), 4);
+    assert_eq!(lower.chars().count(), 4);
+}
+
+#[test]
+fn braille16_normalizes_finite_samples_without_fabricating_gaps() {
+    let curve = braille16_sparkline(&[f32::NAN, 0.0, 7.0, f32::NAN]);
+    let TuiSparklineCurve::Braille16 { upper, lower } = curve else {
+        unreachable!();
+    };
+    assert_eq!(braille_offsets(&upper), vec![0x00, 0x01]);
+    assert_eq!(braille_offsets(&lower), vec![0x80, 0x00]);
+    assert_eq!(upper.chars().count(), 2);
+    assert_eq!(lower.chars().count(), 2);
 }

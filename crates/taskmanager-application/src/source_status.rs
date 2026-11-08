@@ -117,6 +117,19 @@ impl SourceStateKind {
             DeviceStatus::Unsupported => Self::Unknown,
         }
     }
+
+    /// Kind → banner-title key: the single outcome→copy fold on this surface. A
+    /// degraded source (partial answer) keeps the softer title; stale and failed
+    /// sources both mean "the provider did not answer" and share the unavailable
+    /// title. Copy itself stays in the locale catalog.
+    #[must_use]
+    pub const fn banner_title_key(self) -> &'static str {
+        if matches!(self, Self::Degraded) {
+            "source.partial_title"
+        } else {
+            "source.unavailable_title"
+        }
+    }
 }
 
 /// One source's display line, toolkit-neutral: who (`origin`), how bad

@@ -20,6 +20,7 @@ use taskmanager_shell::presentation::gpu_chart_metric::{
 };
 use taskmanager_shell::presentation::{bytes, gpu_display_identity};
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_core::row_page::RowPage;
 
 use super::containers::{StatePanel, StatePanelKind};
 use crate::{TuiApp, TuiTheme};
@@ -136,29 +137,6 @@ impl GpuPanelLayout {
 
 fn bounded_height(rows: usize, available: u16) -> u16 {
     u16::try_from(rows).unwrap_or(u16::MAX).min(available)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct GpuLineViewport {
-    start: usize,
-    end: usize,
-    total: usize,
-}
-
-impl GpuLineViewport {
-    fn resolve(total: usize, requested: usize, rows: usize) -> Self {
-        let visible = total.min(rows);
-        let start = requested.min(total.saturating_sub(visible));
-        Self {
-            start,
-            end: start.saturating_add(visible),
-            total,
-        }
-    }
-
-    const fn is_windowed(self) -> bool {
-        self.end.saturating_sub(self.start) < self.total
-    }
 }
 
 pub(super) fn render_gpu_section(
@@ -612,24 +590,23 @@ fn render_gpu_engine_viewport(
     lines: &[Line<'static>],
     requested: usize,
 ) {
-    let viewport = GpuLineViewport::resolve(
-        lines.len(),
-        requested,
-        usize::from(area.height.saturating_sub(2)),
-    );
-    let title = if viewport.is_windowed() {
+    let total = lines.len();
+    // The shared row-page owner owns this window: the panel's line capacity and
+    // the requested scroll go in, one in-bounds page comes back.
+    let viewport = RowPage::pin(total, usize::from(area.height.saturating_sub(2)), requested);
+    let title = if viewport.len() < total {
         format!(
             "{} · ↑/↓ {}–{} / {}",
             t("gpu.per_engine_title"),
-            viewport.start.saturating_add(1),
-            viewport.end,
-            viewport.total,
+            viewport.first().saturating_add(1),
+            viewport.last(),
+            total,
         )
     } else {
         t("gpu.per_engine_title").to_owned()
     };
     frame.render_widget(
-        Paragraph::new(lines[viewport.start..viewport.end].to_vec())
+        Paragraph::new(lines[viewport.range()].to_vec())
             .block(super::panel(&title, theme))
             .wrap(Wrap { trim: true }),
         area,

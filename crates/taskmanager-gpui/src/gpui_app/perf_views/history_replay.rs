@@ -12,6 +12,7 @@ use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryProjection;
 use taskmanager_application::HistoryReplayError;
+use taskmanager_shell::presentation::format_peak;
 use taskmanager_shell::presentation::history_replay::row_heading;
 use taskmanager_shell::presentation::local_timestamp;
 use taskmanager_theme::Color;
@@ -543,19 +544,6 @@ fn replay_row(
                 )),
         )
         .into_any_element()
-}
-
-/// Peak formatting keeps the persisted unit-free axis honest: three
-/// significant decimals, no invented unit suffix (series carry their unit in
-/// the metric slug).
-fn format_peak(peak: f64) -> String {
-    if peak.abs() >= 100.0 {
-        format!("{peak:.0}")
-    } else if peak.abs() >= 1.0 {
-        format!("{peak:.1}")
-    } else {
-        format!("{peak:.3}")
-    }
 }
 
 /// Curve color follows the series' device family, mirroring the live

@@ -1,6 +1,7 @@
 use super::{apply_accessibility_action, build_snapshot};
-use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
+use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
+use taskmanager_application::ProcessDetailsSection;
 // Linux-only dependency: these snapshots exist only on Linux.
 use taskforest_core::core::metrics::CpuMetrics;
 use taskforest_core::core::metrics::SystemSnapshot;

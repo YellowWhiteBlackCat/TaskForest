@@ -50,6 +50,7 @@ use crate::widgets::chart::{ChartCanvas, ChartContent, ChartPaintState, ChartSty
 use crate::window::{Role, TextRole};
 
 use taskforest_core::core::metrics::{DiskMetrics, DiskPartition};
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::storage_health::FilesystemHealthSnapshot;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{bytes, missing_value};
@@ -213,10 +214,10 @@ fn partition_readout(part: &DiskPartition) -> String {
             let share = (used as f32 / capacity as f32).clamp(0.0, 1.0);
             // The share is a FRACTION; the readout states it in percent.
             format!(
-                "{} / {} ({:.0}%)",
+                "{} / {} ({})",
                 bytes(used),
                 bytes(capacity),
-                share * 100.0
+                percent_text(share * 100.0)
             )
         }
         _ => missing_value(),
@@ -406,7 +407,11 @@ fn gauge_scene(gauge: &NvmeGauge, disk: &str, palette: &UiPalette) -> Box<dyn Sc
 fn gauge_readout(gauge: &NvmeGauge) -> String {
     let mut parts: Vec<String> = Vec::new();
     if let Some(used) = gauge.used_percent {
-        parts.push(format!("{} {used:.0}%", t("disk.endurance_used")));
+        parts.push(format!(
+            "{} {}",
+            t("disk.endurance_used"),
+            percent_text(used)
+        ));
     }
     if let Some(temperature) = gauge.temperature_c {
         parts.push(format!(

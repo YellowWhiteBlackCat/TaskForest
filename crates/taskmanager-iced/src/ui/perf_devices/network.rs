@@ -3,10 +3,12 @@
 use std::rc::Rc;
 
 use super::*;
+use taskmanager_shell::presentation::finite_peak;
 use taskmanager_shell::presentation::wifi_signal_quality_percent;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
+use taskforest_core::core::percent::percent_text;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::DeviceNavigationPresentation;
 
@@ -130,9 +132,7 @@ pub(crate) fn network_summary_lines(
         rows.push(StatRow::text(t("net.link"), Some(format!("{speed} Mbps"))));
         rows.push(StatRow::text(
             t("common.utilization"),
-            observed
-                .utilization_pct
-                .map(|value| format!("{:.0}%", value.round())),
+            observed.utilization_pct.map(percent_text),
         ));
     }
     if let Some(mtu) = observed.mtu_bytes {
@@ -197,7 +197,7 @@ pub(crate) fn network_summary_lines(
             let quality = wifi_signal_quality_percent(dbm);
             rows.push(StatRow::text(
                 t("common.signal"),
-                Some(format!("{dbm} dBm ({quality:.0}%)")),
+                Some(format!("{dbm} dBm ({})", percent_text(quality))),
             ));
         }
         if let Some(bssid) = observed.bssid.as_deref() {
@@ -317,8 +317,7 @@ fn network_block<'a>(
         // instead of snapping to a new scale when a traffic spike lands.
         // The disk page reads the same shared ceiling, so one product never
         // shows two different spike behaviors.
-        let traffic_peak = crate::trend_strip::finite_peak(&rx_samples)
-            .max(crate::trend_strip::finite_peak(&tx_samples));
+        let traffic_peak = finite_peak(&rx_samples).max(finite_peak(&tx_samples));
         graph.max_override = Some(super::range::damped_ceiling(
             &nic.device_id,
             traffic_peak,
@@ -426,8 +425,12 @@ fn network_block<'a>(
             let quality = wifi_signal_quality_percent(dbm);
             wifi_items.push(
                 row![
-                    text(format!("{} {dbm} dBm ({quality:.0}%)", t("common.signal")))
-                        .size(f32::from(tokens::FONT_12)),
+                    text(format!(
+                        "{} {dbm} dBm ({})",
+                        t("common.signal"),
+                        percent_text(quality)
+                    ))
+                    .size(f32::from(tokens::FONT_12)),
                     container(iced::widget::progress_bar(0.0..=100.0, quality))
                         .width(iced::Length::Fixed(120.0)),
                 ]

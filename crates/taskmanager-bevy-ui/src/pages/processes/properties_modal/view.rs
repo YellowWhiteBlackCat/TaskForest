@@ -3,9 +3,8 @@
 use super::{
     ProcessPropertiesAction, ProcessPropertiesBody, ProcessPropertiesDismissButton,
     ProcessPropertiesFacet, ProcessPropertiesFooter, ProcessPropertiesOverlay,
-    ProcessPropertiesPanel, ProcessPropertiesScrollHint, ProcessPropertiesSection,
-    ProcessPropertiesTab, ProcessPropertiesView, on_authorize, on_facet,
-    on_properties_dismiss_activated, on_refresh,
+    ProcessPropertiesPanel, ProcessPropertiesScrollHint, ProcessPropertiesTab,
+    ProcessPropertiesView, on_authorize, on_facet, on_properties_dismiss_activated, on_refresh,
 };
 use crate::palette::{UiPalette, space_4, space_8, space_12, space_16};
 use crate::widgets::chart::{CurveMeasurement, CurvePaintAccess, paint_curve_at_size};
@@ -24,6 +23,8 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Button, ScrollArea, Tab, TabList};
 use std::sync::Arc;
+use taskmanager_application::ProcessDetailsSection;
+use taskmanager_application::i18n::process_details_section_label;
 use taskmanager_application::{
     ProcessInsightFacet, i18n::t, process_details_vm::ProcessDetailsField,
 };
@@ -85,12 +86,12 @@ pub(super) fn properties_modal_scene(
 ) -> impl Scene + use<> {
     let title = format!("{} · {}", t("dialog.properties"), view.target.name);
     let subtitle = format!("PID: {}", view.target.pid);
-    let tabs: Vec<Box<dyn Scene>> = ProcessPropertiesSection::ALL.into_iter().map(|section| {
+    let tabs: Vec<Box<dyn Scene>> = ProcessDetailsSection::ALL.into_iter().map(|section| {
         Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Tab ProcessPropertiesTab(section) ControlVisual(ControlTone::Surface, {section == view.section})
-            Children [ Text({section.label().to_owned()}) TextRole(Role::Body) ] }) as Box<dyn Scene>
+            Children [ Text({process_details_section_label(section).to_owned()}) TextRole(Role::Body) ] }) as Box<dyn Scene>
     }).collect();
-    let facets: Vec<Box<dyn Scene>> = if view.section == ProcessPropertiesSection::Insights {
+    let facets: Vec<Box<dyn Scene>> = if view.section == ProcessDetailsSection::Insights {
         ProcessInsightFacet::ALL.into_iter().map(|facet| Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Button ProcessPropertiesFacet(facet) ControlVisual(ControlTone::Surface, {facet == view.facet}) on(on_facet)
             Children [ Text({process_insight_facet_label(facet).to_owned()}) TextRole(Role::Caption) ] }) as Box<dyn Scene>).collect()
@@ -182,7 +183,7 @@ pub(super) fn properties_modal_scene(
     }
     let mut actions: Vec<Box<dyn Scene>> = Vec::new();
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
-    if view.section == ProcessPropertiesSection::Insights && view.live {
+    if view.section == ProcessDetailsSection::Insights && view.live {
         actions.push(Box::new(bsn! { Node { min_height: rem(palette.control_height_rem), padding: UiRect::horizontal(px(space_8())) }
             Button ProcessPropertiesAction::Refresh ControlVisual(ControlTone::Surface, false) on(on_refresh)
             Children [ Text({t("common.refresh").to_owned()}) TextRole(Role::Body) ] }));

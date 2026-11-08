@@ -19,6 +19,8 @@ compile_error!(
 );
 
 mod assets;
+pub mod detached_chart_window;
+mod frame_timing;
 pub mod gpui_app;
 mod run;
 mod window_presentation;

@@ -1,7 +1,7 @@
 //! Pure page-level telemetry projection for root render composition.
 
-use crate::gpui_app::formatting;
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskmanager_shell::presentation::{observed_percentage, swap_column_visible};
 
 pub(super) struct ProcessPageMetrics {
     pub swap_auto_hidden: bool,
@@ -10,16 +10,9 @@ pub(super) struct ProcessPageMetrics {
 }
 
 pub(super) fn process_page_metrics(snapshot: &SystemSnapshot) -> ProcessPageMetrics {
-    let swap_total_bytes = snapshot.memory.current_swap_total_bytes();
     ProcessPageMetrics {
-        swap_auto_hidden: swap_total_bytes == Some(0),
-        cpu_usage: snapshot
-            .cpu
-            .current_global_usage_pct()
-            .map_or_else(formatting::missing_value, |value| format!("{value:.0}%")),
-        memory_usage: snapshot
-            .memory
-            .used_percentage_observed()
-            .map_or_else(formatting::missing_value, |value| format!("{value:.0}%")),
+        swap_auto_hidden: !swap_column_visible(Some(snapshot)),
+        cpu_usage: observed_percentage(snapshot.cpu.current_global_usage_pct()),
+        memory_usage: observed_percentage(snapshot.memory.used_percentage_observed()),
     }
 }

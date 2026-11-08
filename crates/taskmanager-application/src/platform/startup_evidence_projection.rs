@@ -5,6 +5,66 @@ use taskforest_core::{
     DeviceState, DeviceStatus, FailureKind, StartupBootEvidenceSnapshot, StartupEvidenceFailure,
 };
 
+/// The failed-units pill's value text: the shared "boot evidence unavailable"
+/// line when the fold itself failed, an honest `0` for a true empty set, and
+/// otherwise the count plus up to two unit names — one projection for every
+/// surface that paints the strip, so two pills cannot disagree about the same
+/// evidence.
+#[must_use]
+pub fn failed_units_summary(evidence: &StartupBootEvidenceSnapshot) -> String {
+    if evidence.failed_units_failure.is_some() {
+        return crate::i18n::t("startup.evidence_unavailable").to_string();
+    }
+    if evidence.failed_units.is_empty() {
+        return "0".to_string();
+    }
+    let names = evidence
+        .failed_units
+        .iter()
+        .take(2)
+        .map(|unit| unit.unit.as_str())
+        .collect::<Vec<_>>()
+        .join(" · ");
+    format!("{} · {names}", evidence.failed_units.len())
+}
+
+/// The critical-chain pill's value text: the shared unavailable line when the
+/// fold failed, `missing_value` (the caller's own dash token) when the chain
+/// has no measured node, and otherwise the total measured boot time plus the
+/// head unit name. Untimed nodes contribute nothing.
+#[must_use]
+pub fn critical_chain_summary(
+    evidence: &StartupBootEvidenceSnapshot,
+    missing_value: &str,
+) -> String {
+    if evidence.critical_chain_failure.is_some() {
+        return crate::i18n::t("startup.evidence_unavailable").to_string();
+    }
+    let measured: Vec<_> = evidence
+        .critical_chain
+        .iter()
+        .filter(|node| node.duration_ms.is_some())
+        .collect();
+    if measured.is_empty() {
+        return missing_value.to_string();
+    }
+    let total_ms = measured.iter().fold(0_u64, |sum, node| {
+        sum.saturating_add(node.duration_ms.unwrap_or(0))
+    });
+    let head = measured
+        .first()
+        .map(|node| node.unit.as_str())
+        .unwrap_or("");
+    format!(
+        "{total_ms} ms{}",
+        if head.is_empty() {
+            String::new()
+        } else {
+            format!(" · {head}")
+        }
+    )
+}
+
 /// Application generation assigned when a startup-evidence refresh is submitted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StartupEvidenceRevision(u64);

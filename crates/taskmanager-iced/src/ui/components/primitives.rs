@@ -23,7 +23,8 @@ use taskmanager_ui_contract::IconId;
 use super::IcedElement;
 use super::{Tooltip, TooltipTrigger};
 use crate::theme;
-use zhuge_ui_kit_iced::surface::{self, BadgeGeometry};
+use zhuge_ui_kit_iced::meter::{MeterGeometry, meter_bar};
+use zhuge_ui_kit_iced::surface::{self, BadgeGeometry, StatePanelGeometry};
 
 /// Badge / progress fill tones; each maps to one palette semantic color.
 ///
@@ -143,23 +144,16 @@ pub(crate) fn progress<'a>(
     let radius = bar_height / 2.0;
 
     let bar: IcedElement<'a> = match progress_fill(value) {
-        ProgressFill::Determinate(ratio) => {
-            // FillPortion is a u16 ratio pair; 0.1% resolution over a
-            // clamped 0..=1 ratio can never overflow the 1000 budget.
-            let filled = (ratio * 1000.0).round() as u16;
-            row![
-                container(iced::widget::Space::new())
-                    .width(Length::FillPortion(filled))
-                    .height(Length::Fill)
-                    .style(move |_| container_style(value_fill, radius.into())),
-                container(iced::widget::Space::new())
-                    .width(Length::FillPortion(1000 - filled))
-                    .height(Length::Fill),
-            ]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
-        }
+        ProgressFill::Determinate(ratio) => meter_bar(
+            ratio,
+            MeterGeometry {
+                height: bar_height,
+                width: Length::Fill,
+                radius: radius.into(),
+            },
+            track_fill,
+            value_fill,
+        ),
         ProgressFill::Unknown => row((0..UNKNOWN_STRIPE_COUNT)
             .map(|_| {
                 container(iced::widget::Space::new())
@@ -290,6 +284,14 @@ const STATE_TILE: f32 = 36.0;
 /// an optional detail line, and an optional action — one geometry for empty,
 /// unavailable, partial, and recovery states. `title` is already localized
 /// by the caller; the panel never invents copy or fallback data.
+///
+/// [`zhuge_ui_kit_iced::surface::state_panel`] is the panel's layout container:
+/// it paints the padded, tone-bordered, horizontally centered surface. The
+/// product grammar leads with the tone-tinted icon tile, so the kit's title and
+/// message rows are `None` — absent rows are not materialized — and the owned
+/// copy rides in the `action` slot. Every semantic piece stays here: the icon
+/// tile and its tone border, the muted title, the optional detail, the
+/// optional action, and the [`PanelState`] tone choice.
 pub(crate) fn state_panel<'a>(
     theme: &'a Theme,
     state: PanelState,
@@ -328,12 +330,22 @@ pub(crate) fn state_panel<'a>(
         content = content.push(action);
     }
 
-    container(content.width(Length::Fill).align_x(Alignment::Center))
-        .style(move |_| state_panel_style(surface, tone_fill))
-        .padding(f32::from(tokens::SPACE_16))
-        .center_x(Length::Fill)
-        .width(Length::Fill)
-        .into()
+    surface::state_panel(
+        None,
+        None,
+        Some(
+            content
+                .width(Length::Fill)
+                .align_x(Alignment::Center)
+                .into(),
+        ),
+        StatePanelGeometry {
+            padding: f32::from(tokens::SPACE_16).into(),
+            spacing: 0.0,
+            ..StatePanelGeometry::default()
+        },
+        move |_| state_panel_style(surface, tone_fill),
+    )
 }
 
 /// A solid-fill container style with a corner radius (pre-resolved colors so

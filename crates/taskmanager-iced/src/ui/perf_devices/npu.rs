@@ -1,10 +1,11 @@
 //! The per-NPU Performance-page detail panel for the Iced frontend.
 
 use super::*;
-use taskforest_core::core::npu::{NpuDevice, NpuEngineKind};
+use taskforest_core::core::npu::NpuDevice;
 use taskmanager_shell::presentation::{bytes, missing_value};
 use taskmanager_shell::viewmodel::StatRow;
 
+use taskforest_core::core::percent::percent_text;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 
@@ -60,7 +61,7 @@ fn npu_block<'a>(
             device
                 .utilization_pct
                 .current_value()
-                .map(|pct| format!("{pct:>5.1}%")),
+                .map(|pct| format!("{:>5}", percent_text(*pct))),
         ),
         StatRow::text(
             t("npu.dedicated_memory"),
@@ -92,20 +93,13 @@ fn npu_block<'a>(
     ];
 
     for engine in &device.engines {
-        let label = match engine.kind {
-            NpuEngineKind::Compute => t("npu.engine_compute"),
-            NpuEngineKind::Matrix => t("npu.engine_matrix"),
-            NpuEngineKind::Vector => t("npu.engine_vector"),
-            NpuEngineKind::Video => t("npu.engine_video"),
-            NpuEngineKind::Copy => t("npu.engine_copy"),
-            NpuEngineKind::Unknown => t("npu.engine_unknown"),
-        };
+        let label = i18n::npu_engine_kind_label(engine.kind);
         stats.push(StatRow::text(
             label,
             engine
                 .utilization_pct
                 .current_value()
-                .map(|pct| format!("{pct:>5.1}%")),
+                .map(|pct| format!("{:>5}", percent_text(*pct))),
         ));
     }
 

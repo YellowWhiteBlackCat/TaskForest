@@ -17,6 +17,7 @@ use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, UiGlobalTransform, UiPlugin};
 use bevy::ui_widgets::{Activate, ScrollArea, ValueChange};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{PlatformClient, SmbiosMemoryState, i18n::t};
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::smbios_memory::memory_inventory_snapshot;
@@ -320,7 +321,7 @@ fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bound
     use crate::pages::processes::properties_modal::{
         ProcessPropertiesBody, ProcessPropertiesFacet, ProcessPropertiesFooter,
         ProcessPropertiesPanel, ProcessPropertiesPresentation, ProcessPropertiesScrollHint,
-        ProcessPropertiesSection, ProcessPropertiesTab,
+        ProcessPropertiesTab,
     };
     use taskmanager_application::ProcessInsightFacet;
     pin_english();
@@ -346,7 +347,7 @@ fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bound
         for _ in 0..8 {
             app.update();
         }
-        for section in ProcessPropertiesSection::ALL {
+        for section in ProcessDetailsSection::ALL {
             let (entity, list) = app
                 .world_mut()
                 .query::<(Entity, &ProcessPropertiesTab, &ChildOf)>()
@@ -425,7 +426,7 @@ fn normal_properties_tabs_preserve_frozen_identity_and_measured_inspection_bound
                 .expect("visible scroll hint");
             assert!(hint_node.size().x > 0.0 && hint_node.size().y >= 14.0);
             assert_eq!(hint_text.0, t("proc_insights.scroll_hint"));
-            if section == ProcessPropertiesSection::Insights {
+            if section == ProcessDetailsSection::Insights {
                 for facet in [
                     ProcessInsightFacet::Network,
                     ProcessInsightFacet::Gpu,

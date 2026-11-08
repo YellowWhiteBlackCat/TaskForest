@@ -64,6 +64,9 @@ mod surface_protocol;
 #[path = "tests/tree_expansion.rs"]
 mod tree_expansion;
 
+#[path = "tests/vim_keys.rs"]
+mod vim_keys;
+
 #[path = "tests/appearance.rs"]
 mod appearance;
 

@@ -19,6 +19,20 @@
 use crate::color::{Color, Length};
 use crate::theme::{RadiusScale, Theme, with_alpha};
 
+/// How far a two-series graph lifts the secondary series' ink toward white —
+/// a tint of the SAME color (solid "read" vs light "write"), never a new
+/// product color. One factor for every frontend that paints a dual-series
+/// device graph, so the paired-direction contract cannot drift per surface.
+pub const SECONDARY_TINT_LIFT: f32 = 0.32;
+
+/// The channel law behind [`SECONDARY_TINT_LIFT`]: one sRGB channel lifted
+/// linearly toward full intensity by the tint factor. Frontends apply this to
+/// their own color types channel-wise; alpha is untouched by definition.
+#[must_use]
+pub fn tint_channel_toward_white(channel: f32) -> f32 {
+    channel + (1.0 - channel) * SECONDARY_TINT_LIFT
+}
+
 /// The three event-severity levels the product paints.
 ///
 /// Severity is a cross-frontend vocabulary: a frontend maps its own domain
@@ -231,3 +245,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/headless/theme_severity.rs"]
 mod severity_tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/theme_tint_law.rs"]
+mod tint_law_tests;

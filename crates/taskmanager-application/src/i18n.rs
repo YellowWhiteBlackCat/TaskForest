@@ -24,12 +24,18 @@
 //! and typed/results diagnostics; sentence order belongs here in locale
 //! templates so shared UI remains independent of platform commands.
 
+use crate::process_details_section::ProcessDetailsSection;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
-use taskforest_core::alerts::AlertSeverity;
-use taskforest_core::core::session::{SessionFamily, SessionFamilyFact};
+use taskforest_core::core::alerts::{AlertMetric, AlertSeverity};
+use taskforest_core::core::failure::FailureKind;
+use taskforest_core::core::history::HistoryWindow;
+use taskforest_core::core::npu::NpuEngineKind;
+use taskforest_core::core::services::ServiceAction;
+use taskforest_core::core::session::{SessionControlAction, SessionFamily, SessionFamilyFact};
+use taskforest_core::core::startup::{StartupControlPolicy, StartupImpact, StartupScope};
 
 /// The two locales this app ships. Add a variant + a matching `locales/<code>.json`
 /// (and a wire value below) to extend.
@@ -272,6 +278,108 @@ pub fn session_family_label(family: SessionFamilyFact) -> &'static str {
         SessionFamilyFact::Unobserved => t("users.family_unobserved"),
         SessionFamilyFact::Unavailable => t("users.family_unavailable"),
     }
+}
+
+/// Localized label for one alert metric.
+///
+/// The metric vocabulary and its catalog keys are owned by
+/// `taskforest-core`; resolving them against the active language is owned
+/// here. Every frontend reads alert metric names through this single fold so
+/// the GPUI, Iced, TUI and Bevy surfaces cannot drift on the same metric.
+#[must_use]
+pub fn alert_metric_label(metric: AlertMetric) -> &'static str {
+    t(metric.i18n_key())
+}
+
+/// Localized label for one service lifecycle action.
+///
+/// `ServiceAction` owns the action vocabulary and its catalog keys; this
+/// function owns the one resolution of those keys against the active
+/// language. Frontends must not compose `t(action.i18n_key())` themselves.
+#[must_use]
+pub fn service_action_label(action: ServiceAction) -> &'static str {
+    t(action.i18n_key())
+}
+
+/// Localized label for one NPU engine kind.
+///
+/// The engine-kind vocabulary lives in `taskforest-core`; this is the one
+/// place where its catalog key meets the active language, so the four
+/// frontends cannot name the same engine differently.
+#[must_use]
+pub fn npu_engine_kind_label(kind: NpuEngineKind) -> &'static str {
+    t(kind.i18n_key())
+}
+
+/// Localized label for one session control action.
+///
+/// Every surface that offers "Disconnect" or "Lock" on a login session reads
+/// the word from this fold, so the GPUI, Iced, TUI and Bevy session menus
+/// cannot name the same verb differently.
+#[must_use]
+pub fn session_control_action_label(action: SessionControlAction) -> &'static str {
+    t(action.i18n_key())
+}
+
+/// Localized label for one startup impact tier.
+#[must_use]
+pub fn startup_impact_label(impact: StartupImpact) -> &'static str {
+    t(impact.i18n_key())
+}
+
+/// Localized label for one startup scope.
+#[must_use]
+pub fn startup_scope_label(scope: StartupScope) -> &'static str {
+    t(scope.i18n_key())
+}
+
+/// Localized label for one startup control policy.
+#[must_use]
+pub fn startup_control_policy_label(policy: StartupControlPolicy) -> &'static str {
+    t(policy.i18n_key())
+}
+
+/// The localized "… {count} more" overflow label.
+///
+/// A bounded list that hides rows says so with one wording in every
+/// frontend; the placeholder spelling belongs to the catalog, and the
+/// interpolation rule belongs here.
+#[must_use]
+pub fn more_rows_label(hidden: usize) -> String {
+    t("common.more_rows").replace("{count}", &hidden.to_string())
+}
+
+/// The localized choice label for a history replay window.
+///
+/// The window's catalog key is core vocabulary
+/// ([`HistoryWindow::i18n_key`]); this resolver is the single place where a
+/// key meets the active language, so the four frontends cannot disagree about
+/// how a window is spelled.
+#[must_use]
+pub fn history_window_label(window: HistoryWindow) -> &'static str {
+    t(window.i18n_key())
+}
+
+/// The localized label of one process-properties section tab.
+///
+/// The section's catalog key is product vocabulary
+/// ([`ProcessDetailsSection::i18n_key`]); this resolver is the single place
+/// where that key meets the active language, so the four frontends cannot
+/// disagree about how a section tab is spelled.
+#[must_use]
+pub fn process_details_section_label(section: ProcessDetailsSection) -> &'static str {
+    t(section.i18n_key())
+}
+
+/// The rejection copy for a refused service-log stream request: the catalog
+/// sentence with the typed failure kind interpolated.
+///
+/// Every frontend that refuses a stream says so with one wording; the
+/// placeholder spelling belongs to the catalog, and the interpolation rule
+/// belongs here — never in a view.
+#[must_use]
+pub fn service_log_rejection_detail(failure: FailureKind) -> String {
+    t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}"))
 }
 
 pub fn t(key: &'static str) -> &'static str {

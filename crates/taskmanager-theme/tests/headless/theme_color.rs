@@ -1,4 +1,12 @@
 use super::*;
+use zhuge_ui_tokens::{Rgba, contrast_ratio};
+
+fn product_contrast_ratio(first: Color, second: Color) -> f32 {
+    contrast_ratio(
+        Rgba::new(first.r, first.g, first.b, first.a),
+        Rgba::new(second.r, second.g, second.b, second.a),
+    )
+}
 
 #[test]
 fn from_hex_matches_the_legacy_rgb_semantics() {
@@ -39,9 +47,9 @@ fn scalar_tokens_convert_to_f32() {
 #[test]
 fn contrast_and_accent_math_are_wcag_correct() {
     // White-on-black is the 21:1 ceiling (within float tolerance).
-    assert!((contrast_ratio(Color::WHITE, Color::BLACK) - 21.0).abs() < 1e-3);
+    assert!((product_contrast_ratio(Color::WHITE, Color::BLACK) - 21.0).abs() < 1e-3);
     // Identical colors are 1:1.
-    assert!((contrast_ratio(Color::BLACK, Color::BLACK) - 1.0).abs() < 1e-6);
+    assert!((product_contrast_ratio(Color::BLACK, Color::BLACK) - 1.0).abs() < 1e-6);
     // on_accent picks the max-contrast foreground.
     assert_eq!(on_accent(Color::BLACK), Color::WHITE);
     assert_eq!(on_accent(Color::WHITE), Color::BLACK);
@@ -60,4 +68,16 @@ fn mix_interpolates_endpoints_and_midpoint() {
     // Out-of-range factors clamp, never invert.
     assert_eq!(mix(a, b, -1.0), a);
     assert_eq!(mix(a, b, 2.0), b);
+}
+
+#[test]
+fn mix_blends_on_the_owner_formula_channel_exactly() {
+    // Dyadic channels make every step exact in f32, so a blend that moves to
+    // another space (gamma, premultiplied, per-channel rounding) fails here
+    // instead of drifting silently away from the token owner's `Rgba::lerp`.
+    let a = Color::new(0.0, 0.25, 0.5, 1.0);
+    let b = Color::new(0.75, 0.0, 1.0, 0.5);
+    assert_eq!(mix(a, b, 0.25), Color::new(0.1875, 0.1875, 0.625, 0.875));
+    assert_eq!(mix(a, b, 0.5), Color::new(0.375, 0.125, 0.75, 0.75));
+    assert_eq!(mix(a, b, 0.75), Color::new(0.5625, 0.0625, 0.875, 0.625));
 }

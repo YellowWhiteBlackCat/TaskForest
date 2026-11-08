@@ -1,10 +1,21 @@
 //! Request-correlated per-engine GPU acquisition lifecycle.
 
+use std::time::Duration;
+
 use crate::{RequestAttemptId, RequestCorrelation};
 use taskforest_contract::RequestId;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::identity::DeviceId;
 use taskforest_core::core::metrics::{GpuEngineRowsFailure, GpuEngineRowsSnapshot};
+
+/// How often a live GPU-engines panel re-requests the per-engine rows.
+///
+/// One cadence for every surface that runs the request loop — the helper
+/// task's guidance band is 2–3 s and every frontend sits on the same 2.5 s
+/// mid-band point, so the re-acquisition rhythm is one product fact instead
+/// of three coincidental tunings. The polkit `auth_admin_keep` session means
+/// post-first reads do not re-prompt.
+pub const REFRESH_CADENCE: Duration = Duration::from_millis(2500);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GpuEngineRowsRequestFailure {

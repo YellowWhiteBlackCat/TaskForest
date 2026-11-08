@@ -15,9 +15,11 @@
 //! can never prompt.
 
 use gpui::{Context, Div, InteractiveElement, ParentElement, Styled, div};
+use std::time::SystemTime;
 use taskforest_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::RaplPowerSnapshot;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::RaplPowerRequestFailure;
 use taskmanager_application::{RaplPowerRequest, RaplPowerState, i18n, request_submission_failure};
 use taskmanager_ui::theme_binding::definite_length;
@@ -26,7 +28,6 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::root::platform_submission_time_ms;
 use taskmanager_theme::{Theme, tokens};
 
 const MAX_VISIBLE_PACKAGE_ROWS: usize = 3;
@@ -163,7 +164,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_rapl_power(RaplPowerRequest::Refresh, platform_submission_time_ms())
+                    .submit_rapl_power(RaplPowerRequest::Refresh, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );
@@ -213,8 +214,7 @@ pub(super) fn render_package_power_section(theme: &Theme, model: &PackagePowerMo
         if rows.len() > visible {
             col = col.child(dim_text(
                 theme,
-                &i18n::t("common.more_rows")
-                    .replace("{count}", &(rows.len() - visible).to_string()),
+                &i18n::more_rows_label(rows.len() - visible),
             ));
         }
     }

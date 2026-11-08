@@ -6,40 +6,16 @@ use taskforest_core::core::metrics::{
 };
 use taskforest_core::core::power::BatteryInfo;
 
-/// Responsive GPU chart composition. This is derived from the frame budget's
-/// typed chart inventory, never selected by the user: the Full inventory adds
-/// every available engine history below the fixed aggregate graph; the
-/// AggregateOnly inventory keeps the aggregate (GPUI `GpuChartLayout::
-/// for_chart_inventory` parity).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum GpuChartLayout {
-    AggregateWithEngines,
-    AggregateOnly,
-}
-
-impl GpuChartLayout {
-    #[must_use]
-    pub(super) const fn for_inventory(inventory: PerformanceChartInventory) -> Self {
-        match inventory {
-            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
-            PerformanceChartInventory::Full => Self::AggregateWithEngines,
-        }
-    }
-
-    /// Every real engine is visible in the standard fixed layout. Compact
-    /// space has one aggregate chart and therefore projects no engine charts.
-    pub(super) fn engine_charts(self, gpu: &GpuMetrics) -> impl Iterator<Item = &GpuEngine> {
-        gpu.engines.iter().filter(move |engine| {
-            self == Self::AggregateWithEngines
-                && !engine.name.trim().is_empty()
-                && engine.usage_pct.is_finite()
-        })
-    }
-
-    #[must_use]
-    pub(super) const fn shows_secondary_regions(self) -> bool {
-        matches!(self, Self::AggregateWithEngines)
-    }
+/// Every real engine is visible in the standard fixed layout. Compact space
+/// has one aggregate chart and therefore projects no engine charts.
+pub(super) fn engine_charts(
+    inventory: PerformanceChartInventory,
+    gpu: &GpuMetrics,
+) -> impl Iterator<Item = &GpuEngine> {
+    let extended = inventory.includes_extended_charts();
+    gpu.engines.iter().filter(move |engine| {
+        extended && !engine.name.trim().is_empty() && engine.usage_pct.is_finite()
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -14,6 +14,7 @@ use crate::app::ShellTrack;
 use crate::drain::ShellProjectionFolded;
 
 use super::missing_value;
+use taskforest_core::core::percent::percent_text;
 
 /// The battery ids whose folded status asks the presentation to animate.
 #[derive(Resource, Default)]
@@ -64,7 +65,7 @@ pub(crate) fn battery_charge_pct(battery: &BatteryInfo) -> Option<u8> {
 pub(crate) fn battery_fact_line(battery: &BatteryInfo) -> String {
     let charge = battery
         .current_capacity_pct()
-        .map_or_else(missing_value, |pct| format!("{pct}%"));
+        .map_or_else(missing_value, percent_text);
     let watts = battery
         .current_power_w()
         .filter(|w| w.is_finite())
@@ -84,7 +85,7 @@ pub(crate) fn battery_fact_line(battery: &BatteryInfo) -> String {
         parts.push(format!("{}: {cycles}", t("battery.cycles")));
     }
     if let Some(health) = battery.current_health_pct() {
-        parts.push(format!("{}: {health:.1}%", t("battery.health")));
+        parts.push(format!("{}: {}", t("battery.health"), percent_text(health)));
     }
     if let Some(secs) = battery.current_time_to_full_secs() {
         parts.push(format!(

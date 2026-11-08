@@ -31,6 +31,33 @@ pub const MAX_TRAY_MENU_DEPTH: u8 = 3;
 /// Stable id carried by an activating tray menu item. Zero is a legal id.
 pub type TrayActionId = u32;
 
+/// Stable tray menu action ids shared across frontends.
+pub const TRAY_ACTION_SHOW: TrayActionId = 1;
+pub const TRAY_ACTION_PAUSE: TrayActionId = 2;
+pub const TRAY_ACTION_QUIT: TrayActionId = 3;
+
+/// Frontend-neutral intent behind a tray menu activation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrayIntent {
+    /// Bring or restore the main window to the foreground.
+    ShowWindow,
+    /// Invert the manual refresh pause (mirrors `AppAction::TogglePause`).
+    TogglePause,
+    /// Quit the application and release resources.
+    Quit,
+}
+
+/// Pure mapping from a tray action id to the typed intent.
+#[must_use]
+pub const fn resolve_tray_action(id: TrayActionId) -> Option<TrayIntent> {
+    match id {
+        TRAY_ACTION_SHOW => Some(TrayIntent::ShowWindow),
+        TRAY_ACTION_PAUSE => Some(TrayIntent::TogglePause),
+        TRAY_ACTION_QUIT => Some(TrayIntent::Quit),
+        _ => None,
+    }
+}
+
 /// RGBA (non-premultiplied, 8 bits per channel) pixel buffer for the tray
 /// icon. The single icon source consumed by every OS adapter.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -14,7 +14,9 @@
 //! - the declared CPU budget is honoured, and a `cpu.max` that names no
 //!   budget declares no ceiling at all.
 
-use super::*;
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, ContainerQuotaState, container_quota_view, quota_readout,
+};
 
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::ScalarObservation;

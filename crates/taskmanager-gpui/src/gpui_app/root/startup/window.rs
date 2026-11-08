@@ -22,8 +22,10 @@ use taskmanager_app_host::{
     DaemonSubscriptionWorker, DiagnosticBundleClient, SnapshotExportClient, WindowCaptureClient,
     WindowPresentation,
 };
+use taskmanager_application::snapshot_export::SnapshotExportSession;
+use taskmanager_application::window_capture::WindowCaptureSession;
 use taskmanager_application::{
-    ConfigClient, ConfigRevision, PlatformClient, TelemetryRefreshPolicy,
+    ConfigClient, ConfigRevision, DiagnosticBundleSession, PlatformClient, TelemetryRefreshPolicy,
 };
 use taskmanager_assets::product;
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
@@ -94,10 +96,12 @@ pub(super) fn make_root_builder(inputs: RootWindowInputs) -> RootBuilder {
                 surface_role,
                 cx,
             );
-            view.snapshot_export.install(snapshot_export_client);
-            view.window_capture.install(window_capture_client);
+            view.snapshot_export
+                .install_with(|| SnapshotExportSession::new(snapshot_export_client));
+            view.window_capture
+                .install_with(|| WindowCaptureSession::new(window_capture_client));
             view.diagnostic_bundle_runtime
-                .install(diagnostic_bundle_client);
+                .install_with(|| DiagnosticBundleSession::new(diagnostic_bundle_client));
             view.service_details
                 .install_export_client(service_log_export_client);
             apply_root_startup_config(

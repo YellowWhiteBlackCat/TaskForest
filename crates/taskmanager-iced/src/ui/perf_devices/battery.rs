@@ -7,6 +7,7 @@ use super::*;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::viewmodel::StatRow;
 
+use taskforest_core::core::percent::percent_text;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
     DeviceNavigationPresentation, PerformanceChartInventory,
@@ -67,7 +68,7 @@ pub(crate) fn battery_summary_lines(battery: &BatteryInfo) -> Vec<StatRow> {
     let mut rows = vec![
         StatRow::text(
             t("battery.capacity"),
-            observed.capacity_pct.map(|value| format!("{value}%")),
+            observed.capacity_pct.map(percent_text),
         ),
         StatRow::text(t("battery.status"), Some(battery.status.clone())),
     ];
@@ -89,7 +90,7 @@ pub(crate) fn battery_summary_lines(battery: &BatteryInfo) -> Vec<StatRow> {
     if let Some(health) = observed.health_pct {
         rows.push(StatRow::text(
             t("battery.health"),
-            Some(format!("{health:.1}%")),
+            Some(percent_text(health)),
         ));
     }
     if let Some(secs) = observed.time_to_full_secs {

@@ -378,3 +378,18 @@ fn alert_rule_export_rejects_non_finite_and_duplicate_data() {
         Err(AlertRuleTransferError::DuplicateRuleId("cpu".into()))
     );
 }
+
+#[test]
+fn alert_metric_i18n_key_and_unit_suffix_cover_all_variants() {
+    for metric in AlertMetric::ALL {
+        assert!(!metric.i18n_key().is_empty());
+        let unit = metric.unit_suffix();
+        match metric {
+            AlertMetric::CpuUsagePercent
+            | AlertMetric::MemoryUsagePercent
+            | AlertMetric::SmartPercentUsed => assert_eq!(unit, "%"),
+            AlertMetric::DiskTemperatureC => assert_eq!(unit, "°C"),
+            AlertMetric::SmartCriticalWarning => assert_eq!(unit, ""),
+        }
+    }
+}

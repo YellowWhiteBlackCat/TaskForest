@@ -16,6 +16,7 @@ use taskmanager_application::i18n;
 
 use super::{MISSING_VALUE, service_exit};
 use taskforest_core::ProcessItem;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process_telemetry::CapabilityRiskLevel;
 use taskmanager_application::process_details_vm::command_identity_comparison;
 
@@ -105,8 +106,10 @@ pub fn missing_value() -> String {
 #[must_use]
 pub fn pressure_window_summary(window: &PressureWindow) -> String {
     format!(
-        "10s {:.1}% · 60s {:.1}% · 5m {:.1}%",
-        window.avg10, window.avg60, window.avg300
+        "10s {} · 60s {} · 5m {}",
+        precise_percent_text(window.avg10),
+        precise_percent_text(window.avg60),
+        precise_percent_text(window.avg300)
     )
 }
 
@@ -115,12 +118,7 @@ pub fn pressure_window_summary(window: &PressureWindow) -> String {
 /// narrow label/value row instead of right-truncating the first horizon.
 #[must_use]
 pub fn pressure_window_compact_summary(window: &PressureWindow) -> String {
-    let compact = |value: f32| {
-        let value = format!("{value:.1}%");
-        value
-            .strip_prefix("0.")
-            .map_or(value.clone(), |tail| format!(".{tail}"))
-    };
+    let compact = |value: f32| compact_pressure_percent(value);
     format!(
         "10s {} · 60s {} · 5m {}",
         compact(window.avg10),
@@ -135,18 +133,22 @@ pub fn pressure_window_compact_summary(window: &PressureWindow) -> String {
 /// keeps the beginning of the value from being clipped by right alignment.
 #[must_use]
 pub fn pressure_window_values_compact_summary(window: &PressureWindow) -> String {
-    let compact = |value: f32| {
-        let value = format!("{value:.1}%");
-        value
-            .strip_prefix("0.")
-            .map_or(value.clone(), |tail| format!(".{tail}"))
-    };
+    let compact = |value: f32| compact_pressure_percent(value);
     format!(
         "{} · {} · {}",
         compact(window.avg10),
         compact(window.avg60),
         compact(window.avg300),
     )
+}
+
+/// The dense-rail pressure spelling: the owner's precise percent with the
+/// leading zero dropped (`0.5%` reads `.5%`), so three horizons fit a narrow
+/// label/value row without right-truncating the first one.
+fn compact_pressure_percent(value: f32) -> String {
+    let text = precise_percent_text(value);
+    text.strip_prefix("0.")
+        .map_or(text.clone(), |tail| format!(".{tail}"))
 }
 
 /// Format PSI `some` and optional `full` windows without collapsing a missing

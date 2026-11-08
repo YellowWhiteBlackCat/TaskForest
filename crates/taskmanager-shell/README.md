@@ -26,6 +26,12 @@ notices typed. Frontends request quit with an explicit reason and only read
 `should_quit()`; they render feedback through the read-only projection API.
 Verify shell behavior independently of a compositor.
 
+`src/accessibility_projection.rs` owns the renderer-neutral fold from the shell
+projection into the common semantic component tree: status, CPU graph, bounded
+process rows, absence semantics and their typed values. Frontends bind those
+helpers and may append only their own root name, modal surfaces and structural
+group rows.
+
 ## Module map
 
 ```text
@@ -57,6 +63,8 @@ src/presentation.rs                 renderer-neutral presentation helpers
 src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
 ├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs  smart.rs
+├── percent.rs           the absence-aware percent readouts (the shared dash)
+├── chart_slots.rs       the sample-window → pixel-slot grid (one owner for the charts)
 ├── smart_tool.rs        the shared SMART remediation projection (probe + install hint)
 ├── storage_health.rs    the partition ↔ filesystem health projection
 src/viewmodel.rs                    product-first view-model projections

@@ -6,7 +6,9 @@
 //! feed. The feed itself lives in `taskforest-core`; this module is the shell
 //! adapter that every frontend drives, so the TUI/Iced/gpui log panels never
 //! drift apart.
-use super::{ShellApp, submission_time_ms};
+use std::time::SystemTime;
+
+use super::ShellApp;
 use taskforest_contract::RequestId;
 use taskforest_core::core::services::ServiceLogLevel;
 use taskforest_core::core::services::{
@@ -15,6 +17,7 @@ use taskforest_core::core::services::{
     ServiceLogTimeFilter,
 };
 use taskforest_core::core::target::ServiceId;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::{PlatformEffect, ServiceLogStreamLifecycle, ServiceLogStreamRequest};
 
 /// Minimum wall-clock gap between two incremental service-log follow requests.
@@ -275,7 +278,7 @@ impl ShellApp {
                     }),
                 state,
             },
-            submission_time_ms(),
+            unix_millis(SystemTime::now()),
         );
     }
 

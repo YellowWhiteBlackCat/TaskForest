@@ -141,6 +141,24 @@ pub struct SensorCenterSnapshot {
     pub device_lifecycles: HashMap<String, DeviceLifecycle>,
 }
 
+impl SensorCenterSnapshot {
+    /// Return the duty-cycle (PWM) percentage for a given fan reading, if observed.
+    #[must_use]
+    pub fn fan_pwm_percent(&self, fan: &SensorReading) -> Option<f32> {
+        self.readings
+            .iter()
+            .filter(|reading| reading.device_id() == fan.device_id())
+            .find_map(
+                |reading| match reading.measurement_observation().current_value()? {
+                    SensorMagnitude::DutyCycle { value, maximum } if *maximum > 0 => {
+                        Some(*value as f32 * 100.0 / *maximum as f32)
+                    }
+                    _ => None,
+                },
+            )
+    }
+}
+
 pub fn refresh_sensor_center_state(
     previous: DeviceState,
     snapshot: &mut SensorCenterSnapshot,

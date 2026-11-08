@@ -10,9 +10,9 @@ use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 use taskmanager_shell::{InfoSortCol, InfoTable, SortCol};
 
-use super::DetailsSection;
 use super::selectors::PerfDevice;
 use taskforest_core::core::history::HistoryWindow;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_shell::ProcessStatusFilter;
 
 /// Focus targets that remain local to the Iced adapter.
@@ -102,7 +102,7 @@ pub enum FocusTarget {
     /// The Insights network-escalation acceptance pill.
     ProcessNetworkEscalation,
     /// One process-details modal section tab.
-    DetailsTab(DetailsSection),
+    DetailsTab(ProcessDetailsSection),
     DetailsFacet(ProcessInsightFacet),
     DetailsRefresh,
     /// The Applications Suspend-process action (shell batch path).
@@ -365,10 +365,10 @@ impl FocusTarget {
         Self::ProcessAffinityCpu(0),
         Self::ProcessAffinityApply,
         Self::ProcessNetworkEscalation,
-        Self::DetailsTab(DetailsSection::Overview),
-        Self::DetailsTab(DetailsSection::Performance),
-        Self::DetailsTab(DetailsSection::Command),
-        Self::DetailsTab(DetailsSection::Insights),
+        Self::DetailsTab(ProcessDetailsSection::Overview),
+        Self::DetailsTab(ProcessDetailsSection::Performance),
+        Self::DetailsTab(ProcessDetailsSection::Command),
+        Self::DetailsTab(ProcessDetailsSection::Insights),
         Self::DetailsRefresh,
         Self::DetailsFacet(ProcessInsightFacet::Network),
         Self::DetailsFacet(ProcessInsightFacet::Gpu),

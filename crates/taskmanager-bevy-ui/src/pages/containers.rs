@@ -58,9 +58,10 @@ use crate::window::{Role, TextRole};
 #[path = "containers/quota.rs"]
 mod quota;
 
-use quota::{
-    ContainerQuotaBreach, ContainerQuotaView, container_quota_view, quota_cell_scene,
-    quota_readout, warning_halo_scene,
+use quota::{quota_cell_scene, warning_halo_scene};
+use taskforest_core::core::percent::precise_percent_text;
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, ContainerQuotaView, container_quota_view, quota_readout,
 };
 
 pub(crate) fn containers_fold_observer(
@@ -222,7 +223,8 @@ pub(crate) fn container_row_model(summary: &ContainerSummary) -> ContainerRowMod
         ScalarAvailability::Available | ScalarAvailability::Partial(_) => summary
             .cpu_percentage
             .current_value()
-            .map(|val| format!("{val:.1}%"))
+            .copied()
+            .map(precise_percent_text)
             .unwrap_or_else(missing_value),
         _ => missing_value(),
     };

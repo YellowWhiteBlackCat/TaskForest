@@ -69,3 +69,6 @@ packaging/arch/bin/src/
 packaging/arch/bin/pkg/
 packaging/arch/bin/*.pkg.tar.*
 packaging/arch/bin/*.deb
+
+# Transient Cargo.lock snapshot taken by the shared UI kit consumer verifier.
+/Cargo.lock.zhuge-verify.bak

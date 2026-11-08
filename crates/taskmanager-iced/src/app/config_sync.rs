@@ -7,8 +7,6 @@ use std::time::Duration;
 
 use super::*;
 use taskmanager_application::ConfigPublication;
-use taskmanager_application::ConfigRecovery;
-use taskmanager_application::ConfigStoreErrorKind;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
     ConfigBootstrap, ConfigBootstrapFallback, ConfigDrain, ConfigPublicationOutcome,
@@ -136,7 +134,7 @@ impl IcedApp {
                 FeedbackSource::Settings,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::UntilReplaced,
-                recovery_message("Configuration refresh failed", *recovery),
+                recovery.message_with_prefix("Configuration refresh failed"),
             ),
             outcome => self.report_recovery(outcome),
         }
@@ -203,20 +201,7 @@ impl IcedApp {
             FeedbackSource::Settings,
             severity,
             FeedbackLifecycle::UntilReplaced,
-            recovery_message("Configuration recovered", recovery),
+            recovery.message_with_prefix("Configuration recovered"),
         );
     }
-}
-
-fn recovery_message(prefix: &str, recovery: ConfigRecovery) -> String {
-    format!(
-        "{prefix}: source={:?}, primary={}, backup={}",
-        recovery.source(),
-        recovery
-            .primary_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-        recovery
-            .backup_error()
-            .map_or("none", ConfigStoreErrorKind::stable_code),
-    )
 }

@@ -2,6 +2,8 @@
 //! of process control, affinity, and batch intents, plus failure feedback.
 
 use gpui::Context;
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::ProcessAffinityState;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
@@ -18,9 +20,7 @@ use taskmanager_application::{
 
 use taskmanager_shell::ProcessControlKind;
 
-use super::{
-    ProcessControlAction, RootView, platform_submission_time_ms, process_control_feedback,
-};
+use super::{ProcessControlAction, RootView, process_control_feedback};
 
 impl RootView {
     pub(crate) fn accept_shared_process_control_feedback(
@@ -84,7 +84,7 @@ impl RootView {
             |platform| {
                 let request = request.clone();
                 platform
-                    .submit_process_control(request, platform_submission_time_ms())
+                    .submit_process_control(request, unix_millis(SystemTime::now()))
                     .map_err(submission_failure_kind)
             },
         );
@@ -145,7 +145,7 @@ impl RootView {
                 platform
                     .submit_process_affinity(
                         ProcessAffinityRequest { target },
-                        platform_submission_time_ms(),
+                        unix_millis(SystemTime::now()),
                     )
                     .map_err(submission_failure_kind)
             },
@@ -199,7 +199,7 @@ impl RootView {
                             target: target_for_request,
                             cpus: cpus_for_request,
                         },
-                        platform_submission_time_ms(),
+                        unix_millis(SystemTime::now()),
                     )
                     .map_err(submission_failure_kind)
             },

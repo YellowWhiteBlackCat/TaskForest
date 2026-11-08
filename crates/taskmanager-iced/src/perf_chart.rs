@@ -14,11 +14,12 @@
 //! The point projection ([`series_point_runs`]) and the hover index mapping
 //! ([`hovered_index`]) are pure functions so the geometry math is unit-tested
 //! without a live renderer; [`PerfChart::draw`] only feeds those points into
-//! an iced `Frame`. The window→geometry mapping itself is unified in
-//! [`WindowSlots`] (right-anchored capacity slots, GPUI `sample_x` parity):
-//! drawing x, the windowed projection ([`series_point_runs_windowed`]), and
-//! hover resolution ([`WindowSlots::index_at`]) all derive from the same slot
-//! denominator, so a tooltip can never disagree with a drawn sample. Grid
+//! an iced `Frame`. The window→geometry mapping itself is the shared owner's
+//! ([`taskmanager_shell::presentation::ChartSlots`], right-anchored capacity
+//! slots, GPUI `sample_x` parity): drawing x, the windowed projection
+//! ([`series_point_runs_windowed`]), and hover resolution all derive from the
+//! same slot denominator, so a tooltip can never disagree with a drawn sample.
+//! Grid
 //! counts/alpha and series stroke width are parameterized through
 //! [`ChartOpts`] (GPUI `GraphOpts` grid semantics) with defaults pinned to
 //! the legacy look.
@@ -41,6 +42,7 @@ use iced::widget::canvas::{self, Cache, Geometry, Path, Stroke};
 use iced::{Color, Pixels, Point, Rectangle, Size};
 
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::ChartSlots;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
@@ -60,6 +62,7 @@ pub(crate) use raster::{
 
 use motion::{SeriesSlide, SlidePhase};
 use raster::snap_to_device_grid;
+use taskforest_core::core::percent::percent_text;
 
 /// Stroke width for each series polyline.
 const SERIES_STROKE_WIDTH: f32 = 1.6;
@@ -274,13 +277,11 @@ pub(crate) struct HoverState {
 
 /// Map a cursor x onto the nearest sample index, mirroring the
 /// [`series_point_runs`] projection (samples spread evenly from left to right,
-/// oldest → newest). `None` when the cursor is outside the frame, the frame
-/// has no width, or the window holds fewer than two samples (nothing to
-/// plot/hover — the honest too-few-samples state). Pure so the mapping is
-/// unit-tested without a renderer.
+/// oldest → newest). `None` when the cursor is outside the frame or the frame
+/// has no width. Pure so the mapping is unit-tested without a renderer.
 #[must_use]
 pub(crate) fn hovered_index(cursor_x: f32, width: f32, sample_count: usize) -> Option<usize> {
-    WindowSlots::spread(sample_count, width).index_at(cursor_x)
+    ChartSlots::spread(sample_count, width).index_at(cursor_x)
 }
 
 /// Return the x-coordinate for one chronological sample.
@@ -289,104 +290,11 @@ pub(crate) fn hovered_index(cursor_x: f32, width: f32, sample_count: usize) -> O
 /// one named helper makes the direction explicit and lets every chart's hover
 /// overlay use the same left-to-right contract instead of re-implementing an
 /// easy-to-reverse `step * index` expression. Implemented as the full-window
-/// specialization of [`WindowSlots`] so the legacy spread and the capacity
-/// windowed mapping cannot drift apart.
+/// specialization of the shared owner's [`ChartSlots`] so the legacy spread
+/// and the capacity windowed mapping cannot drift apart.
 #[must_use]
 pub(crate) fn sample_x(index: usize, sample_count: usize, width: f32) -> f32 {
-    WindowSlots::spread(sample_count, width).x(index)
-}
-
-/// The ONE window→geometry mapping every chart shares (GPUI `sample_x` /
-/// `sample_index_at_cursor_x` parity): the newest sample pins to the right
-/// edge and every sample owns a fixed slot of the window — a growing window
-/// (`sample_count < capacity`) therefore grows a short, evenly-paced curve
-/// from the right edge leftward instead of stretching two samples across the
-/// full width. Both directions — the drawing x ([`WindowSlots::x`]) and the
-/// hover index resolution ([`WindowSlots::index_at`]) — derive from the same
-/// denominator, so a hover readout can never disagree with a drawn sample.
-///
-/// The full-window form ([`WindowSlots::spread`], capacity == sample count) is
-/// exactly the legacy [`sample_x`]/[`hovered_index`] spread, so charts that
-/// keep it render pixel-identical to before.
-///
-/// Fewer than two samples carry no honest span: `x` collapses to `0.0` and
-/// `index_at` is `None` (the too-few-samples state every chart refuses to
-/// fabricate a line for). Pure so the slot math is unit-tested headlessly.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct WindowSlots {
-    sample_count: usize,
-    capacity: usize,
-    width: f32,
-}
-
-impl WindowSlots {
-    /// Build the slot grid for a window of `sample_count` samples inside a
-    /// `capacity`-wide frame (`width` pixels). A capacity below the sample
-    /// count is safe: the denominator is their maximum, so an over-full window
-    /// degrades to the full-span spread rather than dividing by zero.
-    #[must_use]
-    pub(crate) fn new(sample_count: usize, capacity: usize, width: f32) -> Self {
-        Self {
-            sample_count,
-            capacity,
-            width,
-        }
-    }
-
-    /// The full-window form: every sample spreads evenly across the whole
-    /// width (the legacy [`sample_x`] projection — no right-anchored growth).
-    #[must_use]
-    pub(crate) fn spread(sample_count: usize, width: f32) -> Self {
-        Self::new(sample_count, sample_count, width)
-    }
-
-    fn denominator(&self) -> f32 {
-        self.sample_count
-            .saturating_sub(1)
-            .max(self.capacity.saturating_sub(1))
-            .max(1) as f32
-    }
-
-    /// The x-coordinate of the sample at `index` (oldest→newest slots,
-    /// newest pinned at `width`). Indices beyond the window clamp to the
-    /// newest slot; a window with fewer than two samples has no span (`0.0`).
-    #[must_use]
-    pub(crate) fn x(&self, index: usize) -> f32 {
-        if self.sample_count < 2 {
-            return 0.0;
-        }
-        let width = if self.width.is_finite() {
-            self.width.max(0.0)
-        } else {
-            0.0
-        };
-        let from_right = (self.sample_count - 1 - index.min(self.sample_count - 1)) as f32;
-        width * (1.0 - from_right / self.denominator())
-    }
-
-    /// The inverse of [`WindowSlots::x`]: map a frame-relative cursor x onto
-    /// the nearest sample slot. `None` outside the frame, for a non-positive
-    /// or non-finite width, or when the window holds fewer than two samples
-    /// (nothing to hover — the honest too-few-samples state). Uses the same
-    /// denominator as `x`, so the resolved index always lands on the slot the
-    /// cursor is actually over, even in a partial right-anchored window.
-    #[must_use]
-    pub(crate) fn index_at(&self, cursor_x: f32) -> Option<usize> {
-        if self.sample_count < 2
-            || !cursor_x.is_finite()
-            || !self.width.is_finite()
-            || self.width <= 0.0
-            || cursor_x < 0.0
-            || cursor_x >= self.width
-        {
-            return None;
-        }
-        let relative = (cursor_x / self.width).clamp(0.0, 1.0);
-        let index = (self.sample_count as f32 - 1.0 - (1.0 - relative) * self.denominator())
-            .round()
-            .clamp(0.0, (self.sample_count - 1) as f32);
-        Some(index as usize)
-    }
+    ChartSlots::spread(sample_count, width).x(index)
 }
 
 /// The three color stops of the vertical area-fill gradient: the series color
@@ -834,10 +742,10 @@ fn draw_hover_readout(
 pub(crate) fn readout_text(cpu: &[f32], memory: &[f32], index: usize) -> Option<String> {
     let mut parts = Vec::new();
     if let Some(value) = cpu.get(index).filter(|value| value.is_finite()) {
-        parts.push(format!("{} {:.0}%", t("common.cpu"), value));
+        parts.push(format!("{} {}", t("common.cpu"), percent_text(*value)));
     }
     if let Some(value) = memory.get(index).filter(|value| value.is_finite()) {
-        parts.push(format!("{} {:.0}%", t("common.memory"), value));
+        parts.push(format!("{} {}", t("common.memory"), percent_text(*value)));
     }
     if parts.is_empty() {
         None
@@ -860,14 +768,14 @@ pub(crate) fn latest_readout_text(cpu: &[f32], memory: &[f32]) -> Option<String>
     };
     match (latest_finite(cpu), latest_finite(memory)) {
         (Some(cpu), Some(memory)) => Some(format!(
-            "{} {:.0}% · {} {:.0}%",
+            "{} {} · {} {}",
             t("common.cpu"),
-            cpu,
+            percent_text(cpu),
             t("common.memory"),
-            memory
+            percent_text(memory)
         )),
-        (Some(cpu), None) => Some(format!("{cpu:.0}%")),
-        (None, Some(memory)) => Some(format!("{memory:.0}%")),
+        (Some(cpu), None) => Some(percent_text(cpu)),
+        (None, Some(memory)) => Some(percent_text(memory)),
         (None, None) => None,
     }
 }

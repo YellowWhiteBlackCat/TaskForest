@@ -1,6 +1,5 @@
 //! Pure text projections for Performance rail cards.
 
-use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{
     CpuMetrics, DiskMetrics, GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics,
 };
@@ -10,30 +9,16 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskmanager_shell::presentation::{
-    device_status_i18n_key, effective_smart_status, gpu_display_identity, missing_value,
-    wifi_signal_quality_percent,
+    effective_smart_status, gpu_display_identity, missing_value, wifi_signal_quality_percent,
 };
 
 use super::super::UnitPrefs;
-use super::super::perf_devices::{gpu_percent_readout, rate_text_pref};
+use super::super::perf_devices::rate_text_pref;
+use taskforest_core::core::percent::percent_text;
 
-/// Format a percentage observation honestly: unavailable renders "—", a
-/// measured zero stays "0%". Shared by the CPU/disk caption lines.
-fn honest_pct(value: Option<f32>) -> String {
-    value.map_or_else(missing_value, |value| format!("{:.0}%", value.round()))
-}
-
-/// Append the localized status badge for a non-healthy device to a caption
-/// line (healthy devices add nothing — they are the silent majority).
-fn append_status_badge(caption: &mut String, status: DeviceStatus) {
-    if status == DeviceStatus::Healthy {
-        return;
-    }
-    if !caption.is_empty() {
-        caption.push_str(" · ");
-    }
-    caption.push_str(t(device_status_i18n_key(status)));
-}
+pub(crate) use taskmanager_shell::presentation::{
+    append_status_badge, battery_caption, fan_caption, observed_percentage,
+};
 
 pub(crate) fn cpu_rail_heading(cpu: &CpuMetrics) -> String {
     let _ = cpu;
@@ -68,7 +53,7 @@ fn cpu_rail_frequency(cpu: &CpuMetrics) -> Option<String> {
 /// CPU caption lines: line 1 carries usage + current frequency; line 2 carries
 /// package temperature and the per-core range when those observations exist.
 pub(crate) fn cpu_rail_caption(cpu: &CpuMetrics) -> (String, String) {
-    let mut cap1 = honest_pct(cpu.current_global_usage_pct());
+    let mut cap1 = observed_percentage(cpu.current_global_usage_pct());
     let frequency = cpu_rail_frequency(cpu);
     let has_frequency = frequency.is_some();
     if let Some(frequency) = frequency {
@@ -122,7 +107,7 @@ pub(crate) fn mem_rail_caption(memory: &MemoryMetrics, units: UnitPrefs) -> (Str
         format!("{used} / {total}"),
         memory
             .used_percentage_observed()
-            .map_or_else(missing_value, |value| format!("{value:.0}%")),
+            .map_or_else(missing_value, percent_text),
     )
 }
 
@@ -143,7 +128,7 @@ pub(crate) fn disk_rail_subtitle(disk: &DiskMetrics) -> String {
 
 /// Disk caption lines: active-time + throughput, then identity and SMART.
 pub(crate) fn disk_rail_caption(disk: &DiskMetrics, units: UnitPrefs) -> (String, String) {
-    let active = honest_pct(disk.current_active_time_pct());
+    let active = observed_percentage(disk.current_active_time_pct());
     let rate = match (
         disk.current_read_bytes_per_sec(),
         disk.current_write_bytes_per_sec(),
@@ -244,7 +229,7 @@ fn nic_caption_line2(nic: &NetworkMetrics) -> String {
         }
         if let Some(signal) = nic.current_signal_dbm() {
             let pct = wifi_signal_quality_percent(signal);
-            parts.push(format!("{pct:.0}%"));
+            parts.push(percent_text(pct));
         }
     } else {
         parts.push(nic.interface_name.as_ref().to_owned());
@@ -295,13 +280,13 @@ pub(crate) fn gpu_rail_caption(gpu: &GpuMetrics, units: UnitPrefs) -> (String, S
             _ => String::new(),
         },
     };
-    let mut parts = vec![gpu_percent_readout(gpu.current_utilization_pct())];
+    let mut parts = vec![observed_percentage(gpu.current_utilization_pct())];
     if let (Some(used), Some(total)) = (vram_used, vram_total)
         && total > 0
     {
         parts.push(format!(
-            "VRAM {:.0}%",
-            (used as f64 * 100.0 / total as f64).round()
+            "VRAM {}",
+            percent_text(used as f64 * 100.0 / total as f64)
         ));
     }
     if let Some(temp) = gpu.current_temperature_c() {
@@ -333,30 +318,10 @@ pub(crate) fn battery_rail_subtitle(battery: &BatteryInfo) -> String {
     }
 }
 
-/// Battery caption lines: current capacity and status.
-pub(crate) fn battery_rail_caption(battery: &BatteryInfo) -> (String, String) {
-    let cap1 = battery
-        .current_capacity_pct()
-        .map_or_else(missing_value, |value| format!("{value}%"));
-    let mut cap2 = battery.status.clone();
-    append_status_badge(&mut cap2, battery.device_state.status);
-    (cap1, cap2)
-}
-
 pub(crate) fn fan_rail_heading(index: usize) -> String {
     format!("{} {index}", t("common.fan"))
 }
 
 pub(crate) fn fan_rail_subtitle(reading: &SensorReading) -> String {
     reading.label().to_owned()
-}
-
-/// Fan caption lines: current RPM and channel label.
-pub(crate) fn fan_rail_caption(reading: &SensorReading) -> (String, String) {
-    let rpm = reading
-        .current_number()
-        .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
-    let mut cap2 = reading.label().to_owned();
-    append_status_badge(&mut cap2, reading.state().status);
-    (rpm, cap2)
 }

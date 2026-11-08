@@ -7,59 +7,23 @@
 
 use std::sync::mpsc::channel;
 
+use taskforest_contract::{TrayController, TrayControllerTarget, sync_tray_pause_checkmark};
 use taskforest_core::core::tray::{
-    TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
-    TraySpecError,
+    TRAY_ACTION_PAUSE, TRAY_ACTION_QUIT, TRAY_ACTION_SHOW, TrayEvent, TrayIntent, TrayMenuItem,
+    TrayMenuSpec, TraySpec, TraySpecError, resolve_tray_action,
 };
 use taskmanager_application::AppAction;
-use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
+use taskmanager_assets::{product, product_tray_icon_data};
 use taskmanager_shell::QuitReason;
 
 use crate::IcedApp;
 use taskmanager_app_host::spawn_tray;
 use taskmanager_application::i18n::t;
 
-/// Stable action ids shared by the frontend-local mapping and the native menu.
-pub const TRAY_ACTION_SHOW: TrayActionId = 1;
-pub const TRAY_ACTION_PAUSE: TrayActionId = 2;
-pub const TRAY_ACTION_QUIT: TrayActionId = 3;
-
-/// Frontend intent behind a tray activation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TrayIntent {
-    /// Restore and foreground the main Iced window.
-    ShowWindow,
-    /// Toggle the shared telemetry refresh policy.
-    TogglePause,
-    /// Close the process and release the singleton/tray resources.
-    Quit,
-}
-
-/// Pure mapping from a native action id to an Iced intent.
-#[must_use]
-pub fn resolve_tray_action(id: TrayActionId) -> Option<TrayIntent> {
-    match id {
-        TRAY_ACTION_SHOW => Some(TrayIntent::ShowWindow),
-        TRAY_ACTION_PAUSE => Some(TrayIntent::TogglePause),
-        TRAY_ACTION_QUIT => Some(TrayIntent::Quit),
-        _ => None,
-    }
-}
-
-/// Deterministic 22×22 RGBA tray icon. The native adapters all consume the
-/// same validated bytes, so the two desktop frontends cannot drift visually.
-pub fn tray_icon_pixels() -> Result<TrayIconData, TrayIconError> {
-    TrayIconData::from_rgba(
-        product_tray_icon_rgba().to_vec(),
-        PRODUCT_TRAY_ICON_SIZE,
-        PRODUCT_TRAY_ICON_SIZE,
-    )
-}
-
 /// Build the localized Iced tray spec. The pause checkmark is seeded from the
 /// same shell policy that the keyboard path mutates.
 pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
-    let icon = tray_icon_pixels().map_err(TraySpecError::Icon)?;
+    let icon = product_tray_icon_data().map_err(TraySpecError::Icon)?;
     let menu = TrayMenuSpec::from_items(vec![
         TrayMenuItem::Action {
             id: TRAY_ACTION_SHOW,
@@ -136,10 +100,10 @@ pub(crate) fn drain_tray_events(app: &mut IcedApp) -> bool {
     activate
 }
 
-/// Keep the tray checkmark aligned with keyboard/Ctrl state and tray state.
-pub(crate) fn sync_tray_pause_checkmark(app: &IcedApp, paused: bool) {
-    app.runtime
-        .sync_tray_pause_checkmark(TRAY_ACTION_PAUSE, paused);
+impl TrayControllerTarget for IcedApp {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        self.runtime.controller()
+    }
 }
 
 #[cfg(test)]

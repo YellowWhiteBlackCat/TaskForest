@@ -17,6 +17,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use taskforest_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::session_family_label;
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
@@ -109,8 +110,5 @@ pub(super) fn render_session_menu_at(
 /// TUI-local display label for one session action, resolved through the shared
 /// catalog so it localizes with the active language.
 pub fn action_label(action: SessionControlAction) -> &'static str {
-    match action {
-        SessionControlAction::Disconnect => t("users.disconnect"),
-        SessionControlAction::Lock => t("users.lock"),
-    }
+    i18n::session_control_action_label(action)
 }

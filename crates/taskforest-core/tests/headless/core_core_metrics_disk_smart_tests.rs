@@ -152,3 +152,63 @@ fn an_unmounted_or_unmatched_partition_resolves_no_filesystem_fact() {
         "a partition with no observed mount resolves no filesystem fact"
     );
 }
+
+fn spare_disk(spare: Option<f32>, threshold: Option<f32>) -> DiskMetrics {
+    let mut disk = DiskMetrics::new("nvme0n1");
+    disk.smart_available_spare_pct = spare;
+    disk.smart_available_spare_threshold_pct = threshold;
+    disk
+}
+
+#[test]
+fn a_reported_spare_threshold_is_authoritative() {
+    // The controller's own number wins; the shared fallback answers only its
+    // absence, and that fallback is the one fact storage_health already owns.
+    assert_eq!(
+        spare_disk(Some(50.0), Some(25.0)).smart_spare_warning_threshold_pct(),
+        25.0
+    );
+    assert_eq!(
+        spare_disk(Some(50.0), None).smart_spare_warning_threshold_pct(),
+        DEFAULT_NVME_SPARE_WARNING_PERCENT
+    );
+    assert_eq!(DEFAULT_NVME_SPARE_WARNING_PERCENT, 10.0);
+}
+
+#[test]
+fn the_spare_warning_folds_at_or_below_the_resolved_threshold() {
+    let threshold = DEFAULT_NVME_SPARE_WARNING_PERCENT;
+    assert!(spare_disk(Some(threshold - 0.01), None).smart_spare_pool_needs_warning());
+    assert!(
+        spare_disk(Some(threshold), None).smart_spare_pool_needs_warning(),
+        "the edge itself warns: a drive at exactly its threshold is already there"
+    );
+    assert!(!spare_disk(Some(threshold + 0.01), None).smart_spare_pool_needs_warning());
+    assert!(spare_disk(Some(90.0), Some(95.0)).smart_spare_pool_needs_warning());
+    assert!(!spare_disk(Some(90.0), Some(10.0)).smart_spare_pool_needs_warning());
+}
+
+#[test]
+fn an_unmeasured_spare_reading_never_becomes_a_warning() {
+    // Absence answers in neither direction: no reading is not a healthy drive
+    // and not a failing one, and a non-finite reading is not a measurement.
+    assert!(!spare_disk(None, None).smart_spare_pool_needs_warning());
+    for unusable in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        assert!(
+            !spare_disk(Some(unusable), None).smart_spare_pool_needs_warning(),
+            "a non-finite spare reading of {unusable} must not decide anything"
+        );
+    }
+}
+
+#[test]
+fn a_corrupt_threshold_cannot_invent_a_warning() {
+    // A reported threshold that is not a usable number resolves no warning,
+    // instead of the comparison silently answering through an infinity.
+    for corrupt in [f32::INFINITY, f32::NEG_INFINITY, f32::NAN] {
+        assert!(
+            !spare_disk(Some(5.0), Some(corrupt)).smart_spare_pool_needs_warning(),
+            "a corrupt threshold of {corrupt} must not fabricate a warning"
+        );
+    }
+}

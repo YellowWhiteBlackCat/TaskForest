@@ -68,6 +68,19 @@ pub enum StartupScope {
     Unknown,
 }
 
+impl StartupScope {
+    /// Locale-catalog key for this startup scope (`startup.scope_user` …).
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::User => "startup.scope_user",
+            Self::System => "startup.scope_system",
+            Self::Session => "startup.scope_session",
+            Self::Unknown => "startup.scope_unknown",
+        }
+    }
+}
+
 /// Control strategy the native provider can honestly offer for this row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -80,6 +93,18 @@ pub enum StartupControlPolicy {
     /// Inventory is available but mutation is not safely implemented.
     #[default]
     Unsupported,
+}
+
+impl StartupControlPolicy {
+    /// Locale-catalog key for this startup control policy (`startup.control_direct` …).
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Direct => "startup.control_direct",
+            Self::UserOverride => "startup.control_user_override",
+            Self::Unsupported => "startup.control_unsupported",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]

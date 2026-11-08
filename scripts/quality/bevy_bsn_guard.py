@@ -27,11 +27,33 @@ examples in documentation cannot satisfy or trip the rule accidentally.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+
+
+def load_shared_scene_owner():
+    """Import the vendored zhuge-ui-kit scene executor beside this guard."""
+
+    owner_path = Path(__file__).with_name("bevy_scene_gate.py")
+    spec = importlib.util.spec_from_file_location("bevy_scene_gate", owner_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load shared scene executor: {owner_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+scene_owner = load_shared_scene_owner()
+mask_noncode = scene_owner.mask_noncode
+line_number = scene_owner.line_number
+scene_spans = scene_owner.scene_spans
+inside_scene = scene_owner.inside_scene
+matching_paren = scene_owner.matching_paren
 
 
 BSN_START = re.compile(r"\bbsn!\s*\{")
@@ -62,135 +84,6 @@ class Violation:
     detail: str
 
 
-def _blank(chars: list[str], start: int, end: int) -> None:
-    """Replace a non-code range with spaces while retaining line endings."""
-
-    for index in range(start, min(end, len(chars))):
-        if chars[index] not in "\r\n":
-            chars[index] = " "
-
-
-def mask_rust(text: str) -> str:
-    """Mask comments and literals without changing offsets or line numbers."""
-
-    chars = list(text)
-    length = len(text)
-    index = 0
-    block_depth = 0
-    while index < length:
-        pair = text[index : index + 2]
-        if block_depth:
-            if pair == "/*":
-                _blank(chars, index, index + 2)
-                block_depth += 1
-                index += 2
-            elif pair == "*/":
-                _blank(chars, index, index + 2)
-                block_depth -= 1
-                index += 2
-            else:
-                _blank(chars, index, index + 1)
-                index += 1
-            continue
-
-        if pair == "//":
-            end = text.find("\n", index)
-            _blank(chars, index, length if end < 0 else end)
-            index = length if end < 0 else end
-            continue
-        if pair == "/*":
-            _blank(chars, index, index + 2)
-            block_depth = 1
-            index += 2
-            continue
-
-        raw = re.match(r"(?:br|r)(#+)?\"", text[index:])
-        if raw:
-            hashes = raw.group(1) or ""
-            content_start = index + len(raw.group(0))
-            terminator = f'"{hashes}'
-            end = text.find(terminator, content_start)
-            end = length if end < 0 else end + len(terminator)
-            _blank(chars, index, end)
-            index = end
-            continue
-
-        if text[index] == '"':
-            end = index + 1
-            escaped = False
-            while end < length:
-                current = text[end]
-                if current == "\n" and not escaped:
-                    break
-                if current == '"' and not escaped:
-                    end += 1
-                    break
-                if current == "\\" and not escaped:
-                    escaped = True
-                else:
-                    escaped = False
-                end += 1
-            _blank(chars, index, end)
-            index = end
-            continue
-
-        # A Rust character literal can contain braces. A lifetime (`'name`)
-        # has no closing quote and is intentionally left as code.
-        if text[index] == "'":
-            end = index + 1
-            escaped = False
-            while end < length and text[end] not in "\r\n":
-                current = text[end]
-                if current == "'" and not escaped:
-                    end += 1
-                    _blank(chars, index, end)
-                    index = end
-                    break
-                if current == "\\" and not escaped:
-                    escaped = True
-                else:
-                    escaped = False
-                end += 1
-            else:
-                index += 1
-            continue
-
-        index += 1
-    return "".join(chars)
-
-
-def line_number(text: str, offset: int) -> int:
-    return text.count("\n", 0, offset) + 1
-
-
-def scene_spans(masked: str) -> tuple[list[tuple[int, int]], list[int]]:
-    """Return balanced ``bsn! { ... }`` spans and unbalanced start offsets."""
-
-    spans: list[tuple[int, int]] = []
-    unbalanced: list[int] = []
-    for match in BSN_START.finditer(masked):
-        opening = masked.find("{", match.start(), match.end())
-        depth = 0
-        closing = None
-        for index in range(opening, len(masked)):
-            if masked[index] == "{":
-                depth += 1
-            elif masked[index] == "}":
-                depth -= 1
-                if depth == 0:
-                    closing = index + 1
-                    break
-        if closing is None:
-            unbalanced.append(match.start())
-        else:
-            spans.append((match.start(), closing))
-    return spans, unbalanced
-
-
-def inside_scene(offset: int, spans: list[tuple[int, int]]) -> bool:
-    return any(start <= offset < end for start, end in spans)
-
-
 def in_return_position(masked: str, start: int) -> bool:
     """A ``Type {`` match right after ``->`` is a signature, not construction.
 
@@ -203,18 +96,6 @@ def in_return_position(masked: str, start: int) -> bool:
     return before.rstrip().endswith("->")
 
 
-def matching_paren(masked: str, opening: int) -> int | None:
-    depth = 0
-    for index in range(opening, len(masked)):
-        if masked[index] == "(":
-            depth += 1
-        elif masked[index] == ")":
-            depth -= 1
-            if depth == 0:
-                return index
-    return None
-
-
 def rust_files(root: Path) -> list[Path]:
     if root.is_file():
         return [root] if root.suffix == ".rs" else []
@@ -223,7 +104,7 @@ def rust_files(root: Path) -> list[Path]:
 
 def scan_file(path: Path, repository: Path) -> list[Violation]:
     original = path.read_text(encoding="utf-8")
-    masked = mask_rust(original)
+    masked = mask_noncode(original)
     spans, unbalanced = scene_spans(masked)
     relative = path.relative_to(repository).as_posix()
     violations: list[Violation] = []

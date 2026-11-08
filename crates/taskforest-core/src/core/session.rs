@@ -10,6 +10,21 @@ pub enum SessionControlAction {
     Lock,
 }
 
+impl SessionControlAction {
+    /// Locale-catalog key for this session verb (`users.disconnect` …).
+    ///
+    /// The core layer stays copy-free: the key is the vocabulary, and the
+    /// application i18n owner is the single place where a key meets the
+    /// active language.
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Disconnect => "users.disconnect",
+            Self::Lock => "users.lock",
+        }
+    }
+}
+
 /// OS-owned facts that identify one login lifetime independently of a
 /// renderer refresh or display field.
 ///

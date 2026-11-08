@@ -48,6 +48,7 @@ use contrast::calibrate_muted_ink;
 use figures::TabularFigures;
 use resize::ColumnWidthNode;
 use selection::CellSelection;
+use zhuge_ui_core::easing::lerp;
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct ZeroValueCell(pub(crate) bool);
@@ -181,8 +182,7 @@ pub(crate) fn distribute_column_widths_with_overrides(
         base_widths
             .iter()
             .map(|&base| {
-                let shrunk =
-                    LAYOUT_MIN_COLUMN_WIDTH_PX + (base - LAYOUT_MIN_COLUMN_WIDTH_PX) * factor;
+                let shrunk = lerp(LAYOUT_MIN_COLUMN_WIDTH_PX, base, factor);
                 clamp_column_width(shrunk)
             })
             .collect()
@@ -198,34 +198,6 @@ pub(crate) fn rows_in_viewport(viewport_height_px: f32, row_height_px: f32) -> u
         return 0;
     }
     (viewport_height_px / row_height_px).floor() as usize
-}
-
-/// Half-open visible row range `[first, last)` over a row space of `total`
-/// rows with `viewport_rows` capacity at scroll offset `scroll_top` (the
-/// index of the first row the caller asked to show).
-///
-/// Clamping contract: an empty table or zero-capacity viewport yields an
-/// empty window; a scroll offset past the end pins to the last full page
-/// (never an empty tail window, never an out-of-bounds range).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct RowWindow {
-    pub(crate) first: usize,
-    pub(crate) last: usize,
-}
-
-/// Compute the visible [`RowWindow`]. Pure; the M1 virtual scroller feeds it
-/// `total` from the shell projection and `scroll_top` from its scroll state.
-pub(crate) fn row_window(total: usize, viewport_rows: usize, scroll_top: usize) -> RowWindow {
-    if total == 0 || viewport_rows == 0 {
-        return RowWindow::default();
-    }
-    let visible = viewport_rows.min(total);
-    let max_top = total - visible;
-    let first = scroll_top.min(max_top);
-    RowWindow {
-        first,
-        last: first + visible,
-    }
 }
 
 /// One header cell's pure label: the column's own word. Sort direction is a
@@ -503,7 +475,7 @@ fn cell_scene(cell: CellRender<'_>, palette: Option<&UiPalette>) -> impl Scene +
 /// Whether a value reads as a measured zero (the dimming policy's input).
 /// A missing value is a dash, never a zero.
 fn is_zero_value(text: &str) -> bool {
-    matches!(text, "0" | "0.0%" | "0 B" | "0 B/s" | "0.0 B/s")
+    matches!(text, "0" | "0%" | "0.0%" | "0 B" | "0 B/s" | "0.0 B/s")
 }
 
 fn header_cells(

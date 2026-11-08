@@ -9,6 +9,7 @@ use taskforest_core::core::metrics::ScalarAvailability;
 use taskforest_core::core::process::ProcessCategory;
 use taskforest_core::core::session::SessionControlAction;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::system_timeline::SystemPageSection;
@@ -23,10 +24,7 @@ use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_direct_memory_inventory;
 
 use super::super::capture::session_control_fixture;
-use super::super::{
-    CaptureProcessAction, ProcessDetailsSection, RootView, SelectedDevice, TopPage,
-    WindowSurfaceKind,
-};
+use super::super::{CaptureProcessAction, RootView, SelectedDevice, TopPage, WindowSurfaceKind};
 
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::process_category_projection::category_expansion_key;

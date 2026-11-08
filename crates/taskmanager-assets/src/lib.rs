@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 use std::borrow::Cow;
+use taskforest_core::tray::{TrayIconData, TrayIconError};
 
 /// Stable user-facing product identity.
 ///
@@ -38,6 +39,16 @@ pub const PRODUCT_TRAY_ICON_SIZE: u32 = 22;
 #[must_use]
 pub fn product_tray_icon_rgba() -> &'static [u8] {
     include_bytes!("../assets/product/taskforest-tray-22.rgba")
+}
+
+/// Deterministic 22×22 RGBA product tray icon data. The native adapters all
+/// consume the same validated bytes, so frontends do not drift visually.
+pub fn product_tray_icon_data() -> Result<TrayIconData, TrayIconError> {
+    TrayIconData::from_rgba(
+        product_tray_icon_rgba().to_vec(),
+        PRODUCT_TRAY_ICON_SIZE,
+        PRODUCT_TRAY_ICON_SIZE,
+    )
 }
 
 /// Canonical TaskForest official product brand logo in scalable vector SVG format.

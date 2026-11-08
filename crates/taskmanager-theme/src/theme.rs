@@ -675,14 +675,14 @@ impl Theme {
 
     /// Accent-gradient START stop: the accent lifted 14% toward white — the
     /// brighter top edge of a Mission Center primary-button gradient.
+    ///
+    /// This is [`mix`] toward white with the accent's own alpha as the target
+    /// alpha, so the blend formula stays the token owner's and the stop still
+    /// keeps `accent.a` rather than fading toward opaque. The arithmetic is the
+    /// same term order the hand-spelled channels used, so every channel is
+    /// bit-for-bit unchanged.
     pub const fn gradient_from(self) -> Color {
-        let lift = 0.14;
-        Color::new(
-            self.accent.r + (1.0 - self.accent.r) * lift,
-            self.accent.g + (1.0 - self.accent.g) * lift,
-            self.accent.b + (1.0 - self.accent.b) * lift,
-            self.accent.a,
-        )
+        mix(self.accent, Color::WHITE.with_alpha(self.accent.a), 0.14)
     }
 
     /// The resolved glass layer for `tier`. The light-mode outline uses the

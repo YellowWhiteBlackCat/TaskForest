@@ -3,6 +3,7 @@ use super::smart::smart_self_test_failure_i18n_key;
 use super::{bytes, device_status_i18n_key, fan_rpm, power_w_precise, temperature_c_precise};
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskforest_core::core::storage_health::{FilesystemHealthSnapshot, FilesystemHealthStatus};
 use taskforest_core::core::system_health::SmartSelfTestObservation;
@@ -57,8 +58,8 @@ pub fn storage_groups(
                     let free = disk.current_available_bytes()?;
                     (total > 0).then(|| {
                         format!(
-                            "{:.1}% · {} {}",
-                            100.0 * total.saturating_sub(free) as f64 / total as f64,
+                            "{} · {} {}",
+                            percent_text(100.0 * total.saturating_sub(free) as f64 / total as f64),
                             bytes(free),
                             t("health.free")
                         )
@@ -148,7 +149,7 @@ pub fn storage_groups(
                 report
                     .report
                     .progress_pct
-                    .map(|value| format!("{value:.0}%"))
+                    .map(percent_text)
                     .unwrap_or_else(missing),
             ),
             row(

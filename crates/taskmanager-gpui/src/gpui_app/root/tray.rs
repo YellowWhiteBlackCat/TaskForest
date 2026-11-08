@@ -15,58 +15,21 @@ use std::sync::mpsc::channel;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 
 use gpui::{AnyWindowHandle, App, Entity};
+use taskforest_contract::{TrayController, TrayControllerTarget, sync_tray_pause_checkmark};
 use taskforest_core::core::tray::{
-    TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
-    TraySpecError,
+    TRAY_ACTION_PAUSE, TRAY_ACTION_QUIT, TRAY_ACTION_SHOW, TrayEvent, TrayIntent, TrayMenuItem,
+    TrayMenuSpec, TraySpec, TraySpecError, resolve_tray_action,
 };
 use taskmanager_app_host::spawn_tray;
-use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
+use taskmanager_assets::{product, product_tray_icon_data};
 use tracing::warn;
 
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::i18n;
 
-/// Stable tray menu action ids. Shared with the (frontend-local) mapping;
-/// never collide across frontends because the id space is per-tray.
-pub const TRAY_ACTION_SHOW: TrayActionId = 1;
-pub const TRAY_ACTION_PAUSE: TrayActionId = 2;
-pub const TRAY_ACTION_QUIT: TrayActionId = 3;
-
-/// Frontend intent behind a tray menu activation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TrayIntent {
-    /// Bring the main window back to the foreground.
-    ShowWindow,
-    /// Invert the manual refresh pause (mirrors `AppAction::TogglePause`).
-    TogglePause,
-    /// Quit the application.
-    Quit,
-}
-
-/// Pure mapping from a tray action id to the frontend intent.
-#[must_use]
-pub fn resolve_tray_action(id: TrayActionId) -> Option<TrayIntent> {
-    match id {
-        TRAY_ACTION_SHOW => Some(TrayIntent::ShowWindow),
-        TRAY_ACTION_PAUSE => Some(TrayIntent::TogglePause),
-        TRAY_ACTION_QUIT => Some(TrayIntent::Quit),
-        _ => None,
-    }
-}
-
-/// The branded 22×22 tray asset shared with the Iced frontend and regenerated
-/// from the same SVG that owns Linux, macOS and Windows application icons.
-pub fn tray_icon_pixels() -> Result<TrayIconData, TrayIconError> {
-    TrayIconData::from_rgba(
-        product_tray_icon_rgba().to_vec(),
-        PRODUCT_TRAY_ICON_SIZE,
-        PRODUCT_TRAY_ICON_SIZE,
-    )
-}
-
 /// Build the localized tray spec. `paused` seeds the refresh checkmark.
 pub fn build_tray_spec(paused: bool) -> Result<TraySpec, TraySpecError> {
-    let icon = tray_icon_pixels().map_err(TraySpecError::Icon)?;
+    let icon = product_tray_icon_data().map_err(TraySpecError::Icon)?;
     let menu = TrayMenuSpec::from_items(vec![
         TrayMenuItem::Action {
             id: TRAY_ACTION_SHOW,
@@ -175,10 +138,9 @@ fn toggle_pause_from_tray(view: &mut RootView) {
     sync_tray_pause_checkmark(view, next);
 }
 
-/// Keep the tray checkmark in sync with the manual-pause state.
-pub(crate) fn sync_tray_pause_checkmark(view: &RootView, paused: bool) {
-    if let Some(tray) = view.tray_controller.as_ref() {
-        let _ = tray.set_item_checked(TRAY_ACTION_PAUSE, paused);
+impl TrayControllerTarget for RootView {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        self.tray_controller.as_deref()
     }
 }
 

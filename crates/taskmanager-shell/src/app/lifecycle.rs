@@ -2,6 +2,10 @@
 
 use super::ShellApp;
 use std::time::Duration;
+use taskmanager_application::i18n;
+use taskmanager_application::window_capture::{
+    WindowCaptureNotice, WindowCaptureNoticeLifecycle, WindowCaptureNoticeSeverity,
+};
 use taskmanager_application::{
     ServiceControlOutcome, SessionControlOutcome, StartupControlOutcome,
 };
@@ -449,6 +453,41 @@ impl ShellApp {
             .reduce(ShellLifecycleEvent::Feedback(FeedbackEvent::SetActivity(
                 text.into(),
             )));
+    }
+
+    /// Bind one typed window-capture notice to this shell's feedback line.
+    ///
+    /// Severity, lifetime and copy come from the application owner; the shell
+    /// owns the feedback vocabulary, so this mapping has exactly one address.
+    /// Two frontends used to carry byte-identical copies of this match.
+    pub fn report_window_capture_notice(&mut self, notice: &WindowCaptureNotice) {
+        let severity = match notice.severity() {
+            WindowCaptureNoticeSeverity::Info => FeedbackSeverity::Info,
+            WindowCaptureNoticeSeverity::Warning => FeedbackSeverity::Warning,
+            WindowCaptureNoticeSeverity::Error => FeedbackSeverity::Error,
+            WindowCaptureNoticeSeverity::Success => FeedbackSeverity::Success,
+        };
+        let lifecycle = match notice.lifecycle() {
+            WindowCaptureNoticeLifecycle::Short => FeedbackLifecycle::TIMED_SHORT,
+            WindowCaptureNoticeLifecycle::Long => FeedbackLifecycle::TIMED_LONG,
+        };
+        let text = match notice {
+            WindowCaptureNotice::Unavailable => i18n::t("window_capture.unavailable").to_string(),
+            WindowCaptureNotice::Queued => i18n::t("window_capture.queued").to_string(),
+            WindowCaptureNotice::Busy => i18n::t("window_capture.busy").to_string(),
+            WindowCaptureNotice::Ready {
+                destination,
+                width,
+                height,
+            } => i18n::t("window_capture.success")
+                .replacen("{}", destination.as_ref(), 1)
+                .replacen("{}", &width.to_string(), 1)
+                .replacen("{}", &height.to_string(), 1),
+            WindowCaptureNotice::Failed(detail) => {
+                i18n::t("window_capture.failed").replace("{}", detail)
+            }
+        };
+        self.report_notice(FeedbackSource::Persistence, severity, lifecycle, text);
     }
 
     pub fn report_notice(

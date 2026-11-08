@@ -10,6 +10,7 @@ use super::*;
 use bevy::app::App;
 use bevy::ecs::query::With;
 use bevy::ui::widget::Text;
+use taskforest_core::core::alerts::AlertSeverity;
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
 use taskmanager_theme::Theme;
 use taskmanager_theme::palette::{SeverityLevel, severity_palette};

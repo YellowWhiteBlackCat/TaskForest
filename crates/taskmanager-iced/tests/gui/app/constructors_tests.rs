@@ -1,6 +1,5 @@
 use super::super::capture_state::{CaptureDataTarget, capture_device_from_name};
 use super::{IcedApp, apply_capture_target, capture_page_from_name};
-use crate::app::DetailsSection;
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
 use taskforest_core::core::config::Config;
@@ -10,6 +9,7 @@ use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::ConfigClient;
 use taskmanager_application::ConfigCoordinator;
 use taskmanager_application::ConfigDrain;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{AppPage, ConfirmationKind};
 use taskmanager_application::{ConfigStore, PlatformClient};
@@ -317,17 +317,17 @@ fn additional_capture_targets_open_expected_surfaces() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-details");
     assert!(app.shell.process_properties_target().is_some());
-    assert_eq!(app.details_section(), DetailsSection::Overview);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Overview);
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-properties-performance");
     assert!(app.shell.process_properties_target().is_some());
-    assert_eq!(app.details_section(), DetailsSection::Performance);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Performance);
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-insights");
     assert!(app.shell.process_properties_target().is_some());
-    assert_eq!(app.details_section(), DetailsSection::Insights);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Insights);
     assert!(app.shell.projection().process_insights.is_some());
 
     let mut app = IcedApp::demo();
@@ -340,7 +340,7 @@ fn additional_capture_targets_open_expected_surfaces() {
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-command");
     assert!(app.shell.process_properties_target().is_some());
-    assert_eq!(app.details_section(), DetailsSection::Command);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Command);
 
     let mut app = IcedApp::demo();
     apply_capture_target(&mut app, "process-end-confirm");

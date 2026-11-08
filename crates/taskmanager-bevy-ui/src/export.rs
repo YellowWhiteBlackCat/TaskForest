@@ -9,39 +9,6 @@ use taskforest_core::core::export::{
 };
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::process::ProcessItem;
-use taskmanager_shell::presentation::{bytes, missing_value};
-
-/// Format a single process item as tab-separated values (TSV).
-#[must_use]
-pub fn process_to_tsv(process: &ProcessItem) -> String {
-    let user = process.current_user().unwrap_or_else(missing_value);
-    let cpu = process
-        .current_cpu_percentage()
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
-    let memory = process
-        .current_memory_bytes()
-        .map_or_else(missing_value, bytes);
-    format!(
-        "{}\t{}\t{}\t{}\t{}\t{}",
-        process.pid,
-        process.name,
-        cpu,
-        memory,
-        if user.is_empty() { "—" } else { &user },
-        process.status,
-    )
-}
-
-/// Format multiple processes as multi-row TSV with a header.
-#[must_use]
-pub fn processes_to_tsv(processes: &[ProcessItem]) -> String {
-    let mut output = String::from("PID\tName\tCPU\tMemory\tUser\tStatus\n");
-    for proc in processes {
-        output.push_str(&process_to_tsv(proc));
-        output.push('\n');
-    }
-    output
-}
 
 /// Export a system snapshot and processes to JSON string.
 #[must_use]

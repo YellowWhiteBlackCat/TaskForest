@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "gate": {
+    "source": "zhuge-ui-kit:crates/zhuge-ui-core/tools/check_interval_normalization.py",
+    "sha256": "34f6ca62a92fffa8e9eb02436f8bca107b0334b0020506a7c223a862170970a5"
+  },
+  "entries": {}
+}

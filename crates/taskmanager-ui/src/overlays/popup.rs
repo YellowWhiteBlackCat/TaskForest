@@ -567,7 +567,7 @@ impl Render for PopupMenuState {
         deferred(
             anchored()
                 .position(self.position)
-                .snap_to_window_with_margin(px(8.0))
+                .snap_to_window_with_margin(crate::theme_binding::pixels(tokens::SPACE_8))
                 .child(container),
         )
         .with_priority(1)

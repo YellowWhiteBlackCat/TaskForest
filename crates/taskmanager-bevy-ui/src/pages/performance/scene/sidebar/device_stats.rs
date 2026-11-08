@@ -14,6 +14,7 @@ use bevy::scene::{Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{AlignItems, FlexDirection, Node, UiRect, Val, percent, rem};
 use bevy::ui::widget::Text;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
@@ -27,7 +28,7 @@ pub(super) fn capped_stats_rows(
     if rows.len() > MAX_VISIBLE_STATS_ROWS {
         let omitted = rows.len() - (MAX_VISIBLE_STATS_ROWS - 1);
         rows.truncate(MAX_VISIBLE_STATS_ROWS - 1);
-        let label = t("common.more_rows").replace("{count}", &omitted.to_string());
+        let label = i18n::more_rows_label(omitted);
         rows.push(Box::new(bsn! {
             Node {
                 width: percent(100),

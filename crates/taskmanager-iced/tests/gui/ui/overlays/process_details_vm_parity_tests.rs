@@ -80,7 +80,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
     );
     assert_eq!(
         vm_text(&vm, ProcessDetailsField::AnonHugePages),
-        "64.0 MiB (64.0% RSS)"
+        "64.0 MiB (64% RSS)"
     );
 
     // The renderer's row fold carries the same observed counters (the output
@@ -98,7 +98,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
     );
     assert_eq!(
         value(ProcessDetailsField::AnonHugePages),
-        Some("64.0 MiB (64.0% RSS)")
+        Some("64.0 MiB (64% RSS)")
     );
 }
 

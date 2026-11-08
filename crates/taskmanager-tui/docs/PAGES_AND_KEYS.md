@@ -5,6 +5,22 @@ to search, `F5` to refresh, and `Ctrl+Space` to pause. `Delete` opens an
 identity-frozen confirmation; only `y` after that confirmation can submit an
 end-task effect.
 
+On table pages, a finite Vi/Vim chord layer adds `gg` for the first row, `G`
+for the last row, `dd` to clear marked batch rows, and `/` to focus the page's
+search field. The sequences are contextual: the first key is only consumed if
+no existing shared/shell/local command or Applications prefix jump already
+owns that character, and a pending chord cancels on a different page, device,
+surface, or any unrelated key. `dd` is a presentation-only clear of batch
+marks; it never terminates a process or submits an effect. This layer is
+stateful and idempotent; replaying a completed sequence returns to its target
+without leaking state.
+
+The trend component retains its one-cell Unicode and ASCII ladders and adds an
+opt-in `TuiSparklineMode::Braille16`: two stacked Unicode Braille rows encode
+one 2×8 dot field per cell, with exact left/right dot masks, finite-only
+normalization and preserved gap cells. No existing trend caller switches mode,
+so established frames and behavior tests remain unchanged.
+
 The Applications page uses one hierarchy: Applications, Background and
 Uncategorized category headers; Applications then exposes PID-less selectable
 application roots before their recursive process trees, while the other

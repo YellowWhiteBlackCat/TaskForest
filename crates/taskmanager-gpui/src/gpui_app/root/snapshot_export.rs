@@ -6,6 +6,7 @@ use taskmanager_application::i18n::t;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::process::ProcessItem;
 use taskmanager_app_host::SnapshotExportClient;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::snapshot_export::{
     SnapshotExportPayload, SnapshotExportSession, SnapshotExportState, SnapshotExportSubmitError,
     SnapshotExportTarget,
@@ -16,25 +17,7 @@ use tracing::{info, warn};
 
 use super::RootView;
 
-#[derive(Debug, Default)]
-pub(crate) enum SnapshotExportRuntime {
-    #[default]
-    Unavailable,
-    Active(SnapshotExportSession<SnapshotExportClient>),
-}
-
-impl SnapshotExportRuntime {
-    pub(crate) fn install(&mut self, client: SnapshotExportClient) {
-        *self = Self::Active(SnapshotExportSession::new(client));
-    }
-
-    fn active_mut(&mut self) -> Option<&mut SnapshotExportSession<SnapshotExportClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(crate) type SnapshotExportRuntime = SessionSlot<SnapshotExportSession<SnapshotExportClient>>;
 
 impl RootView {
     pub(crate) fn request_snapshot_export(

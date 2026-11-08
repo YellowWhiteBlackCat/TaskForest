@@ -12,7 +12,7 @@ use taskmanager_application::first_run::FirstRunPhase;
 
 impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     pub(super) fn product_modal(&mut self, press: KeyPress) -> bool {
-        let Some(surface) = self.surface.and_then(|surface| surface.0.as_ref()) else {
+        let Some(surface) = self.surface.and_then(|surface| surface.active()) else {
             return false;
         };
         if press.modifiers.control || press.modifiers.alt || press.modifiers.platform {

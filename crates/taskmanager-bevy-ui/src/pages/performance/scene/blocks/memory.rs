@@ -17,6 +17,7 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::window::{PrimaryWindow, Window};
 use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments};
 use taskmanager_ui_contract::IconId;
@@ -118,7 +119,7 @@ pub(super) fn segment_row_scene(
                 column_gap: Val::Px(space_8()),
             }
             Children [
-                Node { width: rem(2.75), flex_shrink: 0.0 } Children [ Text(format!("{segment_percent:>4.0}%")) TextRole(Role::Caption) ] --
+                Node { width: rem(2.75), flex_shrink: 0.0 } Children [ Text(format!("{:>4}", percent_text(segment_percent))) TextRole(Role::Caption) ] --
                 Text(value) TextRole(Role::Mono) crate::pages::performance::DynText(DynField::Segment(kind))
             ]
         ]

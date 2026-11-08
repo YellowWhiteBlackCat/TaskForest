@@ -17,6 +17,7 @@ publish = false
 # (ADR-026).
 
 [dependencies]
+zhuge-ui-tokens.workspace = true
 
 [lib]
 name = "taskmanager_theme"

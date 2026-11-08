@@ -11,6 +11,7 @@ use taskmanager_shell::presentation::cpu_topology_summary;
 use taskmanager_shell::presentation::load_average_basis_summary;
 use taskmanager_shell::presentation::load_average_values_summary;
 use taskmanager_shell::presentation::msr_thermal_status_summary;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_shell::presentation::pressure_summary;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

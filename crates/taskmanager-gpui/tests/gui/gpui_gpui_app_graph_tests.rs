@@ -10,16 +10,18 @@
 // the std built-in.
 use super::cache::GraphPresentationCache;
 use super::hover::sample_index_at_cursor_x;
-use super::slide::{GRAPH_SLIDE_DURATION, slide_progress_value, slide_timing_for};
+use super::slide::{slide_progress_value, slide_timing_for};
 use super::{
     GraphOpts, GraphSampleState, GraphSettings, MAX_GRAPH_DATA_POINTS, MIN_GRAPH_DATA_POINTS,
     SMOOTH_TENSION, catmull_rom_controls, compute_column_count, finite_sample_runs,
     graph_sample_state, graph_slide_spacing, latest_finite_sample, latest_samples_rc, sample_x,
     sample_x_slide,
 };
-use gpui::{Bounds, ElementId, Pixels, point, px, size};
+use gpui::{Bounds, ElementId, Pixels, ease_in_out, point, px, size};
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use taskmanager_ui_contract::presentation::motion::{CHART_SLIDE_DURATION, chart_slide_ramp};
+use zhuge_ui_core::easing::transition_progress;
 
 /// Keep graph pixels, hover lookup, and summary statistics on the same newest
 /// sample window. Empty/gap samples are retained; only the time-axis prefix is
@@ -501,21 +503,41 @@ fn full_graph_slide_ignores_unrelated_revision_and_fresh_allocations() {
 fn slide_progress_is_monotonic_and_settles_after_duration() {
     let start = Instant::now();
     assert_eq!(slide_progress_value(start, start), 0.0);
-    let quarter = slide_progress_value(start, start + GRAPH_SLIDE_DURATION / 4);
-    let half = slide_progress_value(start, start + GRAPH_SLIDE_DURATION / 2);
+    let quarter = slide_progress_value(start, start + CHART_SLIDE_DURATION / 4);
+    let half = slide_progress_value(start, start + CHART_SLIDE_DURATION / 2);
     assert!(
         (0.0..1.0).contains(&quarter) && (0.0..1.0).contains(&half) && half > quarter,
         "progress must ease monotonically through the animation"
     );
     assert_eq!(
-        slide_progress_value(start, start + GRAPH_SLIDE_DURATION),
+        slide_progress_value(start, start + CHART_SLIDE_DURATION),
         1.0
     );
     assert_eq!(
-        slide_progress_value(start, start + GRAPH_SLIDE_DURATION * 2),
+        slide_progress_value(start, start + CHART_SLIDE_DURATION * 2),
         1.0,
         "a settled slide must stay settled forever"
     );
+}
+
+/// Folding the slide ramp into the shared owner must not move one pixel: the
+/// owner's curve is bit-identical to the toolkit `ease_in_out` this surface
+/// used before, over every progress the shared duration can actually produce.
+/// If the toolkit ever re-shapes its preset, this test fails loudly instead of
+/// the release surface silently drifting away from the Iced charts.
+#[test]
+fn the_shared_slide_ramp_reproduces_the_toolkit_easing_bit_for_bit() {
+    for microsecond in 0..=(CHART_SLIDE_DURATION.as_micros() as u32) {
+        let raw = transition_progress(
+            Duration::from_micros(u64::from(microsecond)),
+            CHART_SLIDE_DURATION,
+        );
+        assert_eq!(
+            chart_slide_ramp(raw).to_bits(),
+            ease_in_out(raw).to_bits(),
+            "the ramp diverged from the toolkit preset at {microsecond} µs"
+        );
+    }
 }
 
 /// A full ring must keep ONE stable tail-slice allocation across frames;
@@ -590,9 +612,10 @@ fn latest_samples_rc_tail_cuts_like_limit_samples() {
 
 // ── two-series graphs (split-direction throughput families) ────────────────
 
+use super::dual_series_colors;
 use super::hover::multi_series_hover_text;
-use super::{SECONDARY_TINT_LIFT, dual_series_colors};
 use gpui::Rgba;
+use taskmanager_theme::palette::tint_channel_toward_white;
 
 // test-intent: behavior
 /// The secondary series color is the family token lifted toward white by the
@@ -617,7 +640,7 @@ fn dual_series_colors_tint_the_secondary_toward_white_only() {
         (base.g, secondary.g),
         (base.b, secondary.b),
     ] {
-        let expected = channel + (1.0 - channel) * SECONDARY_TINT_LIFT;
+        let expected = tint_channel_toward_white(channel);
         assert!(
             (lifted - expected).abs() < 1e-6,
             "the secondary channel must be exactly the lift of the token"
@@ -734,4 +757,39 @@ fn recorded_short_windows_span_both_edges_and_signed_measurements_keep_their_ran
         throughput.normalized(2_000_000.0) < throughput.normalized(21_000_000.0),
         "byte-rate curves cannot all clamp to the top of a percentage axis"
     );
+}
+
+/// An axis that cannot travel still has a side: this surface parks a sample at
+/// or below the floor on the baseline and a sample above it on the top edge.
+/// The answer is declared by the surface, and every division goes through the
+/// projection's owner.
+#[test]
+fn a_zero_travel_axis_reads_the_side_the_sample_sits_on() {
+    let flat_axis = GraphOpts {
+        min: 20.0,
+        max: 20.0,
+        ..GraphOpts::default()
+    };
+    assert_eq!(flat_axis.normalized(20.0), 0.0);
+    assert_eq!(flat_axis.normalized(0.0), 0.0);
+    assert_eq!(flat_axis.normalized(40.0), 1.0);
+
+    // An inverted declaration canonicalises to the floor before it is asked.
+    let inverted = GraphOpts {
+        min: 30.0,
+        max: 10.0,
+        ..GraphOpts::default()
+    };
+    assert_eq!(inverted.normalized(30.0), 0.0);
+    assert_eq!(inverted.normalized(31.0), 1.0);
+
+    // A non-finite declared bound collapses the axis to the floor, which is the
+    // same shape the surface drew before the projection was shared.
+    let unbounded = GraphOpts {
+        min: f32::NAN,
+        max: f32::NAN,
+        ..GraphOpts::default()
+    };
+    assert_eq!(unbounded.normalized(0.0), 0.0);
+    assert_eq!(unbounded.normalized(50.0), 1.0);
 }

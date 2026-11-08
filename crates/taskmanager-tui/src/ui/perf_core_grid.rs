@@ -24,9 +24,13 @@ use ratatui::widgets::Paragraph;
 use taskforest_core::core::hardware::CpuType;
 use taskforest_core::core::metrics::CpuMetrics;
 use taskmanager_application::i18n::t;
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::load_tiers::{LoadTier, load_tier};
 
-use super::sparkline::{recent_window_with, sparkline_in};
+use super::sparkline::sparkline_in;
 use crate::{TuiApp, TuiGlyphMode, TuiTheme};
+use taskmanager_shell::presentation::latest_samples;
+use zhuge_ui_core::row_page::{RowPage, page_count};
 
 /// Width of one grid cell: three-character core label + space + six-character
 /// trend + space + the widest three-segment readout ("100% · 4.94 GHz ·
@@ -36,11 +40,6 @@ const CELL_WIDTH: u16 = 37;
 /// Samples in one cell's mini trend (the most-recent window of the shared
 /// per-core ring), right-aligned so every trend ends at the readout edge.
 const CELL_TREND_CHARS: usize = 6;
-
-/// Load-tier band edges (percent). Below [`WARN_EDGE`] is green, up to
-/// [`DANGER_EDGE`] is amber, above is red.
-const WARN_EDGE: f32 = 60.0;
-const DANGER_EDGE: f32 = 85.0;
 
 /// The typed group presentation order, mirroring gpui's per-core matrix.
 const GROUP_ORDER: [CpuType; 4] = [
@@ -69,7 +68,7 @@ impl CoreGroup {
 
     /// Header line plus the cell rows the group's cores occupy.
     fn line_count(&self, cols: usize) -> usize {
-        1 + self.indices.len().div_ceil(cols)
+        1 + page_count(self.indices.len(), cols)
     }
 }
 
@@ -86,7 +85,7 @@ pub(super) fn grid_height(app: &TuiApp, width: u16) -> u16 {
     let cols = columns_for(width);
     let lines = match topology_groups(app, cores) {
         Some(groups) => groups.iter().map(|group| group.line_count(cols)).sum(),
-        None => cores.div_ceil(cols),
+        None => page_count(cores, cols),
     };
     lines as u16 + 1
 }
@@ -141,10 +140,10 @@ pub(super) fn render_core_grid(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTh
     }
 
     let visible_rows = usize::from(area.height.saturating_sub(1));
-    let start = app
-        .cpu_core_scroll
-        .min(lines.len().saturating_sub(visible_rows.max(1)));
-    let end = (start + visible_rows).min(lines.len());
+    // The shared row-page owner pins the requested scroll into the measured
+    // panel, so the painted slice and the "{}-{}/{}" indicator never disagree.
+    let page = RowPage::pin(lines.len(), visible_rows, app.cpu_core_scroll);
+    let (start, end) = (page.first(), page.last());
     let title = if visible_rows == 0 {
         format!(" {}  ↑↓", t("common.cores"))
     } else if lines.len() > visible_rows {
@@ -163,7 +162,7 @@ pub(super) fn render_core_grid(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTh
         title,
         Style::new().fg(theme.dim),
     )]));
-    paint.extend(lines.into_iter().skip(start).take(visible_rows));
+    paint.extend(lines.into_iter().skip(start).take(page.len()));
     frame.render_widget(Paragraph::new(paint), area);
 }
 
@@ -234,12 +233,12 @@ fn core_cell(
     core_index: usize,
     mode: TuiGlyphMode,
 ) -> CoreCell {
-    let trend = sparkline_in(mode, recent_window_with(samples, CELL_TREND_CHARS));
+    let trend = sparkline_in(mode, latest_samples(samples, CELL_TREND_CHARS));
     let utilization = samples
         .iter()
         .rev()
         .find(|value| value.is_finite())
-        .map(|value| value.clamp(0.0, 100.0));
+        .copied();
     // The three-segment readout folds the core's current typed observations
     // in the page's data layer; paint only joins the trend with it.
     let readout = super::perf_data::core_cell_readout(cpu, core_index);
@@ -250,20 +249,21 @@ fn core_cell(
     }
 }
 
-/// The load-tier color for one core's latest utilization: green below
-/// [`WARN_EDGE`], amber up to [`DANGER_EDGE`], red above — `dim` while no
-/// sample is finite.
+/// The load-tier color for one core's latest utilization. The band edges and
+/// the clamp-and-bucket fold come from the shared load-tier contract, the same
+/// rule the Iced matrix paints; which ink each tier wears and what an
+/// unobserved core looks like stay the terminal's own theme facts.
 fn tier_color(theme: TuiTheme, utilization: Option<f32>) -> Color {
     let Some(pct) = utilization else {
         return theme.dim;
     };
-    let pct = pct.clamp(0.0, 100.0);
-    if pct >= DANGER_EDGE {
-        theme.danger
-    } else if pct >= WARN_EDGE {
-        theme.warn
-    } else {
-        theme.good
+    match load_tier(FrontendShape::Tui, pct) {
+        Some(LoadTier::Alarm) => theme.danger,
+        Some(LoadTier::Warning) => theme.warn,
+        Some(LoadTier::Calm) => theme.good,
+        // The cell already filtered non-finite samples out; a reading the fold
+        // cannot place keeps the unobserved ink rather than inventing a band.
+        None => theme.dim,
     }
 }
 

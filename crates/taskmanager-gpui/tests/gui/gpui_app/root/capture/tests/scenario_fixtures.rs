@@ -10,6 +10,7 @@ use taskforest_core::core::startup::BootTimeline;
 use taskforest_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS;
 use taskforest_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED;
 use taskforest_core::core::startup::segment_deltas;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
 #[test]

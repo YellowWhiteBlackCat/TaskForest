@@ -10,6 +10,7 @@ use taskmanager_theme::tokens;
 use crate::app::Message;
 use crate::theme;
 use crate::ui::components::segmented_fill_style;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::memory::MemSegment;
 use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_shell::memory::SwapBreakdown;
@@ -138,7 +139,7 @@ fn legend_row(
             .height(Length::Fixed(10.0))
             .style(move |_| theme::fill_style(color)),
         container(text(seg.label.to_string()).size(f32::from(tokens::FONT_12))).width(Length::Fill),
-        text(format!("{pct:>4.0}%")).size(f32::from(tokens::FONT_12)),
+        text(format!("{:>4}", percent_text(pct))).size(f32::from(tokens::FONT_12)),
         text(bytes(seg.bytes)).size(f32::from(tokens::FONT_12)),
     )
     .spacing(8)
@@ -152,16 +153,14 @@ fn swap_bar_view(
     swap: &SwapBreakdown,
     theme: &Theme,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    let pct = if swap.total_bytes == 0 {
-        0.0
-    } else {
-        swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0
-    };
+    let pct =
+        (swap.total_bytes > 0).then(|| swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0);
     let mut label = format!(
-        "{}  {} / {}  ({pct:.0}%)",
+        "{}  {} / {}  ({})",
         t("mem.swap"),
         bytes(swap.used_bytes),
         bytes(swap.total_bytes),
+        pct.map_or_else(missing_value, percent_text),
     );
     if let Some(zram) = swap.zram_bytes.filter(|z| *z > 0) {
         label.push_str(&format!("   ·   {} {}", t("mem.zram_swap"), bytes(zram)));

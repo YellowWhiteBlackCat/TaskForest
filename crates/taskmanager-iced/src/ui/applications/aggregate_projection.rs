@@ -6,6 +6,7 @@
 
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ProcessRowAggregate;
@@ -51,7 +52,7 @@ pub(crate) fn project_group_aggregate_cells(
     GroupAggregateCellProjection {
         cpu: aggregate_cell(
             metrics.cpu(),
-            |value| format!("{value:>5.1}%"),
+            |value| format!("{:>5}", precise_percent_text(*value)),
             |value| *value == 0.0,
         ),
         memory: aggregate_cell(

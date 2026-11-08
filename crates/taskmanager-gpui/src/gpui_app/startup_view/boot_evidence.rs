@@ -9,7 +9,6 @@
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative, rems};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
-use taskforest_core::core::startup::StartupCriticalChainNode;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
@@ -24,6 +23,7 @@ use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot,
 };
 use taskmanager_application::i18n;
+use taskmanager_application::{critical_chain_summary, failed_units_summary};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, GlassTier};
@@ -35,62 +35,6 @@ use taskmanager_theme::{Color, GlassTier};
 // non-interactive stat pills. Failures stay typed ("boot evidence
 // unavailable"), a true empty set reads as "no failed units" — never a
 // fabricated zero or a silent absence.
-
-/// Up to this many failed-unit names appear in the summary pill.
-const MAX_FAILED_UNIT_NAMES: usize = 2;
-
-/// Pure value text for the failed-units pill. `None` means the strip is
-/// omitted entirely (evidence not collected yet); otherwise the text is honest
-/// for every typed state: a failure reads "boot evidence unavailable", a true
-/// empty set reads `0`, and a populated set shows the count plus up to
-/// [`MAX_FAILED_UNIT_NAMES`] unit names.
-fn failed_units_summary(evidence: &StartupBootEvidenceSnapshot) -> Option<String> {
-    if evidence.failed_units_failure.is_some() {
-        return Some(i18n::t("startup.evidence_unavailable").to_string());
-    }
-    if evidence.failed_units.is_empty() {
-        return Some("0".to_string());
-    }
-    let names = evidence
-        .failed_units
-        .iter()
-        .take(MAX_FAILED_UNIT_NAMES)
-        .map(|unit| unit.unit.as_str())
-        .collect::<Vec<_>>()
-        .join(" · ");
-    Some(format!("{} · {names}", evidence.failed_units.len()))
-}
-
-/// Pure value text for the critical-chain pill: total measured boot time
-/// across the chain's nodes plus the head unit name.
-fn critical_chain_summary(evidence: &StartupBootEvidenceSnapshot) -> Option<String> {
-    if evidence.critical_chain_failure.is_some() {
-        return Some(i18n::t("startup.evidence_unavailable").to_string());
-    }
-    let measured: Vec<&StartupCriticalChainNode> = evidence
-        .critical_chain
-        .iter()
-        .filter(|node| node.duration_ms.is_some())
-        .collect();
-    if measured.is_empty() {
-        return Some(formatting::missing_value());
-    }
-    let total_ms = measured.iter().fold(0_u64, |sum, node| {
-        sum.saturating_add(node.duration_ms.unwrap_or(0))
-    });
-    let head = measured
-        .first()
-        .map(|node| node.unit.as_str())
-        .unwrap_or("");
-    Some(format!(
-        "{total_ms} ms{}",
-        if head.is_empty() {
-            String::new()
-        } else {
-            format!(" · {head}")
-        }
-    ))
-}
 
 /// Non-interactive boot-evidence strip shown between the controls row and the
 /// table. Renders nothing until a typed evidence snapshot arrives.
@@ -105,7 +49,7 @@ pub(super) fn boot_evidence_strip(
         return div();
     }
     let failed = failed_units_summary(evidence);
-    let chain = critical_chain_summary(evidence);
+    let chain = critical_chain_summary(evidence, &formatting::missing_value());
     let failed_color = if evidence.failed_units.is_empty() {
         theme.fg_dim
     } else {
@@ -142,28 +86,24 @@ pub(super) fn boot_evidence_strip(
         .flex()
         .flex_row()
         .gap(definite_length(tokens::SPACE_4))
-        .child(if let Some(failed) = failed {
+        .child(
             pill(
                 "startup-evidence-failed",
                 i18n::t("startup.failed_units"),
                 &failed,
                 failed_color,
             )
-            .into_any_element()
-        } else {
-            div().into_any_element()
-        })
-        .child(if let Some(chain) = chain {
+            .into_any_element(),
+        )
+        .child(
             pill(
                 "startup-evidence-chain",
                 i18n::t("startup.critical_chain"),
                 &chain,
                 theme.fg,
             )
-            .into_any_element()
-        } else {
-            div().into_any_element()
-        })
+            .into_any_element(),
+        )
 }
 
 // ── boot timeline waterfall (BN-05) ──────────────────────────────────────────

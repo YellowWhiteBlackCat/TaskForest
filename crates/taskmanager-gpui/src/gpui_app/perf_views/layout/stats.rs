@@ -102,7 +102,7 @@ pub(crate) fn stats_panel(
             div()
                 .text_size(font_size(tokens::FONT_11))
                 .text_color(hsla(theme.fg_dim))
-                .child(i18n::t("common.more_rows").replace("{count}", &omitted.to_string())),
+                .child(i18n::more_rows_label(omitted)),
         );
     }
     col

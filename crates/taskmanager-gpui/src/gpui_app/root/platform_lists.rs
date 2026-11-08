@@ -1,11 +1,13 @@
 //! Platform-neutral startup and login-session control glue.
 
-use super::{RootView, platform_submission_time_ms};
+use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
 use gpui::Context;
+use std::time::SystemTime;
 use taskforest_contract::SubmissionErrorKind;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::session::SessionControlAction;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     RefreshRequest, SessionControlOutcome, SessionControlRequest, SessionControlTarget,
@@ -24,7 +26,7 @@ impl RootView {
             .ok_or(FailureKind::TemporarilyUnavailable)
             .and_then(|platform| {
                 platform
-                    .submit_startup_control(request, platform_submission_time_ms())
+                    .submit_startup_control(request, unix_millis(SystemTime::now()))
                     .map(|_| ())
                     .map_err(|error| submission_error_kind(error.kind))
             });
@@ -58,7 +60,7 @@ impl RootView {
             .ok_or(FailureKind::TemporarilyUnavailable)
             .and_then(|platform| {
                 platform
-                    .submit_session_control(request, platform_submission_time_ms())
+                    .submit_session_control(request, unix_millis(SystemTime::now()))
                     .map(|_| ())
                     .map_err(|error| submission_error_kind(error.kind))
             });
@@ -169,10 +171,7 @@ fn startup_action_label(enabled: bool) -> &'static str {
 }
 
 fn session_action_label(action: SessionControlAction) -> &'static str {
-    match action {
-        SessionControlAction::Disconnect => i18n::t("users.disconnect"),
-        SessionControlAction::Lock => i18n::t("users.lock"),
-    }
+    i18n::session_control_action_label(action)
 }
 
 fn session_target(session_id: &str) -> String {

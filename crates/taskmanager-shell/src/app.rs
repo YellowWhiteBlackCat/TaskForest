@@ -70,7 +70,7 @@ pub use self::direct_track::{
 };
 pub use self::selection::selected_rows_range;
 
-use self::effect_dispatch::{MAX_PENDING_NOTIFICATIONS, submission_time_ms};
+use self::effect_dispatch::MAX_PENDING_NOTIFICATIONS;
 pub use self::effect_dispatch::{queue_effect, queue_effect_result};
 pub use self::frame::{
     BatchFoldChanges, BatchFoldOutput, FrameCommit, ProcessAffinityResult, SmartSelfTestResult,

@@ -1,8 +1,9 @@
 use super::{active_fill, blend, disabled_fg, hover_fill, scrim};
 use crate::primitives::card_surface::CardSurface;
 use taskmanager_theme::Palette;
-use taskmanager_theme::color::{contrast_ratio, on_accent};
+use taskmanager_theme::color::on_accent;
 use taskmanager_theme::{Color, Theme};
+use zhuge_ui_tokens::Rgba;
 
 fn palette() -> Palette {
     Theme::dark().palette()
@@ -26,7 +27,9 @@ fn on_accent_picks_max_contrast_black_or_white() {
     let fg = on_accent(accent);
     assert!(fg == Color::BLACK || fg == Color::WHITE);
     assert!(
-        contrast_ratio(accent, fg) >= 3.0,
+        Rgba::new(accent.r, accent.g, accent.b, accent.a)
+            .contrast_ratio(Rgba::new(fg.r, fg.g, fg.b, fg.a,))
+            >= 3.0,
         "accent text must be readable"
     );
 }

@@ -67,6 +67,7 @@ pub mod export;
 pub mod feature_coverage;
 pub(crate) mod first_run_modal;
 pub(crate) mod focus_visible;
+pub(crate) mod frame_timing;
 pub mod functional;
 pub(crate) mod glass;
 pub mod icons;
@@ -82,6 +83,7 @@ pub(crate) mod saved_views;
 pub(crate) mod scene_attach;
 pub mod semantic;
 pub mod snapshot_export;
+pub(crate) mod spatial_focus;
 pub(crate) mod system_information_modal;
 pub(crate) mod text_selection;
 pub(crate) mod tooltip;
@@ -93,6 +95,14 @@ pub(crate) mod window_surface;
 #[cfg(test)]
 #[path = "../tests/headless/visual_parity.rs"]
 mod visual_parity_tests;
+
+/// The one authority for the Applications selection fixture shared by the
+/// input and text-selection seams. Mounted once at the crate root so both
+/// consumers bind the same fixture instead of each loading the file as a
+/// second module copy.
+#[cfg(test)]
+#[path = "../tests/headless/selection_fixture_support.rs"]
+pub(crate) mod selection_fixture_support;
 
 pub use feature_coverage::feature_coverage_declaration;
 

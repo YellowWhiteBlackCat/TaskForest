@@ -5,8 +5,10 @@
 //! refresh cadence and invalidates scheduled work when that device is no
 //! longer visible.
 
+use std::time::SystemTime;
 use taskforest_contract::SubmissionErrorKind;
 use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::{
     GpuEngineRowsRequest, GpuEngineRowsState, request_submission_failure,
 };
@@ -200,7 +202,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_gpu_engine_rows(request, super::platform_submission_time_ms())
+                    .submit_gpu_engine_rows(request, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );

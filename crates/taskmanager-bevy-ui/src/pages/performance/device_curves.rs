@@ -32,18 +32,16 @@ use bevy::ui::{
     Overflow, PositionType, UiSystems, Val, percent, px, rem,
 };
 use taskforest_core::core::identity::DeviceGeneration;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetricUnit, gpu_chart_metric_history,
 };
-use taskmanager_shell::presentation::{bytes, graph_summary};
+use taskmanager_shell::presentation::{bytes, graph_summary, graph_summary_text};
+use taskmanager_theme::palette::tint_channel_toward_white;
 
 pub(crate) mod storage;
-
-/// How far the secondary series' ink is lifted toward white — the reference
-/// surface's rule: a tint of the SAME color, never a new product color.
-const SECONDARY_TINT_LIFT: f32 = 0.32;
 
 /// The half-width of the travelling highlight, in px (chart geometry).
 const FLOW_RADIUS_PX: f32 = 14.0;
@@ -169,7 +167,7 @@ pub(crate) struct DeviceSeriesPlan {
 
 /// The percent readout.
 fn percent_readout(value: f32) -> String {
-    format!("{value:.0}%")
+    percent_text(value)
 }
 
 /// The byte-rate readout: the shared byte formatter is the only authority.
@@ -201,9 +199,9 @@ fn megahertz_readout(value: f32) -> String {
 fn secondary_ink(base: Color) -> Color {
     let srgba = base.to_srgba();
     Color::srgba(
-        srgba.red + (1.0 - srgba.red) * SECONDARY_TINT_LIFT,
-        srgba.green + (1.0 - srgba.green) * SECONDARY_TINT_LIFT,
-        srgba.blue + (1.0 - srgba.blue) * SECONDARY_TINT_LIFT,
+        tint_channel_toward_white(srgba.red),
+        tint_channel_toward_white(srgba.green),
+        tint_channel_toward_white(srgba.blue),
         srgba.alpha,
     )
 }
@@ -473,15 +471,7 @@ pub(crate) fn paint_curves(
                 || t("perf.collecting_samples").to_owned(),
                 |summary| {
                     let format = status.0.kind.readout(track.shell());
-                    format!(
-                        "{} {} · {} {} · {} {}",
-                        t("common.latest"),
-                        format(summary.latest),
-                        t("common.avg"),
-                        format(summary.average),
-                        t("common.peak"),
-                        format(summary.maximum)
-                    )
+                    graph_summary_text(&summary, None, " · ", format)
                 },
             );
         }

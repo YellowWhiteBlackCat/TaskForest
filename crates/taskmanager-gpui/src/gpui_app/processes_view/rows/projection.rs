@@ -50,17 +50,6 @@ pub fn application_root_count(processes: &[&ProcessItem]) -> usize {
     .count()
 }
 
-/// Seed the canonical category tree expanded on first use. The set is also
-/// used by capture/bootstrap paths, so every surface starts with the same
-/// visible hierarchy while retaining per-category collapse controls.
-pub fn default_category_expansions() -> HashSet<String> {
-    ProcessCategory::ALL
-        .iter()
-        .copied()
-        .map(category_expansion_key)
-        .collect()
-}
-
 pub fn sort_id(col: SortCol) -> &'static str {
     match col {
         SortCol::Name => "sort-name",

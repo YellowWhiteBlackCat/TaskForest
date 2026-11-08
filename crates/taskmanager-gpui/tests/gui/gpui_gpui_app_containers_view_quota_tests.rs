@@ -11,7 +11,6 @@
 //!   declares no ceiling;
 //! - the quota cell keeps its slot: it never leaves the row's content box.
 
-use super::*;
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 use taskforest_core::core::device_state::DeviceState;
@@ -21,6 +20,9 @@ use taskforest_core::core::process_telemetry::{
     ContainerCpuQuota, ContainerQuota, ContainerRollup, ContainerSummary, IsolationKind,
 };
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, ContainerQuotaState, container_quota_view, quota_readout,
+};
 use taskmanager_theme::Theme;
 
 const GIB: u64 = 1024 * 1024 * 1024;
@@ -239,7 +241,7 @@ fn an_overrun_stays_visible_and_is_never_clamped() {
     );
     assert_eq!(
         quota_readout(&view),
-        "150.0%",
+        "150%",
         "the row shows the overrun as the percentage it reached"
     );
 }

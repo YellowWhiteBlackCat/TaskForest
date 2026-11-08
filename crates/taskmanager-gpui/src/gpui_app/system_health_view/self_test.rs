@@ -25,6 +25,7 @@ use crate::gpui_app::system_health_view::{
     SmartSelfTestConfirmationRequest, SystemHealthCallbacks, SystemHealthText, badge, metric,
     state_color,
 };
+use taskforest_core::core::percent::percent_text;
 
 fn disabled_action(theme: &Theme, label: String, id: &'static str) -> Stateful<Div> {
     div()
@@ -104,7 +105,7 @@ pub(crate) fn self_test_card(
                 copy(SystemHealthText::Progress),
                 report
                     .progress_pct
-                    .map(|progress| format!("{progress:.0}%"))
+                    .map(percent_text)
                     .unwrap_or_else(|| copy(SystemHealthText::Unavailable)),
             ))
             .child(metric(

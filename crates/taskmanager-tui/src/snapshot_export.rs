@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use taskforest_core::core::process::ProcessItem;
 use taskmanager_app_host::SnapshotExportClient;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::snapshot_export::{
     SnapshotExportPayload, SnapshotExportSession, SnapshotExportState, SnapshotExportSubmitError,
     SnapshotExportTarget,
@@ -13,29 +14,12 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 use crate::TuiApp;
 use taskmanager_application::i18n::t;
 
-#[derive(Debug, Default)]
-pub(crate) enum TuiSnapshotExportRuntime {
-    #[default]
-    Unavailable,
-    Active(SnapshotExportSession<SnapshotExportClient>),
-}
-
-impl TuiSnapshotExportRuntime {
-    pub(crate) fn install(&mut self, client: SnapshotExportClient) {
-        *self = Self::Active(SnapshotExportSession::new(client));
-    }
-
-    fn active_mut(&mut self) -> Option<&mut SnapshotExportSession<SnapshotExportClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(crate) type TuiSnapshotExportRuntime = SessionSlot<SnapshotExportSession<SnapshotExportClient>>;
 
 impl TuiApp {
     pub(crate) fn install_snapshot_export_client(&mut self, client: SnapshotExportClient) {
-        self.snapshot_export.install(client);
+        self.snapshot_export
+            .install_with(|| SnapshotExportSession::new(client));
     }
 
     pub fn export_snapshot(&mut self) {

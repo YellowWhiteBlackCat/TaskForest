@@ -35,6 +35,7 @@ use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
 // family instead of two unrelated decorations.
 use super::containers::{EmptyStateMotif, empty_state_illustration, empty_state_illustration_size};
 use taskmanager_application::AppPage;
+use taskmanager_application::i18n;
 use taskmanager_shell::InfoSortCol;
 use taskmanager_shell::InfoTable;
 
@@ -346,14 +347,15 @@ fn user_menu_panel(
                 focus::dynamic_button_owned(
                     theme_snapshot,
                     FocusTarget::UserRowMenuDisconnect,
-                    t("users.disconnect").to_string(),
+                    i18n::session_control_action_label(SessionControlAction::Disconnect)
+                        .to_string(),
                     Message::RequestUserRowSessionControl(SessionControlAction::Disconnect),
                     false,
                 ),
                 focus::dynamic_button_owned(
                     theme_snapshot,
                     FocusTarget::UserRowMenuLock,
-                    t("users.lock").to_string(),
+                    i18n::session_control_action_label(SessionControlAction::Lock).to_string(),
                     Message::RequestUserRowSessionControl(SessionControlAction::Lock),
                     false,
                 ),
@@ -381,10 +383,7 @@ fn session_action_bar<'a>(
     rows: &[UserRow],
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     if let Some(pending) = shell.pending_session() {
-        let action = match pending.action {
-            SessionControlAction::Disconnect => t("users.disconnect"),
-            SessionControlAction::Lock => t("users.lock"),
-        };
+        let action = i18n::session_control_action_label(pending.action);
         let prompt = format!(
             "{} session {} ({})?",
             action, pending.session.id, pending.session.user
@@ -442,14 +441,14 @@ fn session_action_bar<'a>(
     row![
         session_action_button(
             theme_snapshot,
-            t("users.disconnect"),
+            i18n::session_control_action_label(SessionControlAction::Disconnect),
             SessionControlAction::Disconnect,
             FocusTarget::SessionDisconnect,
             enabled,
         ),
         session_action_button(
             theme_snapshot,
-            t("users.lock"),
+            i18n::session_control_action_label(SessionControlAction::Lock),
             SessionControlAction::Lock,
             FocusTarget::SessionLock,
             enabled,
@@ -475,10 +474,7 @@ fn session_feedback_line<'a>(
     shell: &ShellApp,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let outcome = shell.projection().session_control_feedback.as_ref()?;
-    let action = match outcome.action {
-        SessionControlAction::Disconnect => t("users.disconnect"),
-        SessionControlAction::Lock => t("users.lock"),
-    };
+    let action = i18n::session_control_action_label(outcome.action);
     let detail = match &outcome.result {
         Ok(()) => None,
         Err(error) => Some(&format!("{error:?}")),

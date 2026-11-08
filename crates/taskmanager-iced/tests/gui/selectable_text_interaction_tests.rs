@@ -13,6 +13,7 @@ use iced::advanced::{Clipboard, Shell};
 use iced::keyboard::key::{NativeCode, Physical};
 use iced::{Element, Event, Point, Rectangle, Size, mouse};
 use taskmanager_assets::embedded_fonts;
+use zhuge_ui_core::easing::lerp;
 
 type TestElement = Element<'static, Message, iced::Theme, iced::Renderer>;
 
@@ -151,7 +152,7 @@ impl Harness {
             .expect("the measured line has the next caret");
 
         Point::new(
-            bounds.x + start + (end - start) * 0.5,
+            bounds.x + lerp(start, end, 0.5),
             bounds.y + bounds.height * 0.5,
         )
     }

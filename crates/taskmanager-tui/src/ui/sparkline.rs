@@ -29,9 +29,18 @@ use ratatui::style::Style;
 use ratatui::text::Span;
 use taskmanager_application::history_decimation::lttb_gap_preserving;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::presentation::{bytes, graph_summary, missing_value};
+use taskmanager_shell::presentation::{
+    bytes, graph_summary, graph_summary_text, latest_samples, missing_value,
+};
+use zhuge_ui_core::value::interval_fraction;
+
+// A TUI sample that cannot be placed sits at the ramp's start; a constant
+// series instead shows the mid-ramp block, which the caller declares below.
+const FLAT_SAMPLE_AT_START: f32 = 0.0;
+const FLAT_SERIES_SHOWS_MID_RAMP: f32 = 0.5;
 
 use crate::TuiGlyphMode;
+use taskforest_core::core::percent::percent_text;
 
 /// How many of the most-recent samples a trend sparkline renders. Keeps every
 /// trend cell a stable width regardless of the 64-sample window depth, and
@@ -104,24 +113,19 @@ pub(super) fn sparkline_in(mode: TuiGlyphMode, samples: &[f32]) -> String {
     samples
         .iter()
         .map(|&value| {
-            // A constant series (range 0, or non-finite guard) renders as the
-            // mid-ramp block so a flat trend still reads as a flat trend.
+            // Two different answers live here, so the range test is not redundant
+            // with the projection's own: a constant or unmeasurable range renders the
+            // mid-ramp block, while inside a real range a non-finite sample stays at
+            // the ramp's start. One declared `flat` cannot answer both.
             let normalized = if !range.is_finite() || range <= 0.0 {
                 0.5_f32
             } else {
-                ((value - min) / range).clamp(0.0, 1.0)
+                interval_fraction(value, min, max, FLAT_SAMPLE_AT_START)
             };
             let idx = ((normalized * 7.0).round() as usize).min(7);
             block_for(mode, idx)
         })
         .collect()
-}
-
-/// The newest explicit window for a live trend; its width follows the
-/// graph-data-points preference.
-pub(super) fn recent_window_with(samples: &[f32], window: usize) -> &[f32] {
-    let tail_start = samples.len().saturating_sub(window);
-    &samples[tail_start..]
 }
 
 /// Minimum finite samples a per-device window needs before its trend renders a
@@ -156,7 +160,7 @@ pub(super) fn device_trend_in(mode: TuiGlyphMode, samples: &[f32], window: usize
     if samples.len() < MIN_DEVICE_TREND_SAMPLES {
         return placeholder_for(mode).to_string();
     }
-    sparkline_in(mode, recent_window_with(samples, window))
+    sparkline_in(mode, latest_samples(samples, window))
 }
 
 /// The glyph rendered for a missing sample (`NaN`) inside an otherwise live
@@ -202,8 +206,8 @@ pub(super) fn device_dual_trend_in(
     secondary_samples: &[f32],
     window: usize,
 ) -> DeviceDualTrend {
-    let primary_window = recent_window_with(primary_samples, window);
-    let secondary_window = recent_window_with(secondary_samples, window);
+    let primary_window = latest_samples(primary_samples, window);
+    let secondary_window = latest_samples(secondary_samples, window);
     // One shared extent over BOTH windows' finite samples, so the pair's
     // amplitudes are directly comparable row-to-row.
     let mut min = f32::INFINITY;
@@ -231,20 +235,15 @@ fn dual_row_in(mode: TuiGlyphMode, samples: &[f32], min: f32, max: f32) -> Strin
     if samples.iter().filter(|value| value.is_finite()).count() < MIN_DEVICE_TREND_SAMPLES {
         return placeholder_for(mode).to_string();
     }
-    let range = max - min;
     samples
         .iter()
         .map(|&value| {
             if !value.is_finite() {
                 return gap_for(mode);
             }
-            // A constant pair (shared range 0, or non-finite guard) renders as
-            // the mid-ramp block so a flat trend still reads as a flat trend.
-            let normalized = if !range.is_finite() || range <= 0.0 {
-                0.5_f32
-            } else {
-                ((value - min) / range).clamp(0.0, 1.0)
-            };
+            // A constant pair (a zero, negative or unmeasurable range) renders as
+            // the mid-ramp block, which is the answer this surface declares.
+            let normalized = interval_fraction(value, min, max, FLAT_SERIES_SHOWS_MID_RAMP);
             block_for(mode, ((normalized * 7.0).round() as usize).min(7))
         })
         .collect()
@@ -309,7 +308,7 @@ pub(super) enum DeviceSummaryUnit {
 /// the post-paint fallback (which would turn `°` into `?`).
 fn summary_value(value: f32, unit: DeviceSummaryUnit, mode: TuiGlyphMode) -> String {
     match unit {
-        DeviceSummaryUnit::Percent => format!("{value:.0}%"),
+        DeviceSummaryUnit::Percent => percent_text(value),
         DeviceSummaryUnit::BytesPerSecond => {
             if value.is_finite() && value >= 0.0 {
                 // `bytes` spells binary tiers in ASCII (B/KiB/MiB/GiB), so the
@@ -353,17 +352,11 @@ pub(super) fn device_summary_line_in(
 ) -> Option<String> {
     let summary = graph_summary(samples)?;
     let separator = summary_separator_for(mode);
-    Some(format!(
-        "{label}{}{} {}{}{} {}{}{} {}",
+    Some(graph_summary_text(
+        &summary,
+        Some(label),
         separator,
-        t("common.latest"),
-        summary_value(summary.latest, unit, mode),
-        separator,
-        t("common.avg"),
-        summary_value(summary.average, unit, mode),
-        separator,
-        t("common.peak"),
-        summary_value(summary.maximum, unit, mode),
+        |value| summary_value(value, unit, mode),
     ))
 }
 
@@ -422,19 +415,177 @@ pub(super) fn history_trend_with_width_in(
     if !min.is_finite() || !max.is_finite() {
         return t("history.application.collecting").to_owned();
     }
-    let range = max - min;
     samples
         .iter()
         .map(|sample| {
             if !sample.is_finite() {
                 return history_trend_gap(mode);
             }
-            let normalized = if range > 0.0 {
-                ((*sample - min) / range).clamp(0.0, 1.0)
-            } else {
-                0.5
-            };
+            // A flat series keeps its mid-ramp block; the projection answers it.
+            let normalized = interval_fraction(*sample, min, max, FLAT_SERIES_SHOWS_MID_RAMP);
             history_trend_block(mode, ((normalized * 7.0).round() as usize).min(7))
+        })
+        .collect()
+}
+
+/// The explicit renderer mode for the shared sparkline component.
+///
+/// `Unicode` and `Ascii` preserve the established one-cell ramp exactly.
+/// `Braille16` is an opt-in high-resolution path: each terminal cell is a pair
+/// of Unicode Braille patterns, giving a 2×8 dot field (sixteen addressable
+/// dots) across two text rows. No caller is forced into this mode, and the old
+/// callers keep their byte-for-byte output.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TuiSparklineMode {
+    /// Existing half-block ramp.
+    #[default]
+    Unicode,
+    /// Existing all-ASCII ink ladder.
+    Ascii,
+    /// Two stacked Unicode Braille cells per terminal column (2×8 dots).
+    Braille16,
+}
+
+/// The painted result of one [`TuiSparklineMode`].
+///
+/// The legacy repertoires remain one line; the Braille path returns two
+/// equal-width lines. Callers may keep a one-cell trend where an ASCII or
+/// Unicode ramp is required, and may switch only a dedicated curve slot to the
+/// two-row Braille form.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TuiSparklineCurve {
+    /// One existing Unicode/ASCII line.
+    Single(String),
+    /// Two stacked Braille lines. Their lengths are always equal.
+    Braille16 {
+        /// The upper 2×4 half of each Braille cell.
+        upper: String,
+        /// The lower 2×4 half of each Braille cell.
+        lower: String,
+    },
+}
+
+impl TuiSparklineCurve {
+    /// The first painted row, or the only row for a legacy curve.
+    #[must_use]
+    pub fn upper(&self) -> &str {
+        match self {
+            Self::Single(text) => text,
+            Self::Braille16 { upper, .. } => upper,
+        }
+    }
+
+    /// The second Braille row; `None` for the existing one-row repertoires.
+    #[must_use]
+    pub fn lower(&self) -> Option<&str> {
+        match self {
+            Self::Single(_) => None,
+            Self::Braille16 { lower, .. } => Some(lower),
+        }
+    }
+
+    /// The common cell width of the curve.
+    #[must_use]
+    pub fn width(&self) -> usize {
+        self.upper().chars().count()
+    }
+}
+
+const BRAILLE_BASE_CODEPOINT: u32 = 0x2800;
+const BRAILLE_BASE_CHAR: char = '\u{2800}';
+const BRAILLE_LEVELS: usize = 8;
+const BRAILLE_MID_LEVEL: usize = 4;
+
+/// `(left, right)` dot masks for the four rows of one Braille cell, top row
+/// first. Each row pair is one vertical level of the two-row 2×8 field.
+const BRAILLE_ROW_DOTS: [(u8, u8); 4] = [
+    (0x01, 0x08), // dots 1 and 4
+    (0x02, 0x10), // dots 2 and 5
+    (0x04, 0x20), // dots 3 and 6
+    (0x40, 0x80), // dots 7 and 8
+];
+
+/// Render one sample sequence through the selected sparkline repertoire.
+///
+/// This is the public component entry point for new opt-in callers. The
+/// Unicode and ASCII branches deliberately call the established `_in` family,
+/// so their output is unchanged. Braille normalizes only finite samples,
+/// paints one dot for each finite sample, and never turns a non-finite sample
+/// into a fabricated point.
+#[must_use]
+pub fn render_sparkline(mode: TuiSparklineMode, samples: &[f32]) -> TuiSparklineCurve {
+    match mode {
+        TuiSparklineMode::Unicode => {
+            TuiSparklineCurve::Single(sparkline_in(crate::TuiGlyphMode::Unicode, samples))
+        }
+        TuiSparklineMode::Ascii => {
+            TuiSparklineCurve::Single(sparkline_in(crate::TuiGlyphMode::Ascii, samples))
+        }
+        TuiSparklineMode::Braille16 => braille16_sparkline(samples),
+    }
+}
+
+/// Render the explicit 2×8 (sixteen-dot) Braille path as two rows.
+#[must_use]
+pub fn braille16_sparkline(samples: &[f32]) -> TuiSparklineCurve {
+    let finite: Vec<(usize, f32)> = samples
+        .iter()
+        .enumerate()
+        .filter_map(|(index, value)| value.is_finite().then_some((index, *value)))
+        .collect();
+    let Some((last_index, _)) = finite.last().copied() else {
+        return TuiSparklineCurve::Braille16 {
+            upper: String::new(),
+            lower: String::new(),
+        };
+    };
+
+    let min = finite
+        .iter()
+        .map(|(_, value)| *value)
+        .fold(f32::INFINITY, f32::min);
+    let max = finite
+        .iter()
+        .map(|(_, value)| *value)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let cells = (last_index / 2) + 1;
+    let mut upper = vec![0_u8; cells];
+    let mut lower = vec![0_u8; cells];
+
+    for (index, value) in finite {
+        // A measured series with no travel keeps the Braille mid level, which is
+        // the answer this surface declares.
+        let normalized = interval_fraction(value, min, max, FLAT_SERIES_SHOWS_MID_RAMP);
+        let level =
+            ((normalized * (BRAILLE_LEVELS as f32 - 1.0)).round() as usize).min(BRAILLE_LEVELS - 1);
+        let row = 3 - (level % 4);
+        let left = index % 2 == 0;
+        let dot = if left {
+            BRAILLE_ROW_DOTS[row].0
+        } else {
+            BRAILLE_ROW_DOTS[row].1
+        };
+        if level >= BRAILLE_MID_LEVEL {
+            upper[index / 2] |= dot;
+        } else {
+            lower[index / 2] |= dot;
+        }
+    }
+
+    TuiSparklineCurve::Braille16 {
+        upper: braille_row(&upper),
+        lower: braille_row(&lower),
+    }
+}
+
+/// Convert eight-dot masks to Unicode Braille characters. Every mask is a
+/// valid codepoint offset, and zero intentionally renders the Braille blank
+/// (`U+2800`) rather than a space so the two-row field retains its width.
+fn braille_row(masks: &[u8]) -> String {
+    masks
+        .iter()
+        .map(|&mask| {
+            char::from_u32(BRAILLE_BASE_CODEPOINT + u32::from(mask)).unwrap_or(BRAILLE_BASE_CHAR)
         })
         .collect()
 }

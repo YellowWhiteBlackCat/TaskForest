@@ -19,12 +19,15 @@ test-support = []
 # overlay contracts from taskmanager-ui-contract. This crate owns the GPUI
 # theme binding (`theme_binding`, ADR-051): the token→gpui conversions and
 # window/appearance/font/animation helpers live here, not in the neutral
-# theme crate.
+# theme crate. `zhuge-ui-core` is the toolkit-neutral numeric projection owner;
+# it is not a TaskForest crate and does not loosen this boundary.
 gpui = { workspace = true }
 taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+zhuge-ui-core.workspace = true
+zhuge-ui-tokens.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

@@ -6,11 +6,12 @@
 use super::*;
 use taskforest_core::core::metrics::GpuMetrics;
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskforest_core::core::units::format_quantity_with;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::presentation::trend;
-use taskmanager_shell::presentation::{gpu_display_identity, missing_value};
+use taskmanager_shell::presentation::{gpu_display_identity, missing_value, observed_percentage};
 
 pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<SelectorInstance> {
     let Some(snapshot) = app.projection().snapshot.as_ref() else {
@@ -35,9 +36,7 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                         .disk_active_time_pct_for(&disk.device_id, disk.device_generation.get()),
                     window,
                 );
-                let active = disk
-                    .current_active_time_pct()
-                    .map_or_else(missing_value, |value| format!("{:.0}%", value.round()));
+                let active = observed_percentage(disk.current_active_time_pct());
                 let rate = match (
                     disk.current_read_bytes_per_sec(),
                     disk.current_write_bytes_per_sec(),
@@ -141,7 +140,7 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                 };
                 let capacity = battery
                     .current_capacity_pct()
-                    .map_or_else(missing_value, |value| format!("{value}%"));
+                    .map_or_else(missing_value, percent_text);
                 let status = if battery.status.is_empty() {
                     missing_value()
                 } else {
@@ -203,7 +202,7 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                 let util = dev
                     .utilization_pct
                     .current_value()
-                    .map_or_else(missing_value, |u| format!("{u:.0}%"));
+                    .map_or_else(missing_value, |u| percent_text(*u));
                 selector_instance(
                     IconId::Gpu,
                     &format!("{} {}", t("npu.title"), index + 1),
@@ -240,10 +239,7 @@ fn cpu_selector_instance(
 ) -> SelectorInstance {
     let cpu = &snapshot.cpu;
     let trend = sparkline::device_trend_in(glyphs, &trend::cpu_usage_percent(&app.history), window);
-    let mut caption = vec![
-        cpu.current_global_usage_pct()
-            .map_or_else(missing_value, |value| format!("{:.0}%", value.round())),
-    ];
+    let mut caption = vec![observed_percentage(cpu.current_global_usage_pct())];
     if let Some(mhz) = cpu.current_frequency_mhz() {
         caption.push(selector_clock_readout(mhz));
     }
@@ -280,7 +276,7 @@ fn memory_selector_instance(
         .map_or_else(missing_value, readout);
     let percentage = memory
         .used_percentage_observed()
-        .map_or_else(missing_value, |value| format!("{value:.0}%"));
+        .map_or_else(missing_value, percent_text);
     selector_instance(
         IconId::Memory,
         t("common.memory"),
@@ -350,13 +346,13 @@ fn gpu_selector_caption(gpu: &GpuMetrics, use_bytes: bool, use_base2: bool) -> S
         }
     }];
     if let Some(util) = gpu.current_utilization_pct() {
-        parts.push(format!("{util:.0}%"));
+        parts.push(percent_text(util));
     }
     if let (Some(used), Some(total)) = (vram_used, vram_total)
         && total > 0
     {
         let pct = (used as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
-        parts.push(format!("VRAM {pct:.0}%"));
+        parts.push(format!("VRAM {}", percent_text(pct)));
     }
     if let Some(temp) = gpu.current_temperature_c() {
         parts.push(format!("{:.0} °C", temp.round()));

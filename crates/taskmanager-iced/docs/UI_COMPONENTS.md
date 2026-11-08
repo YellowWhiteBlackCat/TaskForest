@@ -17,10 +17,11 @@ native selection and renderer caches; all shared types use their defining module
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
   controls that route keyboard access through the focus shell.
 - `src/focus.rs` owns keyboard-reachable activation shells and draws the shared
-  `palette().ring` focus ring gated by the renderer-local input modality
-  (`src/input_modality.rs`: only keyboard focus paints the ring, the same
-  strict policy the GPUI root tracker applies); `src/focus/reveal.rs` measures
-  the actual focused control and reveals it inside its nearest scroll owner.
+  `palette().ring` focus ring gated by the shared input modality
+  (`taskmanager_ui_contract::InputModality`: only keyboard focus paints the
+  ring — one strict policy for GPUI, Iced and Bevy; `src/input_modality.rs`
+  owns only the root capture observer); `src/focus/reveal.rs` measures the
+  actual focused control and reveals it inside its nearest scroll owner.
 - `src/ui/virtual_list.rs` owns bounded table-window geometry, the
   sticky-header composition shell and the typed column vocabulary — the
   Applications table derives widths/alignment/hideability from the shared
@@ -65,7 +66,8 @@ native selection and renderer caches; all shared types use their defining module
   consumes the shared application timeline. Fixed window controls and metric
   paging admit complete cards inside the allocated body; summary CPU/memory
   values use the same accepted readouts as their curves.
-- Device charts share one window→geometry mapping (`WindowSlots`,
+- Device charts share one window→geometry mapping (the shared owner's
+  `taskmanager_shell::presentation::ChartSlots`,
   right-anchored slots; hover crosshairs snap through the same mapping) with
   DATA/OVERLAY dual caches; the dual-series device chart
   (`ui/device_chart/multi.rs`) separates read/write and rx/tx with same-hue

@@ -74,5 +74,6 @@ fn engine_kind_all_has_unique_variants() {
     for kind in NpuEngineKind::ALL {
         let json = serde_json::to_string(kind).expect("kind serializes");
         assert!(seen.insert(json), "duplicate engine kind wire form");
+        assert!(!kind.i18n_key().is_empty());
     }
 }

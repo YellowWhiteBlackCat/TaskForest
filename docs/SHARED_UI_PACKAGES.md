@@ -4,13 +4,13 @@
 
 | package | 当前职责 |
 | --- | --- |
-| `zhuge-ui-core` | 文本分段、字素边界与固定/可变尺寸虚拟窗口 |
-| `zhuge-ui-tokens` | 工具包无关的已解析颜色值 |
+| `zhuge-ui-core` | 文本分段、字素边界、固定/可变尺寸虚拟窗口与其最宽带律（`virtual_list::max_band_rows`）、离散行分页（`row_page`：窗口轴 + 页码轴 + `row_budget`）、区间→单位区间的唯一投影（`value::interval_fraction`，退化答案由调用方声明）、标量线性混合的唯一算式（`easing::lerp`）与过渡时序（`easing`） |
+| `zhuge-ui-tokens` | 工具包无关的已解析颜色值、sRGB/WCAG 数值事实与 transient status 的四语义色投影（`status::StatusKind` / `StatusColors::resolve`） |
 | `zhuge-ui-kit-iced` | Iced surface、badge、富文本、虚拟列表 body |
-| `zhuge-ui-kit-bevy` | Bevy BSN surface、官方 headless button 基础场景 |
+| `zhuge-ui-kit-bevy` | Bevy BSN surface（card/stat row）、官方 headless button 基础场景，以及回收池的槽位回收律（`sync_virtual_slots` + `VirtualScrollSlot` 收据守卫） |
 
 共享包发布于 crates.io（源码托管于 `YellowWhiteBlackCat/zhuge-ui-kit` 单 workspace），四个包独立发版。
-根 Cargo.toml 统一在 `[workspace.dependencies]` 声明版本（如 `zhuge-ui-core = "0.1.3"`）；子 crate 通过 `workspace = true` 继承。
+根 Cargo.toml 统一在 `[workspace.dependencies]` 声明版本，以当前发布版为准；子 crate 通过 `workspace = true` 继承。
 产品各自提交 Cargo.lock，保留独立依赖锁定与发布周期。
 
 ## 产品开发流程
@@ -25,10 +25,24 @@
 5. 改共享包同时检查 TaskForest 与 MusicFrog 的受影响消费者；不要只验证当前产品。
    同一切片迁完旧调用并删除被替换实现，保留既有业务、布局、输入和无障碍契约。
 
+## 共享律法的机械门
+
+共享包把每条律法的**唯一执行器**随 crate 发布：`zhuge-ui-kit-bevy` 的
+`tools/check_bevy_ui.py`（BSN 唯一构造路线 + rem 唯一 authored 长度）与 `zhuge-ui-core` 的
+`tools/check_band_arithmetic.py`（最宽带算术只有一个 owner）、
+`tools/check_interval_normalization.py`（值进入 `0.0..=1.0` 只有一个投影）与
+`tools/check_scalar_mix.py`（`A + (B - A) * t` 只有一个标量混合）与
+`tools/check_easing_owner.py`（`smoothstep` 斜坡形状与「按进度解 cubic-Bézier 曲线参数」各只有一个 owner，
+着色器原始字符串里的 WGSL 内建与只求值的曲线是不同事实，由 fixture 证明放行）。本仓库 `scripts/quality/` 保存这五份
+文件的**逐字节拷贝**与各自的棘轮台账（`bevy_scene_ratchet.json`、`band_arithmetic_ratchet.json`、
+`interval_normalization_ratchet.json`、`scalar_mix_ratchet.json`、`easing_owner_ratchet.json`）；
+台账记录执行器的摘要与所属函数，vendored 拷贝被改动而未同步台账时，`test_*_gate.py` 立即失败，
+并同时证明台账外的新增违规会咬（含同文件两处逐字相同违规各算一笔）。律法正文只有共享包 crate README 一处，产品不得另写第二套检查或第二套算术。
+
 ## 升级与验证
 
-共享包当前是 `0.1.x`：同一兼容线内的功能/修复只升 patch；破坏性更新升到 `0.2`。
-稳定版本按 SemVer：major 破坏、minor 兼容增加、patch 兼容修复。
+共享包各 crate 独立处于 `0.x`：功能与修复升 patch，破坏性更新升 minor（例如 `zhuge-ui-kit-bevy 0.3.0 → 0.4.0`）；
+1.0 起按 SemVer：major 破坏、minor 兼容增加、patch 兼容修复。
 公开类型、工具包版本、MSRV、feature、平台支持以及布局/焦点/滚动变化均需兼容性评估。
 共享包发布要求由其仓库的 `docs/EVOLUTION.md` 持有；产品升级前阅读迁移说明。
 
@@ -38,7 +52,8 @@
 包版本升级由各产品按需决定，不迫使所有产品同步升级。
 
 验证要覆盖受影响构建、行为/几何测试、仓库门禁和真实界面。
-截图必须绑定实际二进制与源码；没有目标平台证据就记录未验证，不能以编译通过代替真实运行实证。
+截图必须绑定实际二进制与源码；Cargo 声明的共享包源码清单属于该源码绑定，
+其外部路径必须仍落在当前前端的生产依赖图中，并逐文件通过摘要校验。没有目标平台证据就记录未验证，不能以编译通过代替真实运行实证。
 
 本产品完成前运行 `bash scripts/quality/local-gates.sh quick`；前端捕获和布局规则
 由 [UI 组件章程](UI_COMPONENT_ARCHITECTURE.md) 与受影响 crate 的文档展开。

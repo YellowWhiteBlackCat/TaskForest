@@ -17,19 +17,21 @@ use crate::gpui_app::processes_view::rows::aggregate_display::{
 };
 use crate::gpui_app::processes_view::rows::projection::category_label;
 use taskforest_core::core::process::ProcessItem;
-use taskforest_core::core::session::SessionControlAction;
-use taskforest_core::core::units::bytes_percent;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
-use taskmanager_shell::process_semantic_key;
+use taskmanager_shell::{
+    MAX_PUBLISHED_ROWS, process_semantic_key, semantic_cpu_graph, semantic_process_row,
+    semantic_status,
+};
 use taskmanager_shell::{
     ProcessProjectionGeneration, ProcessTreeRow, append_process_semantic_rows,
     project_process_tree_rows,
 };
 use taskmanager_ui_contract::{
-    AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, GraphSummary,
-    ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot, SemanticSnapshotBuilder,
+    AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, ModalInput,
+    SemanticAction, SemanticSnapshot, SemanticSnapshotBuilder,
 };
 
 use super::RootView;
@@ -37,11 +39,6 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_shell::presentation::process_batch_action_label;
 
-/// Maximum number of process rows published to the accessibility tree. The
-/// process list can contain thousands of entries; a screen reader reads the
-/// tree top-down, so the highest-CPU rows are by far the most useful and the
-/// tree is kept bounded for AT responsiveness.
-const MAX_PUBLISHED_ROWS: usize = 64;
 /// Aggregate rows accompany the bounded process sample so screen readers get
 /// the same typed availability and coverage as the visible Applications rows.
 const MAX_PUBLISHED_GROUP_ROWS: usize = 64;
@@ -78,10 +75,7 @@ fn session_confirmation_copy(
     let PendingConfirmation::SessionControl(intent) = pending? else {
         return None;
     };
-    let action = match intent.action {
-        SessionControlAction::Disconnect => t("users.disconnect"),
-        SessionControlAction::Lock => t("users.lock"),
-    };
+    let action = i18n::session_control_action_label(intent.action);
     Some((
         action,
         intent.session.id.as_str().to_owned(),
@@ -186,13 +180,6 @@ pub(crate) fn apply_accessibility_action(
 /// builder rejects the inputs (it never does for the values produced here, but
 /// the failure is surfaced honestly rather than panicked).
 fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
-    let cpu_current = view
-        .system_snapshot()
-        .cpu
-        .current_global_usage_pct()
-        .map(|value| f64::from(value.clamp(0.0, 100.0)));
-    let memory_total = view.system_snapshot().memory.current_total_bytes();
-
     // The live region announces the pending confirmation dialog while the
     // semantic builder also publishes a typed modal node below. The status is
     // retained for screen readers that announce live-region changes without
@@ -205,20 +192,15 @@ fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
         {
             format!("confirming: {action} session {session_id} for {user}")
         } else {
-            format!("{} processes", view.processes().len())
+            semantic_status("", view.processes().len())
         };
 
     let mut builder = SemanticSnapshotBuilder::new(revision)
         .application_name(product::GPUI_NAME)
         .status_announcement(status);
-    // The CPU graph is published only when the current scalar is observed.
-    // An unavailable first frame is not a measured 0% value.
-    if let Some(cpu_current) = cpu_current {
-        builder = builder.cpu_graph(GraphSummary {
-            current: cpu_current,
-            peak: cpu_current,
-            maximum: 100.0,
-        });
+    if let Some(summary) = semantic_cpu_graph(view.system_snapshot().cpu.current_global_usage_pct())
+    {
+        builder = builder.cpu_graph(summary);
     }
 
     // Publish aggregate group rows from the canonical shell tree projection.
@@ -304,20 +286,13 @@ fn build_snapshot(view: &RootView, revision: u64) -> Option<SemanticSnapshot> {
     // refresh ticks), never a local float compare.
     let mut rows: Vec<&ProcessItem> = view.processes().iter().collect();
     rows.sort_by(|left, right| compare_processes(left, right, ProcessSortAxis::Cpu, false));
+    let memory_total = view.system_snapshot().memory.current_total_bytes();
     for item in rows.iter().take(MAX_PUBLISHED_ROWS) {
-        let memory_percent = memory_total.and_then(|total| {
-            item.current_memory_bytes()
-                .and_then(|value| bytes_percent(value, total))
-        });
-        builder = builder.process_row(ProcessRowInput {
-            id: process_semantic_key(item),
-            name: item.name.clone(),
-            cpu_percent: item
-                .current_cpu_percentage()
-                .map(|value| f64::from(value.clamp(0.0, 100.0))),
-            memory_percent,
-            selected: view.is_process_selected(item),
-        });
+        builder = builder.process_row(semantic_process_row(
+            item,
+            memory_total,
+            view.is_process_selected(item),
+        ));
     }
 
     if let Some((action, pid, name, id)) = process_confirmation_copy(view.pending_confirmation()) {

@@ -3,14 +3,12 @@
 //! module only paints the folded readout string.
 
 use taskforest_core::core::metrics::CpuMetrics;
+use taskmanager_shell::presentation::observed_percentage;
 
-use crate::gpui_app::formatting;
-
-/// CPU summary-card readout: `"{:.1}%"` for a current observation, the shared
-/// missing-value dash when the provider has none.
+/// CPU summary-card readout: the shared whole-percent spelling for a current
+/// observation, the shared missing-value dash when the provider has none.
 pub(super) fn cpu_summary_readout(cpu: &CpuMetrics) -> String {
-    cpu.current_global_usage_pct()
-        .map_or_else(formatting::missing_value, |value| format!("{value:.1}%"))
+    observed_percentage(cpu.current_global_usage_pct())
 }
 
 #[cfg(test)]

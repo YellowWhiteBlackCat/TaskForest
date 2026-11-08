@@ -43,7 +43,8 @@ use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::perf_chart::{SeriesGeneration, line_path, series_point_runs_for};
 use crate::theme;
-use crate::trend_strip::finite_peak;
+use taskmanager_shell::presentation::finite_peak;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_ui_contract::IconId;
 
 /// The semantic icon introducing one rail device family. Battery/Fan have no
@@ -63,9 +64,9 @@ fn rail_icon(device: &PerfDevice) -> Option<IconId> {
 mod captions;
 
 pub(crate) use captions::{
-    battery_rail_caption, battery_rail_heading, battery_rail_subtitle, cpu_rail_caption,
+    battery_caption, battery_rail_heading, battery_rail_subtitle, cpu_rail_caption,
     cpu_rail_heading, cpu_rail_subtitle, disk_rail_caption, disk_rail_heading, disk_rail_subtitle,
-    fan_rail_caption, fan_rail_heading, fan_rail_subtitle, gpu_rail_caption, gpu_rail_heading,
+    fan_caption, fan_rail_heading, fan_rail_subtitle, gpu_rail_caption, gpu_rail_heading,
     gpu_rail_subtitle, mem_rail_caption, network_category_label, nic_rail_caption,
     nic_rail_heading, nic_rail_subtitle,
 };
@@ -83,8 +84,7 @@ const RAIL_SPARK_WIDTH: f32 = 40.0;
 const FACTS_WIDTH_BUDGET: f32 = 124.0;
 /// Stroke width of the rail sparkline (mirrors the trend strip).
 const SPARK_STROKE_WIDTH: f32 = 1.4;
-/// The percentage ceiling shared by every percentage-typed series.
-const PERCENT_MAX: f32 = 100.0;
+use taskforest_core::core::percent::MAX_PERCENT;
 /// Fixed desktop rail-card extent. A fixed contract makes offscreen cards
 /// representable by spacers instead of measuring every card.
 pub(crate) const RAIL_CARD_HEIGHT: f32 = 104.0;
@@ -269,7 +269,7 @@ fn rail_row(
                 cap1,
                 cap2,
                 samples: Rc::clone(&inputs.cpu_samples),
-                max: PERCENT_MAX,
+                max: MAX_PERCENT,
                 category: RailCategory::Cpu,
                 value_format: RailValueFormat::Percent,
             }
@@ -283,7 +283,7 @@ fn rail_row(
                 cap1,
                 cap2,
                 samples: Rc::clone(&inputs.memory_samples),
-                max: PERCENT_MAX,
+                max: MAX_PERCENT,
                 category: RailCategory::Memory,
                 value_format: RailValueFormat::Percent,
             }
@@ -344,14 +344,14 @@ fn rail_row(
                         .history
                         .gpu_usage_pct_for(gpu.device_id.as_str(), gpu.device_generation.get())
                 }),
-                max: PERCENT_MAX,
+                max: MAX_PERCENT,
                 category: RailCategory::Gpu,
                 value_format: RailValueFormat::Percent,
             }
         }
         PerfDevice::Battery(index) => {
             let battery = inputs.power?.batteries.get(index)?;
-            let (cap1, cap2) = battery_rail_caption(battery);
+            let (cap1, cap2) = battery_caption(battery);
             RailRow {
                 device,
                 heading: battery_rail_heading(battery, index),
@@ -361,14 +361,14 @@ fn rail_row(
                 samples: rail_series(inputs, cached_samples, |shell| {
                     shell.history.battery_capacity_pct_for(battery.id.as_str())
                 }),
-                max: PERCENT_MAX,
+                max: MAX_PERCENT,
                 category: RailCategory::Battery,
                 value_format: RailValueFormat::Percent,
             }
         }
         PerfDevice::Fan(index) => {
             let fan = fans.get(index).copied()?;
-            let (cap1, cap2) = fan_rail_caption(fan);
+            let (cap1, cap2) = fan_caption(fan);
             let samples = rail_series(inputs, cached_samples, |shell| {
                 shell.history.fan_rpm_for(fan.id())
             });
@@ -469,7 +469,7 @@ fn rail_widget_key(
 #[must_use]
 pub(crate) fn format_rail_value(value: f32, format: RailValueFormat) -> String {
     match format {
-        RailValueFormat::Percent => format!("{:.0}%", value.round()),
+        RailValueFormat::Percent => observed_percentage(Some(value)),
         RailValueFormat::BytesPerSec => format!(
             "{}/s",
             super::quantity_text_pref(value.max(0.0) as u64, true, true)

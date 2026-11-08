@@ -258,3 +258,22 @@ fn empty_menu_is_a_valid_icon_only_tray() {
     let spec = TraySpec::new(valid_icon(), None, None, menu, false).unwrap();
     assert_eq!(spec.menu().node_count(), 0);
 }
+
+#[test]
+fn resolve_tray_action_maps_standard_action_ids() {
+    assert_eq!(
+        resolve_tray_action(TRAY_ACTION_SHOW),
+        Some(TrayIntent::ShowWindow)
+    );
+    assert_eq!(
+        resolve_tray_action(TRAY_ACTION_PAUSE),
+        Some(TrayIntent::TogglePause)
+    );
+    assert_eq!(
+        resolve_tray_action(TRAY_ACTION_QUIT),
+        Some(TrayIntent::Quit)
+    );
+    assert_eq!(resolve_tray_action(0), None);
+    assert_eq!(resolve_tray_action(4), None);
+    assert_eq!(resolve_tray_action(99), None);
+}

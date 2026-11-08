@@ -16,7 +16,9 @@ publish = false
 # runtime or OS adapter (those stay behind app-host).
 
 [dependencies]
-zhuge-ui-kit-bevy.workspace = true
+zhuge-ui-core.workspace = true
+zhuge-ui-kit-bevy = { workspace = true, features = ["capture-tools"] }
+zhuge-ui-tokens.workspace = true
 taskforest-core = { path = "../taskforest-core" }
 taskforest-contract = { path = "../taskforest-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
@@ -115,6 +117,7 @@ bevy = { version = "=0.20.1", default-features = false, features = [
     "bevy_winit",
     "bevy_text",
     "ui_picking",
+    "png",
     "accesskit_unix",
     "wayland",
 ] }
@@ -133,6 +136,7 @@ bevy = { version = "=0.20.1", default-features = false, features = [
     "bevy_winit",
     "bevy_text",
     "ui_picking",
+    "png",
 ] }
 
 [dev-dependencies]

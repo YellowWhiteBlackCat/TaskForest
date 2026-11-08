@@ -6,6 +6,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::ScalarObservation;
+use taskmanager_application::i18n::more_rows_label;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::demo_app;
@@ -14,6 +15,7 @@ use taskmanager_application::MAX_CONTAINER_ROWS;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_shell::SortDir;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use zhuge_ui_core::row_page::row_budget;
 
 fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
     // Pin English and serialize against the language-flipping i18n test
@@ -87,9 +89,11 @@ fn containers_overlay_renders_unavailable_fields_as_dashes() {
 
 #[test]
 fn containers_overlay_caps_rows_and_reports_hidden_count() {
-    let (shown, hidden) = container_row_window(203);
+    let budget = row_budget(203, MAX_CONTAINER_ROWS);
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     assert_eq!(shown, MAX_CONTAINER_ROWS);
     assert_eq!(hidden, 3);
+    assert!(budget.truncated() && budget.total() == 203);
     let label = more_rows_label(hidden);
     assert!(label.contains('3'));
     assert!(!label.contains("{count}"));

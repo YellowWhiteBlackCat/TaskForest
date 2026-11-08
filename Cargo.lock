@@ -7779,15 +7779,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ordered-float"
-version = "5.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f59006ce1e204c30956638535b74d317bca99477b9356dfaec54c37f6f600ab"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "ordered-stream"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10443,6 +10434,7 @@ version = "0.5.1"
 dependencies = [
  "crossbeam-channel",
  "ctrlc",
+ "serde_json",
  "taskforest-contract",
  "taskforest-core",
  "taskforest-ipc",
@@ -10452,6 +10444,7 @@ dependencies = [
  "taskmanager-platform-runtime",
  "taskmanager-test-support",
  "tempfile",
+ "zhuge-ui-core",
 ]
 
 [[package]]
@@ -10465,12 +10458,14 @@ dependencies = [
  "taskforest-contract",
  "taskforest-core",
  "taskmanager-test-support",
+ "zhuge-ui-core",
 ]
 
 [[package]]
 name = "taskmanager-assets"
 version = "0.5.1"
 dependencies = [
+ "taskforest-core",
  "usvg 0.48.1",
 ]
 
@@ -10496,7 +10491,9 @@ dependencies = [
  "taskmanager-test-support",
  "taskmanager-theme",
  "taskmanager-ui-contract",
+ "zhuge-ui-core",
  "zhuge-ui-kit-bevy",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -10558,6 +10555,7 @@ dependencies = [
  "taskmanager-theme",
  "taskmanager-ui-contract",
  "tracing",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -10590,6 +10588,8 @@ dependencies = [
  "tracing",
  "uuid",
  "windows-capture",
+ "zhuge-ui-core",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -10718,6 +10718,7 @@ dependencies = [
  "wayland-client",
  "wayland-scanner",
  "zbus",
+ "zhuge-ui-core",
 ]
 
 [[package]]
@@ -10900,6 +10901,9 @@ dependencies = [
 [[package]]
 name = "taskmanager-theme"
 version = "0.5.1"
+dependencies = [
+ "zhuge-ui-tokens",
+]
 
 [[package]]
 name = "taskmanager-tray-muda"
@@ -10929,6 +10933,7 @@ dependencies = [
  "taskmanager-test-support",
  "taskmanager-theme",
  "taskmanager-ui-contract",
+ "zhuge-ui-core",
 ]
 
 [[package]]
@@ -10940,6 +10945,8 @@ dependencies = [
  "taskmanager-icons",
  "taskmanager-theme",
  "taskmanager-ui-contract",
+ "zhuge-ui-core",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -11057,7 +11064,7 @@ dependencies = [
  "nix 0.29.0",
  "num-derive",
  "num-traits",
- "ordered-float 4.6.0",
+ "ordered-float",
  "pest",
  "pest_derive",
  "phf 0.11.3",
@@ -12302,7 +12309,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f2ab60e120fd6eaa68d9567f3226e876684639d22a4219b313ff69ec0ccd5ac"
 dependencies = [
  "log",
- "ordered-float 4.6.0",
+ "ordered-float",
  "strsim",
  "thiserror 1.0.69",
  "wezterm-dynamic-derive",
@@ -12553,7 +12560,7 @@ dependencies = [
  "ndk-sys",
  "objc",
  "once_cell",
- "ordered-float 5.5.1",
+ "ordered-float",
  "parking_lot",
  "portable-atomic",
  "portable-atomic-util",
@@ -12604,7 +12611,7 @@ dependencies = [
  "objc2-metal 0.3.2",
  "objc2-quartz-core 0.3.2",
  "once_cell",
- "ordered-float 5.5.1",
+ "ordered-float",
  "parking_lot",
  "portable-atomic",
  "portable-atomic-util",
@@ -13889,29 +13896,25 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-core"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f452fdd4bff355d593ce4566656bbf5ef747e34cb6a1474bf2190dcea1575fb"
+version = "0.1.18"
 dependencies = [
  "serde",
+ "serde_json",
  "unicode-segmentation",
 ]
 
 [[package]]
 name = "zhuge-ui-kit-bevy"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "859b8b0a4b13fb86aedb406aca5776ac07642daa2f61cedfb450bb9f66648a42"
+version = "0.4.1"
 dependencies = [
  "bevy",
  "parley",
+ "zhuge-ui-core",
 ]
 
 [[package]]
 name = "zhuge-ui-kit-iced"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1992df6d5dd6048dba622652c81e78c7509bd4b0dbf3dbbb4fb1dcc8f265d6ef"
+version = "0.2.0"
 dependencies = [
  "iced_core",
  "iced_widget",
@@ -13921,9 +13924,7 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-tokens"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45770a98507bbc7a4dfec5bf2e75b1b764df98a1fe373e2a48981cc12cd72472"
+version = "0.1.1"
 
 [[package]]
 name = "zlib-rs"

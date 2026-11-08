@@ -6,7 +6,8 @@ use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, Process
 use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskforest_core::core::units::UnitPreferences;
-use taskmanager_application::i18n::t;
+use taskmanager_application::ProcessDetailsSection;
+use taskmanager_application::i18n::{process_details_section_label, t};
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
@@ -70,29 +71,28 @@ pub(crate) fn details_overlay<'a>(
         );
     };
 
-    let tabs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
-        crate::app::DetailsSection::ALL
-            .into_iter()
-            .map(|section| {
-                focus::choice_pill(
-                    theme_snapshot,
-                    crate::app::FocusTarget::DetailsTab(section),
-                    details_tab_label(section).to_string(),
-                    section == app.details_section(),
-                    Message::SelectDetailsSection(section),
-                )
-            })
-            .collect();
+    let tabs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = ProcessDetailsSection::ALL
+        .into_iter()
+        .map(|section| {
+            focus::choice_pill(
+                theme_snapshot,
+                crate::app::FocusTarget::DetailsTab(section),
+                process_details_section_label(section).to_string(),
+                section == app.details_section(),
+                Message::SelectDetailsSection(section),
+            )
+        })
+        .collect();
 
     let body: Element<'a, Message, iced::Theme, iced::Renderer> = match app.details_section() {
-        crate::app::DetailsSection::Overview => key_value_rows(overview_rows_with_local_time(
+        ProcessDetailsSection::Overview => key_value_rows(overview_rows_with_local_time(
             identity,
             shell,
             &app.local_time_rules,
         )),
-        crate::app::DetailsSection::Performance => performance_tab(app, identity),
-        crate::app::DetailsSection::Command => command_tab(app, identity),
-        crate::app::DetailsSection::Insights => crate::ui::insights::insights_block(
+        ProcessDetailsSection::Performance => performance_tab(app, identity),
+        ProcessDetailsSection::Command => command_tab(app, identity),
+        ProcessDetailsSection::Insights => crate::ui::insights::insights_block(
             theme_snapshot,
             shell,
             &target,
@@ -107,7 +107,7 @@ pub(crate) fn details_overlay<'a>(
     .spacing(8);
 
     let facets: Vec<Element<'a, Message>> =
-        if app.details_section() == crate::app::DetailsSection::Insights {
+        if app.details_section() == ProcessDetailsSection::Insights {
             ProcessInsightFacet::ALL
                 .into_iter()
                 .map(|facet| {
@@ -123,7 +123,7 @@ pub(crate) fn details_overlay<'a>(
         } else {
             Vec::new()
         };
-    let actions = if app.details_section() == crate::app::DetailsSection::Insights {
+    let actions = if app.details_section() == ProcessDetailsSection::Insights {
         vec![focus::button(
             theme_snapshot,
             crate::app::FocusTarget::DetailsRefresh,
@@ -150,15 +150,6 @@ pub(crate) fn details_overlay<'a>(
         .into(),
         actions,
     )
-}
-
-fn details_tab_label(section: crate::app::DetailsSection) -> &'static str {
-    match section {
-        crate::app::DetailsSection::Overview => t("prop.overview"),
-        crate::app::DetailsSection::Performance => t("prop.performance"),
-        crate::app::DetailsSection::Command => t("prop.command"),
-        crate::app::DetailsSection::Insights => t("prop.insights"),
-    }
 }
 
 fn overview_rows_with_local_time(

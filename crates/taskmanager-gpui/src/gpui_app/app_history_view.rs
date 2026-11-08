@@ -34,6 +34,7 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
@@ -224,8 +225,8 @@ fn page_header(
         let click_entity = entity.clone();
         windows = windows.segment(
             Segment::new(
-                history_window_id(window),
-                i18n::t(history_window_key(window)),
+                format!("app-history-window-{}", window.compact_token()),
+                i18n::history_window_label(window),
                 move |_window: &mut Window, cx: &mut App| {
                     click_entity.update(cx, |view, cx| {
                         view.set_history_replay_window(window, cx);
@@ -282,22 +283,6 @@ fn page_header(
         .debug_selector(|| "tm-app-history-page-header".to_string())
         .child(title)
         .child(controls)
-}
-
-fn history_window_key(window: HistoryWindow) -> &'static str {
-    match window {
-        HistoryWindow::OneHour => "perf.replay.window.1h",
-        HistoryWindow::TwentyFourHours => "perf.replay.window.24h",
-        HistoryWindow::SevenDays => "perf.replay.window.7d",
-    }
-}
-
-fn history_window_id(window: HistoryWindow) -> &'static str {
-    match window {
-        HistoryWindow::OneHour => "app-history-window-1h",
-        HistoryWindow::TwentyFourHours => "app-history-window-24h",
-        HistoryWindow::SevenDays => "app-history-window-7d",
-    }
 }
 
 fn state_panel(theme: &Theme, title: &'static str, detail: String, tone: Color) -> AnyElement {
@@ -363,7 +348,9 @@ fn row_for_projected(
     let cpu = row
         .peak_cpu_usage
         .filter(|value| value.is_finite())
-        .map_or_else(formatting::missing_value, |value| format!("{value:.1}%"));
+        .map_or_else(formatting::missing_value, |value| {
+            precise_percent_text(value)
+        });
     let memory = row
         .peak_memory_bytes
         .filter(|value| value.is_finite() && *value >= 0.0)

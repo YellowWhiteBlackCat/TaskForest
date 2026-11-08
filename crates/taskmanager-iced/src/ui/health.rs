@@ -8,6 +8,7 @@ use iced::{Element, Length};
 use taskforest_core::core::alerts::AlertMetric;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 
@@ -15,7 +16,8 @@ use crate::app::Message;
 use crate::theme;
 use crate::ui::components::styled_scrollable;
 
-use super::overlays::{metric_label, modal_overlay, suggestion_text};
+use super::overlays::{modal_overlay, suggestion_text};
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::{
@@ -161,8 +163,8 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let cpu_freq = observed.cpu_frequency;
     let cpu_temp = observed.cpu_temperature_c;
     let cpu_text = match (cpu_usage, cpu_freq.as_str()) {
-        (Some(usage), "") | (Some(usage), "—") => format!("{usage:.1}%"),
-        (Some(usage), freq) => format!("{usage:.1}% · {freq}"),
+        (Some(usage), "") | (Some(usage), "—") => percent_text(usage),
+        (Some(usage), freq) => format!("{} · {freq}", percent_text(usage)),
         (None, freq) if freq.is_empty() || freq == "—" => missing_value(),
         (None, freq) => freq.to_string(),
     };
@@ -301,7 +303,7 @@ fn alert_row<'a>(
     shell: &ShellApp,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     row![
-        text(metric_label(metric)).width(Length::Fixed(190.0)),
+        text(i18n::alert_metric_label(metric)).width(Length::Fixed(190.0)),
         text(suggestion_text(metric, shell)).width(Length::Fill),
     ]
     .spacing(8)

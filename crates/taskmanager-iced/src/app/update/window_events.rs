@@ -99,6 +99,7 @@ impl IcedApp {
                 Some(Task::none())
             }
             Message::Frame(now) => {
+                super::super::frame_timing::observe_frame(now);
                 if let Some(target) = self.capture.focus_target
                     && !self.capture.focus_scheduled
                 {
@@ -286,8 +287,7 @@ impl IcedApp {
                     } else if self.shell.page() == AppPage::AppHistory {
                         !self.application_history_projection().rows.is_empty()
                     } else {
-                        self.history_runtime.replay().is_open()
-                            && !self.history_runtime.replay().rows().is_empty()
+                        self.history_runtime.is_open() && !self.history_runtime.rows().is_empty()
                     };
                     if ready {
                         match self.capture.presentation_frame {

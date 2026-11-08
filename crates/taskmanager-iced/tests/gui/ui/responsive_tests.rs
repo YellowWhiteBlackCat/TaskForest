@@ -7,8 +7,7 @@
 
 use super::{
     chrome_presentation_for_width, layout_profile, nav_rail_width, page_layout_for_frame,
-    page_layout_for_viewport, performance_budget_for_perf_frame,
-    performance_budget_from_page_layout, vertical_space,
+    page_layout_for_viewport, performance_budget_for_perf_frame, vertical_space,
 };
 use crate::app::Message;
 use iced::Size;
@@ -16,15 +15,18 @@ use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::saved_views::SavedViewPreset;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::navigation::NavOrientation;
-use taskmanager_ui_contract::presentation::budget::{PageLayoutBudget, SystemPageBudget};
+use taskmanager_ui_contract::presentation::budget::{
+    PageLayoutBudget, PerformancePageBudget, SystemPageBudget,
+};
 use taskmanager_ui_contract::presentation::vocabulary::{
     ChromePresentation, DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
     PerformanceChartInventory, PerformanceDetailsPresentation, SystemSurfacePresentation,
     VerticalSpace,
 };
-use zhuge_ui_core::virtual_list::DEFAULT_OVERSCAN;
 use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, max_band_rows};
 
 fn frame(width: f32, height: f32) -> Size {
     Size::new(width, height)
@@ -36,7 +38,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(ultra.profile, LayoutProfile::UltraCompact);
     assert_eq!(ultra.vertical_space, VerticalSpace::Constrained);
     assert_eq!(ultra.navigation, NavigationPresentation::IconOnly);
-    let ultra_performance = performance_budget_from_page_layout(ultra);
+    let ultra_performance = PerformancePageBudget::for_page_layout(ultra, FrontendShape::Iced);
     assert_eq!(
         ultra_performance.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -59,7 +61,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(standard.vertical_space, VerticalSpace::Standard);
     assert_eq!(standard.page_padding, 16.0);
     assert_eq!(
-        performance_budget_from_page_layout(standard).chart_inventory,
+        PerformancePageBudget::for_page_layout(standard, FrontendShape::Iced).chart_inventory,
         PerformanceChartInventory::Full
     );
     assert_eq!(
@@ -73,7 +75,8 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(wide_short.profile, LayoutProfile::Wide);
     assert_eq!(wide_short.vertical_space, VerticalSpace::Constrained);
     assert_eq!(wide_short.navigation, NavigationPresentation::Labeled);
-    let wide_short_performance = performance_budget_from_page_layout(wide_short);
+    let wide_short_performance =
+        PerformancePageBudget::for_page_layout(wide_short, FrontendShape::Iced);
     assert_eq!(
         wide_short_performance.device_navigation,
         DeviceNavigationPresentation::Sidebar
@@ -201,7 +204,7 @@ fn every_profile_and_vertical_pair_has_one_explicit_page_allocation() {
                 content_width: 0.0,
                 content_height: 0.0,
             };
-            let performance = performance_budget_from_page_layout(layout);
+            let performance = PerformancePageBudget::for_page_layout(layout, FrontendShape::Iced);
             assert_eq!(
                 performance.device_navigation,
                 match profile {
@@ -397,7 +400,7 @@ fn elastic_layout_playbook_table_columns_under_narrow_and_wide_short_viewports()
             "window end <= total_rows at {width}x{height}"
         );
         let materialized_count = window.end - window.start;
-        let max_visible = (viewport_height / row_height).ceil() as usize + 2 * DEFAULT_OVERSCAN + 1;
+        let max_visible = max_band_rows(row_height, viewport_height, DEFAULT_OVERSCAN);
         assert!(
             materialized_count <= max_visible,
             "materialized rows ({materialized_count}) must be bounded by viewport capacity ({max_visible}) at {width}x{height}"
@@ -580,11 +583,10 @@ fn elastic_layout_playbook_stats_rails_and_detail_slots_under_narrow_and_wide_sh
     use super::super::perf_layout::{bounded_heading, bounded_stat_text};
     use super::{
         PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH, PERFORMANCE_STATS_MIN_WIDTH,
-        PERFORMANCE_STATS_STACK_HEIGHT,
     };
     use taskmanager_ui_contract::presentation::vocabulary::{
-        PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_RUNWAY_CORE_FLOOR, PerformanceDetailsPresentation,
-        PerformanceVerticalRunway,
+        PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_RUNWAY_CORE_FLOOR, PERFORMANCE_STATS_STACK_HEIGHT,
+        PerformanceDetailsPresentation, PerformanceVerticalRunway,
     };
 
     assert_eq!(PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);

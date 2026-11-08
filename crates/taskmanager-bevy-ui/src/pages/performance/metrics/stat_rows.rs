@@ -3,6 +3,7 @@
 //! dashes for observations the projection does not carry.
 
 use super::*;
+use taskforest_core::core::percent::percent_text;
 
 /// One already-folded row for a renderer's statistics list.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -159,7 +160,7 @@ pub(crate) fn gpu_header_view_model(shell: &ShellApp) -> HeaderViewModel {
     let subtitle = gpu.and_then(|gpu| gpu.driver.clone()).unwrap_or_default();
     let vital = gpu
         .and_then(|gpu| gpu.current_utilization_pct())
-        .map(|utilization| format!("{utilization:.0}%"))
+        .map(percent_text)
         .unwrap_or_default();
     HeaderViewModel {
         title,
@@ -178,7 +179,7 @@ pub(crate) fn battery_header_view_model(shell: &ShellApp) -> HeaderViewModel {
         .unwrap_or_default();
     let vital = battery
         .and_then(|battery| battery.current_capacity_pct())
-        .map(|capacity| format!("{capacity}%"))
+        .map(percent_text)
         .unwrap_or_default();
     HeaderViewModel {
         title,
@@ -222,8 +223,7 @@ pub(crate) fn disk_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
         |label: String, value: Option<String>| value.map(|value| StatsRow::new(label, value));
     rows.extend(optional(
         t("disk.active_time").to_owned(),
-        disk.current_active_time_pct()
-            .map(|value| format!("{:.0}%", value.round())),
+        disk.current_active_time_pct().map(percent_text),
     ));
     rows.extend(optional(
         t("disk.read").to_owned(),
@@ -289,13 +289,13 @@ pub(crate) fn disk_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
     if let Some(value) = disk.smart_available_spare_pct {
         rows.push(StatsRow::new(
             t("disk.available_spare").to_owned(),
-            format!("{value:.0}%"),
+            percent_text(value),
         ));
     }
     if let Some(value) = disk.smart_percent_used {
         rows.push(StatsRow::new(
             t("disk.endurance_used").to_owned(),
-            format!("{value:.0}%"),
+            percent_text(value),
         ));
     }
     if let Some(hours) = disk.smart_power_on_hours {
@@ -377,8 +377,7 @@ pub(crate) fn network_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
     ));
     rows.extend(optional(
         t("common.utilization").to_owned(),
-        nic.current_utilization_pct()
-            .map(|value| format!("{value:.0}%")),
+        nic.current_utilization_pct().map(percent_text),
     ));
     if let Some(value) = nic.driver.as_deref().filter(|value| !value.is_empty()) {
         rows.push(StatsRow::new(
@@ -390,7 +389,7 @@ pub(crate) fn network_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
         let quality = wifi_signal_quality_percent(signal);
         rows.push(StatsRow::new(
             t("common.signal").to_owned(),
-            format!("{signal} dBm ({quality:.0}%)"),
+            format!("{signal} dBm ({})", percent_text(quality)),
         ));
     }
     rows
@@ -408,8 +407,7 @@ pub(crate) fn gpu_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
         |label: String, value: Option<String>| value.map(|value| StatsRow::new(label, value));
     rows.extend(optional(
         t("common.utilization").to_owned(),
-        gpu.current_utilization_pct()
-            .map(|value| format!("{:.0}%", value.round())),
+        gpu.current_utilization_pct().map(percent_text),
     ));
     if let Some(value) = gpu
         .marketing_name
@@ -511,7 +509,7 @@ pub(crate) fn battery_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
     if let Some(capacity) = battery.current_capacity_pct() {
         rows.push(StatsRow::new(
             t("battery.capacity").to_owned(),
-            format!("{capacity}%"),
+            percent_text(capacity),
         ));
     }
     rows.push(StatsRow::new(
@@ -538,9 +536,7 @@ pub(crate) fn battery_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
     ));
     rows.extend(optional(
         t("battery.health").to_owned(),
-        battery
-            .current_health_pct()
-            .map(|value| format!("{value:.1}%")),
+        battery.current_health_pct().map(percent_text),
     ));
     rows.extend(optional(
         t("battery.time_to_full").to_owned(),

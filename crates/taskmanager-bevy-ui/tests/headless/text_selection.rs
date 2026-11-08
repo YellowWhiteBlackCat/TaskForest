@@ -5,35 +5,13 @@
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
-use taskforest_core::core::metrics::ScalarObservation;
-use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::FeedbackSeverity;
-use taskmanager_shell::{FeedbackSource, ShellApp, fixture};
+use taskmanager_shell::{FeedbackSource, ShellApp};
 
 use super::{ClipboardPort, TextSelectionSession, TextSelectionState, copy_selection_or_row};
 
-fn token_process(pid: u32, name: &str) -> ProcessItem {
-    let mut process = ProcessItem::new(pid, name);
-    process.apply_scalar_observations(ProcessScalarObservations {
-        start_token: ScalarObservation::available(u64::from(pid) * 10_000, 1),
-        ..Default::default()
-    });
-    process
-}
-
-fn shell_with_selection() -> ShellApp {
-    let mut shell = ShellApp::new();
-    fixture::edit_processes(&mut shell, |processes| {
-        *processes = Some(vec![
-            token_process(100, "alpha"),
-            token_process(200, "beta"),
-        ])
-    });
-    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
-    shell
-}
+use crate::selection_fixture_support::shell_with_selection;
 
 impl ClipboardPort {
     pub(crate) fn get_text(&self) -> Option<&str> {

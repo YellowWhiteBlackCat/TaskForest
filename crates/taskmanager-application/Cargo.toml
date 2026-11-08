@@ -17,6 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
+zhuge-ui-core.workspace = true
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }

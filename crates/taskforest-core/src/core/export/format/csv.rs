@@ -5,6 +5,7 @@
 //! their escaping rules.
 
 use crate::core::metrics::SystemSnapshot;
+use crate::core::percent::percent_text;
 use crate::core::process::ProcessItem;
 
 /// Escape one CSV field per RFC 4180: if it contains a comma, double-quote, or
@@ -149,7 +150,7 @@ pub fn processes_to_html(snap: &SystemSnapshot, procs: &[ProcessItem]) -> String
     html_escape(snap.cpu.brand.as_deref().unwrap_or("—"), &mut out);
     out.push_str(" &middot; ");
     match snap.cpu.current_global_usage_pct() {
-        Some(usage) => out.push_str(&format!("{usage:.1}% global")),
+        Some(usage) => out.push_str(&format!("{} global", percent_text(usage))),
         None => out.push_str("— global"),
     }
     out.push_str("</td></tr>\n");
@@ -161,9 +162,10 @@ pub fn processes_to_html(snap: &SystemSnapshot, procs: &[ProcessItem]) -> String
         snap.memory.used_percentage_observed(),
     ) {
         (Some(used), Some(total), Some(percentage)) => out.push_str(&format!(
-            "{} / {} ({percentage:.0}%)",
+            "{} / {} ({})",
             fmt_mib(used),
             fmt_mib(total),
+            percent_text(percentage),
         )),
         (Some(used), _, _) => out.push_str(&format!("{} / — (—)", fmt_mib(used))),
         _ => out.push_str("— / — (—)"),
@@ -181,9 +183,10 @@ pub fn processes_to_html(snap: &SystemSnapshot, procs: &[ProcessItem]) -> String
                 snap.memory.swap_percentage_observed(),
             ) {
                 (Some(used), Some(percentage)) => out.push_str(&format!(
-                    "{} / {} ({percentage:.0}%)",
+                    "{} / {} ({})",
                     fmt_mib(used),
                     fmt_mib(total),
+                    percent_text(percentage),
                 )),
                 _ => out.push_str(&format!("— / {} (—)", fmt_mib(total))),
             }

@@ -150,7 +150,7 @@ fn group_aggregate_cells_and_details_preserve_partial_permission_coverage() {
     let text = frame_text(&app, 180, 52);
 
     assert!(
-        text.contains("12%P1/2"),
+        text.contains("13%P1/2"),
         "the narrow CPU cell keeps a rounded current value and coverage: {text}"
     );
     assert!(

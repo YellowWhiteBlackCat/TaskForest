@@ -31,8 +31,6 @@
 //! cadence but keeps the accepted session available to the central permission
 //! center and to the next GPU-page visit.
 
-use std::time::Duration;
-
 use gpui::{AsyncApp, Context, WeakEntity};
 use taskforest_contract::CapabilityId;
 
@@ -46,7 +44,7 @@ use crate::gpui_app::root::RootView;
 /// `.policy` uses `auth_admin_keep`, so once authorized for the session
 /// subsequent invocations do NOT re-prompt — this just refreshes the busy
 /// percentages. Chosen inside the task's 2–3 s guidance band.
-const POLL_INTERVAL: Duration = Duration::from_millis(2500);
+use taskmanager_application::REFRESH_CADENCE;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RootView state-management glue
@@ -124,7 +122,7 @@ impl RootView {
 /// Each iteration submits ONE engine-rows request through the `PlatformClient`
 /// (a non-blocking channel send — the BLOCKING pkexec/helper invocation happens
 /// on the runtime's bounded engine-rows lane thread), then sleeps
-/// [`POLL_INTERVAL`] and loops while the generation is current and the state is
+/// [`REFRESH_CADENCE`] and loops while the generation is current and the state is
 /// live. The typed answer returns as a `gpu_engine_rows_events` publication in
 /// a later platform batch; `root/gpu_engine_rows.rs` applies it to this state
 /// machine. The generation guard terminates the chain when the user disables,
@@ -161,7 +159,7 @@ pub(crate) fn spawn_refresh_loop(
             // Pause before the next refresh. Re-check the generation AND the
             // live state after the sleep so a disable / device-switch / page
             // navigation during the wait terminates the chain cleanly.
-            cx.background_executor().timer(POLL_INTERVAL).await;
+            cx.background_executor().timer(REFRESH_CADENCE).await;
             let still_active = weak
                 .update(cx, |v, _cx| {
                     let still_active = v.gpu_engine_polling_is_current(poll_gen)

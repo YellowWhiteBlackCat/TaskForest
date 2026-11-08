@@ -27,7 +27,8 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 };
 use taskmanager_theme::Theme;
 
-use super::projection::GpuChartLayout;
+use super::projection::engine_charts;
+use taskmanager_shell::presentation::observed_percentage;
 
 type IcedTheme = iced::Theme;
 
@@ -55,15 +56,15 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
     } = props;
     // The chart inventory comes from the typed frame budget (both axes); no
     // local compact-flag derivation remains.
-    let chart_layout = GpuChartLayout::for_inventory(budget.chart_inventory);
+
     // GPUI parity: no metric selector. The Full inventory REPLACES the
     // aggregate utilization headline with the complete engine inventory when
     // the GPU reports more than one engine; otherwise the utilization family
     // keeps the headline contract. Every other measured scalar family renders
     // simultaneously as a secondary chart below (also Full-gated).
-    let engines: Vec<&GpuEngine> = chart_layout.engine_charts(gpu).collect();
+    let engines: Vec<&GpuEngine> = engine_charts(budget.chart_inventory, gpu).collect();
     let mut graphs: Vec<Element<'a, Message, IcedTheme, Renderer>> = Vec::new();
-    if chart_layout.shows_secondary_regions() && engines.len() > 1 {
+    if budget.chart_inventory.includes_extended_charts() && engines.len() > 1 {
         graphs.extend(gpu_engine_inventory(
             app,
             gpu,
@@ -95,7 +96,7 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
         }
         let samples =
             app.cached_gpu_chart_metric_series(&gpu.device_id, gpu.device_generation.get(), metric);
-        if !chart_layout.shows_secondary_regions()
+        if !budget.chart_inventory.includes_extended_charts()
             || !gpu_metric_available(gpu, metric)
             || !samples.iter().any(|value| value.is_finite())
         {
@@ -195,9 +196,7 @@ fn gpu_engine_inventory<'a>(
     compact: bool,
 ) -> Vec<Element<'a, Message, IcedTheme, Renderer>> {
     let mut engines: Vec<&GpuEngine> =
-        GpuChartLayout::for_inventory(PerformanceChartInventory::Full)
-            .engine_charts(gpu)
-            .collect();
+        engine_charts(PerformanceChartInventory::Full, gpu).collect();
     let Some(primary_index) = engines
         .iter()
         .position(|engine| engine.name.to_ascii_lowercase().contains("3d"))
@@ -209,7 +208,7 @@ fn gpu_engine_inventory<'a>(
     let primary_usage = primary
         .usage_pct
         .is_finite()
-        .then(|| gpu_percent_readout(Some(primary.usage_pct)));
+        .then(|| observed_percentage(Some(primary.usage_pct)));
     let primary_samples =
         app.cached_gpu_engine_series(&gpu.device_id, gpu.device_generation.get(), &primary.name);
     let mut cards = vec![device_mini_graph_fill(
@@ -232,7 +231,7 @@ fn gpu_engine_inventory<'a>(
                 let usage = engine
                     .usage_pct
                     .is_finite()
-                    .then(|| gpu_percent_readout(Some(engine.usage_pct)));
+                    .then(|| observed_percentage(Some(engine.usage_pct)));
                 device_mini_graph_with_height(
                     app.cached_gpu_engine_series(
                         &gpu.device_id,

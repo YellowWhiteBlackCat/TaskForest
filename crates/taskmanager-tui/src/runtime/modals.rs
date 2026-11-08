@@ -22,6 +22,7 @@
 mod health;
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
 use taskforest_core::core::process::ProcessLiveKey;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{AppPage, ProcessInsightFacet};
 use taskmanager_shell::InputDispatch;
 
@@ -113,7 +114,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
             }
             ratatui::crossterm::event::KeyCode::Char(number @ '1'..='7') if !ctrl => {
                 if let Some(target) = app.process_properties_mut()
-                    && target.section == crate::ProcessDetailsSection::Insights
+                    && target.section == ProcessDetailsSection::Insights
                     && let Some(facet) =
                         ProcessInsightFacet::ALL.get((number as usize) - ('1' as usize))
                 {
@@ -134,7 +135,7 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
             ratatui::crossterm::event::KeyCode::Char('e')
                 if !ctrl
                     && app.process_properties().is_some_and(|target| {
-                        target.section == crate::ProcessDetailsSection::Insights
+                        target.section == ProcessDetailsSection::Insights
                             && target.facet == ProcessInsightFacet::Network
                             && ProcessLiveKey::from_process(&target.item).is_some_and(|identity| {
                                 crate::ui::process_details::network_requires_escalation(

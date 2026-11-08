@@ -146,7 +146,11 @@ fn startup_impact_text_carries_the_tier_duration_or_typed_unknown() {
     };
     assert_eq!(
         startup_impact_text(&unknown),
-        i18n::t("startup.impact_unknown"),
+        format!(
+            "{} · {}",
+            i18n::t(unknown.impact.i18n_key()),
+            i18n::t("startup.impact_unmeasured")
+        ),
         "an unmeasured impact never fabricates a duration"
     );
 }

@@ -3,6 +3,8 @@
 use std::convert::Infallible;
 use std::io;
 use std::time::Duration;
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -24,7 +26,8 @@ use crate::{TuiApp, TuiTheme};
 use crate::render;
 
 mod capture_profile;
-mod keys;
+mod frame_timing;
+pub(crate) mod keys;
 mod modals;
 mod navigation;
 mod seam;
@@ -54,11 +57,6 @@ const EVENT_POLL: Duration = Duration::from_millis(100);
 const EVENT_DRAIN_BATCH: usize = 16;
 /// The help overlay's PageUp/PageDown scroll stride (rows per page press).
 const HELP_PAGE_STEP: usize = 8;
-/// Per-engine GPU utilization re-request cadence while a session is enabled on
-/// the visible Performance·GPU page (mirrors GPUI's 2.5 s panel interval; the
-/// polkit `auth_admin_keep` session means post-first reads do not re-prompt).
-const GPU_ENGINE_ROWS_REFRESH: Duration = Duration::from_millis(2500);
-
 /// Per-cycle signals the dirty-flag predicate consults to decide whether the
 /// TUI should repaint this iteration. The TUI used to call `terminal.draw` on
 /// every loop cycle (≈10 Hz, the [`EVENT_POLL`] cadence); the runtime now
@@ -107,14 +105,6 @@ pub fn snapshot_text(width: u16, height: u16) -> String {
     let theme = TuiTheme::from_params(app.theme_params);
     let _ = unwrap_infallible(terminal.draw(|frame| render(frame, &app, theme)));
     terminal.backend().to_string()
-}
-
-fn unix_now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
 }
 
 fn capture_page_name(page: AppPage) -> &'static str {
@@ -405,7 +395,8 @@ fn key_to_terminal(event: KeyEvent) -> Option<ShellKeyEvent> {
 }
 
 fn begin_observations(app: &mut TuiApp, platform: &mut PlatformClient) {
-    app.first_run.observe(Some(platform), unix_now_ms());
+    app.first_run
+        .observe(Some(platform), unix_millis(SystemTime::now()));
     queue_effect(app, platform, PlatformEffect::ObserveDesktopAppearance);
 }
 

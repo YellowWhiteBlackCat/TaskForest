@@ -35,7 +35,7 @@ use gpui::{
 use taskforest_core::core::FailureKind;
 use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n;
-use taskmanager_application::{RefreshRequest, SourceStateKind, merge_source_lines};
+use taskmanager_application::{RefreshRequest, merge_source_lines};
 use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -511,19 +511,6 @@ pub fn unavailable_source_state(
     Some(content.into_any_element())
 }
 
-/// Kind → banner-title key: the ONLY outcome→copy fold on this surface. A
-/// degraded source (partial answer) keeps the softer title; stale and failed
-/// sources both mean "the provider did not answer" and share the unavailable
-/// title. Copy itself stays in the locale catalog.
-fn banner_title_key(kind: SourceStateKind) -> &'static str {
-    if kind == SourceStateKind::Degraded {
-        "source.partial_title"
-    } else {
-        // Stale | Failed (merge never headlines a healthy/unknown line).
-        "source.unavailable_title"
-    }
-}
-
 /// Compact, non-blocking source warning shown above a list that still has
 /// usable rows. It keeps the data visible while making partial results and
 /// their recovery policy explicit.
@@ -581,7 +568,7 @@ pub fn source_notice_with_detail_presentation(
 ) -> Option<AnyElement> {
     let merged = merge_source_lines(sources)?;
     let notice = merged.notice;
-    let title = i18n::t(banner_title_key(merged.kind));
+    let title = i18n::t(merged.kind.banner_title_key());
     let failure = crate::gpui_app::root::platform_lists::control_error_detail(notice.failure());
     let content = match presentation {
         SourceNoticePresentation::Standard => div()

@@ -58,7 +58,7 @@ fn pristine_first_launch_has_no_gpui_recovery_feedback() {
         panic!("expected initial load outcome");
     };
 
-    assert!(initial_config_recovery_message(*recovery).is_none());
+    assert!(recovery.initial_message().is_none());
 
     drop(client);
     drop(coordinator);

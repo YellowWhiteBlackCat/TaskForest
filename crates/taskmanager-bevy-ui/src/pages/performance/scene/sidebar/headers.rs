@@ -2,10 +2,10 @@
 
 use crate::pages::performance::metrics::cpu::cpu_field_text;
 use crate::pages::performance::metrics::{
-    battery_header_view_model, battery_sidebar_caption, disk_header_view_model,
-    disk_sidebar_caption, fan_header_view_model, fan_sidebar_caption, gpu_header_view_model,
-    gpu_sidebar_caption, memory_header_view_model, memory_sidebar_caption,
-    network_header_view_model, network_sidebar_caption,
+    battery_caption, battery_header_view_model, disk_header_view_model, disk_sidebar_caption,
+    fan_caption, fan_header_view_model, gpu_header_view_model, gpu_sidebar_caption,
+    memory_header_view_model, memory_sidebar_caption, network_header_view_model,
+    network_sidebar_caption,
 };
 use crate::pages::performance::{
     CpuField, DynField, DynText, PerformanceDeviceTarget, PerformanceHeaderTarget,
@@ -89,7 +89,7 @@ pub(super) fn device_gpu_caption_scene(gpu: &GpuMetrics) -> Box<dyn Scene> {
 }
 
 pub(super) fn device_battery_caption_scene(battery: &BatteryInfo) -> Box<dyn Scene> {
-    let (cap1, cap2) = battery_sidebar_caption(battery);
+    let (cap1, cap2) = battery_caption(battery);
     caption_pair_scene(
         cap1,
         cap2,
@@ -98,7 +98,7 @@ pub(super) fn device_battery_caption_scene(battery: &BatteryInfo) -> Box<dyn Sce
 }
 
 pub(super) fn device_fan_caption_scene(fan: &SensorReading) -> Box<dyn Scene> {
-    let (cap1, cap2) = fan_sidebar_caption(fan);
+    let (cap1, cap2) = fan_caption(fan);
     caption_pair_scene(
         cap1,
         cap2,

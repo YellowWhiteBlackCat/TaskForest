@@ -62,9 +62,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use taskmanager_theme::GlassTier;
-use taskmanager_ui_contract::{
-    OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
-};
+use taskmanager_ui_contract::{OverlayDismissCause, tooltip_dismisses};
 
 use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::palette::{UiPalette, space_4, space_8};
@@ -73,11 +71,6 @@ use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 
 /// The hover delay before the card becomes visible.
 pub(crate) const TOOLTIP_DELAY: Duration = Duration::from_millis(300);
-
-/// Whether the shared tooltip policy dismisses on one normalized cause.
-fn tooltip_dismisses(cause: OverlayDismissCause) -> bool {
-    dismiss_outcome(OverlayKind::Tooltip, cause, OverlayDismissContext::single()).dismiss
-}
 
 /// Active session of an element hover tooltip.
 #[derive(Clone, Debug, PartialEq, Eq)]

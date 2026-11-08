@@ -51,10 +51,11 @@ src/core.rs                     owner-module index for every fact below
 ├── config/  config.rs          configuration facts and runtime config groups
 ├── diagnostics/                diagnostic snapshot and bundle facts
 ├── history.rs                  gap-aware history facts
-├── storage.rs  storage_health.rs  directory_usage.rs   storage and health facts
+├── storage.rs  storage_health.rs  directory_usage.rs   storage and health facts;
+│                                                       NVMe wear/spare warning rules
 ├── power.rs  npu.rs            power/RAPL and NPU accelerator facts
 ├── cpu_codename.rs  cpu_features.rs                    CPU identity facts
-├── appearance.rs  text.rs  units.rs  tray.rs           presentation helpers
+├── appearance.rs  percent.rs  text.rs  units.rs  tray.rs  presentation helpers
 ├── device_state.rs  system_health.rs  kernel_log.rs    system-level facts
 ├── session.rs  setup.rs  source.rs  target.rs          session identity, family availability and setup/source facts
 └── identity.rs  hardware.rs  failure.rs                core identity and failure types

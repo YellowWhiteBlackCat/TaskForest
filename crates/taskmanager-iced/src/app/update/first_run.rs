@@ -2,6 +2,8 @@
 
 use super::super::{FirstRunMessage, IcedApp, LocalSurface, LocalSurfaceKind, Message};
 use super::dispatch::UpdateDispatch;
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::first_run::FirstRunCompletion;
 use taskmanager_application::{PlatformEffect, UrlOpenRequest};
 use taskmanager_assets::product::REPOSITORY_URL;
@@ -9,10 +11,8 @@ use taskmanager_shell::QuitReason;
 
 impl IcedApp {
     pub(crate) fn begin_first_run_observation(&mut self) {
-        self.first_run.observe(
-            self.runtime.platform_mut(),
-            super::super::refresh::unix_now_ms(),
-        );
+        self.first_run
+            .observe(self.runtime.platform_mut(), unix_millis(SystemTime::now()));
     }
 
     pub(super) fn reduce_first_run_message(&mut self, message: Message) -> UpdateDispatch {
@@ -38,7 +38,7 @@ impl IcedApp {
                 self.first_run.request(
                     action,
                     self.runtime.platform_mut(),
-                    super::super::refresh::unix_now_ms(),
+                    unix_millis(SystemTime::now()),
                 );
                 UpdateDispatch::none()
             }

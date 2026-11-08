@@ -24,6 +24,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod accessibility_projection;
 pub mod app;
 pub mod fixture;
 pub mod history;
@@ -37,6 +38,11 @@ pub mod service_query;
 pub mod system_timeline;
 pub mod viewmodel;
 
+pub use accessibility_projection::{
+    MAX_PUBLISHED_ROWS, base_semantic_snapshot_builder, default_status_announcement,
+    memory_percentage, semantic_cpu_graph, semantic_process_row, semantic_snapshot_header,
+    semantic_status, shell_process_selected,
+};
 pub use app::inventory_rows::{
     InventoryProjectionGeneration, InventoryRowAnchor, InventoryRowDomain, InventoryRowId,
 };

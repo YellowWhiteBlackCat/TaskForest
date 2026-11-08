@@ -19,6 +19,7 @@ use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
+use zhuge_ui_core::row_page::row_budget;
 
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::process_telemetry::LimitValue;
@@ -42,6 +43,7 @@ mod threads;
 pub(super) use formatting::format_connection;
 use formatting::{format_bytes, format_limit, format_pair, format_rate, isolation_label};
 pub use labels::ProcessInsightsLabels;
+use taskforest_core::core::percent::percent_text;
 
 /// Widget-materialization cap shared by the scrollable insight cards (threads,
 /// open files, connections). The collected data stays complete — card headers
@@ -50,14 +52,6 @@ pub use labels::ProcessInsightsLabels;
 /// of elements on every frame the modal is open. Rows beyond the cap are
 /// reported through the explicit `… {count} more` hint.
 pub(super) const MAX_INSIGHT_CARD_ROWS: usize = 200;
-
-/// Pure window math for the card cap: `(shown, hidden)` for a collection of
-/// `total` rows. Extracted so the bounded-materialization contract is testable
-/// without rendering.
-pub(super) fn capped_card_rows(total: usize) -> (usize, usize) {
-    let shown = total.min(MAX_INSIGHT_CARD_ROWS);
-    (shown, total - shown)
-}
 
 /// Attach the test-support row selector to one insight-card row.
 ///
@@ -194,7 +188,11 @@ fn network_card(
                 .child(labels.no_connections.to_string()),
         );
     } else {
-        let (shown, hidden) = capped_card_rows(network.connections.len().saturating_sub(first));
+        let budget = row_budget(
+            network.connections.len().saturating_sub(first),
+            MAX_INSIGHT_CARD_ROWS,
+        );
+        let (shown, hidden) = (budget.shown(), budget.hidden());
         connections = connections.child(
             div()
                 .text_size(font_size(tokens::FONT_11))
@@ -336,7 +334,7 @@ fn gpu_card(
                     labels.gpu_usage,
                     device
                         .utilization_pct
-                        .map(|value| format!("{value:.1}%"))
+                        .map(percent_text)
                         .unwrap_or_else(|| labels.unknown.to_string()),
                 ))
                 .child(metric_row(
@@ -371,7 +369,7 @@ fn resource_card(
     let memory = resources
         .memory_usage_percent()
         .map_or(memory.clone(), |percent| {
-            format!("{memory} ({percent:.0}%)")
+            format!("{memory} ({})", percent_text(percent))
         });
     let cpu = match (
         resources.cpu_time_quota_micros,
@@ -379,7 +377,7 @@ fn resource_card(
     ) {
         (Some(LimitValue::Unlimited), _) => labels.unlimited.to_string(),
         (Some(LimitValue::Value(quota)), Some(period)) if period > 0 => {
-            format!("{:.1}%", quota as f64 / period as f64 * 100.0)
+            percent_text(quota as f64 / period as f64 * 100.0)
         }
         _ => labels.unknown.to_string(),
     };
@@ -392,7 +390,9 @@ fn resource_card(
     );
     let pids = resources
         .process_usage_percent()
-        .map_or(pids.clone(), |percent| format!("{pids} ({percent:.0}%)"));
+        .map_or(pids.clone(), |percent| {
+            format!("{pids} ({})", percent_text(percent))
+        });
     let resource_group = resources
         .resource_group
         .map(ToOwned::to_owned)
@@ -527,7 +527,11 @@ pub(crate) fn environment_card(
             .text_color(hsla(theme.fg_dim))
             .child(header),
     );
-    let (shown, hidden) = capped_card_rows(environment.entries.len().saturating_sub(first));
+    let budget = row_budget(
+        environment.entries.len().saturating_sub(first),
+        MAX_INSIGHT_CARD_ROWS,
+    );
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     content = content.child(
         div()
             .flex()

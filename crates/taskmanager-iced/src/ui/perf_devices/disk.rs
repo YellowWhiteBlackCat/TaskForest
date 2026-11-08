@@ -10,11 +10,12 @@ use taskforest_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot}
 
 use crate::ui::smart_self_test_confirmation::confirmation;
 use taskmanager_shell::presentation::{
-    device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
+    device_status_i18n_key, effective_smart_status, finite_peak, has_smart_fields, missing_value,
 };
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
+use taskforest_core::core::percent::percent_text;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
@@ -86,9 +87,7 @@ pub(crate) fn disk_summary_lines(
         ),
         StatRow::text(
             t("disk.active_time"),
-            observed
-                .active_time_pct
-                .map(|value| format!("{:.0}%", value.round())),
+            observed.active_time_pct.map(percent_text),
         ),
         StatRow::text(t("disk.read"), rate(observed.read_bytes_per_sec)),
         StatRow::text(t("disk.write"), rate(observed.write_bytes_per_sec)),
@@ -182,15 +181,15 @@ pub(crate) fn disk_summary_lines(
     if let Some(pct) = disk.smart_percent_used {
         rows.push(StatRow::text(
             t("disk.endurance_used"),
-            Some(format!("{pct:.0}%")),
+            Some(percent_text(pct)),
         ));
     }
     if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
-        let value = if spare <= threshold {
-            format!("{spare:.0}% ⚠ (≤{threshold:.0}%)")
+        let threshold = disk.smart_spare_warning_threshold_pct();
+        let value = if disk.smart_spare_pool_needs_warning() {
+            format!("{} ⚠ (≤{})", percent_text(spare), percent_text(threshold))
         } else {
-            format!("{spare:.0}%")
+            percent_text(spare)
         };
         rows.push(StatRow::text(t("disk.available_spare"), Some(value)));
     }
@@ -359,8 +358,7 @@ fn disk_graphs<'a>(
     // The throughput graph's Y ceiling tracks the traffic peak. Switching it
     // in one step makes the curve jump, so the ceiling eases over the shared
     // 120 ms damped transition: the axis and the curve move together.
-    let traffic_peak = crate::trend_strip::finite_peak(&read_samples)
-        .max(crate::trend_strip::finite_peak(&write_samples));
+    let traffic_peak = finite_peak(&read_samples).max(finite_peak(&write_samples));
     let mut throughput_graph = graph;
     throughput_graph.max_override = Some(range::damped_ceiling(
         &disk.device_id,
@@ -539,12 +537,12 @@ pub(crate) fn partition_usage_text(
             let ratio = (used as f32 / total as f32).clamp(0.0, 1.0);
             (
                 format!(
-                    "{} / {} · {} {} · {:.0}%",
+                    "{} / {} · {} {} · {}",
                     quantity_text_pref(used, units.use_bytes, units.use_base2),
                     quantity_text_pref(total, units.use_bytes, units.use_base2),
                     t("disk.free"),
                     quantity_text_pref(free, units.use_bytes, units.use_base2),
-                    ratio * 100.0,
+                    percent_text(ratio * 100.0),
                 ),
                 Some(ratio),
             )

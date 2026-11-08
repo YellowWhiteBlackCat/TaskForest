@@ -40,7 +40,7 @@ fn battery_stats_render_health_and_estimates_only_when_current() {
         time_to_empty_secs: ScalarObservation::available(3_780.0, 10),
         ..Default::default()
     }));
-    assert_eq!(row_value(&full, "battery.health").as_deref(), Some("87.5%"));
+    assert_eq!(row_value(&full, "battery.health").as_deref(), Some("88%"));
     assert_eq!(
         row_value(&full, "battery.time_to_empty").as_deref(),
         Some("01h 03m")
@@ -81,7 +81,7 @@ fn battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absen
         row_value(&rows, "battery.voltage").as_deref(),
         Some("12.40 V")
     );
-    assert_eq!(row_value(&rows, "battery.health").as_deref(), Some("87.5%"));
+    assert_eq!(row_value(&rows, "battery.health").as_deref(), Some("88%"));
     assert_eq!(row_value(&rows, "battery.cycles").as_deref(), Some("312"));
 
     let sparse = battery_stats(&battery_with_scalars(BatteryScalarObservations::default()));

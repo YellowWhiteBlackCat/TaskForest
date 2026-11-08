@@ -1,6 +1,5 @@
 //! Complete, responsive alert-rule editor controls.
 
-use super::{metric_label, severity_label};
 use gpui::{Div, Entity, ParentElement, SharedString, Styled, div, rems};
 use std::collections::HashSet;
 use std::time::Duration;
@@ -41,25 +40,6 @@ struct AlertTargetOption {
     label: String,
 }
 
-fn metric_supports_target(metric: AlertMetric) -> bool {
-    matches!(
-        metric,
-        AlertMetric::DiskTemperatureC
-            | AlertMetric::SmartPercentUsed
-            | AlertMetric::SmartCriticalWarning
-    )
-}
-
-fn maximum_threshold(metric: AlertMetric) -> f32 {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => 100.0,
-        AlertMetric::DiskTemperatureC => 200.0,
-        AlertMetric::SmartCriticalWarning => 1.0,
-    }
-}
-
 fn next_custom_rule_id(rules: &[ManagedAlertRule]) -> String {
     let ids: HashSet<_> = rules
         .iter()
@@ -97,7 +77,7 @@ fn target_options(disks: &[DiskMetrics]) -> Vec<AlertTargetOption> {
 }
 
 fn cycle_target(rule: &mut AlertRule, targets: &[AlertTargetOption]) {
-    if !metric_supports_target(rule.metric) || targets.is_empty() {
+    if !rule.metric.is_disk_scoped() || targets.is_empty() {
         rule.target = None;
         return;
     }
@@ -122,7 +102,7 @@ fn apply_adjustment(
     let before = rule.clone();
     match adjustment {
         RuleAdjustment::Threshold(delta) => {
-            rule.threshold = (rule.threshold + delta).clamp(0.0, maximum_threshold(rule.metric));
+            rule.threshold = (rule.threshold + delta).clamp(0.0, rule.metric.threshold_ceiling());
             rule.hysteresis = rule.hysteresis.min(rule.threshold);
         }
         RuleAdjustment::Duration(delta) => {
@@ -257,7 +237,7 @@ fn target_control(
     managed: &ManagedAlertRule,
     entity: &Entity<RootView>,
 ) -> Div {
-    let supports_target = metric_supports_target(managed.rule.metric);
+    let supports_target = managed.rule.metric.is_disk_scoped();
     let value = if supports_target {
         managed
             .rule
@@ -344,7 +324,7 @@ fn rule_row(
                 .child(
                     div()
                         .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
-                        .child(metric_label(managed.rule.metric)),
+                        .child(i18n::alert_metric_label(managed.rule.metric)),
                 )
                 .child(
                     div()
@@ -377,7 +357,7 @@ fn rule_row(
                         .child(elements::pill(
                             theme,
                             ("alert-severity", index),
-                            severity_label(managed.rule.severity),
+                            i18n::alert_severity_label(managed.rule.severity),
                             false,
                             false,
                             move |_window, cx| {

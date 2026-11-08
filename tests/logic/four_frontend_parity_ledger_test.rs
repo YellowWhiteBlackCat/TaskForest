@@ -14,12 +14,23 @@ use taskmanager_accessibility_linux::snapshot_to_tree_update;
 use taskmanager_application::CommandId;
 use taskmanager_shell::presentation::{command_help, page_help};
 use taskmanager_shell::presentation::{graph_summary, peak_of};
-use taskmanager_theme::color::contrast_ratio;
 use taskmanager_theme::{
-    HighContrast, LightDark, NativeAppearance, ResolvedFonts, Skin, Theme, detect_high_contrast,
-    detect_mode,
+    Color, HighContrast, LightDark, NativeAppearance, ResolvedFonts, Skin, Theme,
+    detect_high_contrast, detect_mode,
 };
 use taskmanager_ui_contract::{GraphSummary, ProcessRowInput, SemanticSnapshotBuilder};
+use zhuge_ui_tokens::Rgba;
+
+/// WCAG contrast between two theme colors.
+///
+/// The ratio has one owner: `zhuge-ui-tokens` (ADR-063 — the token crate owns
+/// the color science). The theme's own `Color` is the toolkit-neutral
+/// projection, so the measurement maps onto the owner's type and back rather
+/// than re-deriving luminance here.
+fn contrast_ratio(first: Color, second: Color) -> f32 {
+    let to_token = |color: Color| Rgba::new(color.r, color.g, color.b, color.a);
+    to_token(first).contrast_ratio(to_token(second))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Frontend {

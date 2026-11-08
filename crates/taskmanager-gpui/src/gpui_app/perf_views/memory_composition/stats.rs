@@ -5,9 +5,11 @@
 
 use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_shell::memory::memory_segments;
+use taskmanager_shell::presentation::observed_percentage;
 
 use crate::gpui_app::formatting;
 use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_application::i18n;
 
@@ -105,9 +107,7 @@ pub(super) fn summary_tiles(memory: &MemoryMetrics, units: UnitPreferences) -> S
         .map_or_else(formatting::missing_value, |value| {
             units.format_quantity(value, QuantityFamily::Memory, false)
         });
-    let used_note = memory
-        .used_percentage_observed()
-        .map_or_else(formatting::missing_value, |value| format!("{value:.0}%"));
+    let used_note = observed_percentage(memory.used_percentage_observed());
     // Kernel `MemAvailable` excludes the ZFS ARC; the tile reads the core
     // ARC-aware availability projection so a ZFS host doesn't look starved.
     let available = memory
@@ -134,9 +134,7 @@ pub(super) fn summary_tiles(memory: &MemoryMetrics, units: UnitPreferences) -> S
         }
         _ => formatting::missing_value(),
     };
-    let swap_note = memory
-        .swap_percentage_observed()
-        .map_or_else(formatting::missing_value, |value| format!("{value:.0}%"));
+    let swap_note = observed_percentage(memory.swap_percentage_observed());
 
     SummaryTiles {
         used,
@@ -160,13 +158,16 @@ pub(super) fn swap_bar_stats(
     units: UnitPreferences,
 ) -> Option<SwapBarStats> {
     let used = memory.current_swap_used_bytes()?;
-    let total_bytes = memory.current_swap_total_bytes()?.max(1);
+    let total_bytes = memory.current_swap_total_bytes()?;
+    if total_bytes == 0 {
+        return None;
+    }
     let total = bytes_to_gib(total_bytes);
     let used_share = (bytes_to_gib(used) / total).clamp(0.0, 1.0) as f32;
     let mut label = format!(
-        "Swap  {}  ({:.0}%)",
+        "Swap  {}  ({})",
         units.format_quantity_pair(used, total_bytes, QuantityFamily::Memory, false),
-        used_share * 100.0,
+        percent_text(used_share * 100.0),
     );
     if let Some(zram) = memory.current_compressed_swap_used_bytes()
         && zram > 0

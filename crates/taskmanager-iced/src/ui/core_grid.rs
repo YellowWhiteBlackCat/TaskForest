@@ -5,9 +5,11 @@
 //! graphs read). Each cell renders a rolling mini-HISTORY sparkline of its
 //! whole window — a tiny line+area `Canvas` (reusing the Performance chart's
 //! `[0,100]` point projection) — with the LATEST sample tinting the line by
-//! load tier: green up to 60%, amber 60–85%, red above. A pinned core therefore
-//! pops at a glance AND shows its recent trend, matching the gpui per-core cell
-//! (which renders a rolling mini-history per logical core). The "XX%" readout
+//! load tier. A pinned core therefore pops at a glance AND shows its recent
+//! trend. The band edges and the clamp-and-bucket fold come from the shared
+//! load-tier contract (`taskmanager_ui_contract::presentation::load_tiers`);
+//! the gpui per-core cell by contrast tints by CPU type and declares that axis
+//! absent, so no parity claim is made here. The "XX%" readout
 //! stays beneath the sparkline. A core with no finite sample yet renders an
 //! honest dash, never a fabricated 0%; a core with a single sample draws no
 //! line (the readout carries the value) until a second snapshot arrives.
@@ -34,19 +36,19 @@ use iced::{Color, Length, Point, Rectangle, Size};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_theme::{Theme, tokens};
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::load_tiers::{LoadTier, load_tier};
 
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_runs};
 use crate::theme;
 use crate::ui::components::{chart_inset, chart_surface, styled_scrollable};
 use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::percent::percent_text;
+use zhuge_ui_core::row_page::page_count;
 
 /// Cells per row in the grid.
 const CELLS_PER_ROW: usize = 6;
-/// Load-tier band edges (percent): below [`WARN_EDGE`] is green, up to
-/// [`DANGER_EDGE`] is amber, above is red.
-const WARN_EDGE: f32 = 60.0;
-const DANGER_EDGE: f32 = 85.0;
 /// Fixed per-cell sparkline height (a touch taller than the app-history row
 /// sparkline so a pinned core's recent history reads at a glance inside the
 /// cell). Width is `Fill` against the cell so the line tracks the column.
@@ -78,7 +80,7 @@ pub(crate) const CORE_GRID_SCROLL_ID: &str = "performance-cpu-core-grid";
 /// host submits 22 batched canvases instead of 128 per-core ones.
 #[must_use]
 pub(crate) fn grid_row_count(core_count: usize) -> usize {
-    core_count.div_ceil(CELLS_PER_ROW)
+    page_count(core_count, CELLS_PER_ROW)
 }
 
 /// The sparkline band of one cell inside a row box.
@@ -262,7 +264,7 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
 pub(crate) fn format_core_readout(usage_pct: Option<f32>, freq_mhz: Option<u64>) -> String {
     let mut parts = Vec::with_capacity(2);
     if let Some(value) = usage_pct.filter(|value| value.is_finite()) {
-        parts.push(format!("{:>3.0}%", value.clamp(0.0, 100.0)));
+        parts.push(format!("{:>4}", percent_text(value.clamp(0.0, 100.0))));
     }
     match freq_mhz {
         Some(mhz) if mhz >= 1000 => parts.push(format!("{:.1} GHz", mhz as f64 / 1000.0)),
@@ -310,10 +312,7 @@ fn core_grid_cell(
         // observation is unavailable. Dim that stale trend and keep the
         // readout missing instead of treating the history gap (NaN) as a
         // current percentage.
-        let stroke_color = usage_pct
-            .filter(|value| value.is_finite())
-            .map(|value| tier_color(theme_snapshot, value.clamp(0.0, 100.0)))
-            .unwrap_or_else(|| crate::theme_binding::color(theme_snapshot.fg_dim));
+        let stroke_color = tier_color(theme_snapshot, usage_pct);
         let chart = CoreCellChart::new(samples, stroke_color);
         // The slot reserves the band the batched canvas draws into; the row's
         // band is the same band the cell reserves.
@@ -493,18 +492,17 @@ impl canvas::Program<Message> for CoreRowBatch {
     }
 }
 
-/// The load-tier color for one utilization value: success below [`WARN_EDGE`],
-/// warning up to [`DANGER_EDGE`], danger above — the same green/amber/red bands
-/// the TUI grid paints (both derive from the shared theme tokens).
+/// The load-tier color for one core's latest observation: the same band fold
+/// the TUI grid paints, from the shared load-tier contract. Which ink each
+/// tier wears is Iced's own theme binding, and an unobserved or non-finite
+/// reading wears the dim missing ink — never a fabricated calm band.
 #[must_use]
-fn tier_color(theme: &Theme, utilization: f32) -> Color {
-    let pct = utilization.clamp(0.0, 100.0);
-    let token = if pct >= DANGER_EDGE {
-        theme.danger
-    } else if pct >= WARN_EDGE {
-        theme.warning
-    } else {
-        theme.success
+fn tier_color(theme: &Theme, utilization: Option<f32>) -> Color {
+    let token = match utilization.and_then(|value| load_tier(FrontendShape::Iced, value)) {
+        Some(LoadTier::Alarm) => theme.danger,
+        Some(LoadTier::Warning) => theme.warning,
+        Some(LoadTier::Calm) => theme.success,
+        None => theme.fg_dim,
     };
     crate::theme_binding::color(token)
 }

@@ -5,6 +5,7 @@ use iced::Element;
 use taskforest_core::core::metrics::{GpuMetrics, SystemSnapshot};
 
 use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_shell::presentation::{
     bytes, device_status_i18n_key, gpu_display_identity, missing_value,
 };
@@ -92,9 +93,7 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         ),
         StatRow::text(
             t("common.utilization"),
-            observed
-                .utilization_pct
-                .map(|value| format!("{:.0}%", value.round())),
+            observed.utilization_pct.map(percent_text),
         ),
     ];
     if let Some(name) = gpu
@@ -202,7 +201,7 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
     if let Some(value) = observed.idle_residency_pct {
         rows.push(StatRow::text(
             t("gpu.idle_residency"),
-            Some(format!("{:.0}%", value.round())),
+            Some(observed_percentage(Some(value))),
         ));
     }
     if let Some(value) = observed.temperature_c {
@@ -233,7 +232,7 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         .current_fan_speed_pct()
         .filter(|value| value.is_finite())
     {
-        rows.push(StatRow::text(t("fan.pwm"), Some(format!("{pct:.0}%"))));
+        rows.push(StatRow::text(t("fan.pwm"), Some(percent_text(pct))));
     }
     if let Some(driver) = gpu.driver.as_deref() {
         rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
@@ -265,7 +264,7 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         if !engine.name.trim().is_empty() && engine.usage_pct.is_finite() {
             rows.push(StatRow::text(
                 engine.name.clone(),
-                Some(format!("{:.0}%", engine.usage_pct.round())),
+                Some(observed_percentage(Some(engine.usage_pct))),
             ));
         }
     }
@@ -322,7 +321,7 @@ pub(crate) fn append_gpu_engine_stats(
                 }
                 stats.push(StatRow::text(
                     engine.name.clone(),
-                    Some(format!("{:.0}%", engine.utilization_pct.round())),
+                    Some(observed_percentage(Some(engine.utilization_pct))),
                 ));
                 seen.push(engine.name.clone());
             }
@@ -344,10 +343,6 @@ pub(crate) fn append_gpu_engine_stats(
     }
 }
 
-pub(crate) fn gpu_percent_readout(value: Option<f32>) -> String {
-    value.map_or_else(missing_value, |value| format!("{:.0}%", value.round()))
-}
-
 pub(super) fn gpu_headline_label_value(
     metric: super::projection::GpuHeadlineMetric,
 ) -> (String, String) {
@@ -358,7 +353,7 @@ pub(super) fn gpu_headline_label_value(
             t("common.utilization").to_owned(),
             match metric.value {
                 Some(GpuHeadlineValue::UtilizationPercent(value)) => {
-                    gpu_percent_readout(Some(value))
+                    observed_percentage(Some(value))
                 }
                 _ => missing(),
             },
@@ -447,6 +442,7 @@ pub(crate) fn gpu_section(
 mod engine_graph;
 pub(crate) use engine_graph::engine_rows_presentation;
 use engine_graph::{GpuBlockProps, gpu_block};
+use taskforest_core::core::percent::percent_text;
 
 /// Dedicated visual progress bars and percentage meters for Dedicated VRAM and Shared VRAM.
 ///
@@ -482,11 +478,14 @@ pub(crate) fn gpu_vram_meters_panel<'a>(
 
             let header = iced::widget::row![
                 iced::widget::text(label).size(f32::from(tokens::FONT_12)),
-                iced::widget::text(format!("{used_str} / {total_str} ({:.1}%)", pct * 100.0))
-                    .size(f32::from(tokens::FONT_11))
-                    .style(move |_| iced::widget::text::Style {
-                        color: Some(theme::muted_text_color(theme_snapshot)),
-                    }),
+                iced::widget::text(format!(
+                    "{used_str} / {total_str} ({})",
+                    percent_text(pct * 100.0)
+                ))
+                .size(f32::from(tokens::FONT_11))
+                .style(move |_| iced::widget::text::Style {
+                    color: Some(theme::muted_text_color(theme_snapshot)),
+                }),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center);
@@ -588,7 +587,7 @@ pub(crate) fn gpu_engines_panel<'a>(
                 let clamped = (pct_val / 100.0).clamp(0.0, 1.0);
                 let row_header = iced::widget::row![
                     iced::widget::text(name.clone()).size(f32::from(tokens::FONT_12)),
-                    iced::widget::text(format!("{:.0}%", pct_val.round()))
+                    iced::widget::text(observed_percentage(Some(*pct_val)))
                         .size(f32::from(tokens::FONT_11))
                         .style(move |_| iced::widget::text::Style {
                             color: Some(theme::muted_text_color(theme_snapshot)),
@@ -614,7 +613,7 @@ pub(crate) fn gpu_engines_panel<'a>(
         let summary = engine_items
             .iter()
             .take(3)
-            .map(|(n, p)| format!("{n}: {:.0}%", p.round()))
+            .map(|(n, p)| format!("{n}: {}", percent_text(*p)))
             .collect::<Vec<_>>()
             .join(" · ");
         panel_col.push(

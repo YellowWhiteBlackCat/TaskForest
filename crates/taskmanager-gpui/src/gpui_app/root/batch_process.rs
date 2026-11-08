@@ -1,17 +1,19 @@
 //! Confirmation and result plumbing for typed multi-process actions.
 
-use super::{RootView, platform_submission_time_ms};
+use super::RootView;
 use crate::gpui_app::elements;
 use gpui::{
     AnyElement, App, ClipboardItem, Context, Entity, IntoElement, ParentElement, ScrollHandle,
     Styled, Window, div, px,
 };
+use std::time::SystemTime;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::{
     ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
     ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
     ProcessLiveKey, export_process_batch_history,
 };
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, PendingConfirmation, ProcessControlRequest, RefreshRequest,
@@ -210,7 +212,7 @@ impl RootView {
                 platform
                     .submit_process_control(
                         ProcessControlRequest::ExecuteBatch(intent),
-                        platform_submission_time_ms(),
+                        unix_millis(SystemTime::now()),
                     )
                     .map_err(super::process_control::submission_failure_kind)
             },
@@ -237,7 +239,7 @@ impl RootView {
     ) {
         let feedback = record_completed_process_batch(
             &mut self.process_batch_history,
-            platform_submission_time_ms(),
+            unix_millis(SystemTime::now()),
             result,
         );
         self.show_local_feedback(feedback, cx);

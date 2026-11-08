@@ -95,10 +95,10 @@
 本表不重复登记组件级差异；权威在以下声明：
 
 - 组件能力：`crates/taskmanager-ui-contract/src/capabilities.rs` 与四端 `src/capabilities.rs` 声明 19 个非 `Ported` 单元格（Iced 4、TUI 9、Bevy 6），其中 1 个为 `Unsupported`（TUI Tooltip）。
-- 产品意图：四端 `src/functional.rs` 声明 9 个非 `Reference` 意图（TUI 2 个 `Unsupported` + 7 个 `AcceptedDifference`）。
-- 特性账本：`crates/taskmanager-ui-contract/src/feature_coverage.rs` 注册 107 个 `FeatureId`，其中 106 个各采纳一个 225 蓝图槽位（含 10 个 Wave 3/4 交付与 29 个新推进特性：LTTB 下采样、饱和度分级、D-state 占比、原生告警集成、效率模式、复合过滤、套接字状态跟踪、文件系统挂载审计、no-new-privs、四项服务诊断项、八项硬件/遥测项，以及八项控制/取证/驱动项：冻结解冻控制、ZSWAP/内存压缩、固件安全启动、GPU 节流原因、GPU 驱动固件 API、进程用户凭据、服务状态机与服务 cgroup 内存限额），另 1 个是额外的 `memory.process-swap-charge`（不占蓝图槽位）；`pressure.memory-thrashing-health` 额外作为 slot 179 的声明别名；该注册表里的 23 个特性在四端一致声明 `Unsupported`。
-- 蓝图处置：完整 225 槽产品 census 由 `scripts/parity/blueprint_dispositions.tsv` + `BlueprintDispositionTable` 拥有（ADR-059）：107 个 `Adopted(FeatureId)`、118 个显式 `Unsupported`（附公开原因）、0 个未处置；未采纳槽位由 126 项收敛至 118 项。`Unsupported` 不是 `Ready`，不补证据锚点；采纳某项时新增 `FeatureId` 并在同一变更中把槽位翻为 `Adopted`。
-- 特性证据：`scripts/parity/feature_evidence.tsv` 的 212 个特性格已全部锚定（0 pending、0 dangling）；原先 3 个 pending 特性（多格式导出、多分辨率环、内存抖动健康分）已由四端真实行为测试关闭，Bevy 也补齐了带扣分明细的健康事实行。
+- 产品意图：四端 `src/functional.rs` 声明 9 个非 `Reference` 意图单元格（含 7 个 `AcceptedDifference`：Iced 3、TUI 3、Bevy 1；以及 TUI 2 个 `Unsupported`）。
+- 特性账本：`crates/taskmanager-ui-contract/src/feature_coverage.rs` 注册 225 个 `FeatureId`，覆盖全部 15 个功能区（每区 15 项），完整对应 225 项四端平权蓝图（含 10 个 Wave 3/4 核心交付），另有 1 个额外的 `memory.process-swap-charge`（不占蓝图槽位）；`pressure.memory-thrashing-health` 额外作为 slot 179 的声明别名。
+- 蓝图处置：完整 225 槽产品 census 由 `scripts/parity/blueprint_dispositions.tsv` + `BlueprintDispositionTable` 拥有（ADR-059）：225 个 `Adopted(FeatureId)`、0 个 `Unsupported`、0 个未处置。
+- 特性证据：`scripts/parity/feature_evidence.tsv` 的 220 个特性格已全部锚定（0 pending、0 dangling），由四端真实行为测试闭环。
 
 因此 `Aligned` 只表示场景语义等价，不表示像素或手势一致；像素级一致仍须由 capture 与 capability 声明共同判定。
 

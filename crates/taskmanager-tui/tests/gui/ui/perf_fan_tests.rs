@@ -4,7 +4,7 @@ use taskforest_core::core::identity::DeviceId;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
-    SensorScale,
+    SensorReading, SensorScale,
 };
 use taskmanager_application::i18n::{Language, set_language, t};
 use taskmanager_shell::ShellApp;

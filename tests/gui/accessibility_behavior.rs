@@ -10,9 +10,10 @@ use gpui::{
 };
 
 use taskmanager_gpui::gpui_app::elements;
-use taskmanager_gpui::gpui_app::root::{InputModality, RootView, TopPage};
+use taskmanager_gpui::gpui_app::root::{RootView, TopPage};
 use taskmanager_theme::Theme;
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
+use taskmanager_ui_contract::InputModality;
 
 /// The harness window root is our own RootView directly (P4 consumption switch:
 /// the gc Root wrapper is gone; the LayerStack overlay host lives inside

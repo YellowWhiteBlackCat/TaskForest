@@ -39,65 +39,10 @@ use crate::TuiApp;
 pub(crate) mod process_properties_support;
 use crate::TuiTheme;
 use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskmanager_application::ProcessDetailsSection;
+use taskmanager_application::i18n::process_details_section_label;
 use taskmanager_application::process_details_vm::process_details_rows_with_local_time;
 use taskmanager_shell::presentation::command_identity_summary;
-
-/// The active Properties section. Mirrors GPUI's `ProcessDetailsSection`
-/// (`crates/taskmanager-gpui/src/gpui_app/root/chrome.rs`): Overview / Performance / Command / Insights.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum ProcessDetailsSection {
-    #[default]
-    Overview,
-    Performance,
-    Command,
-    Insights,
-}
-
-impl ProcessDetailsSection {
-    /// Every section in the order the Tab / Left-Right cycle walks them.
-    /// Enumerated here (not re-listed at the call site) so the quality gate's
-    /// "no duplicated variant list" rule holds.
-    pub const ALL: [Self; 4] = [
-        Self::Overview,
-        Self::Performance,
-        Self::Command,
-        Self::Insights,
-    ];
-
-    /// The next section in the Overview → Performance → Command → Insights cycle.
-    #[must_use]
-    pub const fn next(self) -> Self {
-        match self {
-            Self::Overview => Self::Performance,
-            Self::Performance => Self::Command,
-            Self::Command => Self::Insights,
-            Self::Insights => Self::Overview,
-        }
-    }
-
-    /// The previous section (BackTab / Left cycle).
-    #[must_use]
-    pub const fn prev(self) -> Self {
-        match self {
-            Self::Overview => Self::Insights,
-            Self::Performance => Self::Overview,
-            Self::Command => Self::Performance,
-            Self::Insights => Self::Command,
-        }
-    }
-
-    /// The existing i18n catalog key for the tab label (reused as-is so the
-    /// modal adds no locales edits).
-    #[must_use]
-    pub const fn label_key(self) -> &'static str {
-        match self {
-            Self::Overview => "prop.overview",
-            Self::Performance => "prop.performance",
-            Self::Command => "prop.command",
-            Self::Insights => "prop.insights",
-        }
-    }
-}
 
 /// The Properties modal's frozen target: the process row plus the active tab,
 /// plus the tab body's vertical-scroll intent. The process is cloned at open
@@ -211,7 +156,7 @@ fn tab_row_line(active: Option<ProcessDetailsSection>, theme: TuiTheme) -> Line<
     for section in ProcessDetailsSection::ALL {
         let is_active = active == Some(section);
         spans.push(Span::styled(
-            format!(" {} ", t(section.label_key())),
+            format!(" {} ", process_details_section_label(section)),
             if is_active {
                 Style::new()
                     .fg(theme.color(Color::White))

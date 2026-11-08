@@ -8,7 +8,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
 };
-use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::{ApplicationHistoryStatus, PerformanceHistoryProjection, i18n::t};
 use taskmanager_shell::presentation::{history_replay::row_heading, missing_value};
 
@@ -45,7 +44,7 @@ fn render_projection(
     let mut heading = format!(
         "{} · {}",
         t("perf.replay.title"),
-        window_label(model.selected_window)
+        model.selected_window.compact_token()
     );
     if model.stale() {
         heading.push_str(&format!(" · {}", t("history.application.refreshing")));
@@ -117,13 +116,5 @@ fn render_projection(
             )));
         }
         frame.render_widget(Paragraph::new(lines), rect);
-    }
-}
-
-fn window_label(window: HistoryWindow) -> &'static str {
-    match window {
-        HistoryWindow::OneHour => "1h",
-        HistoryWindow::TwentyFourHours => "24h",
-        HistoryWindow::SevenDays => "7d",
     }
 }

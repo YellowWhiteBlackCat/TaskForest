@@ -8,8 +8,10 @@ use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::perf_history::ProcessPerfHistory;
 use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{
     i18n::t,
     process_details_vm::{ProcessDetailsField, detail_value, process_details_rows_with_local_time},
@@ -36,7 +38,7 @@ impl IcedApp {
         let caption = |field, label: &'static str, samples: &[f32], current, family, rate| {
             let peak = peak_of(samples, current).map(|peak| {
                 if field == ProcessDetailsField::Cpu {
-                    format!("{peak:.1}%")
+                    precise_percent_text(peak)
                 } else {
                     format_quantity_f64(f64::from(peak), family, rate, &UnitPreferences::default())
                 }
@@ -146,7 +148,7 @@ impl IcedApp {
 
     /// The process-details modal's active section tab.
     #[must_use]
-    pub fn details_section(&self) -> DetailsSection {
+    pub fn details_section(&self) -> ProcessDetailsSection {
         self.process_presentation.details_section
     }
 

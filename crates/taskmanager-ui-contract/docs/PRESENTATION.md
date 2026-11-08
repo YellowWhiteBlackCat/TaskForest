@@ -17,6 +17,7 @@ parity       probe grid and the unexplained-difference rule
 sizes        control-role matrix and hit-target floor
 motion       motion-role/curve matrix and forbidden sites
 resolution   the frame's resolved facts and the re-deriving verifier
+load_tiers   the per-core load-tier band edges + the clamp-and-bucket fold
 ```
 
 Intent, metric and classification are shared ("求同"). Units, chrome deduction
@@ -41,6 +42,11 @@ A deliberate per-shape difference is an explicit row in `thresholds` with an
 architecture driver, or an `unrecorded:` debt cell in the census. The probe
 grid computes `unexplained_differences(left, right)`; "(GPUI parity)" prose is
 not evidence (ARCH § 8.3).
+`load_tiers` applies the same discipline to the per-core load band: Iced and
+the TUI share the reference edges, Bevy's wider bar band carries its driver in
+the declaration, and GPUI declares the axis absent because its matrix tints by
+CPU type. The ink each tier paints with and the missing-sample convention stay
+per-shape paint facts until a capture decides them.
 
 ## Evidence
 

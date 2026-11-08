@@ -160,7 +160,7 @@ pub(super) fn device_row(
         .gap(definite_length(tokens::SPACE_10))
         .child(
             icons_binding::icon(icon)
-                .size(px(16.0))
+                .size(definite_length(tokens::ICON_INLINE))
                 .text_color(hsla(if is_sel { base } else { theme.fg_dim })),
         )
         .child(

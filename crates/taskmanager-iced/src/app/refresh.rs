@@ -1,7 +1,9 @@
 //! Named tick systems for platform drain, scheduling and view-local finish.
 
 use super::*;
+use std::time::SystemTime;
 use taskforest_core::core::identity::DeviceId;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::first_run::FirstRunCompletion;
 use taskmanager_application::{DesktopAppearanceEvent, ServiceUpdate};
 
@@ -15,7 +17,7 @@ use taskmanager_shell::gpu_chart_metric_gate;
 use taskmanager_shell::queue_effect_result;
 use taskmanager_shell::{ShellApp, queue_effect};
 
-const GPU_ENGINE_ROWS_REFRESH: std::time::Duration = std::time::Duration::from_millis(2500);
+use taskmanager_application::REFRESH_CADENCE;
 
 struct TickPlan {
     insight_effect: Option<PlatformEffect>,
@@ -67,7 +69,7 @@ impl IcedApp {
     fn prepare_tick_system(&mut self) -> TickPlan {
         self.poll_service_log_export();
         let insight_effect = self.request_selected_process_insights();
-        let now_ms = unix_now_ms();
+        let now_ms = unix_millis(SystemTime::now());
         self.window_time.observe_tick_millis(now_ms);
         let service_log_effect = self.shell.poll_service_log(now_ms);
         let details_log_effect = (!self.runtime.is_demo())
@@ -82,7 +84,7 @@ impl IcedApp {
             self.shell.gpu_engine_rows_state(),
             GpuEngineRowsState::Loading { .. } | GpuEngineRowsState::Ready(_)
         ) && selected_gpu_index.is_some()
-            && self.runtime.gpu_engine_rows_due(GPU_ENGINE_ROWS_REFRESH)
+            && self.runtime.gpu_engine_rows_due(REFRESH_CADENCE)
         {
             self.runtime.reset_gpu_engine_rows_cadence();
             let index = selected_gpu_index.unwrap_or_default();
@@ -177,7 +179,7 @@ impl IcedApp {
 
         if !shell.paused() {
             platform.set_telemetry_interval(shell.telemetry_interval());
-            let _ = platform.run_scheduled_refresh(unix_now_ms());
+            let _ = platform.run_scheduled_refresh(unix_millis(SystemTime::now()));
         }
         if let Some(device_id) = plan.gpu_device {
             queue_effect(
@@ -243,12 +245,4 @@ impl IcedApp {
             Some(_) | None => None,
         }
     }
-}
-
-pub(super) fn unix_now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
 }

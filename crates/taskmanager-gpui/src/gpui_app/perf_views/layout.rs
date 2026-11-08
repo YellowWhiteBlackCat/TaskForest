@@ -55,6 +55,8 @@ mod stats;
 pub(super) use stats::stats_panel;
 mod composition;
 use composition::{performance_split, performance_stack};
+use taskforest_core::core::percent::MAX_PERCENT;
+use taskforest_core::core::percent::percent_text;
 
 /// The shared main graph lives in a flex viewport that owns the page height.
 /// A plain intrinsic-height body would leave the graph with no definite
@@ -66,7 +68,6 @@ const COMPACT_GRAPH_MIN_HEIGHT: Length = Length(72.0);
 const COMPACT_GRAPH_HEIGHT: Pixels = px(72.0);
 const COMPACT_GRAPH_SECTION_HEIGHT: Pixels = px(94.0);
 const PERFORMANCE_TITLE_MAX_WIDTH: Length = Length(400.0);
-const PERFORMANCE_STATS_STACK_HEIGHT: Pixels = px(220.0);
 /// Inner trailing breathing room for the pinned statistics rail. The rail is
 /// flush with the page edge by contract, but its text content is not: without
 /// this inset a right-aligned value reaches the window boundary and a long
@@ -173,7 +174,7 @@ impl<'a> ChartSpec<'a> {
             title: None,
             color,
             unit,
-            max: 100.0,
+            max: MAX_PERCENT,
             series: ChartSeries::Single { samples },
             tier: ChartTier::Headline,
             max_height: None,
@@ -201,7 +202,7 @@ impl<'a> ChartSpec<'a> {
             title: None,
             color,
             unit,
-            max: 100.0,
+            max: MAX_PERCENT,
             series: ChartSeries::Dual {
                 aggregate,
                 primary,
@@ -229,7 +230,7 @@ impl<'a> ChartSpec<'a> {
             title: Some(title),
             color,
             unit,
-            max: 100.0,
+            max: MAX_PERCENT,
             series: ChartSeries::Single { samples },
             tier: ChartTier::Secondary,
             max_height: None,
@@ -251,7 +252,7 @@ impl<'a> ChartSpec<'a> {
             title: Some(title),
             color,
             unit,
-            max: 100.0,
+            max: MAX_PERCENT,
             series: ChartSeries::Single { samples },
             tier: ChartTier::Compact,
             max_height: None,
@@ -307,7 +308,7 @@ fn badge_formatter(unit: GraphUnit) -> fn(f32) -> String {
 
 fn format_graph_value(unit: GraphUnit, value: f32) -> String {
     match unit {
-        GraphUnit::Percent => format!("{value:.0}%"),
+        GraphUnit::Percent => percent_text(value),
         GraphUnit::NetworkRate(units) => {
             crate::gpui_app::formatting::format_network_graph_megabytes(units, value)
         }
@@ -514,8 +515,8 @@ pub(crate) fn render_chart(
 fn summary_overlay(theme: &Theme, row: Div) -> Div {
     div()
         .absolute()
-        .bottom(px(6.0))
-        .left(px(8.0))
+        .bottom(definite_length(tokens::SPACE_6))
+        .left(definite_length(tokens::SPACE_8))
         .max_w(px(320.0))
         .min_w(px(0.0))
         .child(

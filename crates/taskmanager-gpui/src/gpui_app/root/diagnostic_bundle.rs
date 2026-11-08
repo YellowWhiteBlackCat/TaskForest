@@ -6,6 +6,7 @@ use gpui::{
 };
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
@@ -28,25 +29,8 @@ use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_r
 
 use super::RootView;
 
-#[derive(Debug, Default)]
-pub(crate) enum DiagnosticBundleRuntime {
-    #[default]
-    Unavailable,
-    Active(DiagnosticBundleSession<DiagnosticBundleClient>),
-}
-
-impl DiagnosticBundleRuntime {
-    pub(crate) fn install(&mut self, client: DiagnosticBundleClient) {
-        *self = Self::Active(DiagnosticBundleSession::new(client));
-    }
-
-    fn active_mut(&mut self) -> Option<&mut DiagnosticBundleSession<DiagnosticBundleClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(crate) type DiagnosticBundleRuntime =
+    SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>;
 
 impl RootView {
     /// Build an immutable sanitized plan. The preview never stores raw sources.

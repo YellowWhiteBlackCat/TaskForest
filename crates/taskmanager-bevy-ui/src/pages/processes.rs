@@ -22,6 +22,7 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppAction, AppPage};
 
 use taskmanager_shell::ShellApp;
+use zhuge_ui_core::row_page::RowPage;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
@@ -303,7 +304,10 @@ fn on_select_step(
         return; // empty table or clamped at the edge: nothing observable moved
     }
     let total = shell.visible_process_count();
-    surface.scroll.top = centered_scroll_top(total, surface.scroll.viewport_rows, shell.selected);
+    surface.scroll.top =
+        RowPage::reveal_centered(total, surface.scroll.viewport_rows, shell.selected)
+            .page()
+            .first();
     let Ok(root) = surface.roots.single() else {
         return;
     };
@@ -327,7 +331,10 @@ fn on_select_row(
     }
     let after = selected_identity(shell);
     let total = shell.visible_process_count();
-    surface.scroll.top = centered_scroll_top(total, surface.scroll.viewport_rows, shell.selected);
+    surface.scroll.top =
+        RowPage::reveal_centered(total, surface.scroll.viewport_rows, shell.selected)
+            .page()
+            .first();
     let Ok(root) = surface.roots.single() else {
         return;
     };
@@ -351,7 +358,10 @@ fn on_toggle_row_selection(
     }
     let after = selected_identity(shell);
     let total = shell.visible_process_count();
-    surface.scroll.top = centered_scroll_top(total, surface.scroll.viewport_rows, shell.selected);
+    surface.scroll.top =
+        RowPage::reveal_centered(total, surface.scroll.viewport_rows, shell.selected)
+            .page()
+            .first();
     let Ok(root) = surface.roots.single() else {
         return;
     };
@@ -525,7 +535,7 @@ fn rebuild_table(
         surface.scroll.top,
         &hidden_ids,
     );
-    surface.scroll.top = projection.window.first;
+    surface.scroll.top = projection.window.first();
     let columns = visible_columns(&hidden_ids);
     let widths = live_widths(&columns, surface.widths.as_deref());
     for artifact in surface.artifacts.iter() {
@@ -556,7 +566,7 @@ fn rebuild_table(
         commands.entity(header).despawn();
     }
     if let Ok(slot) = surface.header_slots.single() {
-        let sort_proj = sort_projection(shell.process_sort);
+        let sort_proj = Some(sort_projection(shell.process_sort));
         let header = header_scene_with_widths(&columns, &widths, sort_proj, &surface.palette.inner);
         let header_node = bsn! {
             Node {
@@ -625,7 +635,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let header = header_scene_with_widths(
         &columns,
         &widths,
-        sort_projection(context.shell.process_sort),
+        Some(sort_projection(context.shell.process_sort)),
         palette,
     );
     let header_slot = bsn! {
@@ -706,6 +716,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
 #[cfg(test)]
 #[path = "../../tests/headless/pages/processes.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/process_fixture_support.rs"]
+mod process_fixture_support;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/processes_table_parity.rs"]

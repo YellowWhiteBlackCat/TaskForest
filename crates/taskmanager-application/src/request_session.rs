@@ -19,7 +19,7 @@ mod smbios_memory;
 
 pub use gpu_engine_rows::{
     GpuEngineRowsFailed, GpuEngineRowsReady, GpuEngineRowsRequestFailure, GpuEngineRowsSession,
-    GpuEngineRowsState,
+    GpuEngineRowsState, REFRESH_CADENCE,
 };
 pub use msr_readout::{
     MsrReadoutFailed, MsrReadoutReady, MsrReadoutRequestFailure, MsrReadoutSession, MsrReadoutState,

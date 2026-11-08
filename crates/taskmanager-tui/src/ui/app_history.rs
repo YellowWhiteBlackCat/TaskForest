@@ -4,7 +4,6 @@ use ratatui::layout::Constraint;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Cell, Paragraph, Row, Wrap};
 use ratatui::{Frame, layout::Rect};
-use taskforest_core::core::history::HistoryWindow;
 use taskmanager_application::{
     ApplicationHistoryProjection, ApplicationHistoryRow, ApplicationHistoryStatus,
     ApplicationHistoryUnavailableReason, i18n::t,
@@ -14,6 +13,7 @@ use taskmanager_shell::presentation::{bytes, missing_value};
 use super::containers::{StatePanel, StatePanelKind};
 use super::sparkline::history_trend_in;
 use crate::{TuiApp, TuiTheme};
+use taskforest_core::core::percent::precise_percent_text;
 
 pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     render_app_history_projection(
@@ -40,7 +40,7 @@ fn render_app_history_projection(
     let title = format!(
         "{} · {}",
         t("history.application.title"),
-        window_label(projection.selected_window)
+        projection.selected_window.compact_token()
     );
     let actions = history_actions();
     let slots = super::pinned_actions::PinnedActions::new(area, &actions);
@@ -134,7 +134,7 @@ fn history_row_text(row: &ApplicationHistoryRow, theme: TuiTheme) -> [String; 5]
     let cpu = row
         .peak_cpu_usage_pct()
         .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
+        .map_or_else(missing_value, precise_percent_text);
     let memory = row
         .peak_memory_bytes()
         .filter(|value| value.is_finite() && *value >= 0.0)
@@ -203,14 +203,6 @@ fn render_history_cards(
             theme.color(Color::White)
         });
         frame.render_widget(Paragraph::new(lines.join("\n")).style(style), slot);
-    }
-}
-
-fn window_label(window: HistoryWindow) -> &'static str {
-    match window {
-        HistoryWindow::OneHour => "1h",
-        HistoryWindow::TwentyFourHours => "24h",
-        HistoryWindow::SevenDays => "7d",
     }
 }
 

@@ -44,6 +44,7 @@ pub(crate) use thermal::thermal_zone_rows;
 pub(crate) mod overview;
 pub(crate) mod privacy;
 pub(crate) mod topology;
+pub(crate) mod topology_graph;
 
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::drain::ShellProjectionFolded;
@@ -58,9 +59,10 @@ use bevy::ui_widgets::{ScrollArea, TextInput};
 use dashboard::{SystemDashboardState, SystemDashboardToolbar};
 use privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
 use taskforest_core::core::metrics::SmbiosMemorySnapshot;
-use taskforest_core::core::npu::NpuEngineKind;
 use taskforest_core::core::npu::NpuInventorySnapshot;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::SmbiosMemoryState;
+use taskmanager_application::i18n;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::health_score_summary;
@@ -131,10 +133,10 @@ pub(crate) fn system_summary_model(projection: &SystemProjectionStore) -> System
     SystemSummaryModel {
         cpu: snapshot
             .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-            .map_or_else(missing_value, |value| format!("{value:.1}%")),
+            .map_or_else(missing_value, percent_text),
         memory: snapshot
             .and_then(|snapshot| snapshot.memory.used_percentage_observed())
-            .map_or_else(missing_value, |value| format!("{value:.1}%")),
+            .map_or_else(missing_value, percent_text),
         processes: projection
             .processes
             .as_ref()
@@ -228,17 +230,10 @@ pub(crate) fn system_fact_rows(
                     .current_value()
                     .copied()
                     .filter(|value| value.is_finite())
-                    .map_or_else(missing_value, |value| format!("{value:.0}%")),
+                    .map_or_else(missing_value, percent_text),
             });
             for engine in &dev.engines {
-                let label = match engine.kind {
-                    NpuEngineKind::Compute => t("npu.engine_compute"),
-                    NpuEngineKind::Matrix => t("npu.engine_matrix"),
-                    NpuEngineKind::Vector => t("npu.engine_vector"),
-                    NpuEngineKind::Video => t("npu.engine_video"),
-                    NpuEngineKind::Copy => t("npu.engine_copy"),
-                    NpuEngineKind::Unknown => t("npu.engine_unknown"),
-                };
+                let label = i18n::npu_engine_kind_label(engine.kind);
                 rows.push(SystemFactRow {
                     group: SystemFactGroup::Npu,
                     label: format!("{} · {label}", t("npu.title")),
@@ -247,7 +242,7 @@ pub(crate) fn system_fact_rows(
                         .current_value()
                         .copied()
                         .filter(|value| value.is_finite())
-                        .map_or_else(missing_value, |value| format!("{value:.0}%")),
+                        .map_or_else(missing_value, percent_text),
                 });
             }
             for (label, observation) in [

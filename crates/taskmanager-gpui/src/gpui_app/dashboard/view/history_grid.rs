@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_application::system_timeline::TimelineMetric;
+use taskmanager_shell::presentation::finite_peak;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::definite_length;
@@ -65,12 +66,4 @@ pub(super) fn render_history_grid(
         grid = grid.child(card(metric, label, color, max, unit, entity.clone()));
     }
     grid
-}
-
-fn finite_peak(samples: &[f32]) -> f32 {
-    samples
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite())
-        .fold(0.0_f32, f32::max)
 }

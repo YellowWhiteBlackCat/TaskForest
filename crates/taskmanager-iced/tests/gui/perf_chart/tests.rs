@@ -147,8 +147,8 @@ fn chronological_projection_always_advances_left_to_right() {
     assert_eq!(sample_x(99, 4, width), width, "out-of-range indices clamp");
     assert_eq!(
         sample_x(0, 1, width),
-        0.0,
-        "one sample has no fabricated span"
+        width,
+        "a lone sample owns the right edge, like every other surface"
     );
 }
 
@@ -232,10 +232,13 @@ fn line_area_and_smooth_geometry_are_built_per_gap_bounded_run() {
 }
 
 #[test]
-fn single_sample_lands_at_the_left_edge_without_fabricating_a_second() {
+fn single_sample_lands_at_the_right_edge_without_fabricating_a_second() {
     let points = single_run(&[42.0]);
     assert_eq!(points.len(), 1, "no second vertex invented for one sample");
-    assert_eq!(points[0].x, 0.0); // step is 0 when count == 1
+    assert_eq!(
+        points[0].x, SIZE.width,
+        "the lone sample owns the right edge, like every other surface"
+    );
     // height * (1 - 0.42) — f32 division is not bit-exact, so compare on an
     // epsilon (the project's established float-assertion convention).
     assert!((points[0].y - 58.0).abs() < 1e-3, "got {}", points[0].y);
@@ -358,9 +361,12 @@ fn vertical_area_gradient_points_from_top_to_bottom() {
 }
 
 /// The hover mapping is the inverse of the point projection: cursor x →
-/// nearest sample index across the width, oldest → newest. Out-of-frame
-/// positions, zero-width frames, and sub-two-sample windows are all honest
-/// `None` (nothing to hover — never a fabricated index).
+/// nearest sample index across the width, oldest → newest. A cursor before
+/// the frame, a zero-width frame, and a non-finite cursor are honest `None`
+/// (nothing to hover — never a fabricated index). Inside the frame the cursor
+/// clamps into the grid, so the right edge is the newest slot and a
+/// one-sample window keeps its sample hoverable — the answers the shared
+/// owner gives every surface.
 #[test]
 fn hovered_index_maps_cursor_x_to_the_nearest_sample() {
     // Four samples across a 200-wide frame: 0, 1, 2, 3 at x = 0, 66.7, 133.3, 200.
@@ -373,9 +379,17 @@ fn hovered_index_maps_cursor_x_to_the_nearest_sample() {
 
     // Honest non-hover states.
     assert_eq!(hovered_index(-1.0, 200.0, 4), None, "left of frame");
-    assert_eq!(hovered_index(200.0, 200.0, 4), None, "right of frame");
+    assert_eq!(
+        hovered_index(200.0, 200.0, 4),
+        Some(3),
+        "the right edge is the newest slot"
+    );
     assert_eq!(hovered_index(50.0, 0.0, 4), None, "zero-width frame");
-    assert_eq!(hovered_index(50.0, 200.0, 1), None, "sub-two-sample window");
+    assert_eq!(
+        hovered_index(50.0, 200.0, 1),
+        Some(0),
+        "a one-sample window keeps its sample hoverable"
+    );
     assert_eq!(hovered_index(f32::NAN, 200.0, 4), None, "non-finite cursor");
 }
 

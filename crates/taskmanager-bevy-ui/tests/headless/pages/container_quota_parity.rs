@@ -44,13 +44,13 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture;
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, ContainerQuotaState, container_quota_view, quota_readout,
+};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
-use super::quota::{
-    ContainerQuotaBreach, ContainerQuotaCell, ContainerQuotaState, ContainerWarningHalo,
-    container_quota_view, quota_readout, warning_halo_alpha,
-};
+use super::quota::{ContainerQuotaCell, ContainerWarningHalo, warning_halo_alpha};
 use super::{ContainerRowMarker, scene};
 use crate::app::PageContext;
 use crate::palette::ui_palette;
@@ -394,7 +394,7 @@ fn an_overrun_stays_visible() {
     );
     let cells = quota_cells(&mut app);
     assert_eq!(
-        cells[0].2, "150.0%",
+        cells[0].2, "150%",
         "the row shows the overrun as the percentage it reached"
     );
     assert_ne!(

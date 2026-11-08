@@ -17,6 +17,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::{ProviderRuntimeState, SystemSnapshot};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     SourceLineProjection, SourceStateKind, device_source_line, truncate_text,
@@ -35,7 +36,7 @@ use crate::health_review::HealthReviewMode;
 #[path = "../../tests/headless/ui/health_support.rs"]
 pub(crate) mod health_support;
 use crate::TuiTheme;
-use crate::ui::alerts::{alert_event_line, managed_rule_line, metric_label, metric_unit};
+use crate::ui::alerts::{alert_event_line, managed_rule_line};
 use crate::ui::{DeviceHealth, classify_device_state};
 use taskforest_core::core::device_state::DeviceState;
 
@@ -110,11 +111,11 @@ fn render_selected_rule_details(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
     };
     let rule = &managed.rule;
     let lines = vec![
-        format!("{} · {}", rule.id, metric_label(rule.metric)),
+        format!("{} · {}", rule.id, i18n::alert_metric_label(rule.metric)),
         format!(
             "Threshold:{:.1}{}  Duration:{}s",
             rule.threshold,
-            metric_unit(rule.metric),
+            rule.metric.unit_suffix(),
             rule.for_duration.as_secs()
         ),
         format!(

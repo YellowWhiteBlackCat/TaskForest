@@ -264,6 +264,8 @@ pub struct SnapshotExportSession<P> {
     port: P,
 }
 
+use crate::session_slot::SessionClose;
+
 impl<P: SnapshotExportPort> SnapshotExportSession<P> {
     #[must_use]
     pub fn new(port: P) -> Self {
@@ -320,6 +322,12 @@ impl<P: SnapshotExportPort> SnapshotExportSession<P> {
 
     pub fn close(&mut self) {
         self.controller.close();
+    }
+}
+
+impl<P: SnapshotExportPort> SessionClose for SnapshotExportSession<P> {
+    fn close_session(&mut self) {
+        self.close();
     }
 }
 

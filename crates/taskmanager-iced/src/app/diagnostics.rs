@@ -11,6 +11,7 @@ use iced::widget::{column, container, row};
 use iced::{Element, Length};
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_theme::Theme;
 
@@ -73,29 +74,8 @@ pub(crate) fn skeleton_wave(phase: f32) -> f32 {
     (phase * std::f32::consts::TAU).cos() * 0.5 + 0.5
 }
 
-#[derive(Debug, Default)]
-pub(super) enum IcedDiagnosticRuntime {
-    #[default]
-    Unavailable,
-    Active(DiagnosticBundleSession<DiagnosticBundleClient>),
-}
-
-impl IcedDiagnosticRuntime {
-    pub(super) fn active_mut(
-        &mut self,
-    ) -> Option<&mut DiagnosticBundleSession<DiagnosticBundleClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-
-    pub(super) fn close(&mut self) {
-        if let Some(session) = self.active_mut() {
-            session.close();
-        }
-    }
-}
+pub(super) type IcedDiagnosticRuntime =
+    SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>;
 
 /// The placeholder bands of the skeleton, painted with the traveling wave.
 fn diagnostic_skeleton_element<'a>(
@@ -159,7 +139,8 @@ impl IcedApp {
 
 impl IcedApp {
     pub(crate) fn install_diagnostic_bundle_client(&mut self, client: DiagnosticBundleClient) {
-        self.diagnostics = IcedDiagnosticRuntime::Active(DiagnosticBundleSession::new(client));
+        self.diagnostics
+            .install_with(|| DiagnosticBundleSession::new(client));
     }
 
     pub(crate) fn open_diagnostic_bundle(&mut self) {

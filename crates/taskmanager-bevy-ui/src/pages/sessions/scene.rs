@@ -2,6 +2,7 @@
 
 use super::*;
 use bevy::text::{LineBreak, TextLayout};
+use taskmanager_application::i18n;
 
 pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
@@ -30,7 +31,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 SessionDisconnectButton
                 Children [
 
-                        Text({ t("users.disconnect").to_owned() })
+                        Text({ i18n::session_control_action_label(SessionControlAction::Disconnect).to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE
@@ -54,7 +55,7 @@ pub(super) fn sessions_toolbar_scene(has_selection: bool, palette: &UiPalette) -
                 SessionLockButton
                 Children [
 
-                        Text({ t("users.lock").to_owned() })
+                        Text({ i18n::session_control_action_label(SessionControlAction::Lock).to_owned() })
                         TextRole(Role::Caption)
                         TextLayout { linebreak: LineBreak::NoWrap }
                         Pickable::IGNORE

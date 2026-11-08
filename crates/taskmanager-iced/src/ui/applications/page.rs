@@ -5,13 +5,14 @@ use crate::IcedApp;
 use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::scrollable::Direction;
 use iced::widget::{column, text_input};
-use iced::{Alignment, Element, Length, Renderer, Theme};
+use iced::{Alignment, Element, Length, Padding, Renderer, Theme};
 use taskforest_core::core::process::ProcessBatchAction;
 use zhuge_ui_core::virtual_list::VirtualWindow;
+use zhuge_ui_kit_iced::surface::{self, StatePanelGeometry};
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body};
 
-use taskmanager_shell::presentation::process_anomaly_summary;
 use taskmanager_shell::presentation::uninterruptible_process_summary;
+use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visible};
 use taskmanager_shell::{ProcessControlScope, SortDir};
 use taskmanager_theme::tokens::FONT_13;
 use taskmanager_theme::tokens::FONT_CAPTION;
@@ -61,7 +62,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
     // A measured zero swap total means the host has no swap device and the
     // Swap column is hidden. An unknown total keeps it visible so unavailable
     // values are not mistaken for confirmed absence.
-    let swap_visible = projection::swap_column_visible(shell.projection().snapshot.as_ref());
+    let swap_visible = swap_column_visible(shell.projection().snapshot.as_ref());
 
     let search: Element<'_, Message, Theme, Renderer> = if shell.search_active() {
         row![
@@ -169,13 +170,24 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         // GPUI-parity empty state: a centered message instead of a blank
         // header + scrollable (render.rs: `proc.no_processes` /
         // `proc.no_processes_match`).
-        container(text(empty_state_message(shell.query.as_str())).size(f32::from(FONT_13)))
-            .center_x(Length::Fill)
-            .center_y(Length::Fill)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .style(move |_| theme::panel_style(theme_snapshot))
-            .into()
+        container(surface::state_panel(
+            Some(empty_state_message(shell.query.as_str())),
+            None,
+            None,
+            StatePanelGeometry {
+                padding: Padding::ZERO,
+                spacing: 0.0,
+                title_size: f32::from(FONT_13),
+                ..StatePanelGeometry::default()
+            },
+            |_| container::Style::default(),
+        ))
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |_| theme::panel_style(theme_snapshot))
+        .into()
     } else {
         let key = applications_virtual_table_key(projection_generation, &row_context, window);
         let open_menu = row_context.open_menu_identity.is_some()
