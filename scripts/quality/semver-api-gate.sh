@@ -54,6 +54,11 @@
 #                                   JSON and the nightly toolchain is installed
 #   SEMVER_RUSTDOC_TOOLCHAIN        toolchain that can emit rustdoc JSON
 #                                   (default: nightly; rustdoc JSON is unstable)
+#   SEMVER_SCRATCH                  run-directory root for the baseline tree, logs
+#                                   and probe (default: repo `.tmp/`, because the
+#                                   per-user quota on `/tmp` is shared machine-wide
+#                                   and a quota-exhausted scratch shows up as I/O
+#                                   errors inside the check, not as an API break)
 #
 # Exit codes:
 #   0  every checked crate kept its public API
@@ -394,7 +399,42 @@ fi
 # ---------------------------------------------------------------------------
 # Per-crate checks
 # ---------------------------------------------------------------------------
-log_dir="$(mktemp -d "${TMPDIR:-/tmp}/semver-api-gate.XXXXXX")"
+# Scratch placement is a gate-reliability decision, not a style one. The
+# baseline-tree extraction, the per-crate logs and the write probe all live
+# here; a filesystem with a tight per-user quota (a qgroup-capped /tmp, for
+# example) turns a machine condition into "Disk quota exceeded" I/O errors
+# inside the check, which the old flow reported as "broke the public API".
+# Default to the repository's ignored `.tmp/`, keep honoring an explicit
+# TMPDIR, and refuse to run when nothing is writable rather than emit a
+# misattributed FAIL.
+scratch_root="${SEMVER_SCRATCH:-${TMPDIR:-$repo/.tmp/semver-gate}}"
+mkdir -p "$scratch_root" 2>/dev/null ||
+    scratch_root="$repo/.tmp/semver-gate"
+mkdir -p "$scratch_root" 2>/dev/null || {
+    fail "no scratch root is writable: '$SEMVER_SCRATCH', TMPDIR and '$repo/.tmp' all failed."
+    fail "point SEMVER_SCRATCH at a writable directory outside any exhausted quota."
+    exit 2
+}
+# A directory can be writable and still be quota-dead for the gigabytes this
+# gate extracts. Probe with a real write before spending minutes building.
+probe_dir="$(mktemp -d "${scratch_root%/}/semver-probe.XXXXXX")" || {
+    fail "cannot create a probe directory under '$scratch_root'"
+    exit 2
+}
+if ! head -c 134217728 /dev/zero >"$probe_dir/write-probe" 2>"$probe_dir/write-probe.err"; then
+    fail "scratch root '$scratch_root' cannot hold the gate's own writes:"
+    sed 's/^/semver-gate:   /' "$probe_dir/write-probe.err" >&2 || true
+    fail "the gate would report an I/O condition as a public-API break; refusing to run."
+    fail "point SEMVER_SCRATCH at a filesystem with at least 128 MiB of writable space."
+    rm -rf "$probe_dir"
+    exit 2
+fi
+rm -rf "$probe_dir"
+
+log_dir="$(mktemp -d "${scratch_root%/}/semver-api-gate.XXXXXX")" || {
+    fail "cannot create the run directory under '$scratch_root'"
+    exit 2
+}
 cleanup() { rm -rf "$log_dir"; }
 trap cleanup EXIT
 

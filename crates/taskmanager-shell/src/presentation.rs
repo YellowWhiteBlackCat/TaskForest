@@ -58,6 +58,7 @@ pub use process::*;
 pub use startup::{startup_impact_text, startup_source_text};
 pub use storage::*;
 use taskforest_core::core::metrics::ResourcePressure;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::precise_percent_text;
 use taskmanager_application::i18n;
 use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
@@ -468,7 +469,7 @@ pub fn cpu_clock_readout(mhz: u64) -> String {
 /// two surfaces can never disagree about the same radio.
 #[must_use]
 pub fn wifi_signal_quality_percent(dbm: i32) -> f32 {
-    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
+    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamped_percent()
 }
 
 /// [`wifi_signal_quality_percent`] over an optional dBm observation: a

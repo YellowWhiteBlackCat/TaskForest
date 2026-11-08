@@ -294,17 +294,82 @@ def find_run_root(repo_root: Path, launcher_pids: set[int]) -> Path | None:
     return None
 
 
+# Poll interval for the receipts below. The budgets are wall-clock because the
+# capture path's own budgets (build, validate, hold) are wall-clock too; the
+# iteration count is derived from the budget so a loop can never run past its
+# own deadline (and stays a bounded iterator, which the repo automation guard
+# requires).
+POLL_INTERVAL_SECONDS = 0.1
+# The supervisor publishes its run identity within a second or two; a minute is
+# already generous for a loaded host.
+IDENTITY_BUDGET_SECONDS = 60.0
+# One private capture is: KWin up, app start + markers, two bounded window
+# receipts, Spectacle, then the independent validator (itself bounded at 180s
+# because it re-hashes the source manifest and both window PNGs). A run that
+# reaches no verdict inside this budget is reported as exactly that.
+VALIDATION_BUDGET_SECONDS = 300.0
+
+
+def budget_polls(budget: float) -> int:
+    return int(budget / POLL_INTERVAL_SECONDS)
+
+
+def run_failure(
+    process: subprocess.Popen[str],
+    run_root: Path | None,
+    description: str,
+) -> IsolationError:
+    """Build the failure message from the run's own receipts, not a guess.
+
+    The capture runner writes its rejection line to `runner-failure.txt` and
+    the supervisor records the child's exit code; without them this test could
+    only say "did not reach validation pass", which reads like an isolation
+    failure even when the cause was a timeout or a rejected capture.
+    """
+    pieces = [f"supervisor exit_code={process.poll()}"]
+    if run_root is not None:
+        try:
+            payload = json.loads((run_root / "supervisor.json").read_text(encoding="utf-8"))
+            pieces.append(f"child_exit_code={payload.get('exit_code')}")
+        except (OSError, json.JSONDecodeError):
+            pass
+        for name in ("runner-failure.txt", "stdout.log"):
+            path = run_root / name
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace").strip()
+            except OSError:
+                continue
+            if text:
+                pieces.append(f"{name}: {text[-600:]}")
+    return IsolationError(
+        f"run {run_root} {description}\n" + "\n".join(pieces)
+    )
+
+
 def wait_for_receipt(repo_root: Path, process: subprocess.Popen[str]) -> RunReceipt:
+    """Wait for one private capture run to publish a passing validation receipt.
+
+    Bounded iteration *and* a wall-clock deadline: the iteration count keeps
+    each loop provably finite (and is derived from the budget), while the
+    deadline is the unit the capture path's own budgets are written in. Every
+    timeout reports what the run actually said — the supervisor's exit code and
+    the runner's own rejection line — instead of the generic "did not reach
+    validation pass", which read like an isolation failure when the cause was a
+    timeout or a rejected capture.
+    """
     run_root: Path | None = None
-    for _ in range(900):
+    identity_deadline = time.monotonic() + IDENTITY_BUDGET_SECONDS
+    for _poll in range(budget_polls(IDENTITY_BUDGET_SECONDS)):
         run_root = find_run_root(repo_root, process_tree(process.pid))
         if run_root is not None:
             break
         if process.poll() is not None:
+            raise run_failure(process, run_root, "exited before publishing its run identity")
+        if time.monotonic() >= identity_deadline:
             break
-        time.sleep(0.1)
+        time.sleep(POLL_INTERVAL_SECONDS)
     if run_root is None:
-        raise IsolationError(f"supervisor {process.pid} did not publish its run identity")
+        raise run_failure(process, run_root, "published no run identity")
     try:
         supervisor_payload = json.loads(
             (run_root / "supervisor.json").read_text(encoding="utf-8")
@@ -313,7 +378,8 @@ def wait_for_receipt(repo_root: Path, process: subprocess.Popen[str]) -> RunRece
         raise IsolationError(f"invalid supervisor receipt: {run_root}") from error
     metadata = {key: str(value) for key, value in supervisor_payload.items()}
     validation = run_root / "validation.json"
-    for _ in range(1200):
+    validation_deadline = time.monotonic() + VALIDATION_BUDGET_SECONDS
+    for _poll in range(budget_polls(VALIDATION_BUDGET_SECONDS)):
         if validation.is_file():
             try:
                 payload = json.loads(validation.read_text(encoding="utf-8"))
@@ -322,11 +388,15 @@ def wait_for_receipt(repo_root: Path, process: subprocess.Popen[str]) -> RunRece
             if payload.get("status") == "pass":
                 metadata.update(read_metadata(run_root / "metadata.txt"))
                 return RunReceipt(process=process, run_root=run_root, metadata=metadata)
+            raise IsolationError(
+                f"run {run_root} validation receipt is not a pass: {payload.get('status')!r}"
+            )
         if process.poll() is not None:
+            raise run_failure(process, run_root, "exited without a validation receipt")
+        if time.monotonic() >= validation_deadline:
             break
-        time.sleep(0.1)
-    log = (run_root / "stdout.log").read_text(encoding="utf-8", errors="replace") if (run_root / "stdout.log").is_file() else ""
-    raise IsolationError(f"run {run_root} did not reach validation pass\n{log[-2000:]}")
+        time.sleep(POLL_INTERVAL_SECONDS)
+    raise run_failure(process, run_root, "reached no validation verdict inside its budget")
 
 
 def launch(repo_root: Path, test_root: Path, label: str) -> subprocess.Popen[str]:
@@ -363,6 +433,92 @@ def launch(repo_root: Path, test_root: Path, label: str) -> subprocess.Popen[str
     )
     handle.close()
     return process
+
+
+CAPTURE_BUILD_COMMAND = [
+    "cargo",
+    "build",
+    "--locked",
+    "--quiet",
+    "-p",
+    "taskmanager-gpui",
+    "--bin",
+    "taskforest-g",
+]
+# The capture path snapshots exactly this command into every receipt
+# (`scripts/capture-host-wayland-diagnostic.sh`, recorded as
+# `build_command` in `metadata.txt`); the prewarm must be the same build,
+# not a lookalike.
+# The pair itself costs about 50 s on a warm target directory; a full cold
+# compile of the GPUI capture binary does not belong in the quick tier at all,
+# so the budget is a capacity bound rather than a build-size promise. Exceeding
+# it means "this host cannot run the stage now", never "the code is broken".
+PREWARM_BUDGET_SECONDS = float(os.environ.get("TM_CAPTURE_PREWARM_SECONDS", "300"))
+
+
+def prewarm_capture_build(
+    repo_root: Path,
+    command: list[str] | None = None,
+    budget: float | None = None,
+) -> None:
+    budget = PREWARM_BUDGET_SECONDS if budget is None else budget
+    """Build the capture binary once, serially, before the A/B pair starts.
+
+    Both private captures snapshot the same Cargo output through one shared
+    build lock. Launched cold and concurrently, they serialize on that lock
+    while each still waits inside the fixed validation budget, so a slow
+    first compile reads as "the other run broke isolation" — the R124
+    host-state FAIL was this race, not the code under test. A single serial
+    pre-build turns the two captures into readers of a fresh binary instead
+    of rivals producing one. A failed pre-build is a fail-closed gate error:
+    without a buildable capture binary the isolation proof means nothing.
+    """
+    build_command = list(command or CAPTURE_BUILD_COMMAND)
+    try:
+        subprocess.run(
+            build_command,
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=budget,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise IsolationUnavailable(
+            f"capture build prewarm exceeded {budget:g}s (cold target directory?): "
+            f"{' '.join(build_command)}"
+        ) from error
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = getattr(error, "stderr", "") or str(error)
+        raise IsolationError(
+            f"capture build prewarm failed: {str(detail).strip()[-400:]}"
+        ) from error
+
+
+def prewarm_self_test(repo_root: Path) -> None:
+    """Prove the prewarm cannot pass vacuously: success, failure, and timeout."""
+    prewarm_capture_build(repo_root, command=["true"])
+    cases = (
+        # A broken build is a real gate failure: it must not become a SKIP.
+        (["false"], IsolationError, "prewarm failed"),
+        # A host that cannot build inside the budget is a missing prerequisite:
+        # it must be skippable, and it must not be reported as a code failure.
+        (["sleep", "5"], IsolationUnavailable, "prewarm exceeded"),
+    )
+    for broken, expected, fragment in cases:
+        try:
+            prewarm_capture_build(repo_root, command=broken, budget=0.2)
+        except expected as error:
+            if fragment not in str(error):
+                raise IsolationError(
+                    f"prewarm error for {broken} does not explain itself: {error}"
+                ) from error
+        else:
+            raise IsolationError(f"prewarm accepted a failing build: {broken}")
+    # The two answers must be distinguishable: `IsolationUnavailable` is the
+    # skippable kind, and a bare `IsolationError` is not.
+    if issubclass(IsolationError, IsolationUnavailable):
+        raise IsolationError("failure and unavailability are no longer distinguishable")
 
 
 def terminate(receipt: RunReceipt) -> None:
@@ -415,6 +571,10 @@ def assert_cleaned(run: RunReceipt) -> None:
 def run(repo_root: Path) -> Path:
     if (reason := isolation_preflight()) is not None:
         raise IsolationUnavailable(reason)
+    # Serialize the expensive part before the pair exists: two cold captures
+    # competing for one build lock is a race against the validation budget,
+    # not a test of isolation. See `prewarm_capture_build`.
+    prewarm_capture_build(repo_root)
     test_uuid = uuid.uuid4()
     test_root = repo_root / "target" / "capture-isolation" / "tests" / str(test_uuid)
     test_root.mkdir(parents=True, mode=0o700)
@@ -462,6 +622,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     if args.self_test:
         assert uuid.UUID(str(uuid.uuid4()))
+        prewarm_self_test(args.repo_root.resolve())
         print("capture isolation self-test: PASS")
         return 0
     if args.preflight:
@@ -473,6 +634,13 @@ def main(argv: list[str]) -> int:
         return 3
     try:
         output = run(args.repo_root.resolve())
+    except IsolationUnavailable as error:
+        # Preflight can pass and the run still discover it cannot proceed —
+        # a cold target directory is the known case. The stage prerequisite
+        # is missing, which is exit 3 (the code the harness already reads as
+        # UNAVAILABLE), not a verdict about the code under test.
+        print(f"capture isolation: UNAVAILABLE: {error}", file=sys.stderr)
+        return 3
     except (IsolationError, OSError, subprocess.SubprocessError) as error:
         print(f"capture isolation: FAIL: {error}", file=sys.stderr)
         return 1

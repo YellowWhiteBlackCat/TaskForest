@@ -14,6 +14,10 @@ use taskforest_core::core::metrics::GpuThrottleReason;
 use taskforest_core::core::metrics::{
     GpuEngine, GpuEngineKind, GpuMetricField, GpuMetrics, GpuScalarObservations, ScalarObservation,
 };
+// The RC6 derivation that needs the percent-domain clamp is itself
+// test-support-gated, so the owner import follows that feature axis.
+#[cfg(any(test, feature = "test-support"))]
+use taskforest_core::core::percent::ClampedPercent;
 
 use super::read_sysfs_string;
 
@@ -148,7 +152,7 @@ pub fn detect_gpu_metrics_with_rc6_from_paths(
                     // Monotonic counter; saturating_sub guards against the
                     // rare driver reset that makes it jump backwards.
                     let delta = curr.saturating_sub(*prev_res);
-                    let rc6_pct = ((delta as f32 / (dt * 1000.0)) * 100.0).clamp(0.0, 100.0);
+                    let rc6_pct = ((delta as f32 / (dt * 1000.0)) * 100.0).clamped_percent();
                     let mut observations = *m.scalar_observations();
                     observations.utilization_pct = ScalarObservation::available(100.0 - rc6_pct, 0);
                     observations.idle_residency_pct = ScalarObservation::available(rc6_pct, 0);

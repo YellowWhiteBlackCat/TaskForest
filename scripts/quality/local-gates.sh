@@ -722,7 +722,32 @@ if maybe capture-isolation; then
         fi
     fi
     if [[ "$capture_isolation_gate" == "1" || ( "$capture_isolation_gate" == "auto" && "$capture_isolation_host_ready" == "1" ) ]]; then
-        run_stage capture-isolation quick timeout --kill-after=10s 240s python3 scripts/test_capture_isolation.py --repo-root "$repo"
+        # The A/B pair itself is about a minute on a warm tree, but it starts
+        # with one serial capture build, so the stage budget covers a cold
+        # compile as well. Exit 3 is the script's "prerequisite disappeared
+        # mid-flight" answer (a target directory that cannot build inside the
+        # budget); it records SKIP, exactly as the preflight does — a host
+        # condition must never be filed as a code failure.
+        capture_isolation_started="$(date +%s)"
+        capture_isolation_rc=0
+        timeout --kill-after=10s "${CAPTURE_ISOLATION_TIMEOUT:-600}" python3 scripts/test_capture_isolation.py --repo-root "$repo" || capture_isolation_rc=$?
+        capture_isolation_elapsed="$(( $(date +%s) - capture_isolation_started ))"
+        if [[ "$capture_isolation_rc" -eq 0 ]]; then
+            record capture-isolation quick PASS "$capture_isolation_elapsed"
+            echo "PASS capture-isolation"
+        elif [[ "$capture_isolation_rc" -eq 3 ]]; then
+            record capture-isolation quick SKIP 0
+            echo "SKIP capture-isolation (capture build prewarm unavailable this run)"
+        else
+            record capture-isolation quick FAIL "$capture_isolation_elapsed"
+            echo "FAIL capture-isolation"
+            failures=$((failures + 1))
+            if [[ "$fail_fast" == "1" ]]; then
+                echo "local-gates: fail-fast after capture-isolation (rc=$capture_isolation_rc); use --keep-going for a diagnostic batch" >&2
+                exit "$capture_isolation_rc"
+            fi
+        fi
+        stages_run=$((stages_run + 1))
     else
         reason="TM_CAPTURE_ISOLATION_GATE=$capture_isolation_gate"
         if [[ "$capture_isolation_gate" == "auto" ]]; then

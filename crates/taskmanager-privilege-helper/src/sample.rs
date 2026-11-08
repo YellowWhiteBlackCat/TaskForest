@@ -24,6 +24,7 @@ use std::io;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use taskforest_core::core::percent::ClampedPercent;
 use taskmanager_perf_ioctl::GpuEngineCounter;
 
 use crate::discovery::{I915EngineCfg, PmuLayout, XeEngineCfg};
@@ -109,7 +110,7 @@ fn sample_xe(
                     // engine is skipped rather than emitting 0% or NaN.
                     continue;
                 }
-                let busy_pct = (active_delta as f32 / total_delta as f32 * 100.0).clamp(0.0, 100.0);
+                let busy_pct = (active_delta as f32 / total_delta as f32 * 100.0).clamped_percent();
                 sampled.push(SampledEngine {
                     label: engine.label.clone(),
                     class_name: engine.class_name.clone(),
@@ -157,7 +158,7 @@ fn sample_i915(
                 if elapsed_ns == 0 {
                     continue;
                 }
-                let busy_pct = (busy_ns as f32 / elapsed_ns as f32 * 100.0).clamp(0.0, 100.0);
+                let busy_pct = (busy_ns as f32 / elapsed_ns as f32 * 100.0).clamped_percent();
                 sampled.push(SampledEngine {
                     label: engine.label.clone(),
                     class_name: engine.class_name.clone(),

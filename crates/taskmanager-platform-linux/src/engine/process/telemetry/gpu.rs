@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
+use taskforest_core::core::percent::ClampedPercent;
 
 use super::{
     ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity, state_for_status,
@@ -98,7 +99,7 @@ impl ProcessGpuRateTracker {
                     }
                     let elapsed_ns = elapsed_ms as f64 * 1_000_000.0;
                     Some(
-                        ((current - *previous) as f64 / elapsed_ns * 100.0).clamp(0.0, 100.0)
+                        ((current - *previous) as f64 / elapsed_ns * 100.0).clamped_percent()
                             as f32,
                     )
                 });

@@ -3,6 +3,10 @@
 use super::*;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use taskforest_core::core::device_state::DeviceState;
+// The percent-domain clamp is only reached inside the Windows-gated WDDM
+// counter path below, so the owner import follows that same platform axis.
+#[cfg(windows)]
+use taskforest_core::core::percent::ClampedPercent;
 #[cfg(windows)]
 use taskforest_core::{DeviceStatus, IsolationKind};
 use taskforest_core::{ProcessIsolation, ProcessNetworkSnapshot};
@@ -104,7 +108,7 @@ impl WinProcessGpuProvider {
             for (luid, utilization) in utilization_by_luid {
                 devices.push(ProcessGpuDevice {
                     device_id: dxgi_gpu_process_identity(luid),
-                    utilization_pct: Some(utilization.clamp(0.0, 100.0)),
+                    utilization_pct: Some(utilization.clamped_percent()),
                     // Dedicated usage is Task Manager's "Dedicated GPU memory"
                     // column; the contract's single memory field carries it,
                     // and shared usage stays unreported until it grows one.

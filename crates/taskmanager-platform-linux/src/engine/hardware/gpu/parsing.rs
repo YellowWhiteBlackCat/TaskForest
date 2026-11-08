@@ -1,5 +1,7 @@
 //! Pure GPU sysfs value and driver-name parsers.
 
+use taskforest_core::core::percent::ClampedPercent;
+
 /// Parse an AMD amdgpu `*_busy_percent` sysfs value (an integer 0–100) into a
 /// clamped `f32`. Returns `None` on empty/unparseable input. Negatives and
 /// values over 100 (which amdgpu shouldn't emit but defensively...) are clamped
@@ -12,7 +14,7 @@ pub(super) fn parse_busy_percent(raw: &str) -> Option<f32> {
     if t.is_empty() {
         return None;
     }
-    t.parse::<f32>().ok().map(|v| v.clamp(0.0, 100.0))
+    t.parse::<f32>().ok().map(|v| v.clamped_percent())
 }
 
 /// Pure helper: extract the driver name from a `device/driver` symlink target.

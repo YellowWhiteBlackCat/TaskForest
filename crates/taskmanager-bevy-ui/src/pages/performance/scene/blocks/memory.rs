@@ -17,6 +17,7 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::window::{PrimaryWindow, Window};
 use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments};
@@ -90,7 +91,7 @@ pub(super) fn segment_row_scene(
     let memory = crate::pages::performance::metrics::memory_segments_total(shell);
     let segment_percent = memory
         .filter(|total| *total > 0)
-        .map(|total| (segment.bytes as f32 / total as f32 * 100.0).clamp(0.0, 100.0))
+        .map(|total| (segment.bytes as f32 / total as f32 * 100.0).clamped_percent())
         .unwrap_or(0.0);
     let value = segment_bytes_value(shell, segment.kind);
     let kind = segment.kind;

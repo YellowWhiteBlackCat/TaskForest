@@ -2,6 +2,7 @@
 //! `LINUX-NVIDIA-02` covers field-isolated fan and typed throttle reads.
 
 use super::*;
+use taskforest_core::core::percent::ClampedPercent;
 
 #[cfg(feature = "nvidia")]
 mod throttle;
@@ -233,11 +234,11 @@ fn read_nvml_device(
             .map_err(|error| classify_error(&error)),
         encoder_pct: device
             .encoder_utilization()
-            .map(|info| (info.utilization as f32).clamp(0.0, 100.0))
+            .map(|info| (info.utilization as f32).clamped_percent())
             .map_err(|error| classify_error(&error)),
         decoder_pct: device
             .decoder_utilization()
-            .map(|info| (info.utilization as f32).clamp(0.0, 100.0))
+            .map(|info| (info.utilization as f32).clamped_percent())
             .map_err(|error| classify_error(&error)),
         fan_speed_pct: read_maximum_fan_speed(device),
         throttle_reasons: read_throttle_reasons(device),
@@ -281,7 +282,7 @@ fn select_maximum_fan_speed(
     successful
         .into_iter()
         .reduce(f32::max)
-        .map(|speed| speed.clamp(0.0, 100.0))
+        .map(|speed| speed.clamped_percent())
         .ok_or(NvmlFailureKind::NotSupported)
 }
 
@@ -354,7 +355,7 @@ fn assemble_nvml_device(readout: NvmlDeviceReadout) -> NvmlDeviceAssembly {
     }
     match readout.utilization {
         Ok((gpu, _memory)) => {
-            let utilization = (gpu as f32).clamp(0.0, 100.0);
+            let utilization = (gpu as f32).clamped_percent();
             observations.utilization_pct = ScalarObservation::available(utilization, 0);
             fields.push(GpuMetricField::Utilization);
         }

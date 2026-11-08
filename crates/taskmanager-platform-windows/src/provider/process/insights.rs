@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use taskforest_contract::ProviderFailure;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{
     CounterDelta, CumulativeCounter, DeviceState, FailureKind, FrozenProcessIdentity,
     ProcessEnvironment, ProcessInsightSnapshot, ProcessOpenFiles, ProcessThreadInfo,
@@ -103,7 +104,7 @@ fn thread_rows_with_rates(
                     let cpu_secs = value as f64 / 1e7;
                     // One thread runs on at most one logical CPU, so the
                     // single-core-equivalent rate clamps to 100%.
-                    cpu_percent = Some(((cpu_secs / wall_secs * 100.0).clamp(0.0, 100.0)) as f32);
+                    cpu_percent = Some(((cpu_secs / wall_secs * 100.0).clamped_percent()) as f32);
                 }
             }
         }

@@ -20,6 +20,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use taskforest_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetricField, GpuMetrics};
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{DeviceId, FailureKind};
 use taskmanager_perf_ioctl::GpuEngineCounter;
 
@@ -516,7 +517,7 @@ fn engine_usage_pct(
             if elapsed_ns == 0 {
                 return Err(FailureKind::TemporarilyUnavailable);
             }
-            Ok((busy_delta as f32 / elapsed_ns as f32 * 100.0).clamp(0.0, 100.0))
+            Ok((busy_delta as f32 / elapsed_ns as f32 * 100.0).clamped_percent())
         }
         EngineBusyDelta::TickRatio {
             active_delta,
@@ -527,7 +528,7 @@ fn engine_usage_pct(
                 // has already reseeded to the new baseline.
                 return Err(FailureKind::IdentityChanged);
             }
-            Ok((active_delta as f32 / total_delta as f32 * 100.0).clamp(0.0, 100.0))
+            Ok((active_delta as f32 / total_delta as f32 * 100.0).clamped_percent())
         }
     }
 }

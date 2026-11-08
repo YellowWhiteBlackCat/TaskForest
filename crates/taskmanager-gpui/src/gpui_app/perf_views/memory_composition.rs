@@ -25,6 +25,7 @@ use taskmanager_theme::{Color, GlassTier, Theme, with_alpha};
 
 mod stats;
 use stats::{composition_labels, overview_stats, segment_shares, summary_tiles, swap_bar_stats};
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 
 type CompositionSegment = (Color, f32, String, u64);
@@ -120,7 +121,7 @@ fn composition_legend(
             continue;
         }
         shown = true;
-        let percent = (bytes_to_gib(*bytes) / total * 100.0).clamp(0.0, 100.0);
+        let percent = (bytes_to_gib(*bytes) / total * 100.0).clamped_percent();
         column = column.child(
             div()
                 .flex()

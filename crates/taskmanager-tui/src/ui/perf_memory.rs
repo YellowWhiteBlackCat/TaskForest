@@ -23,6 +23,7 @@ use crate::TuiApp;
 use crate::TuiTheme;
 
 use super::units::memory_text_pref;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 
 /// Map a shared segment kind onto the terminal palette color. Every frontend
@@ -208,7 +209,7 @@ fn legend_line(
     let pct = if total == 0 {
         0.0
     } else {
-        (seg.bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0)
+        (seg.bytes as f64 / total as f64 * 100.0).clamped_percent()
     };
     Line::from(vec![
         Span::styled("█ ", Style::new().fg(color)),
@@ -276,7 +277,7 @@ fn render_swap_bar(
     use_base2: bool,
 ) {
     let pct = (swap.total_bytes > 0)
-        .then(|| (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0).clamp(0.0, 100.0));
+        .then(|| (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0).clamped_percent());
     let mut label = format!(
         "{}  {} / {}  ({})",
         t("mem.swap"),

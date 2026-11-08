@@ -27,6 +27,46 @@ pub const MISSING_PERCENT: &str = "—";
 /// percent reads this fact instead of re-deriving `100.0` per surface.
 pub const MAX_PERCENT: f32 = 100.0;
 
+/// The percentage floor that ceiling is paired with. Percent-domain quantities
+/// are never negative; a reading below zero is a measurement fault, not data.
+pub const MIN_PERCENT: f32 = 0.0;
+
+/// The percent-domain clamp: keep a reading inside [`MIN_PERCENT`]..=
+/// [`MAX_PERCENT`].
+///
+/// Utilization, charge, wear and share are percentages, and the product's
+/// invariant is that an unavailable or faulty reading is never painted as
+/// progress or printed above a hundred. That is one rule; every surface used
+/// to re-spell `clamp(0.0, 100.0)` and each rewrite was a chance to disagree
+/// about the bounds.
+///
+/// Non-finite input keeps the platform `clamp` answer (infinite readings move
+/// to the nearer bound, `NaN` returns unchanged): this is the boundary of the
+/// percent *domain*, not an absence policy — absence is a presentation
+/// decision (`MISSING_PERCENT`) and stays with the caller, exactly as the
+/// module comment says. A caller that must not paint a non-finite reading as
+/// progress filters for finiteness first, as it already does.
+///
+/// The bound names are spelled out per impl rather than read back through
+/// `Self::MIN`/`Self::MAX`: those paths resolve to the float type's own
+/// extreme-value constants, which are a different fact entirely.
+pub trait ClampedPercent: Copy {
+    /// Keep a percent-domain reading inside `0..=100` without changing its type.
+    fn clamped_percent(self) -> Self;
+}
+
+impl ClampedPercent for f32 {
+    fn clamped_percent(self) -> Self {
+        f32::clamp(self, MIN_PERCENT, MAX_PERCENT)
+    }
+}
+
+impl ClampedPercent for f64 {
+    fn clamped_percent(self) -> Self {
+        f64::clamp(self, f64::from(MIN_PERCENT), f64::from(MAX_PERCENT))
+    }
+}
+
 #[cfg(test)]
 #[path = "../../tests/headless/core_core_percent_tests.rs"]
 mod tests;

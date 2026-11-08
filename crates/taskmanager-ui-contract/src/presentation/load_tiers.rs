@@ -17,7 +17,7 @@
 //! not a silent constant change.
 
 use crate::keybindings::FrontendShape;
-use taskforest_core::core::percent::MAX_PERCENT;
+use taskforest_core::core::percent::ClampedPercent;
 
 /// How a reading that sits exactly on a band edge is counted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -129,7 +129,7 @@ pub fn load_tier_edges(frontend: FrontendShape) -> Option<LoadTierEdges> {
 /// The load tier one reading falls into within one resolved band.
 ///
 /// The clamp onto the percent scale is part of the fold, so no shape re-spells
-/// it: a reading outside `[0, MAX_PERCENT]` buckets as if it sat on the nearer
+/// it: a reading outside the percent domain buckets as if it sat on the nearer
 /// edge. A non-finite reading has no tier — that is an absence, and the shape
 /// keeps its own missing-value ink for it.
 #[must_use]
@@ -137,7 +137,7 @@ pub fn tier_within(edges: LoadTierEdges, percent: f32) -> Option<LoadTier> {
     if !percent.is_finite() {
         return None;
     }
-    let value = percent.clamp(0.0, MAX_PERCENT);
+    let value = percent.clamped_percent();
     let crossed = |edge: f32| match edges.membership {
         EdgeMembership::AtEdgeIsHigher => value >= edge,
         EdgeMembership::AboveEdgeOnly => value > edge,

@@ -10,6 +10,7 @@ use std::time::Instant;
 use std::sync::Arc;
 
 use taskforest_contract::ProviderFailure;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{
     CumulativeCounter, FailureKind, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
     NetworkTelemetryObservation, NetworkWirelessObservations, ScalarObservation,
@@ -295,7 +296,7 @@ fn wireless_observations_for(
 fn link_utilization_pct(rx_bytes_per_sec: u64, tx_bytes_per_sec: u64, link_speed_mbps: u64) -> f32 {
     let bytes_per_second = rx_bytes_per_sec.saturating_add(tx_bytes_per_sec);
     let capacity_bits_per_second = link_speed_mbps as f64 * 1_000_000.0;
-    (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamp(0.0, 100.0) as f32
+    (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamped_percent() as f32
 }
 
 /// Derive `utilization_pct` from rx+tx byte rates against link capacity, in the

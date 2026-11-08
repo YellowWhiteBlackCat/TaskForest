@@ -44,6 +44,7 @@ use crate::perf_chart::{SeriesGeneration, area_path, line_path, series_point_run
 use crate::theme;
 use crate::ui::components::{chart_inset, chart_surface, styled_scrollable};
 use taskforest_core::core::hardware::CpuType;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use zhuge_ui_core::row_page::page_count;
 
@@ -264,7 +265,7 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
 pub(crate) fn format_core_readout(usage_pct: Option<f32>, freq_mhz: Option<u64>) -> String {
     let mut parts = Vec::with_capacity(2);
     if let Some(value) = usage_pct.filter(|value| value.is_finite()) {
-        parts.push(format!("{:>4}", percent_text(value.clamp(0.0, 100.0))));
+        parts.push(format!("{:>4}", percent_text(value.clamped_percent())));
     }
     match freq_mhz {
         Some(mhz) if mhz >= 1000 => parts.push(format!("{:.1} GHz", mhz as f64 / 1000.0)),

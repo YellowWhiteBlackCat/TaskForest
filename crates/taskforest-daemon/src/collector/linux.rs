@@ -1,6 +1,7 @@
 //! Linux procfs metrics collector implementation.
 
 use std::fs;
+use taskforest_core::core::percent::ClampedPercent;
 
 use super::{MetricsCollector, SystemTelemetrySnapshot};
 
@@ -58,7 +59,7 @@ impl LinuxMetricsCollector {
         self.last_cpu_total = total;
 
         let usage = 100.0 * (1.0 - (idle_delta as f64 / total_delta as f64));
-        Some(usage.clamp(0.0, 100.0))
+        Some(usage.clamped_percent())
     }
 
     fn sample_memory(&mut self) -> (Option<u64>, Option<u64>) {

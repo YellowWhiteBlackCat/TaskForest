@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{
     DeviceId, FailureKind, ScalarAvailability, ScalarObservation, SourceOutcome,
 };
@@ -432,7 +433,7 @@ pub(super) fn link_utilization_pct(
     let bytes_per_second = rx_bytes_per_sec.saturating_add(tx_bytes_per_sec);
     let capacity_bits_per_second = link_speed_mbps as f64 * 1_000_000.0;
     Some(
-        (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamp(0.0, 100.0) as f32,
+        (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamped_percent() as f32,
     )
 }
 

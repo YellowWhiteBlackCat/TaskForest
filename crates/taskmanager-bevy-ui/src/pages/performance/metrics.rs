@@ -4,6 +4,7 @@ use super::*;
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::NetworkAdapterType;
 use taskforest_core::core::metrics::SmartAvailability;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::power::BatteryInfo;
 use taskforest_core::core::sensors::SensorQuantity;
@@ -172,7 +173,7 @@ pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
                 .and_then(swap_breakdown)
                 .map_or_else(missing_value, |swap| {
                     let pct = (swap.used_bytes as f64 / swap.total_bytes as f64 * 100.0)
-                        .clamp(0.0, 100.0);
+                        .clamped_percent();
                     format!(
                         "{} / {} ({})",
                         bytes(swap.used_bytes),
@@ -213,7 +214,7 @@ pub(super) fn core_usage_count(shell: &ShellApp) -> usize {
 pub(super) fn core_usage_fill_pct(shell: &ShellApp, index: usize) -> f32 {
     core_usage_pct(shell, index)
         .filter(|value| value.is_finite())
-        .map_or(0.0, |value| value.clamp(0.0, 100.0))
+        .map_or(0.0, |value| value.clamped_percent())
 }
 
 pub(super) struct GpuVramViewModel {
@@ -227,7 +228,7 @@ pub(super) fn gpu_vram_view_model(gpu: &GpuMetrics) -> Option<GpuVramViewModel> 
     if total == 0 {
         return None;
     }
-    let pct = (used as f32 / total as f32 * 100.0).clamp(0.0, 100.0);
+    let pct = (used as f32 / total as f32 * 100.0).clamped_percent();
     Some(GpuVramViewModel {
         label: format!(
             "{}: {} / {} ({})",
@@ -694,7 +695,7 @@ pub(crate) fn segment_bytes_value(shell: &ShellApp, kind: MemSegmentKind) -> Str
 /// their saturating byte sums — is owned by `taskmanager_shell::memory`).
 pub(super) fn segment_line(segment: &MemSegment, total: Option<u64>) -> String {
     let share = total.filter(|total| *total > 0).map(|total| {
-        let pct = (segment.bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
+        let pct = (segment.bytes as f64 / total as f64 * 100.0).clamped_percent();
         percent_text(pct)
     });
     share.map_or_else(

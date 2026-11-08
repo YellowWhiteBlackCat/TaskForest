@@ -20,6 +20,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, FlexDirection, Node, Overflow,
     PositionType, UiRect, Val, percent, px, rem,
 };
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::power::BatteryInfo;
 
 use crate::pages::performance::metrics::battery::BatteryChargeStates;
@@ -64,7 +65,7 @@ pub(crate) fn battery_icon_scene(
     let radius = extent * 0.08;
     let band_width = extent * 0.22;
     let charge = charge_pct.unwrap_or(0);
-    let fill = f32::from(charge).clamp(0.0, 100.0);
+    let fill = f32::from(charge).clamped_percent();
     let id = battery.id.clone();
     let outline = palette.dim_color;
     let fill_ink = palette.accent;

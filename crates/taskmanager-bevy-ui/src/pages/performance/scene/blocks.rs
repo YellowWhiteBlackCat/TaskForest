@@ -25,6 +25,7 @@ use taskmanager_theme::GlassTier;
 pub(crate) mod memory;
 use memory::{memory_legend_container_scene, section_header, segment_row_scene, swap_bar_scene};
 pub(crate) use memory::{segment_bar_scene, sync_memory_legend_layout};
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 
 /// The GPU engine row's fixed column widths, in rem.
@@ -158,7 +159,7 @@ fn gpu_block_scene(shell: &ShellApp, gpu: &GpuMetrics, palette: &UiPalette) -> i
 
     for engine in &gpu.engines {
         let name = engine.name.clone();
-        let pct = engine.usage_pct.clamp(0.0, 100.0);
+        let pct = engine.usage_pct.clamped_percent();
         let usage = percent_text(pct);
         details.push(Box::new(bsn! {
             Node {

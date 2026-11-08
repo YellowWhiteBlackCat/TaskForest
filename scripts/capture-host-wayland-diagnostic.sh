@@ -614,13 +614,29 @@ parity_evidence=false
 durable_output=none
 EOF
 
-if ! PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s 30s python3 \
+# The validator re-hashes the run's own evidence: the 1,119-line source
+# manifest (~8s), both window PNGs (~7s each), plus hashes and OCR. Measured
+# 26-41s on this repository's NVMe, so the old 30s bound cut the check off in
+# the middle of its own work and — worse — the `if !` folded that kill into
+# "validator rejected the capture", reporting a host-speed condition as a
+# product verdict. The budget now covers the measured work with headroom, and
+# the exit code decides whether the capture was rejected or never judged.
+validator_rc=0
+PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=10s "${CAPTURE_VALIDATOR_TIMEOUT:-180s}" python3 \
   "$REPO/scripts/validate_host_wayland_diagnostic.py" \
   --image "$IMAGE" --metadata "$METADATA" --markers "$MARKERS" --ocr-output "$OCR" \
   --receipt "$RECEIPT" --run-dir "$RUN_DIR" --repo-root "$REPO" \
-  --logical-size "$WINDOW_SIZE" --scenario "$SCENARIO" --theme "$SKIN" --current-worktree; then
-  fail "independent host diagnostic validator rejected the capture"
-fi
+  --logical-size "$WINDOW_SIZE" --scenario "$SCENARIO" --theme "$SKIN" --current-worktree ||
+  validator_rc=$?
+case "$validator_rc" in
+  0) ;;
+  124 | 137)
+    fail "independent host diagnostic validator timed out after ${CAPTURE_VALIDATOR_TIMEOUT:-180s} (no verdict was reached)"
+    ;;
+  *)
+    fail "independent host diagnostic validator rejected the capture (exit $validator_rc)"
+    ;;
+esac
 
 HOLD_SECONDS="${TM_CAPTURE_ISOLATION_HOLD_SECONDS:-0}"
 case "$HOLD_SECONDS" in
