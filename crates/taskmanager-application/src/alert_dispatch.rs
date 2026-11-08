@@ -19,9 +19,11 @@ use taskforest_core::alerts::{
     Alert, AlertInstanceId, AlertRuleId, NotificationGate, NotificationPolicy,
 };
 
+use crate::i18n;
 use crate::platform::DesktopNotificationRequest;
 use std::collections::HashSet;
 use taskforest_core::alerts::AlertMetric;
+use taskforest_core::core::percent::percent_text;
 
 /// Shared alert-to-notification delivery state.
 #[derive(Debug, Clone)]
@@ -94,20 +96,16 @@ impl AlertDispatcher {
                 if !self.gate.consider(alert, now_ms) {
                     return None;
                 }
-                let metric_label = match alert.metric {
-                    AlertMetric::CpuUsagePercent => "CPU Usage",
-                    AlertMetric::MemoryUsagePercent => "Memory Usage",
-                    AlertMetric::DiskTemperatureC => "Disk Temperature",
-                    AlertMetric::SmartPercentUsed => "SSD Wear",
-                    AlertMetric::SmartCriticalWarning => "SMART Warning",
-                };
+                let metric_label = i18n::alert_metric_label(alert.metric);
                 let body = match alert.metric {
                     AlertMetric::CpuUsagePercent
                     | AlertMetric::MemoryUsagePercent
                     | AlertMetric::SmartPercentUsed => {
                         format!(
-                            "{}: {:.0}% (threshold: {:.0}%)",
-                            metric_label, alert.value, alert.threshold
+                            "{}: {} (threshold: {})",
+                            metric_label,
+                            percent_text(alert.value),
+                            percent_text(alert.threshold)
                         )
                     }
                     AlertMetric::DiskTemperatureC => {

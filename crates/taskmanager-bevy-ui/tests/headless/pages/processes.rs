@@ -5,8 +5,9 @@
 //!
 //! Two layers, mirroring the crate's existing test style:
 //! - pure: the row view model (contract-column formatting over typed
-//!   observations, honest dashes), the empty/filtered empty states, the
-//!   virtual-window clamping and the TUI-parity selection-follow formula;
+//!   observations, honest dashes) and the empty/filtered empty states. Row
+//!   paging and the selection-follow reveal are owned by `zhuge-ui-core`
+//!   (`row_page`), so this file proves the wiring, not that arithmetic;
 //! - wired: the real observer composition on a `MinimalPlugins` app — mount,
 //!   the seam events (`ProcessSelectStep`/`ProcessScrollIntent`/
 //!   `ProcessQueryCommit`), the shell-owned selection reducers they route
@@ -38,10 +39,11 @@ use taskmanager_shell::{ProcessStatusFilter, ShellApp};
 use taskmanager_theme::Theme;
 
 use super::details::ProcessDetailsRoot;
+use super::process_fixture_support::{applications_shell, process, shell_with};
 use super::toolbar::{ProcessEndTaskButton, ProcessFilterButton, ProcessKillTaskButton};
 use super::{
     ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
-    ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, centered_scroll_top, content,
+    ProcessScrollState, ProcessSelectRow, ProcessSelectStep, ProcessSelectionChanged, content,
     count_line_text, count_line_text_for_shell, empty_state_text, rows_projection, sort_projection,
 };
 use crate::app::{FrontendTrack, Page, PageContext};
@@ -49,18 +51,6 @@ use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
 
 // ---- fixtures -----------------------------------------------------------
-
-/// A process with exactly the observations the test names — every other
-/// scalar stays honestly absent so the dash cells are exercised for free.
-fn process(pid: u32, name: &str) -> ProcessItem {
-    ProcessItem::new(pid, name).with_scalar_observations(ProcessScalarObservations {
-        // A process row needs the provider-issued live token before the shell
-        // can accept it as a selectable identity. This fixture still leaves
-        // every displayed resource scalar unavailable.
-        start_token: ScalarObservation::available(u64::from(pid), 1),
-        ..ProcessScalarObservations::default()
-    })
-}
 
 fn with_cpu(process: &mut ProcessItem, cpu: f32) {
     let mut scalars = *process.scalar_observations();
@@ -72,26 +62,6 @@ fn with_scalars(process: &mut ProcessItem, edit: impl FnOnce(&mut ProcessScalarO
     let mut scalars = *process.scalar_observations();
     edit(&mut scalars);
     process.apply_scalar_observations(scalars);
-}
-
-/// A shell whose process inventory is exactly `items` (fixture seam: the same
-/// typed seed the TUI tests use, revision included).
-fn shell_with(items: Vec<ProcessItem>) -> ShellApp {
-    let mut shell = ShellApp::new();
-    fixture::edit_processes(&mut shell, |processes| *processes = Some(items));
-    shell
-}
-
-/// `shell_with` plus the shared Applications row context — the same
-/// `SelectPage` application the page's mount bootstrap performs (and the TUI
-/// performs when its Applications page opens). Pure tests that exercise the
-/// shell's selection reducers need it: a fresh shell still sits on the
-/// default Performance page and `select_row`/`move_selection` would clamp
-/// against the wrong row space.
-fn applications_shell(items: Vec<ProcessItem>) -> ShellApp {
-    let mut shell = shell_with(items);
-    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
-    shell
 }
 
 /// `MinimalPlugins` + the scene/asset plumbing the page scene resolves
@@ -364,7 +334,7 @@ fn empty_projection_is_honest_per_query_state() {
     let quiet = ShellApp::new();
     let projection = rows_projection(&quiet, 10, 0);
     assert_eq!(projection.total, 0);
-    assert_eq!(projection.window.first, projection.window.last);
+    assert_eq!(projection.window.first(), projection.window.last());
     assert_eq!(empty_state_text(""), t("empty.no_processes_reported"));
     assert_eq!(empty_state_text("zzz"), t("empty.no_processes_match_query"));
     assert_ne!(
@@ -391,62 +361,63 @@ fn sort_projection_maps_the_shell_sort_onto_contract_tokens() {
     let cpu_desc = sort_projection((SortCol::Cpu, SortDir::Desc));
     assert_eq!(
         cpu_desc,
-        Some(crate::widgets::table::SortProjection {
+        crate::widgets::table::SortProjection {
             column: "CPU",
             descending: true,
-        })
+        }
     );
     let name_asc = sort_projection((SortCol::Name, SortDir::Asc));
     assert_eq!(
         name_asc,
-        Some(crate::widgets::table::SortProjection {
+        crate::widgets::table::SortProjection {
             column: "Name",
             descending: false,
-        })
+        }
     );
     assert_eq!(
         sort_projection((SortCol::Pss, SortDir::Asc)),
-        Some(crate::widgets::table::SortProjection {
+        crate::widgets::table::SortProjection {
             column: "MemoryPss",
             descending: false,
-        })
+        }
     );
 }
 
-// ---- pure: virtual window wiring -----------------------------------------
-
-#[test]
-fn scroll_intent_clamps_to_the_last_full_window() {
-    let items: Vec<ProcessItem> = (0..7).map(|pid| process(pid, "p")).collect();
-    let shell = shell_with(items);
-    // Intent far past the end pins to the last full page (viewport 3, total 7).
-    let projection = rows_projection(&shell, 3, 30);
-    assert_eq!(projection.window.first, 4);
-    assert_eq!(projection.window.last, 7);
-    // The store-back rule: the intent resource normalizes to the window start.
-    let mut state = ProcessScrollState {
-        viewport_rows: 3,
-        top: 30,
-    };
-    state.top = rows_projection(&shell, state.viewport_rows, state.top)
-        .window
-        .first;
-    assert_eq!(state.top, 4, "a rebuild stores the clamped start back");
-}
-
-#[test]
-fn selection_follow_matches_the_tui_table_window_formula() {
-    // Half a viewport above the cursor, pinned to the last full page.
-    assert_eq!(centered_scroll_top(7, 3, 0), 0);
-    assert_eq!(centered_scroll_top(7, 3, 3), 2);
-    assert_eq!(centered_scroll_top(7, 3, 6), 4);
-    assert_eq!(centered_scroll_top(100, 10, 99), 90);
-    // Degenerate spaces stay at zero, never underflow.
-    assert_eq!(centered_scroll_top(0, 10, 5), 0);
-    assert_eq!(centered_scroll_top(5, 0, 2), 0);
-}
-
 // ---- wired: the observer composition --------------------------------------
+
+#[test]
+fn selecting_a_row_follows_it_with_the_shared_centered_reveal() {
+    // The page keeps the cursor at the centre of the measured viewport by
+    // asking the shared row-page owner for the reveal, never its own arithmetic.
+    let items: Vec<ProcessItem> = (0..40).map(|pid| process(pid, "p")).collect();
+    let mut app = headless_page_app(
+        ui_palette(&Theme::dark(), UiSize::Standard),
+        shell_with(items),
+    );
+    app.update();
+
+    fire_seam(&mut app, |root| ProcessSelectRow {
+        entity: root,
+        row: 20,
+    });
+    let state = *app.world().resource::<ProcessScrollState>();
+    assert_eq!(state.top, 19, "half a three-row viewport above the cursor");
+    let links = row_links(&mut app);
+    assert_eq!(
+        links.iter().map(|(_, index)| *index).collect::<Vec<_>>(),
+        vec![19, 20, 21],
+        "the selected row stays materialized inside the revealed window"
+    );
+
+    // A cursor pinned at the last row still reveals a full page, not a stub.
+    fire_seam(&mut app, |root| ProcessSelectRow {
+        entity: root,
+        row: 39,
+    });
+    let state = *app.world().resource::<ProcessScrollState>();
+    assert_eq!(state.top, 37, "the last row pins to the final full page");
+    assert_eq!(row_links(&mut app).len(), state.viewport_rows);
+}
 
 #[test]
 fn mount_renders_the_contract_header_and_the_initial_window() {

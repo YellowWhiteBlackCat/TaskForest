@@ -5,7 +5,8 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
+use taskforest_core::core::time::unix_millis;
 
 use crossbeam_channel::{Receiver, Sender, TrySendError, bounded, select_biased};
 use taskmanager_application::{
@@ -248,7 +249,7 @@ fn worker_loop(
 /// read path, and an honestly dead lane (typed stop on later admission) beats
 /// a worker silently retrying over the same broken code.
 fn run_one_query(command: &QueryCommand, loader: &HistoryReplayLoader) -> bool {
-    let loaded_at_ms = unix_now_ms();
+    let loaded_at_ms = unix_millis(SystemTime::now());
     let (outcome, faulted) = match catch_worker_panic(|| loader(command.request, loaded_at_ms)) {
         Ok(Ok(rows)) => (HistoryReplayCompletionOutcome::Loaded(rows), false),
         Ok(Err(error)) => (HistoryReplayCompletionOutcome::Failed(error), false),
@@ -345,15 +346,6 @@ fn map_store_error(error: HistoryStoreError) -> HistoryReplayError {
 
 fn runtime_error(kind: HistoryReplayErrorKind, detail: &str) -> HistoryReplayError {
     HistoryReplayError::new(kind, Arc::<str>::from(detail))
-}
-
-fn unix_now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_millis()
-        .try_into()
-        .unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

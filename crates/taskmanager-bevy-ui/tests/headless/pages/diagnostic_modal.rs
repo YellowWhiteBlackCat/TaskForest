@@ -46,7 +46,7 @@ fn open_reviews_cached_facts_confirm_requires_a_writer_and_close_invalidates() {
             .contains("zed")
     );
     assert!(plan.sanitized_contents("services.json").is_some());
-    assert!(app.world().resource::<DiagnosticRuntime>().0.is_none());
+    assert!(!app.world().resource::<DiagnosticRuntime>().0.is_active());
     app.world_mut().trigger(DiagnosticCommand::Confirm);
     app.update();
     assert!(

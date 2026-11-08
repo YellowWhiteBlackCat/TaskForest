@@ -48,7 +48,7 @@ fn on_command(
     mut pending: Option<ResMut<PendingEffects>>,
     mut commands: Commands,
 ) {
-    let about_open = matches!(state.0, Some(WindowSurface::About));
+    let about_open = matches!(state.active(), Some(WindowSurface::About));
     match command.event() {
         AboutCommand::Open => commands.trigger(WindowSurfaceCommand::About),
         AboutCommand::Close => {

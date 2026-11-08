@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 
 use taskforest_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, CompositeSourceSnapshot, EventEnvelope,
@@ -15,8 +17,6 @@ use taskforest_core::core::appearance::{DesktopAppearance, DesktopFamily, Prefer
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::identity::ProviderId;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
-
-use super::submitted_at_ms;
 
 #[derive(Default)]
 struct EmptyCapabilities;
@@ -229,7 +229,10 @@ fn stale_event_for_another_request_does_not_complete_the_handshake() {
         PlatformFacets::default().with_integration(integration),
     ));
     let request_id = client
-        .submit_desktop_appearance(DesktopAppearanceRequest::Observe, submitted_at_ms())
+        .submit_desktop_appearance(
+            DesktopAppearanceRequest::Observe,
+            unix_millis(SystemTime::now()),
+        )
         .expect("submission accepted");
     // A snapshot for a DIFFERENT request id: the loop must ignore it and
     // keep waiting (falls through to the timeout fallback).

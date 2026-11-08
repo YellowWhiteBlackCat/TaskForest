@@ -3,11 +3,51 @@ use std::sync::Arc;
 
 use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_application::{
-    HistoryReplayCompletion, HistoryReplayCompletionOutcome, HistoryReplayError,
-    HistoryReplayErrorKind, HistoryReplayRow,
+    HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayCompletionOutcome,
+    HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRequest, HistoryReplayRow,
 };
 
 use super::*;
+
+/// The replay control surface the headless test drives.
+///
+/// Production code never opens a replay window by hand: the application
+/// runtime owns that transition. The test therefore owns its own seam, in the
+/// test tree, instead of the production file carrying `#[cfg(test)]` marks.
+trait ReplayTestControl {
+    fn open(&mut self) -> Option<HistoryReplayRequest>;
+    fn select_window(&mut self, window: HistoryWindow) -> Option<HistoryReplayRequest>;
+    fn reject_submission(&mut self, request: HistoryReplayRequest, error: HistoryReplayError);
+    fn complete(&mut self, completion: HistoryReplayCompletion) -> bool;
+}
+
+impl ReplayTestControl for IcedHistoryReplay {
+    fn open(&mut self) -> Option<HistoryReplayRequest> {
+        self.presentation = IcedHistoryPresentation::Replay;
+        self.runtime.controller_mut().open().ok()
+    }
+
+    fn select_window(&mut self, window: HistoryWindow) -> Option<HistoryReplayRequest> {
+        let request = self.runtime.controller_mut().select_window(window).ok();
+        self.sync_rows_projection();
+        request
+    }
+
+    fn reject_submission(&mut self, request: HistoryReplayRequest, error: HistoryReplayError) {
+        let _ = self
+            .runtime
+            .controller_mut()
+            .reject_submission(request, error);
+        self.sync_rows_projection();
+    }
+
+    fn complete(&mut self, completion: HistoryReplayCompletion) -> bool {
+        let applied = self.runtime.controller_mut().complete(completion)
+            == HistoryReplayCompletionDisposition::Applied;
+        self.sync_rows_projection();
+        applied
+    }
+}
 
 fn rows(value: f32) -> Arc<[HistoryReplayRow]> {
     Arc::from([HistoryReplayRow {

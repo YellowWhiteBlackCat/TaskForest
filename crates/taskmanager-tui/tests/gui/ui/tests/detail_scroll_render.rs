@@ -7,13 +7,14 @@
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{AppAction, AppPage};
 
 use crate::ui::process_details::process_details_support::render_process_details;
 use crate::ui::process_details::{clamped_scroll, wrapped_content_height};
+use crate::ui::process_properties::ProcessPropertiesTarget;
 use crate::ui::process_properties::process_properties_support::render_process_properties;
-use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{TuiApp, TuiTheme};
 use taskmanager_application::SurfaceKind;
 use taskmanager_application::i18n::{Language, set_language};

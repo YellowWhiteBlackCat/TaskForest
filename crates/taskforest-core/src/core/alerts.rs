@@ -125,6 +125,72 @@ impl AlertMetric {
         Self::SmartPercentUsed,
         Self::SmartCriticalWarning,
     ];
+
+    /// Locale-catalog key for this alert metric (`alerts.metric_cpu` …).
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::CpuUsagePercent => "alerts.metric_cpu",
+            Self::MemoryUsagePercent => "alerts.metric_memory",
+            Self::DiskTemperatureC => "alerts.metric_disk_temperature",
+            Self::SmartPercentUsed => "alerts.metric_smart_used",
+            Self::SmartCriticalWarning => "alerts.metric_smart_critical",
+        }
+    }
+
+    /// Unit suffix for this metric value (e.g. `%` or `°C`). The binary
+    /// SMART-warning metric carries no unit.
+    #[must_use]
+    pub const fn unit_suffix(self) -> &'static str {
+        match self {
+            Self::CpuUsagePercent | Self::MemoryUsagePercent | Self::SmartPercentUsed => "%",
+            Self::DiskTemperatureC => "°C",
+            Self::SmartCriticalWarning => "",
+        }
+    }
+
+    /// Whether this metric is observed per disk, so one alert names the
+    /// device it belongs to.
+    ///
+    /// The disk family is one fact about the metric, not a per-frontend
+    /// decision: an editor that offers a device filter and a banner that
+    /// prints a target must agree on which metrics are device-scoped.
+    #[must_use]
+    pub const fn is_disk_scoped(self) -> bool {
+        matches!(
+            self,
+            Self::DiskTemperatureC | Self::SmartPercentUsed | Self::SmartCriticalWarning
+        )
+    }
+
+    /// The continuous range one rule's threshold may take for this metric:
+    /// the minimum, the maximum and the step.
+    ///
+    /// The binary SMART-warning bit has no continuous range — it keeps the
+    /// step buttons alone — so it answers `None` rather than a made-up
+    /// numeric band.
+    #[must_use]
+    pub const fn threshold_range(self) -> Option<(f32, f32, f32)> {
+        match self {
+            Self::CpuUsagePercent | Self::MemoryUsagePercent | Self::SmartPercentUsed => {
+                Some((0.0, 100.0, 1.0))
+            }
+            Self::DiskTemperatureC => Some((0.0, 200.0, 1.0)),
+            Self::SmartCriticalWarning => None,
+        }
+    }
+
+    /// The ceiling one rule's threshold may never exceed for this metric.
+    ///
+    /// A metric without a continuous range still has a ceiling of one: the
+    /// binary warning bit is either raised or not.
+    #[must_use]
+    pub const fn threshold_ceiling(self) -> f32 {
+        match self.threshold_range() {
+            Some((_, max, _)) => max,
+            None => 1.0,
+        }
+    }
 }
 
 /// One threshold, duration, and hysteresis policy.

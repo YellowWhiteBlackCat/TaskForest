@@ -34,9 +34,11 @@
 //! numeric tables so neither can drift.
 
 pub mod budget;
+pub mod load_tiers;
 pub mod motion;
 pub mod parity;
 pub mod resolution;
+pub mod settings;
 pub mod sizes;
 pub mod thresholds;
 pub mod vocabulary;

@@ -10,6 +10,7 @@ Verifies:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -65,6 +66,76 @@ def evaluate_soak_series(rss_samples: list[int], fd_samples: list[int]) -> list[
     return violations
 
 
+def load_jsonl_samples(path: Path) -> tuple[dict[str, dict[str, list[int]]], list[str]]:
+    """Load the soak runner's authoritative samples without rewriting them."""
+    series: dict[str, dict[str, list[int]]] = {}
+    findings: list[str] = []
+    if not path.is_file():
+        return series, [f"samples file is missing: {path}"]
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as error:
+            findings.append(f"line {line_number}: invalid JSON: {error}")
+            continue
+        if not isinstance(row, dict):
+            findings.append(f"line {line_number}: not an object")
+            continue
+        name = row.get("target")
+        if not isinstance(name, str) or not name:
+            findings.append(f"line {line_number}: missing target")
+            continue
+        target = series.setdefault(name, {"rss_kib": [], "fd_count": []})
+        for metric in ("rss_kib", "fd_count"):
+            value = row.get(metric)
+            if value is None:
+                # An unavailable OS observation stays absent; the evaluator
+                # judges the observed subseries, it never fabricates zero.
+                continue
+            if isinstance(value, int) and value >= 0:
+                target[metric].append(value)
+            else:
+                findings.append(f"line {line_number}: invalid {metric}: {value!r}")
+    return series, findings
+
+
+def evaluate_jsonl_samples(
+    path: Path,
+    required_hours: float = 72.0,
+    elapsed_hours: float | None = None,
+) -> dict[str, object]:
+    series, findings = load_jsonl_samples(path)
+    if not series:
+        findings.append("samples contain no observed targets")
+    per_target: dict[str, object] = {}
+    for name, metrics in sorted(series.items()):
+        violations = evaluate_soak_series(metrics["rss_kib"], metrics["fd_count"])
+        findings.extend(f"{name}: {violation}" for violation in violations)
+        per_target[name] = {
+            "rss_samples": len(metrics["rss_kib"]),
+            "fd_samples": len(metrics["fd_count"]),
+            "rss_first_kib": metrics["rss_kib"][0] if metrics["rss_kib"] else None,
+            "rss_last_kib": metrics["rss_kib"][-1] if metrics["rss_kib"] else None,
+            "fd_first": metrics["fd_count"][0] if metrics["fd_count"] else None,
+            "fd_last": metrics["fd_count"][-1] if metrics["fd_count"] else None,
+            "violations": violations,
+        }
+    if elapsed_hours is not None and elapsed_hours < required_hours:
+        findings.append(
+            f"wall-clock duration is {elapsed_hours}h, below the {required_hours}h judgement window"
+        )
+    return {
+        "path": path.as_posix(),
+        "status": "pass" if not findings else "review_required",
+        "elapsed_hours": elapsed_hours,
+        "required_hours": required_hours,
+        "targets": per_target,
+        "findings": findings,
+    }
+
+
 def self_test() -> int:
     # 1. Flat stable samples must PASS
     flat_rss = [10000, 12000, 12100, 12050, 12100, 12080]
@@ -83,7 +154,40 @@ def self_test() -> int:
     assert any("File descriptor leak" in e for e in errors), "self-test failed to catch FD leak"
 
     print("Soak stability guard self-test: PASS (memory growth and FD leak detection verified)")
-    return 0
+    failures = 0
+    import json
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="soak-jsonl-") as raw:
+        path = Path(raw) / "samples.jsonl"
+        rows = [
+            {"target": "a", "rss_kib": 10000, "fd_count": 15},
+            {"target": "a", "rss_kib": 10000, "fd_count": 15},
+            {"target": "a", "rss_kib": 10000, "fd_count": 15},
+            {"target": "a", "rss_kib": None, "fd_count": None},
+            "{not json}\n",
+        ]
+        path.write_text("\n".join(json.dumps(row) if isinstance(row, dict) else row for row in rows), encoding="utf-8")
+        report = evaluate_jsonl_samples(path, 72.0, 0.5)
+        failures += report["status"] != "review_required"
+        failures += report["targets"]["a"]["rss_samples"] != 3
+        failures += not any("invalid JSON" in item for item in report["findings"])
+        failures += not any("duration is 0.5h" in item for item in report["findings"])
+        leak_path = Path(raw) / "leak.jsonl"
+        leak_rows = [
+            {"target": "a", "rss_kib": 10000, "fd_count": 15},
+            {"target": "a", "rss_kib": 10000, "fd_count": 15},
+            {"target": "a", "rss_kib": 28000, "fd_count": 30},
+        ]
+        leak_path.write_text("\n".join(json.dumps(row) for row in leak_rows), encoding="utf-8")
+        leak = evaluate_jsonl_samples(leak_path, 72.0, 72.0)
+        failures += not any("RSS memory grew" in item for item in leak["findings"])
+        failures += not any("File descriptor leak" in item for item in leak["findings"])
+        if failures:
+            print(f"Soak JSONL guard self-test: FAIL ({failures} assertions)")
+        else:
+            print("Soak JSONL guard self-test: PASS (observed-series and absent-metric rules verified)")
+    return 1 if failures else 0
 
 
 def run_standalone_soak_check(repo_root: Path) -> int:
@@ -124,10 +228,30 @@ def run_standalone_soak_check(repo_root: Path) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true", help="run unit self-tests")
+    parser.add_argument("--samples-jsonl", type=Path, help="evaluate one authoritative soak samples.jsonl")
+    parser.add_argument("--elapsed-hours", type=float, help="observed wall-clock duration")
+    parser.add_argument("--json", type=Path, help="write the JSONL evaluation report")
     args = parser.parse_args()
 
     if args.self_test:
         return self_test()
+    if args.samples_jsonl:
+        report = evaluate_jsonl_samples(
+            args.samples_jsonl,
+            elapsed_hours=args.elapsed_hours,
+        )
+        if args.json:
+            args.json.parent.mkdir(parents=True, exist_ok=True)
+            args.json.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        print(
+            f"Soak JSONL guard: status={report['status']} targets={len(report['targets'])} "
+            f"findings={len(report['findings'])}"
+        )
+        for finding in report["findings"]:
+            print(f"  FINDING {finding}")
+        if args.json:
+            print(f"wrote {args.json}")
+        return 0 if report["status"] == "pass" else 1
 
     repo_root = Path(__file__).resolve().parents[2]
     return run_standalone_soak_check(repo_root)

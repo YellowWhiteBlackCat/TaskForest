@@ -9,6 +9,7 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual
 use std::rc::Rc;
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
 use taskforest_core::core::services::{ServiceAction, ServiceStatus};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppPage, RefreshRequest};
 
@@ -362,7 +363,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
             row![
                 text(format!(
                     "{} {}?",
-                    service_action_label(target.action),
+                    i18n::service_action_label(target.action),
                     target.service_id
                 )),
                 focus::button(
@@ -414,17 +415,6 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
     .spacing(8)
     .height(Length::Fill)
     .into()
-}
-
-pub(super) fn service_action_label(action: ServiceAction) -> &'static str {
-    match action {
-        ServiceAction::Start => t("svc.start"),
-        ServiceAction::Stop => t("svc.stop"),
-        ServiceAction::Restart => t("svc.restart"),
-        ServiceAction::Enable => t("svc.enable"),
-        ServiceAction::Disable => t("svc.disable"),
-        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
-    }
 }
 
 /// The per-row Start/Restart/Stop/Enable/Disable strip. `source_index` is the

@@ -6,6 +6,7 @@ use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quant
 use taskmanager_shell::presentation::peak_of;
 
 use super::ProcessHistories;
+use taskforest_core::core::percent::precise_percent_text;
 
 pub(super) struct ProcessPerformancePeaks {
     pub cpu: String,
@@ -21,7 +22,7 @@ pub(super) fn performance_peaks(
 ) -> ProcessPerformancePeaks {
     ProcessPerformancePeaks {
         cpu: optional_peak(&histories.cpu, item.current_cpu_percentage(), |peak| {
-            format!("{peak:.1}%")
+            precise_percent_text(peak)
         }),
         memory: optional_peak(
             &histories.memory,

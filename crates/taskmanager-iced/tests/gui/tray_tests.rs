@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_assets::PRODUCT_TRAY_ICON_SIZE;
 use taskmanager_shell::QuitReason;
 
 #[test]

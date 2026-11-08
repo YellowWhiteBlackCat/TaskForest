@@ -51,12 +51,15 @@ use bevy::ui::widget::Text;
 use bevy::window::{PrimaryWindow, Window, WindowPlugin};
 use taskforest_ipc::SubscriptionMask;
 use taskmanager_app_host::NativeAppHost;
+use zhuge_ui_kit_bevy::frame_capture::install_sync_frame_capture;
+use zhuge_ui_kit_bevy::frame_timing::install_bevy_frame_timing;
 
 mod backdrop_capture;
 pub(crate) use backdrop_capture::BackdropCaptureTarget;
 mod capture_marker;
 mod capture_marker_interactive;
 mod capture_state;
+mod frame_capture;
 use backdrop_capture::{drive_backdrop_capture, sync_backdrop_capture};
 use capture_marker::emit_capture_marker;
 use capture_state::{initialize_capture_state, is_demo, is_production};
@@ -84,7 +87,9 @@ use crate::widgets::chart::ChartPointer;
 use crate::widgets::controls::{ControlVisual, control_background};
 use taskforest_contract::InstanceRole;
 use taskmanager_app_host::acquire_single_instance;
+use taskmanager_application::DiagnosticBundleSession;
 use taskmanager_application::i18n::t;
+use taskmanager_application::snapshot_export::SnapshotExportSession;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::FeedbackTone;
 use taskmanager_shell::ShellApp;
@@ -266,8 +271,18 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
         );
         if let Ok(client) = NativeAppHost::production().diagnostic_bundle_client() {
             let mut diagnostic = DiagnosticRuntime::default();
-            diagnostic.install(client);
+            diagnostic
+                .0
+                .install_with(|| DiagnosticBundleSession::new(client));
             app.insert_resource(diagnostic);
+        }
+
+        if let Ok(client) = NativeAppHost::production().snapshot_export_client() {
+            let mut snapshot = crate::snapshot_export::BevySnapshotExportRuntime::default();
+            snapshot
+                .0
+                .install_with(|| SnapshotExportSession::new(client));
+            app.insert_resource(snapshot);
         }
 
         let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
@@ -305,7 +320,9 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
                 .after(crate::pages::performance::replay::paint_charts)
                 .after(crate::pages::system::dashboard::paint_charts),
         );
+        install_sync_frame_capture(&mut app, frame_capture::SYNC_FRAME_ENV);
     }
+    install_bevy_frame_timing(&mut app, &crate::frame_timing::env());
     match app.run() {
         AppExit::Success => ExitCode::SUCCESS,
         AppExit::Error(_) => ExitCode::FAILURE,
@@ -457,6 +474,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::tooltip::register(app);
         crate::text_selection::register(app);
         crate::focus_visible::register(app);
+        crate::spatial_focus::register(app);
         app.add_systems(
             Startup,
             (

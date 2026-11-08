@@ -3,9 +3,7 @@ use taskmanager_test_support::DiskMetricsFixtureBuilder;
 
 use taskforest_core::core::{AlertMetric, AlertRule, AlertSeverity};
 
-use super::{
-    RuleAdjustment, apply_adjustment, maximum_threshold, next_custom_rule_id, target_options,
-};
+use super::{RuleAdjustment, apply_adjustment, next_custom_rule_id, target_options};
 
 #[test]
 fn duration_hysteresis_and_target_edits_are_bounded_and_reversible() {
@@ -79,7 +77,7 @@ fn editable_thresholds_match_transfer_contract_and_custom_ids_stay_unique() {
         RuleAdjustment::Threshold(5.0),
         &[],
     ));
-    assert_eq!(cpu_rule.threshold, maximum_threshold(cpu_rule.metric));
+    assert_eq!(cpu_rule.threshold, cpu_rule.metric.threshold_ceiling());
 
     let rules = [
         super::ManagedAlertRule {

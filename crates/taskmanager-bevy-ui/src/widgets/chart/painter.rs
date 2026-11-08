@@ -24,6 +24,8 @@ use bevy::scene::{EntityWorldMutSceneExt, Scene, bsn};
 use bevy::time::Time;
 use bevy::ui::widget::{ImageNode, NodeImageMode, Text};
 use bevy::ui::{ComputedNode, Display, Node, Overflow, PositionType, Val, percent, px};
+use taskmanager_ui_contract::presentation::motion::CHART_SLIDE_DURATION;
+use zhuge_ui_core::easing::smoothstep;
 
 use crate::widgets::chart::canvas::{
     CanvasCrosshair, CanvasFill, CanvasFlow, CanvasGrid, CanvasImage, CanvasSpec, rasterize,
@@ -34,10 +36,6 @@ use crate::widgets::chart::geometry::{
 use crate::widgets::chart::hover::{
     ChartHoverLabel, ChartPointer, hover_position, hover_slot_in, hover_text,
 };
-
-/// How long one sample slot takes to slide in, in seconds — the same slide
-/// the reference surface runs.
-pub(crate) const CHART_SLIDE_SECONDS: f32 = 0.18;
 
 /// How long the travelling highlight takes to run the curve, in seconds.
 pub(crate) const CHART_FLOW_SECONDS: f32 = 1.6;
@@ -242,8 +240,7 @@ pub(crate) fn slide_offset(progress: f32, width: f32, points: usize) -> f32 {
     if points < 2 {
         return 0.0;
     }
-    let eased = progress.clamp(0.0, 1.0);
-    let eased = eased * eased * (3.0 - 2.0 * eased);
+    let eased = smoothstep(progress);
     let slot = width / (points - 1) as f32;
     -(1.0 - eased) * slot
 }
@@ -367,7 +364,7 @@ pub(crate) fn paint_chart_canvases(
             state.slide = 0.0;
         }
         if state.slide < 1.0 {
-            state.slide = (state.slide + delta / CHART_SLIDE_SECONDS).min(1.0);
+            state.slide = (state.slide + delta / CHART_SLIDE_DURATION.as_secs_f32()).min(1.0);
         }
         if canvas.style.flow.is_some() {
             state.flow_phase = (state.flow_phase + delta / CHART_FLOW_SECONDS) % 1.0;

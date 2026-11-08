@@ -22,6 +22,7 @@ use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundle
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::i18n::t;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_preview_text,
@@ -67,19 +68,8 @@ pub(crate) struct DiagnosticRawReport;
 
 #[derive(Resource, Default)]
 pub(crate) struct DiagnosticRuntime(
-    pub(crate) Option<DiagnosticBundleSession<DiagnosticBundleClient>>,
+    pub(crate) SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>,
 );
-
-impl DiagnosticRuntime {
-    pub(crate) fn install(&mut self, client: DiagnosticBundleClient) {
-        self.0 = Some(DiagnosticBundleSession::new(client));
-    }
-    pub(crate) fn close(&mut self) {
-        if let Some(session) = &mut self.0 {
-            session.close();
-        }
-    }
-}
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct DiagnosticControl(pub(crate) DiagnosticCommand);
@@ -148,7 +138,7 @@ fn on_command(command: On<DiagnosticCommand>, mut access: DiagnosticAccess) {
                 .surface
                 .diagnostic
                 .as_mut()
-                .and_then(|runtime| runtime.0.as_mut());
+                .and_then(|runtime| runtime.0.active_mut());
             if let Some(state) = access.surface.state.diagnostic_mut() {
                 state.confirm(runtime, target);
             }
@@ -192,7 +182,7 @@ fn drain(
 ) {
     let completions = runtime
         .0
-        .as_mut()
+        .active_mut()
         .map_or_else(Vec::new, DiagnosticBundleSession::drain);
     let mut changed = false;
     for completion in completions {

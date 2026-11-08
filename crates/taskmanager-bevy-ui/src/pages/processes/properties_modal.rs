@@ -24,7 +24,8 @@ use bevy::scene::{CommandsSceneExt, Ready};
 use bevy::ui::{ComputedNode, ScrollPosition, UiSystems};
 use bevy::ui_widgets::{Activate, SelectedTab, TabList, ValueChange};
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_application::{PlatformEffect, ProcessInsightFacet, i18n::t};
+use taskmanager_application::ProcessDetailsSection;
+use taskmanager_application::{PlatformEffect, ProcessInsightFacet};
 use taskmanager_shell::ShellApp;
 use view::ProcessPropertiesCurve;
 
@@ -46,34 +47,10 @@ use performance::PerformanceCurve;
 use quota::QuotaFact;
 use tabs::TabIndicatorMotion;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum ProcessPropertiesSection {
-    #[default]
-    Overview,
-    Performance,
-    Command,
-    Insights,
-}
-impl ProcessPropertiesSection {
-    pub(crate) const ALL: [Self; 4] = [
-        Self::Overview,
-        Self::Performance,
-        Self::Command,
-        Self::Insights,
-    ];
-    pub(crate) fn label(self) -> &'static str {
-        t(match self {
-            Self::Overview => "prop.overview",
-            Self::Performance => "prop.performance",
-            Self::Command => "prop.command",
-            Self::Insights => "prop.insights",
-        })
-    }
-}
 #[derive(Clone, Debug)]
 pub(crate) struct ProcessPropertiesView {
     pub(crate) target: FrozenProcessIdentity,
-    pub(crate) section: ProcessPropertiesSection,
+    pub(crate) section: ProcessDetailsSection,
     pub(crate) facet: ProcessInsightFacet,
     pub(crate) rows: Vec<(String, String)>,
     pub(crate) curves: Vec<PerformanceCurve>,
@@ -107,14 +84,14 @@ impl ProcessPropertiesView {
 }
 #[derive(Resource)]
 pub(crate) struct ProcessPropertiesPresentation {
-    pub(crate) section: ProcessPropertiesSection,
+    pub(crate) section: ProcessDetailsSection,
     pub(crate) facet: ProcessInsightFacet,
     target_key: Option<ProcessLiveKey>,
 }
 impl Default for ProcessPropertiesPresentation {
     fn default() -> Self {
         Self {
-            section: ProcessPropertiesSection::Overview,
+            section: ProcessDetailsSection::Overview,
             facet: ProcessInsightFacet::Network,
             target_key: None,
         }
@@ -150,7 +127,7 @@ pub(crate) struct ProcessPropertiesFooter;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessPropertiesDismissButton;
 #[derive(Component, Clone, Default)]
-pub(crate) struct ProcessPropertiesTab(pub(crate) ProcessPropertiesSection);
+pub(crate) struct ProcessPropertiesTab(pub(crate) ProcessDetailsSection);
 #[derive(Component, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum ProcessPropertiesAction {
     #[default]
@@ -188,7 +165,7 @@ fn on_applied(
         .and_then(FrozenProcessIdentity::live_key);
     if state.target_key != key {
         state.target_key = key;
-        state.section = ProcessPropertiesSection::Overview;
+        state.section = ProcessDetailsSection::Overview;
         state.facet = ProcessInsightFacet::Network;
     }
     republish(&mut commands);
@@ -230,7 +207,7 @@ pub(super) fn on_tab(
         return;
     };
     state.section = tab.0;
-    if tab.0 == ProcessPropertiesSection::Insights {
+    if tab.0 == ProcessDetailsSection::Insights {
         request_insights(&mut track, &mut effects, false);
     }
     republish(&mut commands);
@@ -288,7 +265,7 @@ pub(super) fn on_authorize(
 ) {
     let Some(view) = view_model(
         track.shell(),
-        ProcessPropertiesSection::Insights,
+        ProcessDetailsSection::Insights,
         ProcessInsightFacet::Network,
     ) else {
         return;
@@ -465,24 +442,24 @@ pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> b
     }
     let (section, facet) = match scenario {
         "process-properties-performance" => (
-            ProcessPropertiesSection::Performance,
+            ProcessDetailsSection::Performance,
             ProcessInsightFacet::Network,
         ),
         "process-memory-pss-swap" => (
-            ProcessPropertiesSection::Overview,
+            ProcessDetailsSection::Overview,
             ProcessInsightFacet::Network,
         ),
         "process-network-details" => (
-            ProcessPropertiesSection::Insights,
+            ProcessDetailsSection::Insights,
             ProcessInsightFacet::Network,
         ),
-        "process-gpu-details" => (ProcessPropertiesSection::Insights, ProcessInsightFacet::Gpu),
+        "process-gpu-details" => (ProcessDetailsSection::Insights, ProcessInsightFacet::Gpu),
         "process-resource-limits" => (
-            ProcessPropertiesSection::Insights,
+            ProcessDetailsSection::Insights,
             ProcessInsightFacet::Resources,
         ),
         "process-isolation" => (
-            ProcessPropertiesSection::Insights,
+            ProcessDetailsSection::Insights,
             ProcessInsightFacet::Isolation,
         ),
         _ => return false,
@@ -537,7 +514,7 @@ pub(crate) fn capture_ready(access: &mut PropertiesCapture, scenario: &str) -> b
     {
         return false;
     }
-    if section == ProcessPropertiesSection::Performance {
+    if section == ProcessDetailsSection::Performance {
         let mut metrics = Vec::new();
         for (curve, measured, node) in access.curves.iter() {
             if measured.0.is_none()

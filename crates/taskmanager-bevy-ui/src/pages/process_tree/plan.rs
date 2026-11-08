@@ -14,6 +14,7 @@ use taskmanager_shell::presentation::bytes;
 
 use super::aggregate::{ProcessTreeCellKind, aggregate_metric_compact_text, aggregate_metric_text};
 use super::{ProcessTreeRowView, ProcessTreeToggle};
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 
 /// How a hierarchy guide column draws its vertical connector.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -203,8 +204,8 @@ fn row_facts(row: &ProcessTreeRowView<'_>) -> (String, Vec<(ProcessTreeCellKind,
     let mut cells: Vec<(ProcessTreeCellKind, String)> =
         vec![(ProcessTreeCellKind::Name, name.clone())];
     if let Some(cpu) = &row.cpu {
-        let format_value = |value: &f32| format!("{value:.1}%");
-        let compact_value = |value: &f32| format!("{value:.1}%").replace(".0%", "%");
+        let format_value = |value: &f32| precise_percent_text(*value);
+        let compact_value = |value: &f32| percent_text(*value);
         let full = aggregate_metric_text(cpu, format_value);
         summary.push_str(&format!(" · {} {full}", t("common.cpu")));
         cells.push((

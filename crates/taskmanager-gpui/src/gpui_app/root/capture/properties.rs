@@ -1,7 +1,8 @@
 //! Positive frozen-target data required before certifying a presented properties frame.
-use super::super::{ProcessDetailsSection, RootView, TopPage};
+use super::super::{RootView, TopPage};
 use super::CaptureScenario;
 use crate::gpui_app::process_insights::ProcessInsightsRenderState;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_shell::fixture::process_insights::process_insights_capture_data_ready;
 impl RootView {
     pub(crate) fn process_properties_capture_ready(&mut self) -> bool {

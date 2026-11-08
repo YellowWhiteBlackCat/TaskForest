@@ -77,7 +77,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessAffinityApply => "iced-process-affinity-apply".to_owned(),
         FocusTarget::ProcessNetworkEscalation => "iced-process-net-escalation".to_owned(),
         FocusTarget::DetailsTab(section) => {
-            format!("iced-details-tab-{}", section.key())
+            format!("iced-details-tab-{}", section.token())
         }
         FocusTarget::DetailsFacet(facet) => format!("iced-details-facet-{facet:?}"),
         FocusTarget::DetailsRefresh => "iced-details-refresh".to_owned(),

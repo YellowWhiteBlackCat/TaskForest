@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::percent::{percent_text, precise_percent_text};
 use crate::core::{
     DeviceGeneration, DeviceId, FilesystemHealthSnapshot, SensorCenterSnapshot, SmartSelfTestKind,
     SmartSelfTestReport, StorageDeviceKey, StorageDeviceTarget,
@@ -221,7 +222,7 @@ impl SystemHealthScore {
             deductions.push(HealthDeduction {
                 kind: HealthDeductionKind::SwapPressure,
                 points: (((used - 80.0) / 20.0 * 20.0).round() as u8).clamp(1, 20),
-                evidence: format!("swap used {used:.1}%"),
+                evidence: format!("swap used {}", percent_text(used)),
             });
         }
         if input.thermal_throttled == Some(true) {
@@ -271,7 +272,7 @@ fn add_pressure_deduction(
     deductions.push(HealthDeduction {
         kind,
         points,
-        evidence: format!("pressure avg10 {value:.1}%"),
+        evidence: format!("pressure avg10 {}", precise_percent_text(value)),
     });
 }
 

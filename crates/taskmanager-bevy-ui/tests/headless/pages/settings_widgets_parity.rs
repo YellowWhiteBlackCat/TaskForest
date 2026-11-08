@@ -44,9 +44,10 @@ use bevy::ui_widgets::{Checkbox, ScrollArea, Scrollbar, ScrollbarThumb};
 use bevy::window::{ExitCondition, PrimaryWindow, Window, WindowPlugin};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_ui_contract::InputModality;
 
 use crate::app::{Page, PageContent, Route};
-use crate::focus_visible::{FocusRing, InputModality};
+use crate::focus_visible::FocusRing;
 use crate::pages::settings::{SettingsChoice, SettingsField};
 use crate::palette::{composite_over, ui_palette};
 use crate::tooltip::{TooltipOverlay, TooltipState, TooltipText, resolve_placement};

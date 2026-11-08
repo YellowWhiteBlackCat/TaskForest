@@ -33,6 +33,10 @@ Beyond the README module map, these ownership facts apply:
 - `src/core/alerts/` owns alert rules, active-set transitions and the bounded,
   versioned event export; event history is session-local domain state, not a
   renderer cache.
+- `src/core/percent.rs` owns the ONE percent spelling: a level (a magnitude on
+  a fixed 0..=100 scale) reads as a whole percent, a rate (a value whose tenth
+  carries the fact) reads with one decimal. The absence of a measurement is
+  not decided here — the presentation layer owns the absence-aware readouts.
 - `src/core.rs` is the owner module index and `src/lib.rs` contains only the
   core crate's own aggregate API, never a cross-layer forwarding facade;
   consumers should prefer the explicit domain module that owns each fact.

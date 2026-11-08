@@ -10,7 +10,7 @@ fn cpu_readout_formats_current_observation_and_missing_state() {
         global_usage_pct: ScalarObservation::available(42.5, 10),
         ..Default::default()
     });
-    assert_eq!(cpu_summary_readout(&cpu), "42.5%");
+    assert_eq!(cpu_summary_readout(&cpu), "43%");
 
     cpu.apply_scalar_observations(CpuScalarObservations::unavailable(
         FailureKind::PermissionDenied,

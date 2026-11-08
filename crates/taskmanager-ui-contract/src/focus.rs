@@ -1,5 +1,45 @@
 //! Toolkit-neutral focus and modal-containment policy.
 
+/// The most recent input origin capable of changing focus in a window.
+///
+/// No toolkit attaches an input origin to focus state, so every frontend
+/// tracks the origin itself and asks this shared vocabulary whether the
+/// focus ring should be painted. The three states and the focus-visible rule
+/// live here so the frontends cannot drift into four different focus-visible
+/// policies.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
+pub enum InputModality {
+    /// Initial state and focus changes initiated directly by application code.
+    #[default]
+    Programmatic,
+    /// A keyboard event was observed at the toolkit capture boundary.
+    Keyboard,
+    /// A pointer button was pressed over the window surface.
+    Pointer,
+}
+
+impl InputModality {
+    /// Strict focus-visible policy: only keyboard modality paints an outset
+    /// focus ring. Programmatic focus inherits the previous origin and never
+    /// paints a ring by itself.
+    #[must_use]
+    pub const fn shows_focus_ring(self) -> bool {
+        matches!(self, Self::Keyboard)
+    }
+
+    /// Adopt a new origin, reporting whether the observable state changed.
+    ///
+    /// Adapters use the report to re-render only when the focus-visible
+    /// decision can actually differ.
+    pub fn transition(&mut self, next: Self) -> bool {
+        if *self == next {
+            return false;
+        }
+        *self = next;
+        true
+    }
+}
+
 /// Opaque identity for the control that should regain focus after a modal closes.
 ///
 /// Frontend adapters own the actual toolkit handle and associate it with this

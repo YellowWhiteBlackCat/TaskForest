@@ -82,6 +82,17 @@ impl CpuTemperatureSource {
     pub const fn is_labeled_fallback(&self) -> bool {
         matches!(self, Self::PackageHwmon | Self::ThermalZone)
     }
+
+    /// The i18n note key for a temperature source tier that needs a visible
+    /// qualifier; native chip drivers stay unqualified.
+    #[must_use]
+    pub const fn qualifier_note_key(self) -> Option<&'static str> {
+        match self {
+            Self::PackageHwmon => Some("cpu.temperature_source.package_hwmon"),
+            Self::ThermalZone => Some("cpu.temperature_source.thermal_zone"),
+            Self::Coretemp | Self::K10temp | Self::Zenpower => None,
+        }
+    }
 }
 
 /// Width of the saturation band above 100% still accepted from a provider

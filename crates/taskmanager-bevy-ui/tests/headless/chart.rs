@@ -1,7 +1,6 @@
 use super::*;
-use crate::widgets::chart::geometry::{
-    ChartScale, ChartSlots, ChartVertex, chart_runs, chart_runs_in,
-};
+use crate::widgets::chart::geometry::{ChartScale, ChartVertex, chart_runs, chart_runs_in};
+use taskmanager_shell::presentation::ChartSlots;
 
 #[test]
 fn chart_projection_maps_extrema_and_keeps_newest_at_right_edge() {
@@ -16,7 +15,17 @@ fn chart_projection_maps_extrema_and_keeps_newest_at_right_edge() {
 fn unavailable_samples_break_the_line_instead_of_becoming_zero() {
     let segments = line_segments(&[1.0, f32::NAN, 3.0, 4.0], 90.0, 30.0, MAX_CHART_POINTS);
     assert_eq!(segments.len(), 1);
-    assert_eq!(segments[0].start.x, 60.0);
+    // The slot grid is the shared owner's, and the owner keeps the release
+    // surface's evaluation order: the slot ratio is measured from the right
+    // (`1 - from_right / denominator`), which rounds once more than the
+    // mathematically equivalent form. The gap's first sample therefore lands
+    // within one f32 ULP of 60.0 (4e-6 px at this scale) instead of exactly
+    // on it — the release surface's pixels stay bit-identical.
+    assert!(
+        (segments[0].start.x - 60.0).abs() < 1e-3,
+        "the run starts at the gap's first slot: {}",
+        segments[0].start.x
+    );
     assert!((segments[0].start.y - 10.0).abs() < 1e-4);
     assert_eq!(segments[0].end, ChartVertex { x: 90.0, y: 0.0 });
 }

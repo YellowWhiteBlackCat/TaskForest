@@ -28,6 +28,7 @@ use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 use super::{SystemFactGroup, SystemFactRow, fact_row_scene, section_card_scene};
 use crate::palette::UiPalette;
 use crate::window::WindowPalette;
+use zhuge_ui_core::easing::lerp;
 
 /// The temperature above which an observed reading is a hot spot.
 pub(crate) const HOT_SENSOR_THRESHOLD_C: f32 = 85.0;
@@ -247,7 +248,7 @@ fn breathe_hot_rows(
     mut rows: Query<&mut BackgroundColor, With<HotSensorRow>>,
 ) {
     let phase = time.map_or(0.0, |time| time.elapsed_secs() * HOT_BREATH_HZ);
-    let alpha = HOT_WASH_MIN + (HOT_WASH_MAX - HOT_WASH_MIN) * (0.5 + 0.5 * phase.sin());
+    let alpha = lerp(HOT_WASH_MIN, HOT_WASH_MAX, 0.5 + 0.5 * phase.sin());
     for mut fill in &mut rows {
         fill.0 = palette.inner.danger_color.with_alpha(alpha);
     }

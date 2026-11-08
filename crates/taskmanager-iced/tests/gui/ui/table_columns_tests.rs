@@ -13,11 +13,10 @@ use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::virtual_table;
 
 use crate::ui::applications::rows::visible_column_elements;
-use crate::ui::applications::{
-    apps_columns, column_alignment, column_hideable, sort_col_contract_id,
-};
+use crate::ui::applications::{apps_columns, column_alignment, column_hideable};
 use crate::ui::tables::services_columns;
 use crate::ui::users::users_columns;
+use taskmanager_shell::saved_views::sort_token;
 use taskmanager_ui_contract::PROCESS_COLUMNS;
 use taskmanager_ui_contract::find;
 
@@ -29,10 +28,7 @@ use taskmanager_ui_contract::find;
 fn process_column_widths_and_tokens_are_contract_truth() {
     let with_swap = apps_columns(true);
     for (column, width) in &with_swap {
-        if *column == SortCol::Pss {
-            continue; // shell superset: no contract row by design
-        }
-        let spec = find(sort_col_contract_id(*column))
+        let spec = find(sort_token(*column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         assert_eq!(
             *width, spec.default_width,
@@ -42,7 +38,7 @@ fn process_column_widths_and_tokens_are_contract_truth() {
 
     let tokens: std::collections::HashSet<&str> = with_swap
         .iter()
-        .map(|(column, _)| sort_col_contract_id(*column))
+        .map(|(column, _)| sort_token(*column))
         .collect();
     for spec in PROCESS_COLUMNS {
         assert!(
@@ -66,7 +62,7 @@ fn numeric_alignment_follows_the_contract_numeric_flag() {
         if column == SortCol::Pss {
             continue;
         }
-        let spec = find(sort_col_contract_id(column))
+        let spec = find(sort_token(column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         let expected = if spec.numeric {
             Horizontal::Right
@@ -86,7 +82,7 @@ fn column_menu_toggles_only_contract_hideable_columns() {
         if column == SortCol::Pss {
             continue;
         }
-        let spec = find(sort_col_contract_id(column))
+        let spec = find(sort_token(column))
             .unwrap_or_else(|| panic!("{column:?} must map onto PROCESS_COLUMNS"));
         assert_eq!(
             column_hideable(column),

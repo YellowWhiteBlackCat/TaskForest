@@ -499,6 +499,36 @@ impl HistoryWindow {
             Self::SevenDays => 7 * 24 * 60 * 60 * 1000,
         }
     }
+
+    /// Locale-catalog key for this window's choice label
+    /// (`perf.replay.window.1h` …).
+    ///
+    /// The core layer stays copy-free: the key is the vocabulary, and the
+    /// application i18n owner is the single place where a key meets the
+    /// active language.
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::OneHour => "perf.replay.window.1h",
+            Self::TwentyFourHours => "perf.replay.window.24h",
+            Self::SevenDays => "perf.replay.window.7d",
+        }
+    }
+
+    /// Width-driven compact token for this window (`1h` / `24h` / `7d`).
+    ///
+    /// Surfaces that spell the window inside a longer string (a TUI footer, a
+    /// widget element id) read this token instead of re-matching the enum;
+    /// the localized sentence comes from [`HistoryWindow::i18n_key`] through
+    /// the i18n owner.
+    #[must_use]
+    pub const fn compact_token(self) -> &'static str {
+        match self {
+            Self::OneHour => "1h",
+            Self::TwentyFourHours => "24h",
+            Self::SevenDays => "7d",
+        }
+    }
 }
 
 /// Fact-only peak summary for one series over one window.

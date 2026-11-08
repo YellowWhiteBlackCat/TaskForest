@@ -42,9 +42,8 @@ pub(crate) mod editor;
 pub(crate) mod pause;
 pub(crate) mod severity;
 pub(crate) mod toast;
-use taskforest_core::core::alerts::{
-    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRuleId, AlertSeverity,
-};
+use taskforest_core::core::alerts::{Alert, AlertEvent, AlertEventKind, AlertRuleId};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
 
@@ -187,26 +186,6 @@ fn rule_toggle_observer(
 
 // ---- view model (pure; the headless-test surface) ----
 
-/// Unit suffix for a metric value. The binary SMART-critical metric carries
-/// no unit (its value is the warning bit).
-pub(crate) fn metric_unit(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => "%",
-        AlertMetric::DiskTemperatureC => "°C",
-        AlertMetric::SmartCriticalWarning => "",
-    }
-}
-
-fn severity_label(severity: AlertSeverity) -> &'static str {
-    match severity {
-        AlertSeverity::Info => "Info",
-        AlertSeverity::Warning => "Warning",
-        AlertSeverity::Critical => "Critical",
-    }
-}
-
 /// The hysteresis clear band joined from the canonical rule set. A rule that
 /// left the set omits the band honestly instead of inventing one.
 fn alert_clear_band(alert: &Alert, rules: &[ManagedAlertRule]) -> String {
@@ -217,7 +196,7 @@ fn alert_clear_band(alert: &Alert, rules: &[ManagedAlertRule]) -> String {
         Some(managed) => format!(
             " (clears ≤ {:.1}{})",
             managed.rule.threshold - managed.rule.hysteresis,
-            metric_unit(alert.metric)
+            alert.metric.unit_suffix()
         ),
         None => " (rule not in set; clear band unknown)".to_owned(),
     }
@@ -231,9 +210,13 @@ pub(crate) fn active_alert_banner_rows(
     alert: &Alert,
     rules: &[ManagedAlertRule],
 ) -> (String, String) {
-    let unit = metric_unit(alert.metric);
+    let unit = alert.metric.unit_suffix();
     (
-        format!("{} · {}", severity_label(alert.severity), alert.target),
+        format!(
+            "{} · {}",
+            i18n::alert_severity_label(alert.severity),
+            alert.target
+        ),
         format!(
             "{:.1}{} ≥ {:.1}{}{}",
             alert.value,
@@ -250,9 +233,9 @@ pub(crate) fn active_alert_banner_rows(
 pub(crate) fn managed_rule_line(managed: &ManagedAlertRule) -> String {
     format!(
         "{} · ≥ {:.1}{} — {}",
-        severity_label(managed.rule.severity),
+        i18n::alert_severity_label(managed.rule.severity),
         managed.rule.threshold,
-        metric_unit(managed.rule.metric),
+        managed.rule.metric.unit_suffix(),
         if managed.enabled {
             "enabled"
         } else {
@@ -261,25 +244,15 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule) -> String {
     )
 }
 
-pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => "CPU Usage",
-        AlertMetric::MemoryUsagePercent => "Memory Usage",
-        AlertMetric::DiskTemperatureC => "Disk Temperature",
-        AlertMetric::SmartPercentUsed => "SMART Percent Used",
-        AlertMetric::SmartCriticalWarning => "SMART Critical Warning",
-    }
-}
-
 pub(crate) fn event_history_line(event: &AlertEvent) -> String {
-    let unit = metric_unit(event.alert.metric);
+    let unit = event.alert.metric.unit_suffix();
     let kind_str = match event.kind {
         AlertEventKind::Activated => "Activated",
         AlertEventKind::Cleared => "Cleared",
     };
     format!(
         "[{kind_str}] {} · {} — {:.1}{} (thresh: {:.1}{})",
-        severity_label(event.alert.severity),
+        i18n::alert_severity_label(event.alert.severity),
         event.alert.target,
         event.alert.value,
         unit,

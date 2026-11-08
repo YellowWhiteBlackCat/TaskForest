@@ -12,7 +12,9 @@ use gpui::{
 use std::collections::{HashMap, HashSet};
 use taskmanager_application::i18n;
 use taskmanager_application::process_category_projection::category_expansion_key;
-use taskmanager_shell::{ProcessRowId, app_tree_expansion_key_for_identity};
+use taskmanager_shell::{
+    ProcessRowId, app_tree_expansion_key_for_identity, saved_views::sort_token,
+};
 use taskmanager_theme::Color;
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::theme_binding::{
@@ -30,9 +32,9 @@ use taskmanager_theme::tokens;
 pub(crate) mod projection;
 pub use projection::{
     ProcRowProps, ProjectionCache, RowCellText, ShellVisibleRowsProps, Toggle, VisibleRow,
-    VisibleRowsProps, application_root_count, category_tree_rows, default_category_expansions,
-    effective_process_hidden_cols, effective_process_sort_col, project_visible_rows_from_shell,
-    sort_col_step, sort_id, visible_rows, visible_rows_with_local_time, visible_sort_cols,
+    VisibleRowsProps, application_root_count, category_tree_rows, effective_process_hidden_cols,
+    effective_process_sort_col, project_visible_rows_from_shell, sort_col_step, sort_id,
+    visible_rows, visible_rows_with_local_time, visible_sort_cols,
 };
 
 // ── GPUI column kit over the shell `SortCol` ─────────────────────────────────
@@ -73,44 +75,16 @@ pub fn columns() -> &'static [SortCol] {
     ]
 }
 
-/// Stable token identifying this column in the toolkit-neutral
-/// [`taskmanager_ui_contract::PROCESS_COLUMNS`] inventory — spelled exactly
-/// like the persisted sort / hidden-columns tokens (`sort_token` /
-/// `hidden_tokens`), so persistence, the contract, and the shell enum agree
-/// on one string per column. The match is compiler-exhaustive: adding a
-/// variant without an arm here is a build error, and the contract gate test
-/// below then forces the matching contract row.
-pub fn contract_id(col: SortCol) -> &'static str {
-    match col {
-        SortCol::Name => "Name",
-        SortCol::User => "User",
-        SortCol::Pid => "PID",
-        SortCol::Threads => "Threads",
-        SortCol::StartTime => "StartTime",
-        SortCol::State => "Status",
-        SortCol::Cpu => "CPU",
-        SortCol::Memory => "Memory",
-        SortCol::Swap => "Swap",
-        SortCol::Pss => "MemoryPss",
-        SortCol::DiskRead => "DiskRead",
-        SortCol::DiskWrite => "DiskWrite",
-        SortCol::Network => "Network",
-        SortCol::CpuTime => "CPUTime",
-        SortCol::Fds => "FDs",
-        SortCol::Nice => "Nice",
-    }
-}
-
 /// The neutral contract row for this column. A miss is a programming error
 /// (a variant without a contract row); the delegating accessors keep
 /// panic-free fallbacks so rendering survives, while the contract gate test
 /// fails the suite in CI.
 fn contract_spec(col: SortCol) -> Option<&'static ProcessColumnSpec> {
-    let spec = find(contract_id(col));
+    let spec = find(sort_token(col));
     debug_assert!(
         spec.is_some(),
         "SortCol {col:?} ({}) is missing from PROCESS_COLUMNS",
-        contract_id(col)
+        sort_token(col)
     );
     spec
 }

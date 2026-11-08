@@ -27,7 +27,6 @@ use taskforest_core::core::metrics::ScalarObservationGroup;
 use taskforest_core::core::power::BatteryInfo;
 use taskforest_core::core::power::BatteryScalarObservations;
 use taskforest_core::core::power::PowerSupplySnapshot;
-use taskforest_core::core::process::ProcessCategory;
 use taskforest_core::core::sensors::SensorCenterSnapshot;
 use taskforest_core::core::sensors::SensorDescriptor;
 use taskforest_core::core::sensors::SensorMagnitude;
@@ -41,19 +40,11 @@ use taskforest_core::core::time::LocalTimeRules;
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_app_host::HistoryReplayClient;
 use taskmanager_application::AppPage;
-use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::process_category_projection::default_category_expansions;
 use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::record_demo_history_frame;
 use taskmanager_shell::fixture::seed_projection_fact;
-
-fn default_category_expansions() -> std::collections::HashSet<String> {
-    ProcessCategory::ALL
-        .iter()
-        .copied()
-        .map(category_expansion_key)
-        .collect()
-}
 
 impl IcedApp {
     /// Build a blank frontend; `platform` is `None` for no-I/O loading-state
@@ -109,7 +100,7 @@ impl IcedApp {
             system_section: SystemPageSection::Hardware,
             system_health_section: HealthReviewSection::All,
             system_dashboard_first_metric: 0,
-            history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
+            history_runtime: super::history_replay::IcedHistoryReplay::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),
@@ -196,7 +187,7 @@ impl IcedApp {
             system_section: SystemPageSection::Hardware,
             system_health_section: HealthReviewSection::All,
             system_dashboard_first_metric: 0,
-            history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
+            history_runtime: super::history_replay::IcedHistoryReplay::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),

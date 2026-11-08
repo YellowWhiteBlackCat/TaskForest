@@ -1,6 +1,7 @@
 //! Tests for graph settings, language preference, history seeding, and modal animation transitions.
 
 use std::time::{Duration, Instant};
+use taskmanager_application::ProcessDetailsSection;
 
 use super::*;
 use crate::app::SettingsChange;
@@ -47,7 +48,7 @@ fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
 #[test]
 fn details_section_resets_to_overview_when_properties_open() {
     let mut app = IcedApp::demo();
-    assert_eq!(app.details_section(), DetailsSection::Overview);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Overview);
 
     // Opening the properties overlay through the real keyboard route
     // (Enter, Applications page) must land on Overview even after a previous
@@ -57,22 +58,24 @@ fn details_section_resets_to_overview_when_properties_open() {
     let enter = IcedKey::Fixed(ShellKeyEvent::new(KeyCode::Enter, Modifiers::NONE));
     let _ = app.update(Message::Key(enter));
     assert!(app.process_properties_open());
-    assert_eq!(app.details_section(), DetailsSection::Overview);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Overview);
 
-    let _ = app.update(Message::SelectDetailsSection(DetailsSection::Insights));
-    assert_eq!(app.details_section(), DetailsSection::Insights);
+    let _ = app.update(Message::SelectDetailsSection(
+        ProcessDetailsSection::Insights,
+    ));
+    assert_eq!(app.details_section(), ProcessDetailsSection::Insights);
 
     // Close and reopen: the tab returns to Overview.
     let _ = app.update(Message::DismissOverlay);
     let _ = app.update(Message::Key(enter));
     assert!(app.process_properties_open());
-    assert_eq!(app.details_section(), DetailsSection::Overview);
+    assert_eq!(app.details_section(), ProcessDetailsSection::Overview);
 
     // Every tab has a stable focus operation id.
-    for section in DetailsSection::ALL {
+    for section in ProcessDetailsSection::ALL {
         assert_eq!(
             crate::focus::focus_id(FocusTarget::DetailsTab(section)),
-            format!("iced-details-tab-{}", section.key())
+            format!("iced-details-tab-{}", section.token())
         );
     }
 }

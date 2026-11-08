@@ -2,14 +2,15 @@
 
 use super::super::window_surface::WindowSurface;
 use super::super::{
-    DetailsPanelProps, ProcessDetailsSection, RootView, WindowSurfaceDismissReason,
-    WindowSurfaceKind, batch_process, details_panel_content, diagnostic_bundle, elements, i18n,
-    perf_views, service_control, services_view, system_health, termination,
+    DetailsPanelProps, RootView, WindowSurfaceDismissReason, WindowSurfaceKind, batch_process,
+    details_panel_content, diagnostic_bundle, elements, i18n, perf_views, service_control,
+    services_view, system_health, termination,
 };
 use super::overlays;
 use gpui::{AnyElement, App, Context, Div, IntoElement, ParentElement, Stateful, Window, px};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::target::ServiceId;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::SmartSelfTestState;
 use taskmanager_application::{PendingConfirmation, SurfaceDismissReason, SurfaceKind};
 use taskmanager_theme::Theme;

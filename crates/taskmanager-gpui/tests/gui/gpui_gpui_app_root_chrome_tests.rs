@@ -296,7 +296,7 @@ fn observed_fault_and_huge_page_counters_reach_the_overview_rows() {
         .position(|(field, _)| *field == ProcessDetailsField::AnonHugePages)
         .expect("overview carries anonymous huge pages");
     assert_eq!(
-        overview[huge_row].1, "64.0 MiB (25.0% RSS)",
+        overview[huge_row].1, "64.0 MiB (25% RSS)",
         "the overview row must carry the observed huge-page charge"
     );
 }

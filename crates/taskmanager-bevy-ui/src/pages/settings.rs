@@ -90,30 +90,9 @@ pub(crate) struct SettingsFooter;
 
 /// The telemetry refresh-cadence choices (ms), in display order — the same
 /// four steps the TUI settings form exposes.
-pub(crate) const REFRESH_CHOICES_MS: [u64; 4] = [500, 1000, 2000, 5000];
-
-/// The history-capacity choices (samples), in display order — steps inside
-/// the shared store's 10..=600 clamp (the same ladder as the graph-points
-/// preference).
-pub(crate) const CAPACITY_CHOICES: [usize; 4] = [60, 120, 300, 600];
-
-/// The index of the live interval among the cadence choices; `None` when the
-/// effective cadence is not one of the offered steps (a clamped or
-/// externally-set interval) — rendered honestly as no selection.
-pub(crate) fn refresh_choice_index(interval: TelemetryInterval) -> Option<usize> {
-    let millis = u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX);
-    REFRESH_CHOICES_MS
-        .iter()
-        .position(|&choice| choice == millis)
-}
-
-/// The index of the live capacity among the capacity choices; `None` when
-/// the effective capacity is not one of the offered steps.
-pub(crate) fn capacity_choice_index(capacity: usize) -> Option<usize> {
-    CAPACITY_CHOICES
-        .iter()
-        .position(|&choice| choice == capacity)
-}
+use taskmanager_ui_contract::presentation::settings::{
+    CAPACITY_CHOICES, REFRESH_CHOICES_MS, capacity_choice_index, refresh_choice_index,
+};
 
 /// One of the two switchable theme modes resolved from the same token
 /// combination as the cold start (GNOME skin, no high contrast, system

@@ -4,38 +4,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::channel;
 
-use taskforest_contract::{TrayController, TrayFailure};
-use taskforest_core::core::tray::{TrayActionId, TrayEvent, TrayMenuItem};
-use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product};
+use taskforest_contract::{TrayController, TrayFailure, sync_tray_pause_checkmark};
+use taskforest_core::core::tray::{
+    TrayActionId, TrayEvent, TrayIntent, TrayMenuItem, resolve_tray_action,
+};
+use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_data};
 
 use super::*;
 use taskmanager_application::i18n::t;
-
-// The polymorphic `TrayControllerTarget` impls the tray tests exercise live
-// here, in the test tree: production only ever syncs through `TrayResource`.
-impl TrayControllerTarget for Option<Box<dyn TrayController>> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        self.as_deref()
-    }
-}
-
-impl TrayControllerTarget for Option<&dyn TrayController> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        *self
-    }
-}
-
-impl TrayControllerTarget for Box<dyn TrayController> {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        Some(&**self)
-    }
-}
-
-impl TrayControllerTarget for dyn TrayController {
-    fn controller(&self) -> Option<&dyn TrayController> {
-        Some(self)
-    }
-}
 
 #[derive(Default)]
 struct MockTrayController {
@@ -67,7 +43,7 @@ impl TrayController for MockTrayController {
 fn action_mapping_is_complete_and_rejects_unknown_ids() {
     assert_eq!(
         resolve_tray_action(TRAY_ACTION_SHOW),
-        Some(TrayIntent::Show)
+        Some(TrayIntent::ShowWindow)
     );
     assert_eq!(
         resolve_tray_action(TRAY_ACTION_PAUSE),
@@ -83,8 +59,8 @@ fn action_mapping_is_complete_and_rejects_unknown_ids() {
 }
 
 #[test]
-fn tray_icon_pixels_has_valid_dimensions_and_opacity() {
-    let icon = tray_icon_pixels().expect("product tray icon should be valid RGBA bitmap");
+fn product_tray_icon_data_has_valid_dimensions_and_opacity() {
+    let icon = product_tray_icon_data().expect("product tray icon should be valid RGBA bitmap");
     assert_eq!(icon.width(), PRODUCT_TRAY_ICON_SIZE);
     assert_eq!(icon.height(), PRODUCT_TRAY_ICON_SIZE);
     assert_eq!(
@@ -209,7 +185,7 @@ fn tray_resource_event_draining() {
             TrayEvent::MenuActivated { id } => id,
             _ => 0,
         }),
-        Some(TrayIntent::Show)
+        Some(TrayIntent::ShowWindow)
     );
     assert_eq!(
         resolve_tray_action(match events[2] {

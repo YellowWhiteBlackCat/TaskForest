@@ -37,13 +37,15 @@ use taskmanager_shell::ShellApp;
 
 mod direct;
 use direct::run_direct_arms;
+pub(crate) mod vim;
 
 type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 14] = [
+const KEY_SYSTEMS: [KeySystem; 15] = [
     open_modal_system,
+    vim::handle,
     owned_input_system,
     navigation_orientation_system,
     character_system,

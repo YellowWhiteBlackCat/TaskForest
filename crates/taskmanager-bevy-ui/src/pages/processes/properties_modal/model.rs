@@ -1,10 +1,11 @@
 //! Identity-bound properties facts, independent of table filtering.
 
+use super::ProcessPropertiesView;
 use super::insights::insight_rows;
 use super::performance::{PerformanceCurve, performance_curves};
-use super::{ProcessPropertiesSection, ProcessPropertiesView};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{ProcessDetailsField, process_details_rows};
@@ -48,7 +49,7 @@ pub(super) fn field_label(field: ProcessDetailsField) -> &'static str {
 
 pub(crate) fn view_model(
     shell: &ShellApp,
-    section: ProcessPropertiesSection,
+    section: ProcessDetailsSection,
     facet: ProcessInsightFacet,
 ) -> Option<ProcessPropertiesView> {
     let target = shell.process_properties_target()?;
@@ -70,7 +71,7 @@ pub(crate) fn view_model(
         current.populate_ancestor_lineage(shell.projection().processes_slice());
         let vm = process_details_rows(&current, &UnitPreferences::default());
         let fields: &[ProcessDetailsField] = match section {
-            ProcessPropertiesSection::Overview => &[
+            ProcessDetailsSection::Overview => &[
                 ProcessDetailsField::Pss,
                 ProcessDetailsField::Uss,
                 ProcessDetailsField::Swap,
@@ -97,12 +98,12 @@ pub(crate) fn view_model(
                 ProcessDetailsField::DiskReadTotal,
                 ProcessDetailsField::DiskWriteTotal,
             ],
-            ProcessPropertiesSection::Command => &[
+            ProcessDetailsSection::Command => &[
                 ProcessDetailsField::Name,
                 ProcessDetailsField::Exe,
                 ProcessDetailsField::Cmdline,
             ],
-            ProcessPropertiesSection::Performance | ProcessPropertiesSection::Insights => &[],
+            ProcessDetailsSection::Performance | ProcessDetailsSection::Insights => &[],
         };
         for field in fields {
             if let Some(row) = vm.iter().find(|row| row.field == *field) {
@@ -112,16 +113,16 @@ pub(crate) fn view_model(
                 ));
             }
         }
-        if section == ProcessPropertiesSection::Performance {
+        if section == ProcessDetailsSection::Performance {
             curves = performance_curves(&current, &vm);
         }
-        if section == ProcessPropertiesSection::Overview {
+        if section == ProcessDetailsSection::Overview {
             let segments = super::memory::memory_segments(&current);
             if segments.is_measured() {
                 memory = Some(segments);
             }
         }
-        if section == ProcessPropertiesSection::Insights {
+        if section == ProcessDetailsSection::Insights {
             let projection = shell
                 .projection()
                 .process_insights

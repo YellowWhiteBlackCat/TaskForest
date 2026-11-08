@@ -6,6 +6,8 @@ use gpui::{Context, Div, ElementId, IntoElement, ParentElement, Styled, div, px}
 use taskmanager_shell::presentation::GraphSummary;
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::graph_summary;
+use taskmanager_shell::presentation::graph_summary_item_label;
+use taskmanager_shell::presentation::graph_summary_items;
 use taskmanager_shell::presentation::power_w;
 use taskmanager_shell::presentation::temperature_c;
 use taskmanager_telemetry_store::TelemetryStore;
@@ -72,11 +74,12 @@ use partition_stats::MAX_VISIBLE_MOUNTED_PARTITIONS;
 use partition_stats::partition_panel;
 pub use smart_dialog::render_smart_dialog;
 use smart_status::status_footer;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::{
-    device_status_i18n_key, effective_smart_status, has_smart_fields,
+    device_status_i18n_key, effective_smart_status, finite_max_floored, has_smart_fields,
 };
 
-pub(crate) use gpu_page::{GpuChartLayout, GpuRenderState, gpu_percentage_readout, render_gpu};
+pub(crate) use gpu_page::{GpuRenderState, render_gpu};
 
 /// Memory page's fixed chrome above the chart area: the title row and the
 /// main-column gaps. Generous by intent — it only gates a mode change.
@@ -119,7 +122,7 @@ mod device_topology_tests;
 // the top-right pill thus reads in the graph's native unit (memory/GPU = %,
 // storage activity/GPU/memory = %, network = MB/s).
 pub(super) fn badge_pct(v: f32) -> String {
-    format!("{v:.0}%")
+    percent_text(v)
 }
 fn badge_network_bytes_decimal(v: f32) -> String {
     format_network_graph_megabytes(
@@ -503,7 +506,8 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         &d.device_id,
         d.device_generation,
     );
-    let observed_max = finite_series_peak(&read_samples).max(finite_series_peak(&write_samples));
+    let observed_max =
+        finite_max_floored(1.0, &read_samples).max(finite_max_floored(1.0, &write_samples));
     // Active-time percentage window beneath the throughput pair (the battery
     // power / fan temperature secondary-chart precedent): this disk's own
     // generation-scoped activity ring on the shared 0..100 percent scale. The
@@ -586,8 +590,8 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::dual_headline(
-                // finite_series_peak already floors the shared dynamic scale at
-                // 1.0, so an all-gap window keeps a neutral axis.
+                // finite_max_floored already floors the shared dynamic scale
+                // at 1.0, so an all-gap window keeps a neutral axis.
                 "main-graph",
                 (ElementId::from("tm-perf-main-graph"), d.device_id.clone()),
                 DualLanes {
@@ -665,7 +669,8 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         &n.device_id,
         n.device_generation,
     );
-    let observed_max = finite_series_peak(&rx_samples).max(finite_series_peak(&tx_samples));
+    let observed_max =
+        finite_max_floored(1.0, &rx_samples).max(finite_max_floored(1.0, &tx_samples));
     let max = if performance.graph.network_dynamic_scaling {
         observed_max
     } else {
@@ -708,28 +713,6 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     })
 }
 
-// ---- shared helpers ----
-
-// ---- shared helpers ----
-
-/// Greatest finite sample of a window, floored — the shared dynamic max of a
-/// throughput graph. `f32::max` ignores the NaN gaps, so an all-gap (or
-/// empty) window floors to the given neutral scale instead of a degenerate
-/// zero.
-pub(super) fn finite_series_peak_floored(floor: f32, samples: &[f32]) -> f32 {
-    samples
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite())
-        .fold(floor, f32::max)
-}
-
-/// `finite_series_peak_floored` at the throughput floor (1.0 MB/s) — the
-/// shared dynamic max of a two-series disk/network graph.
-pub(super) fn finite_series_peak(samples: &[f32]) -> f32 {
-    finite_series_peak_floored(1.0, samples)
-}
-
 pub(super) fn graph_summary_row(
     theme: &Theme,
     samples: &[f32],
@@ -742,6 +725,9 @@ pub(super) fn graph_summary_row(
             .whitespace_nowrap()
             .child(format!("{label} {val}"))
     };
+    let items = graph_summary_items(&summary)
+        .into_iter()
+        .map(|(statistic, value)| item(graph_summary_item_label(statistic), format_value(value)));
     Some(
         div()
             .flex()
@@ -751,9 +737,7 @@ pub(super) fn graph_summary_row(
             .gap(definite_length(tokens::SPACE_12))
             .text_size(font_size(tokens::FONT_11))
             .text_color(hsla(theme.fg_dim))
-            .child(item(i18n::t("common.latest"), format_value(summary.latest)))
-            .child(item(i18n::t("common.avg"), format_value(summary.average)))
-            .child(item(i18n::t("common.peak"), format_value(summary.maximum))),
+            .children(items),
     )
 }
 

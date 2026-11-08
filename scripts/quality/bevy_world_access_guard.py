@@ -2,9 +2,26 @@
 """Reject unrestricted world access in production Bevy UI code."""
 from __future__ import annotations
 import argparse
+import importlib.util
 import re
+import sys
 from pathlib import Path
-from bevy_bsn_guard import mask_rust
+
+
+def load_shared_scene_owner():
+    """Import the vendored zhuge-ui-kit scene executor beside this guard."""
+
+    owner_path = Path(__file__).with_name("bevy_scene_gate.py")
+    spec = importlib.util.spec_from_file_location("bevy_scene_gate", owner_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load shared scene executor: {owner_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+mask_noncode = load_shared_scene_owner().mask_noncode
 
 RULES = (
     ("BEVY-WORLD-001", re.compile(r"\b(?:World|DeferredWorld|UnsafeWorldCell)\b"), "declare specific system parameters instead of the whole world"),
@@ -13,7 +30,7 @@ RULES = (
 )
 
 def violations(source: str) -> list[tuple[int, str, str]]:
-    masked = mask_rust(source)
+    masked = mask_noncode(source)
     return sorted((masked.count("\n", 0, match.start()) + 1, code, reason)
                   for code, pattern, reason in RULES for match in pattern.finditer(masked))
 

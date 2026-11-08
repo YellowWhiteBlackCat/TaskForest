@@ -42,7 +42,7 @@ use crate::gpui_app::root::{Hover, RootView};
 use taskforest_core::core::source::SourceStatus;
 use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskforest_core::core::startup::{
-    StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact, StartupImpactEvidence,
+    StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact,
 };
 use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
@@ -804,16 +804,9 @@ fn action_bar(
 }
 
 /// The impact column: the tier word plus its measured duration, or the typed
-/// unknown text. Pure so the Startup feature evidence can assert the exact
-/// renderer output without a second formatting path.
-pub(super) fn startup_impact_text(entry: &StartupEntry) -> String {
-    match entry.impact_evidence {
-        StartupImpactEvidence::Measured { duration_ms } => {
-            format!("{} · {duration_ms} ms", i18n::t(entry.impact.i18n_key()))
-        }
-        StartupImpactEvidence::Unknown { .. } => i18n::t("startup.impact_unknown").to_string(),
-    }
-}
+/// unmeasured text. The fold is the shell's shared projection, so the GPUI
+/// Startup table reads like the TUI, Iced and Bevy ones.
+pub(super) use taskmanager_shell::presentation::startup_impact_text;
 
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_gpui_app_startup_view_row_memo_tests.rs"]

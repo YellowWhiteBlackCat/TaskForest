@@ -21,6 +21,21 @@ keeps its headline, optional engine cards and memory group without inventing
 unsupported families. Disk/network directions share a peak and static grid but
 have separate scene keys and independent hover facts.
 
+Detaching one chart from this viewport is a typed, fail-closed contract, not a
+second renderer. `detached_chart_window::DetachedChartWindowState` freezes a
+`DetachedChartKey` and applies `Detach`/`Reattach` commands; the embedded mode
+is the default. `ChartWindowCapability::current()` is `Unavailable` in this
+build because no verified second-window adapter exists, so a detach never
+reaches a window request and no UI surface may advertise a floating chart.
+`LayerShellSurface` names the Wayland request only; existing
+`window_presentation` layer-shell support belongs to the main desktop-widget
+host and is not evidence of a detached chart protocol. A granted session (only
+representable in tests today) reattaches exclusively through its frozen key,
+and duplicate or foreign requests leave the session unchanged or fail with a
+typed error. Behavior is pinned in
+`tests/headless/detached_chart_window_tests.rs`; no host geometry claims are
+made because no visible window is created.
+
 Device-sidebar width is clamped to current page slots before pinning its
 edges. If the rail cannot coexist with the main viewport, the same devices use
 the strip. The pinned scrollbar leaves a dedicated resize gutter, transparent

@@ -14,6 +14,7 @@ use taskmanager_shell::viewmodel::StatRow;
 
 use super::{device_status_i18n_key, rate_str};
 use crate::gpui_app::sidebar::network_category_label;
+use taskforest_core::core::percent::percent_text;
 
 /// The Network page's undroppable one-line fact: adapter health plus the
 /// negotiated link speed. Lives in the DATA layer (ARCH.md §8.1) because it
@@ -95,8 +96,7 @@ pub(super) fn network_stats(
         ));
         stats.push(StatRow::text(
             i18n::t("common.utilization"),
-            n.current_utilization_pct()
-                .map(|value| format!("{value:.0}%")),
+            n.current_utilization_pct().map(percent_text),
         ));
     }
     if let Some(mtu) = n.current_mtu_bytes() {
@@ -180,7 +180,7 @@ pub(super) fn network_stats(
         let quality = wifi_signal_quality_percent(sig);
         stats.push(StatRow::text(
             i18n::t("common.signal"),
-            Some(format!("{sig} dBm ({quality:.0}%)")),
+            Some(format!("{sig} dBm ({})", percent_text(quality))),
         ));
     }
     if is_wireless {

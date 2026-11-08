@@ -18,10 +18,11 @@ use taskforest_core::core::process::ProcessItem;
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
-use taskmanager_shell::{ProcessRowAggregate, process_semantic_key};
+use taskmanager_shell::{
+    MAX_PUBLISHED_ROWS, ProcessRowAggregate, semantic_process_row, semantic_snapshot_header,
+};
 use taskmanager_ui_contract::{
-    GraphSummary, ModalInput, ProcessAggregateSemantics, ProcessGroupRowInput, ProcessRowInput,
-    SemanticSnapshot, SemanticSnapshotBuilder,
+    ModalInput, ProcessAggregateSemantics, ProcessGroupRowInput, ProcessRowInput, SemanticSnapshot,
 };
 
 use crate::TuiApp;
@@ -31,8 +32,6 @@ use taskmanager_application::{PendingConfirmation, SurfaceKind};
 /// Maximum number of process rows published to the semantic tree (GPUI/Iced
 /// parity): a screen reader reads the tree top-down, so the bounded prefix
 /// of the shell's active ordering is the useful slice.
-const MAX_PUBLISHED_ROWS: usize = 64;
-
 /// Owned semantic rows in the exact order of the TUI's visual Applications
 /// projection. Structural groups stay structural; they are never rewritten as
 /// fake processes merely to fit the old builder API.
@@ -63,48 +62,22 @@ impl TuiApp {
     /// builder rejects the inputs (surfaced honestly, never panicked).
     #[must_use]
     pub fn semantic_snapshot(&self) -> Option<SemanticSnapshot> {
-        let mut builder = SemanticSnapshotBuilder::new(self.shell.projection().refresh_count)
-            .application_name(product::NAME)
-            .status_announcement(self.semantic_status_text());
+        let mut builder = semantic_snapshot_header(&self.shell, product::NAME);
 
-        if let Some(current) = self
-            .shell
-            .projection()
-            .snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-            .filter(|value| value.is_finite())
-        {
-            builder = builder.cpu_graph(GraphSummary {
-                current: f64::from(current.clamp(0.0, 100.0)),
-                peak: f64::from(current.clamp(0.0, 100.0)),
-                maximum: 100.0,
-            });
-        }
-
-        let memory_total = self
-            .shell
-            .projection()
-            .snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.memory.current_total_bytes());
         for row in self.semantic_rows().into_iter().take(MAX_PUBLISHED_ROWS) {
             match row {
                 TuiSemanticRow::Process { process, selected } => {
-                    let name = if process.name.trim().is_empty() {
-                        String::from("Unnamed process")
-                    } else {
-                        process.name.clone()
-                    };
                     builder = builder.process_row(ProcessRowInput {
-                        id: process_semantic_key(&process),
-                        name,
-                        cpu_percent: semantic_cpu_percent(&process),
-                        memory_percent: semantic_memory_percent(
-                            process.current_memory_bytes(),
-                            memory_total,
-                        ),
                         selected,
+                        ..semantic_process_row(
+                            &process,
+                            self.shell
+                                .projection()
+                                .snapshot
+                                .as_ref()
+                                .and_then(|snapshot| snapshot.memory.current_total_bytes()),
+                            true,
+                        )
                     });
                 }
                 TuiSemanticRow::Group {
@@ -186,16 +159,6 @@ impl TuiApp {
                 })
                 .collect()
         })
-    }
-
-    /// The polite live-region text: the footer status line when the shell set
-    /// one this cycle, otherwise the visible row count (Iced parity).
-    fn semantic_status_text(&self) -> String {
-        if self.shell.feedback_text().trim().is_empty() {
-            format!("{} processes visible", self.shell.visible_process_count())
-        } else {
-            self.shell.feedback_text().to_owned()
-        }
     }
 
     /// The top modal surface on the TUI's precedence stack, or `None` when no
@@ -412,25 +375,4 @@ fn aggregate_semantics(aggregate: &ProcessRowAggregate) -> ProcessAggregateSeman
         threads: aggregate.threads().clone(),
         fds: aggregate.fds().clone(),
     }
-}
-
-/// Typed CPU percentage for one row, honest about availability (Iced parity):
-/// finite values are clamped into the 0..=100 semantic range; everything else
-/// stays `None` so the contract renders `Unavailable`, never zero.
-fn semantic_cpu_percent(process: &ProcessItem) -> Option<f64> {
-    process
-        .current_cpu_percentage()
-        .filter(|value| value.is_finite())
-        .map(|value| f64::from(value.clamp(0.0, 100.0)))
-}
-
-/// Typed memory percentage for one row against the system total. `None` when
-/// either side is unobserved or the total is not positive, so the contract
-/// renders `Unavailable` instead of a fabricated zero.
-fn semantic_memory_percent(value: Option<u64>, total: Option<u64>) -> Option<f64> {
-    let (value, total) = (value?, total.filter(|total| *total > 0)?);
-    // This is a bounded display conversion at the semantic edge; source
-    // values remain u64 in the shared process and snapshot contracts.
-    let percentage = (value as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
-    percentage.is_finite().then_some(percentage)
 }

@@ -40,6 +40,7 @@ use iced::widget::canvas::{self, Cache, Geometry};
 use iced::widget::{column, text};
 use iced::{Color, Length, Rectangle};
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::ChartSlots;
 use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_theme::{Theme, tokens};
@@ -47,11 +48,11 @@ use taskmanager_theme::{Theme, tokens};
 use super::quantity_text_pref;
 use crate::app::Message;
 use crate::perf_chart::{
-    ChartOpts, HoverState, ReadoutColors, SeriesGeneration, WindowSlots, area_path, draw_grid_opts,
+    ChartOpts, HoverState, ReadoutColors, SeriesGeneration, area_path, draw_grid_opts,
     draw_hover_sample_mark, draw_readout_pill, draw_y_axis_ticks, hovered_index, line_path,
     scaled_y_in_range, series_point_runs_in_range, y_axis_tick_values,
 };
-use crate::trend_strip::finite_peak;
+use taskmanager_shell::presentation::finite_peak;
 
 /// Primary per-device canvas height. GPUI gives the selected device's main
 /// graph the dominant vertical region; Iced therefore must not compress it to
@@ -67,8 +68,7 @@ pub(crate) const ENGINE_DEVICE_CHART_HEIGHT: f32 = 56.0;
 /// stroke) — the parameterization exists so the two-series graph and any
 /// future variant share the same authority.
 const CHART_OPTS: ChartOpts = ChartOpts::DEFAULT;
-/// The percentage ceiling shared by every percentage-typed series.
-const PERCENT_MAX: f32 = 100.0;
+use taskforest_core::core::percent::MAX_PERCENT;
 /// Minimum frame height that carries y-axis tick labels: the 260px primary
 /// and 128px secondary graphs read them; the 56px engine strips stay clean.
 const AXIS_TICK_MIN_HEIGHT: f32 = 96.0;
@@ -96,7 +96,7 @@ pub(crate) fn axis_ticks_visible(height: f32) -> bool {
 /// slot x, horizontal rule and snap dot at the sample's y — formatted by the
 /// graph's own [`DeviceMetricScale`] (`scale`) in the same unit family as the
 /// caption. The crosshair, the pill, and the drawn polyline all resolve
-/// through the ONE shared [`WindowSlots`] mapping, so the readout never
+/// through the ONE shared [`ChartSlots`] mapping, so the readout never
 /// disagrees with a visible sample.
 pub(crate) struct DeviceChart {
     pub samples: Rc<[f32]>,
@@ -333,10 +333,10 @@ impl canvas::Program<Message> for DeviceChart {
             };
             let size = frame.size();
             // The crosshair and the pill share ONE slot mapping
-            // (`WindowSlots::spread`) with the drawn series — the vertical
+            // (`ChartSlots::spread`) with the drawn series — the vertical
             // rule, the snap dot, and the readout all land on the sample the
             // cursor is over, never beside it (GPUI hover parity).
-            let slots = WindowSlots::spread(samples.len(), size.width);
+            let slots = ChartSlots::spread(samples.len(), size.width);
             let x = slots.x(index);
             let value = samples
                 .get(index)
@@ -382,7 +382,7 @@ impl canvas::Program<Message> for DeviceChart {
 }
 
 /// Two-series (split-direction) device graphs: the disk read/write and NIC
-/// rx/tx form of this module's single-series graph, sharing the WindowSlots
+/// rx/tx form of this module's single-series graph, sharing the ChartSlots
 /// mapping, the y-axis tick ladder, and the two-cache contract. Consumed by
 /// the Disk/Network Performance pages.
 pub(crate) mod multi;

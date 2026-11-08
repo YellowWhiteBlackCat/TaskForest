@@ -112,6 +112,42 @@ fn groups_project_connected_display_facts_into_hardware_details() {
     assert!(display.value.contains("S/N A-42"));
 }
 
+/// The display line is one typed fact with one owner. Three frontends used to
+/// carry byte-identical private copies; this pins the composition order, the
+/// finite-refresh guard and the absence rules so binding the owner cannot
+/// silently change what any page shows.
+#[test]
+fn display_summary_owns_the_field_order_and_absence_rules() {
+    let prior = i18n::current_language();
+    i18n::set_language(i18n::Language::En);
+    let full = DisplayInfo {
+        connector: "DP-1".into(),
+        manufacturer: Some("DEL".into()),
+        model: Some("  ".into()),
+        serial: Some("A-42".into()),
+        width_mm: Some(600),
+        height_mm: Some(340),
+        width_px: Some(1920),
+        height_px: Some(1080),
+        refresh_hz: Some(60.0),
+        hdr_supported: Some(true),
+    };
+    let line = display_summary(&full).expect("connector is always present");
+    assert_eq!(
+        line,
+        "DP-1 · DEL · 1920×1080 · 60.0 Hz · HDR HDR supported · 600×340 mm · S/N A-42"
+    );
+
+    let sparse = DisplayInfo {
+        connector: "eDP-1".into(),
+        refresh_hz: Some(f32::NAN),
+        ..Default::default()
+    };
+    assert_eq!(display_summary(&sparse).as_deref(), Some("eDP-1"));
+    assert_eq!(display_hdr_capability(&sparse), None);
+    i18n::set_language(prior);
+}
+
 #[test]
 fn copy_all_is_grouped_and_preserves_measured_zero() {
     // copy_all_text begins with the i18n title; pin English so the

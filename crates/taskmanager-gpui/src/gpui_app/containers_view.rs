@@ -33,17 +33,19 @@ use taskforest_core::core::{
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
-use taskmanager_application::container_row_window;
+use taskmanager_application::MAX_CONTAINER_ROWS;
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::data::row::DataRow;
 use taskmanager_ui::primitives::state_panel::StatePanel;
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_core::row_page::row_budget;
 
-mod quota;
-
-use quota::{ContainerQuotaBreach, container_quota_view, quota_readout};
+use taskforest_core::core::percent::precise_percent_text;
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, container_quota_view, quota_readout,
+};
 
 /// Render the Containers page body (no outer padding — the caller wraps it).
 /// The rollup's typed [`DeviceStatus`] drives which branch is taken so a
@@ -130,7 +132,10 @@ struct RowCells<'a> {
 }
 
 fn container_list(t: &Theme, containers: &[ContainerSummary], units: UnitPreferences) -> Div {
-    let (shown, hidden) = container_row_window(containers.len());
+    // The shared row-page owner splits the inventory; this frontend owns only
+    // the cap, so a truncated list always comes with its stated omission.
+    let budget = row_budget(containers.len(), MAX_CONTAINER_ROWS);
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     let mut list = div().flex().flex_col();
     for (index, container) in containers[..shown].iter().enumerate() {
         list = list.child(with_row_selector(
@@ -202,7 +207,8 @@ pub fn container_row_vm(container: &ContainerSummary, units: UnitPreferences) ->
         ScalarAvailability::Available | ScalarAvailability::Partial(_) => container
             .cpu_percentage
             .current_value()
-            .map(|value| format!("{value:.1}%"))
+            .copied()
+            .map(precise_percent_text)
             .unwrap_or_else(formatting::missing_value),
         // First-sample gap, vanished cgroup, or a read failure: never `0.0%`.
         _ => formatting::missing_value(),
@@ -322,7 +328,7 @@ fn name_cell(
         .flex()
         .flex_row()
         .items_center()
-        .gap(px(4.0))
+        .gap(definite_length(tokens::SPACE_4))
         .flex_1()
         .min_w(px(0.0))
         .text_size(font_size(tokens::FONT_12))
@@ -429,3 +435,7 @@ fn runtime_label(kind: &IsolationKind) -> String {
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_gpui_app_containers_view_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_gpui_app_containers_view_quota_tests.rs"]
+mod quota_tests;

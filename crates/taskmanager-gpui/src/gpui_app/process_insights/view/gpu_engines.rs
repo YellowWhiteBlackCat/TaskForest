@@ -23,39 +23,25 @@ use taskmanager_ui::theme_binding::hsla;
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskforest_core::core::ProcessGpuEngineUsage;
 use taskforest_core::core::device_state::DeviceStatus;
+use taskmanager_shell::presentation::{format_engine_cycles, format_engine_time};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 use super::ProcessInsightsLabels;
+use taskforest_core::core::percent::percent_text;
 
 /// Card title.
 const TITLE: &str = "GPU engines";
 /// Healthy empty message (a live, non-GPU process).
 const NO_ENGINES: &str = "No GPU engine counters";
 
-/// Format one engine's cumulative busy time as a human-friendly duration.
-fn format_engine_time(nanoseconds: u64) -> String {
-    let seconds = nanoseconds as f64 / 1_000_000_000.0;
-    format!("{seconds:.1}s")
-}
-
-/// Format a cumulative cycle counter (xe fdinfo) as a compact count.
-fn format_engine_cycles(cycles: u64) -> String {
-    if cycles >= 1_000_000_000 {
-        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
-    } else if cycles >= 1_000_000 {
-        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
-    } else {
-        format!("{cycles} cycles")
-    }
-}
-
 /// Render one engine line: `<name>  <rate>  <cumulative>`.
 fn format_engine_line(engine: &ProcessGpuEngineUsage, labels: &ProcessInsightsLabels) -> String {
     let rate = engine
         .usage_pct
         .current_value()
-        .map(|value| format!("{value:.1}%"))
+        .copied()
+        .map(percent_text)
         .unwrap_or_else(|| labels.unknown.to_string());
     // xe exposes cycles instead of busy ns; the cycle count is the honest
     // cumulative observable there, preferred over the "unknown" fallback.

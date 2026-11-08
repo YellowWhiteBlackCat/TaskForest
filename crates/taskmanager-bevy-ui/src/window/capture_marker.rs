@@ -27,7 +27,7 @@ use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::table::ZeroValueCell;
 use crate::window::capture_marker_interactive::InteractiveCaptureAccess;
 use crate::window::{FeedbackLine, WindowPalette};
-use crate::window_surface::{ModalBody, WindowSurface, WindowSurfaceState};
+use crate::window_surface::{ModalBody, WindowSurfaceKind, WindowSurfaceState};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::{With, Without};
@@ -407,7 +407,9 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             }
         }
         Some("event-center") => {
-            if !matches!(access.window_surface.0, Some(WindowSurface::EventCenter))
+            if !access
+                .window_surface
+                .is_kind(WindowSurfaceKind::EventCenter)
                 || access
                     .track
                     .shell
@@ -416,19 +418,16 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                     .event_history()
                     .len()
                     < 2
-                || ![
-                    "events.title",
-                    "events.activated",
-                    "events.cleared",
-                    "common.export",
-                    "common.close",
-                ]
-                .iter()
-                .all(|key| {
-                    access.text.iter().any(|(text, node)| {
-                        text.0 == t(key) && node.size().x > 0.0 && node.size().y > 0.0
-                    })
-                })
+                || !super::capture_marker_interactive::has_all_texts(
+                    &access.text,
+                    &[
+                        "events.title",
+                        "events.activated",
+                        "events.cleared",
+                        "common.export",
+                        "common.close",
+                    ],
+                )
             {
                 return;
             }
@@ -453,27 +452,24 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             }
         }
         Some("saved-view-presets") => {
-            if !matches!(access.window_surface.0, Some(WindowSurface::SavedViews))
+            if !access.window_surface.is_kind(WindowSurfaceKind::SavedViews)
                 || !access
                     .saved_views
                     .rows
                     .iter()
                     .any(|row| row.is_user_saved())
-                || ![
-                    "saved_views.title",
-                    "saved_views.save_current",
-                    "common.apply",
-                    "common.remove",
-                    "common.export",
-                    "common.import",
-                    "common.close",
-                ]
-                .iter()
-                .all(|key| {
-                    access.text.iter().any(|(text, node)| {
-                        text.0 == t(key) && node.size().x > 0.0 && node.size().y > 0.0
-                    })
-                })
+                || !super::capture_marker_interactive::has_all_texts(
+                    &access.text,
+                    &[
+                        "saved_views.title",
+                        "saved_views.save_current",
+                        "common.apply",
+                        "common.remove",
+                        "common.export",
+                        "common.import",
+                        "common.close",
+                    ],
+                )
             {
                 return;
             }
@@ -483,14 +479,13 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             }
         }
         Some("sidebar-edit") => {
-            if !matches!(access.window_surface.0, Some(WindowSurface::SidebarDevices))
-                || !["Edit devices", "Hide", "Move up", "Move down", "Done"]
-                    .iter()
-                    .all(|label| {
-                        access.text.iter().any(|(text, node)| {
-                            text.0 == *label && node.size().x > 0.0 && node.size().y > 0.0
-                        })
-                    })
+            if !access
+                .window_surface
+                .is_kind(WindowSurfaceKind::SidebarDevices)
+                || !super::capture_marker_interactive::has_all_texts(
+                    &access.text,
+                    &["Edit devices", "Hide", "Move up", "Move down", "Done"],
+                )
             {
                 return;
             }

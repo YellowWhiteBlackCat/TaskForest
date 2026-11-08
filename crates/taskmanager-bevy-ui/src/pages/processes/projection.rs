@@ -12,10 +12,13 @@ use taskmanager_shell::presentation::{
     MISSING_VALUE, bytes, optional_cpu_time_seconds, optional_nice, process_anomaly_summary,
     start_clock_local, uninterruptible_process_summary,
 };
+use taskmanager_shell::saved_views::sort_token;
 use taskmanager_shell::{ShellApp, SortCol, SortDir, process_semantic_key};
 pub(crate) use taskmanager_ui_contract::ProcessColumnSpec;
 
-use crate::widgets::table::{RowWindow, SortProjection, row_window, visible_columns};
+use crate::widgets::table::{SortProjection, visible_columns};
+use taskforest_core::core::percent::precise_percent_text;
+use zhuge_ui_core::row_page::RowPage;
 
 /// One row's cell vector over the contract columns (contract order, widths,
 /// and numeric alignment come from the shared vocabulary, never a local copy).
@@ -59,7 +62,7 @@ fn cell_text(process: &ProcessItem, column: &str) -> String {
         "Status" => process.status.clone(),
         "CPU" => process
             .current_cpu_percentage()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}%")),
+            .map_or_else(|| MISSING_VALUE.to_owned(), precise_percent_text),
         "Memory" => process
             .current_memory_bytes()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
@@ -87,35 +90,17 @@ fn cell_text(process: &ProcessItem, column: &str) -> String {
     }
 }
 
-/// Map the shell's sort slot onto the ui-contract column token.
-fn contract_token(column: SortCol) -> Option<&'static str> {
-    match column {
-        SortCol::Pid => Some("PID"),
-        SortCol::Name => Some("Name"),
-        SortCol::Cpu => Some("CPU"),
-        SortCol::Memory => Some("Memory"),
-        SortCol::Pss => Some("MemoryPss"),
-        SortCol::Swap => Some("Swap"),
-        SortCol::User => Some("User"),
-        SortCol::State => Some("Status"),
-        SortCol::Threads => Some("Threads"),
-        SortCol::CpuTime => Some("CPUTime"),
-        SortCol::DiskRead => Some("DiskRead"),
-        SortCol::DiskWrite => Some("DiskWrite"),
-        SortCol::Network => Some("Network"),
-        SortCol::StartTime => Some("StartTime"),
-        SortCol::Fds => Some("FDs"),
-        SortCol::Nice => Some("Nice"),
-    }
-}
-
 /// The shell sort as the widgets' header projection input.
-pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> Option<SortProjection> {
+///
+/// The column token is the shell's canonical `sort_token` — the same string
+/// the persisted sort and hidden-column tokens use, so persistence, the
+/// contract row and the header cannot disagree.
+pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> SortProjection {
     let (column, direction) = sort;
-    contract_token(column).map(|column| SortProjection {
-        column,
+    SortProjection {
+        column: sort_token(column),
         descending: direction == SortDir::Desc,
-    })
+    }
 }
 
 /// One rendered row: its visible-set index, identity for the accessibility
@@ -136,7 +121,7 @@ pub(crate) struct ProcessRowView {
 /// Full window projection: the total behind the filter plus the visible slice.
 pub(crate) struct ProcessRowsProjection {
     pub(crate) total: usize,
-    pub(crate) window: RowWindow,
+    pub(crate) window: RowPage,
     pub(crate) rows: Vec<ProcessRowView>,
 }
 
@@ -149,14 +134,14 @@ pub(crate) fn rows_projection_with_hidden(
 ) -> ProcessRowsProjection {
     let visible = shell.visible_processes();
     let total = visible.len();
-    let window = row_window(total, viewport_rows, scroll_top);
+    let window = RowPage::pin(total, viewport_rows, scroll_top);
     let selected = total.checked_sub(1).map(|last| shell.selected.min(last));
     let columns = visible_columns(hidden_cols);
-    let rows = visible[window.first..window.last]
+    let rows = visible[window.range()]
         .iter()
         .enumerate()
         .map(|(offset, process)| {
-            let index = window.first + offset;
+            let index = window.first() + offset;
             let is_selected = Some(index) == selected || shell.is_process_selected(process);
             ProcessRowView {
                 index,
@@ -185,20 +170,6 @@ pub(crate) fn rows_projection(
     scroll_top: usize,
 ) -> ProcessRowsProjection {
     rows_projection_with_hidden(shell, viewport_rows, scroll_top, &[])
-}
-
-/// Scroll top that keeps `selected` centered in the window — the TUI
-/// `table_window` follow formula, verbatim: half a viewport above the cursor,
-/// pinned to the last full page, never past either end.
-pub(crate) fn centered_scroll_top(total: usize, viewport_rows: usize, selected: usize) -> usize {
-    if total == 0 || viewport_rows == 0 {
-        return 0;
-    }
-    let visible = viewport_rows.min(total);
-    let selected = selected.min(total - 1);
-    selected
-        .saturating_sub(visible / 2)
-        .min(total.saturating_sub(visible))
 }
 
 /// The status line under the search box: the shared running-count copy, plus

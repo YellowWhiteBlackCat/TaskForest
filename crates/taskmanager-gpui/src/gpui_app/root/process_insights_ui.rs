@@ -6,14 +6,17 @@ use crate::gpui_app::process_insights::{
     ProcessInsightsError, ProcessInsightsErrorKind, ProcessInsightsRenderState,
 };
 use gpui::Context;
+use std::time::SystemTime;
 use taskforest_contract::SubmissionErrorKind;
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskforest_core::core::time::unix_millis;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{
     ProcessInsightsRevision, ProjectedProcessInsights, request_submission_failure,
 };
 
-use super::{ProcessDetailsSection, RootView, platform_submission_time_ms};
+use super::RootView;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ProcessInsightsRequest {
@@ -141,7 +144,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_process_network_escalation(platform_submission_time_ms())
+                    .submit_process_network_escalation(unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );
@@ -237,7 +240,7 @@ impl RootView {
             return true;
         };
         let submission = match platform
-            .submit_process_insights(target.clone(), platform_submission_time_ms())
+            .submit_process_insights(target.clone(), unix_millis(SystemTime::now()))
         {
             Ok(submission) => submission,
             Err(_) => {

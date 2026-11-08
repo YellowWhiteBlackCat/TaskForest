@@ -141,7 +141,7 @@ fn health_rows_cover_every_domain_with_fixture_values() {
     assert_eq!(rows.len(), 8);
     let row = |label: &str| rows.iter().find(|row| row.label == label).expect(label);
     assert!(row("CPU").healthy);
-    assert!(row("CPU").value.contains("37.4%"));
+    assert!(row("CPU").value.contains("37%"));
     assert!(row("Memory").healthy);
     assert!(row("Memory").value.contains("GiB"));
     assert!(row("Network").healthy);

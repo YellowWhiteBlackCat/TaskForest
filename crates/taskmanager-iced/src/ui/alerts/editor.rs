@@ -1,11 +1,11 @@
 //! Wrapped rule cards keep whole control groups inside the bounded page body.
 use crate::app::alerts::editor::RuleAdjustment;
-use crate::app::alerts::{metric_label, metric_unit, severity_label};
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::{focus, theme};
 use iced::widget::{column, row, text};
 use iced::{Element, Length};
 use taskforest_core::core::alerts::AlertMetric;
+use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, i18n::t};
 use taskmanager_theme::{Theme, tokens};
 
@@ -64,7 +64,7 @@ pub(super) fn card<'a>(
             format!(
                 "{:.1}{}",
                 managed.rule.threshold,
-                metric_unit(managed.rule.metric)
+                managed.rule.metric.unit_suffix()
             ),
             0,
             RuleAdjustment::Threshold(-1),
@@ -91,12 +91,12 @@ pub(super) fn card<'a>(
         toggle,
         control(
             6,
-            metric_label(managed.rule.metric).into(),
+            i18n::alert_metric_label(managed.rule.metric).into(),
             RuleAdjustment::Metric
         ),
         control(
             7,
-            severity_label(managed.rule.severity).into(),
+            i18n::alert_severity_label(managed.rule.severity).into(),
             RuleAdjustment::Severity
         ),
         control(

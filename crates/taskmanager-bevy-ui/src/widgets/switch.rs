@@ -47,8 +47,9 @@ use bevy::ui::{Checked, UiTransform, Val2};
 use taskmanager_theme::tokens::{self, MotionPolicy};
 
 use crate::palette::UiPalette;
-use crate::widgets::easing::{Easing, eased_progress};
+use crate::widgets::easing::eased_progress;
 use crate::window::WindowPalette;
+use zhuge_ui_core::easing::lerp;
 
 /// The slot's width, in rem — the switch rides the reading-size axis, so it
 /// re-scales with the user's UI-size choice.
@@ -205,8 +206,8 @@ pub(crate) fn sync_switch_thumbs(
         }
         if slide.running {
             slide.elapsed += time.delta();
-            let progress = eased_progress(Easing::EaseOut, slide.elapsed, duration);
-            slide.position = slide.from + (slide.target - slide.from) * progress;
+            let progress = eased_progress(slide.elapsed, duration);
+            slide.position = lerp(slide.from, slide.target, progress);
             if progress >= 1.0 {
                 slide.position = slide.target;
                 slide.running = false;

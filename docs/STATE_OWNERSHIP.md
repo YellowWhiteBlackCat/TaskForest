@@ -21,6 +21,7 @@
 | 采样时刻 | `taskmanager-telemetry-store` 的 live graph 读边 | 被采纳观测自带 `measured_at_ms` | 接受时刻**不得**改标为采样时刻；无测量时刻＝缺口（共享破折号，不是 `-N` 偏移） | `taskmanager-telemetry-store/src/live_graph.rs`、`taskforest-core/src/core/metrics/sample.rs` |
 | NPU 功耗 / 能耗 | `taskforest-core` 的 `NpuPowerReport` | provider 按能力填充 | 无该计数器＝**没有观测**（序列缺省），**不得**用利用率顶替 | `taskforest-core/src/core/npu.rs` |
 | SMART 修复提示 | `taskforest-core` 的 `SmartToolRemediation` | 平台在**真看见**包管理器时补安装命令 | 平台中立探针在合同里；前端**不拼命令**；未装工具时字段缺省而非编造 | `taskforest-core/src/core/metrics/disk.rs` |
+| NVMe 耐久与备用块告警 | `taskforest-core`：`is_nvme_wear_warning` / `is_nvme_wear_critical` / `DiskMetrics::smart_spare_pool_needs_warning` | 阈值只在 `storage_health` 的默认常量与控制器上报值里 | 四前端只问规则、不写 `>= 90.0` / `>= 100.0` / `spare <= 10.0`；控制器上报阈值优先，缺席才回落默认；不可用读数既不判健康也不判告警 | `taskforest-core/src/core/storage_health.rs`、`taskforest-core/src/core/metrics/disk.rs` |
 | 分区 ↔ 文件系统健康关联 | `taskforest-core` 的 `DiskPartition::filesystem_health` | 合同层做一次关联 | 前端**不按挂载点字符串匹配**；无观测＝没有事实（不是健康） | `taskforest-core/src/core/metrics/disk.rs` |
 | System 趋势投影 | `taskmanager-application` | 权威 host 环 identity/revision + typed window | 四端同源时间格、缺口、最新值、峰值与覆盖；前端只持有原生绘图缓存 | `taskmanager-application/src/system_timeline.rs` |
 | 可选系统设置 | application `FirstRunController` | quiet Observe / explicit typed action / matching terminal | 四端设置页显式入口；surface 独立拥有可见性，迟到结果不重开 | `application/src/first_run.rs`（ADR-040） |

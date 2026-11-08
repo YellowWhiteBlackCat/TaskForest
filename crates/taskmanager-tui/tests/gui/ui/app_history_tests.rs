@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskforest_core::core::history::ApplicationHistoryIdentity;
+use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 use taskmanager_application::{ApplicationHistoryMetricSeries, ApplicationHistoryRow};
 
 use super::*;

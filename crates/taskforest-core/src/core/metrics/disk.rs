@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::core::device_state::DeviceState;
 use crate::core::smart::{SmartProviderFailureKind, SmartSelfTestCapabilities};
 use crate::core::storage::{StorageConnection, StorageIdentityStability};
-use crate::core::storage_health::{FilesystemHealth, FilesystemHealthSnapshot};
+use crate::core::storage_health::{
+    DEFAULT_NVME_SPARE_WARNING_PERCENT, FilesystemHealth, FilesystemHealthSnapshot,
+};
 use crate::core::{DeviceGeneration, FailureKind, ProviderId};
 
 use super::ScalarObservation;
@@ -536,6 +538,43 @@ impl DiskMetrics {
     /// only while serializing the private wire DTO.
     pub fn apply_scalar_observations(&mut self, observations: DiskScalarObservations) {
         self.scalar_observations = observations;
+    }
+
+    /// The available-spare level this device warns at, in percent.
+    ///
+    /// The controller-reported threshold is authoritative; a drive that
+    /// reports none resolves to [`DEFAULT_NVME_SPARE_WARNING_PERCENT`], the
+    /// same conservative fallback the fixed-threshold
+    /// [`crate::core::storage_health::is_nvme_spare_warning`] rule spends.
+    /// Surfaces render this number next to their spare reading, so the
+    /// warning a user can see and the warning the contract decides on can
+    /// never quote different thresholds.
+    #[must_use]
+    pub const fn smart_spare_warning_threshold_pct(&self) -> f32 {
+        match self.smart_available_spare_threshold_pct {
+            Some(value) => value,
+            None => DEFAULT_NVME_SPARE_WARNING_PERCENT,
+        }
+    }
+
+    /// Whether this device's spare pool has crossed its warning level.
+    ///
+    /// One rule for every surface: the reading is a warning when the observed
+    /// spare pool sits at or below the resolved threshold, inclusive at the
+    /// edge. Absence is not a warning in either direction — no spare reading,
+    /// or a threshold that is not a usable number, answers `false`, so an
+    /// unmeasured drive is never painted as a failing one and never painted as
+    /// a healthy one by the same rule.
+    #[must_use]
+    pub fn smart_spare_pool_needs_warning(&self) -> bool {
+        let Some(spare) = self.smart_available_spare_pct else {
+            return false;
+        };
+        if !spare.is_finite() {
+            return false;
+        }
+        let threshold = self.smart_spare_warning_threshold_pct();
+        threshold.is_finite() && spare <= threshold
     }
 
     #[must_use]

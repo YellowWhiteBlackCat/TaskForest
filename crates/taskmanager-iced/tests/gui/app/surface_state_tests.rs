@@ -2,34 +2,34 @@ use super::*;
 use taskforest_core::core::process::ProcessLiveKey;
 
 impl IcedApp {
-    pub(crate) const fn settings_open(&self) -> bool {
+    pub(crate) fn settings_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::Settings))
     }
 
-    pub(crate) const fn about_open(&self) -> bool {
+    pub(crate) fn about_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::About))
     }
 
-    pub(crate) const fn health_open(&self) -> bool {
+    pub(crate) fn health_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::Health))
     }
 
-    pub(crate) const fn containers_open(&self) -> bool {
+    pub(crate) fn containers_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::Containers))
     }
 
-    pub(crate) const fn alert_center_open(&self) -> bool {
+    pub(crate) fn alert_center_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::AlertCenter))
     }
 
-    pub(crate) const fn disk_smart_index(&self) -> Option<usize> {
+    pub(crate) fn disk_smart_index(&self) -> Option<usize> {
         match self.local_surface() {
             Some(LocalSurface::DiskSmart { index }) => Some(*index),
             _ => None,
         }
     }
 
-    pub(crate) const fn user_menu_row(&self) -> Option<usize> {
+    pub(crate) fn user_menu_row(&self) -> Option<usize> {
         match self.context_menu() {
             Some(ContextMenu::User { visual_index, .. }) => Some(*visual_index),
             _ => None,
@@ -56,14 +56,14 @@ fn local_surface_replacement_and_branch_matched_dismiss_are_explicit() {
         }
     );
     assert_eq!(
-        state.reduce(LocalSurfaceEvent::Dismiss(LocalSurfaceKind::Settings)),
+        state.reduce(LocalSurfaceEvent::Dismiss(LocalSurfaceKind::Settings, ())),
         LocalSurfaceTransition::Unchanged,
         "a stale Settings close must not consume the About surface"
     );
     assert_eq!(state.kind(), Some(LocalSurfaceKind::About));
     assert_eq!(
-        state.reduce(LocalSurfaceEvent::Dismiss(LocalSurfaceKind::About)),
-        LocalSurfaceTransition::Dismissed(LocalSurfaceKind::About)
+        state.reduce(LocalSurfaceEvent::Dismiss(LocalSurfaceKind::About, ())),
+        LocalSurfaceTransition::Dismissed(LocalSurfaceKind::About, ())
     );
     assert_eq!(state.kind(), None);
 }
@@ -72,22 +72,20 @@ fn local_surface_replacement_and_branch_matched_dismiss_are_explicit() {
 fn context_menu_is_one_typed_slot_and_rejects_a_stale_close() {
     let mut state = ContextMenuState::default();
     assert_eq!(
-        state.reduce(ContextMenuEvent::Open(Box::new(ContextMenu::Process {
+        state.reduce(ContextMenuEvent::Open(ContextMenu::Process {
             identity: ProcessLiveKey::from_parts(41, 41).expect("fixture identity"),
-        }))),
+        })),
         ContextMenuTransition::Opened(ContextMenuKind::Process)
     );
     assert_eq!(
-        state.reduce(ContextMenuEvent::Open(Box::new(
-            ContextMenu::ProcessColumns
-        ))),
+        state.reduce(ContextMenuEvent::Open(ContextMenu::ProcessColumns)),
         ContextMenuTransition::Replaced {
             previous: ContextMenuKind::Process,
             current: ContextMenuKind::ProcessColumns,
         }
     );
     assert_eq!(
-        state.reduce(ContextMenuEvent::Dismiss(ContextMenuKind::Process)),
+        state.reduce(ContextMenuEvent::Dismiss(ContextMenuKind::Process, ())),
         ContextMenuTransition::Unchanged
     );
     assert_eq!(state.kind(), Some(ContextMenuKind::ProcessColumns));

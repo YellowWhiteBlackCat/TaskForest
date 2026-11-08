@@ -392,11 +392,5 @@ pub fn more_rows_hint(t: &Theme, hidden: usize) -> Div {
     div()
         .text_size(font_size(tokens::FONT_11))
         .text_color(hsla(t.fg_dim))
-        .child(more_rows_label(hidden))
-}
-
-/// Locale formatting for [`more_rows_hint`], split out so the count
-/// substitution is unit-testable without a theme.
-pub fn more_rows_label(hidden: usize) -> String {
-    i18n::t("common.more_rows").replace("{count}", &hidden.to_string())
+        .child(i18n::more_rows_label(hidden))
 }

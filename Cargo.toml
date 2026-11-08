@@ -85,6 +85,9 @@ taskmanager-telemetry-store = { path = "crates/taskmanager-telemetry-store" }
 taskmanager-ui-contract = { path = "crates/taskmanager-ui-contract" }
 taskmanager-shell = { path = "crates/taskmanager-shell" }
 taskmanager-theme = { path = "crates/taskmanager-theme" }
+# The color-science owner for the parity ledger's WCAG measurement (ADR-063:
+# the token crate owns contrast; the theme crate only projects it).
+zhuge-ui-tokens = { workspace = true }
 taskmanager-accessibility-linux = { path = "crates/taskmanager-accessibility-linux" }
 accesskit = "0.24.1"
 accesskit_consumer = "0.38" 
@@ -131,7 +134,7 @@ cryoglyph = { path = "./patches/cryoglyph" }
 gpui = { package = "gpui-kit", version = "0.8.1", default-features = false }
 
 # Shared UI packages from crates.io.
-zhuge-ui-core = "0.1.3"
-zhuge-ui-tokens = "0.1.0"
-zhuge-ui-kit-iced = "0.1.0"
-zhuge-ui-kit-bevy = "0.1.1"
+zhuge-ui-core = "0.1.18"
+zhuge-ui-tokens = "0.1.1"
+zhuge-ui-kit-iced = "0.2.0"
+zhuge-ui-kit-bevy = "0.4.1"

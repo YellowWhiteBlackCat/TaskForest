@@ -47,6 +47,19 @@ impl NpuEngineKind {
         Self::Copy,
         Self::Unknown,
     ];
+
+    /// Locale-catalog key for this NPU engine kind (`npu.engine_compute` …).
+    #[must_use]
+    pub const fn i18n_key(self) -> &'static str {
+        match self {
+            Self::Compute => "npu.engine_compute",
+            Self::Matrix => "npu.engine_matrix",
+            Self::Vector => "npu.engine_vector",
+            Self::Video => "npu.engine_video",
+            Self::Copy => "npu.engine_copy",
+            Self::Unknown => "npu.engine_unknown",
+        }
+    }
 }
 
 /// One engine's utilization with typed availability.

@@ -4,10 +4,11 @@
 //! graph's rendering geometry and its event plumbing from growing together.
 //! Both tooltip and crosshair still consume the exact same sample-slot map.
 
-use super::graph_capacity;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Instant;
+use taskmanager_shell::presentation::ChartSlots;
+use taskmanager_shell::presentation::graph_window_samples;
 
 use gpui::{
     AnyElement, App, Bounds, ElementId, Hsla, InteractiveElement, IntoElement, MouseMoveEvent,
@@ -100,20 +101,8 @@ fn sample_slot_at_cursor_x(
     x: Pixels,
     capacity: usize,
 ) -> Option<usize> {
-    let n = samples.len();
-    if n == 0 || width <= px(0.0) {
-        return None;
-    }
-    let rel = ((f32::from(x) - f32::from(left)) / f32::from(width)).clamp(0.0, 1.0);
-    let denom = n.saturating_sub(1).max(capacity.saturating_sub(1)).max(1) as f32;
-    let idx = if n == 1 {
-        0
-    } else {
-        (n as f32 - 1.0 - (1.0 - rel) * denom)
-            .round()
-            .clamp(0.0, (n - 1) as f32) as usize
-    };
-    Some(idx)
+    ChartSlots::new(samples.len(), capacity, f32::from(width))
+        .index_at(f32::from(x) - f32::from(left))
 }
 
 /// Slide-aware cursor resolution: the visible curve is the slide base
@@ -133,7 +122,7 @@ fn sample_slot_at_cursor_x_slide(
     if n == 0 || width <= px(0.0) {
         return None;
     }
-    let capacity = graph_capacity(data_points).max(1);
+    let capacity = graph_window_samples(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     let slot = f32::from(width) / denom;
     let index = ((f32::from(x) - f32::from(left)) / slot + progress.clamp(0.0, 1.0))

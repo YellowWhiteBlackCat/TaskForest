@@ -4,8 +4,7 @@ use crate::app::FrontendTrack;
 use crate::drain::{ShellProjectionFolded, run_drain_cycle};
 use crate::input::PendingEffects;
 use crate::pages::processes::properties_modal::{
-    ProcessPropertiesAction, ProcessPropertiesOverlay, ProcessPropertiesSection,
-    ProcessPropertiesTab, register,
+    ProcessPropertiesAction, ProcessPropertiesOverlay, ProcessPropertiesTab, register,
 };
 use crate::palette::ui_palette;
 use crate::window::{AppShellRoot, WindowPalette};
@@ -26,6 +25,7 @@ use taskforest_contract::{
 };
 use taskforest_core::core::FailureKind;
 use taskforest_core::core::process_telemetry::{ProcessIdentity, ProcessInsightSnapshot};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessFacets,
@@ -151,7 +151,7 @@ fn mounted_properties_submit_once_fold_partial_results_and_reject_late_refresh_r
         .world_mut()
         .query::<(Entity, &ProcessPropertiesTab, &ChildOf)>()
         .iter(app.world())
-        .find(|(_, tab, _)| tab.0 == ProcessPropertiesSection::Insights)
+        .find(|(_, tab, _)| tab.0 == ProcessDetailsSection::Insights)
         .map(|(e, _, parent)| (e, parent.parent()))
         .expect("tab");
     app.world_mut().trigger(ValueChange {
@@ -172,7 +172,7 @@ fn mounted_properties_submit_once_fold_partial_results_and_reject_late_refresh_r
     let shell = &app.world().non_send::<FrontendTrack>().shell;
     let missing_gpu = super::view_model(
         shell,
-        ProcessPropertiesSection::Insights,
+        ProcessDetailsSection::Insights,
         ProcessInsightFacet::Gpu,
     )
     .expect("gpu");
@@ -215,7 +215,7 @@ fn mounted_properties_submit_once_fold_partial_results_and_reject_late_refresh_r
     assert_eq!(
         super::view_model(
             shell,
-            ProcessPropertiesSection::Insights,
+            ProcessDetailsSection::Insights,
             ProcessInsightFacet::Network
         )
         .expect("network")

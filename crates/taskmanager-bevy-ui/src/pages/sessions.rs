@@ -43,6 +43,7 @@ use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskforest_core::core::source::SourceStatus;
 use taskforest_core::core::target::SessionId;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::{session_family_label, t};
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 
@@ -169,10 +170,7 @@ pub(crate) fn empty_state_text(sources: Option<&[SourceStatus]>) -> String {
 /// parity: success and failure both name the action and the target).
 pub(crate) fn feedback_line_text(outcome: &SessionControlOutcome) -> String {
     let target = outcome.identity.session_id.to_string();
-    let action = match outcome.action {
-        SessionControlAction::Disconnect => t("users.disconnect"),
-        SessionControlAction::Lock => t("users.lock"),
-    };
+    let action = i18n::session_control_action_label(outcome.action);
     match outcome.result {
         Ok(()) => t("feedback.session_request_accepted")
             .replace("{action}", action)

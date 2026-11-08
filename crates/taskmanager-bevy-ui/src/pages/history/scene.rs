@@ -6,6 +6,11 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::Query;
 use bevy::scene::CommandsSceneExt;
 use bevy::ui::UiSystems;
+use zhuge_ui_core::value::interval_fraction;
+
+// A constant series reads as half the strip, the answer it drew before the
+// projection was shared.
+const FLAT_SERIES_SHOWS_MID_RAMP: f32 = 0.5;
 
 use super::*;
 use crate::glass::{GlassPanelMaterial, card_material};
@@ -154,7 +159,7 @@ fn history_notice_scene(model: &HistoryPageModel, palette: &UiPalette) -> Box<dy
 }
 
 fn history_empty_scene(model: &HistoryPageModel) -> Box<dyn Scene> {
-    let (heading, detail) = status_copy(model.status);
+    let (heading, detail) = model.status.copy_text();
     let mut detail = detail.to_owned();
     if let Some(code) = model.notice.error_code {
         detail.push_str(" (error=");
@@ -249,7 +254,6 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
     }
     let min = finite.iter().copied().fold(f32::INFINITY, f32::min);
     let max = finite.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let range = max - min;
     let compact = lttb_gap_preserving(&metric.samples, 36);
     let bars: Vec<Box<dyn Scene>> = compact
         .iter()
@@ -257,10 +261,10 @@ fn trend_scene(metric: &HistoryMetricView, palette: &UiPalette) -> Box<dyn Scene
         .map(|sample| {
             let height = if !sample.is_finite() {
                 TREND_BAR_GAP_PX
-            } else if range > 0.0 {
-                (((sample - min) / range).clamp(0.0, 1.0) * TREND_STRIP_HEIGHT_PX).max(TREND_BAR_GAP_PX)
             } else {
-                TREND_STRIP_HEIGHT_PX / 2.0
+                // A constant series reads as half the strip — the same answer it
+                // drew before the projection was shared.
+                (interval_fraction(sample, min, max, FLAT_SERIES_SHOWS_MID_RAMP) * TREND_STRIP_HEIGHT_PX).max(TREND_BAR_GAP_PX)
             };
             if sample.is_finite() {
                 Box::new(bsn! {

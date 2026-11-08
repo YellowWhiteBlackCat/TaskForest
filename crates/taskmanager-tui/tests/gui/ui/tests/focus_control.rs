@@ -10,11 +10,12 @@
 
 use ratatui::layout::Rect;
 use taskforest_core::core::process::ProcessLiveKey;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{AppAction, AppPage, ConfirmationKind, SurfaceKind};
 
 use crate::TuiApp;
 use crate::ui::frame_plan::{TuiFocusControl, TuiFocusTarget, TuiFramePlan};
-use crate::ui::process_properties::ProcessDetailsSection;
+
 use crate::{TuiSurfaceKind, demo_app};
 
 const FRAME: Rect = Rect::new(0, 0, 120, 40);

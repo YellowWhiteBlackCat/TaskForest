@@ -7,7 +7,6 @@
 //! events over a software-rendered widget tree; no native window is required.
 
 use crate::app::{FocusTarget, IcedApp, Message};
-use crate::input_modality::InputModality;
 use crate::keys::IcedKey;
 use crate::theme::focus_ring_color;
 use crate::theme_binding::color;
@@ -20,6 +19,7 @@ use iced::{Element, Event, Size, mouse};
 use taskmanager_application::AppPage;
 use taskmanager_assets::embedded_fonts;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::InputModality;
 
 type TestElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 

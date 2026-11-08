@@ -12,7 +12,7 @@ use bevy::ecs::system::Query;
 use bevy::math::Vec2;
 use bevy::picking::events::{PointerMove, PointerOut};
 
-use crate::widgets::chart::geometry::ChartSlots;
+use taskmanager_shell::presentation::ChartSlots;
 
 /// The pointer's position inside the canvas, normalized to the node's box
 /// (the origin at the center, the corners at ±0.5).

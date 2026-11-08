@@ -7,8 +7,8 @@
 use crate::smart_self_test::target_is_running;
 use crate::ui;
 use crate::{
-    ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
-    SessionMenuTarget, TuiApp, TuiSurface, TuiSurfaceKind,
+    ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget, SessionMenuTarget, TuiApp,
+    TuiSurface, TuiSurfaceKind,
 };
 use taskforest_core::core::process::{FrozenProcessIdentity, PriorityTier};
 use taskforest_core::core::process::{ProcessBatchAction, ProcessLiveKey};
@@ -16,6 +16,7 @@ use taskforest_core::core::services::ServiceAction;
 use taskforest_core::core::session::SessionControlAction;
 use taskforest_core::core::smart::self_test::SmartSelfTestKind;
 use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{

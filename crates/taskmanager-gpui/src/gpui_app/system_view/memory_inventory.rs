@@ -7,7 +7,9 @@
 //! permission center. `Hidden` renders no card at all.
 
 use gpui::{AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Styled, div};
+use std::time::SystemTime;
 use taskforest_contract::{CapabilityId, SubmissionErrorKind};
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::{SmbiosMemoryRequest, i18n, request_submission_failure};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -54,7 +56,7 @@ impl RootView {
                 platform
                     .submit_smbios_memory(
                         SmbiosMemoryRequest::Refresh,
-                        crate::gpui_app::root::platform_submission_time_ms(),
+                        unix_millis(SystemTime::now()),
                     )
                     .map_err(|error| error.kind)
             },

@@ -8,6 +8,9 @@ description = "Toolkit-neutral branding, icon, font, and UI assets for TaskFores
 readme = "README.md"
 publish = false
 
+[dependencies]
+taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+
 [dev-dependencies]
 usvg = "0.48.1"
 

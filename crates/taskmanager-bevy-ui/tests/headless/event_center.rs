@@ -69,7 +69,7 @@ fn native_event_controls_filter_export_clear_and_close_owned_history() {
         app.update();
     }
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::EventCenter)
     ));
     click(&mut app, EventAction::Filter(Some(AlertEventKind::Cleared)));
@@ -120,5 +120,10 @@ fn native_event_controls_filter_export_clear_and_close_owned_history() {
             .is_empty()
     );
     click(&mut app, EventAction::Close);
-    assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+    assert!(
+        app.world()
+            .resource::<WindowSurfaceState>()
+            .active()
+            .is_none()
+    );
 }

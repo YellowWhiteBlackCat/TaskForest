@@ -42,6 +42,7 @@ mod self_test;
 mod stats;
 use self_test::self_test_card;
 use stats::{filesystem_capacity, sensor_rows};
+use taskforest_core::core::percent::percent_text;
 use taskmanager_theme::Theme;
 
 /// Copy identifiers are resolved by the caller so this isolated component can
@@ -210,7 +211,8 @@ fn filesystem_row(
     let capacity = filesystem_capacity(filesystem, disk)
         .map(|(used_pct, available)| {
             format!(
-                "{used_pct:.1}% · {} {}",
+                "{} · {} {}",
+                percent_text(used_pct),
                 format_bytes(units, available),
                 copy(SystemHealthText::Free)
             )
@@ -219,7 +221,7 @@ fn filesystem_row(
     let inodes = filesystem
         .inode_usage_percent
         .filter(|value| value.is_finite())
-        .map_or_else(unavailable, |value| format!("{value:.1}%"));
+        .map_or_else(unavailable, percent_text);
     div()
         .p(definite_length(tokens::SPACE_9))
         .rounded(rem_length(tokens::control_radius(theme)))

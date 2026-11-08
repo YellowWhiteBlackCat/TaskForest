@@ -9,6 +9,7 @@ use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskmanager_shell::presentation::health_score_for_snapshot;
 use taskmanager_shell::presentation::health_score_summary;
 use taskmanager_shell::presentation::kernel_error_summary;
+use taskmanager_shell::presentation::system_information::display_summary;
 pub(crate) mod memory_inventory;
 mod npu;
 mod tiles;
@@ -18,7 +19,7 @@ pub(crate) use tiles::build_tiles;
 
 use taskmanager_ui_contract::IconId;
 
-use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::{DmiIdentityFacts, SystemSnapshot};
 use taskmanager_application::SmbiosMemoryState;
 
@@ -270,10 +271,10 @@ pub(super) fn device_section(hw: &HardwareInfo, smbios: &SmbiosMemoryState) -> S
         }
     }
     for display in &hw.displays {
-        s.rows.push((
-            i18n::t("system.display").to_string(),
-            display_summary(display),
-        ));
+        if let Some(summary) = display_summary(display) {
+            s.rows
+                .push((i18n::t("system.display").to_string(), summary));
+        }
     }
     s.rows.push((
         i18n::t("common.virtualization").to_string(),
@@ -282,47 +283,6 @@ pub(super) fn device_section(hw: &HardwareInfo, smbios: &SmbiosMemoryState) -> S
             .unwrap_or_else(|| i18n::t("common.none").to_string()),
     ));
     s
-}
-
-fn display_summary(display: &DisplayInfo) -> String {
-    let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
-        .into_iter()
-        .flatten()
-        .filter(|value| !value.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut parts = vec![display.connector.clone()];
-    if !identity.is_empty() {
-        parts.push(identity);
-    }
-    if let (Some(width), Some(height)) = (display.width_px, display.height_px) {
-        parts.push(format!("{width}×{height}"));
-    }
-    if let Some(refresh) = display
-        .refresh_hz
-        .filter(|value| value.is_finite() && *value > 0.0)
-    {
-        parts.push(format!("{refresh:.1} Hz"));
-    }
-    if let Some(hdr) = display_hdr_capability(display) {
-        parts.push(hdr);
-    }
-    if let (Some(width), Some(height)) = (display.width_mm, display.height_mm) {
-        parts.push(format!("{width}×{height} mm"));
-    }
-    if let Some(serial) = display.serial.as_deref().filter(|value| !value.is_empty()) {
-        parts.push(format!("S/N {serial}"));
-    }
-    parts.join(" · ")
-}
-
-fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
-    let state = match display.hdr_supported {
-        Some(true) => i18n::t("system.hdr_supported"),
-        Some(false) => i18n::t("system.hdr_unsupported"),
-        None => return None,
-    };
-    Some(format!("{} {state}", i18n::t("system.hdr")))
 }
 
 /// CPU topology + clocks + caches; the instruction set renders as chips.

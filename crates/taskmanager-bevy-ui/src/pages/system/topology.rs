@@ -64,7 +64,7 @@ pub(crate) struct MemoryChannel {
 /// The platform's own locator is the only naming authority: a locator that
 /// does not name a channel leaves the module in the board map without a
 /// channel rather than guessing one.
-fn split_locator(locator: Option<&str>) -> Option<(String, String)> {
+pub(crate) fn split_locator(locator: Option<&str>) -> Option<(String, String)> {
     let locator = locator.map(str::trim).filter(|value| !value.is_empty())?;
     let (channel, slot) = locator.split_once('-')?;
     let channel = channel.trim();

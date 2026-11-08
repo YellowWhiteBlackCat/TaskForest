@@ -293,8 +293,7 @@ mod highlighted_text_tests {
 
 #[cfg(test)]
 mod more_rows_hint_tests {
-    use super::more_rows_label;
-    use taskmanager_application::i18n::{self, Language};
+    use taskmanager_application::i18n::{self, Language, more_rows_label};
 
     /// The bounded-list hint must carry the real hidden count into the
     /// localized template, in both shipped locales (pin + restore the global

@@ -11,6 +11,147 @@ use taskforest_contract::{WindowCaptureBackend, WindowCaptureFailureKind};
 
 pub const MAX_WINDOW_CAPTURE_ERROR_CHARS: usize = 512;
 
+/// Which notice a frontend must show after one capture request.
+///
+/// The two non-GPUI frontends used to carry byte-identical private copies of
+/// the submit/drain match arms, including the i18n keys and the
+/// `{destination}/{width}/{height}` substitution order. Keeping the *decision*
+/// here means a frontend only binds a notice factory; it cannot disagree with
+/// its sibling about what `Busy` or `Ready` means.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WindowCaptureNoticeSeverity {
+    Info,
+    Warning,
+    Error,
+    Success,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WindowCaptureNoticeLifecycle {
+    Short,
+    Long,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WindowCaptureNotice {
+    Unavailable,
+    Queued,
+    Busy,
+    Failed(String),
+    Ready {
+        destination: Arc<str>,
+        width: u32,
+        height: u32,
+    },
+}
+
+impl WindowCaptureNotice {
+    /// Severity and lifetime of the notice. The frontend maps these onto its
+    /// own feedback vocabulary; the *decision* stays toolkit-neutral.
+    #[must_use]
+    pub const fn severity(&self) -> WindowCaptureNoticeSeverity {
+        match self {
+            Self::Queued => WindowCaptureNoticeSeverity::Info,
+            Self::Busy => WindowCaptureNoticeSeverity::Warning,
+            Self::Unavailable | Self::Failed(_) => WindowCaptureNoticeSeverity::Error,
+            Self::Ready { .. } => WindowCaptureNoticeSeverity::Success,
+        }
+    }
+
+    #[must_use]
+    pub const fn lifecycle(&self) -> WindowCaptureNoticeLifecycle {
+        match self {
+            Self::Unavailable | Self::Failed(_) => WindowCaptureNoticeLifecycle::Long,
+            Self::Queued | Self::Busy | Self::Ready { .. } => WindowCaptureNoticeLifecycle::Short,
+        }
+    }
+}
+
+/// One capture request, decided once for every frontend.
+///
+/// `None` in the session slot is an honest "no capture client was installed",
+/// not a failed request. `submitted` says whether a request went onto the port.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WindowCaptureRequestOutcome {
+    pub submitted: bool,
+    pub notice: WindowCaptureNotice,
+}
+
+/// Build the request target from the live environment and submit it.
+///
+/// The caller passes the `OsString` (it owns the process environment read) so
+/// this owner stays a pure rule and can be tested without process globals.
+pub fn request_current_window_capture<P: WindowCapturePort>(
+    session: Option<&mut WindowCaptureSession<P>>,
+    output: Option<std::ffi::OsString>,
+) -> WindowCaptureRequestOutcome {
+    let target = output
+        .map(|value| WindowCaptureTarget::path(PathBuf::from(value)))
+        .unwrap_or_else(|| WindowCaptureTarget::current_directory("taskforest-window.png"));
+    let Some(session) = session else {
+        return WindowCaptureRequestOutcome {
+            submitted: false,
+            notice: WindowCaptureNotice::Unavailable,
+        };
+    };
+    match session.submit(target) {
+        Ok(_) => WindowCaptureRequestOutcome {
+            submitted: true,
+            notice: WindowCaptureNotice::Queued,
+        },
+        Err(WindowCaptureSubmitError::Busy(_)) => WindowCaptureRequestOutcome {
+            submitted: false,
+            notice: WindowCaptureNotice::Busy,
+        },
+        Err(WindowCaptureSubmitError::RequestSpaceExhausted) => WindowCaptureRequestOutcome {
+            submitted: false,
+            notice: WindowCaptureNotice::Unavailable,
+        },
+        Err(WindowCaptureSubmitError::Rejected(error)) => WindowCaptureRequestOutcome {
+            submitted: false,
+            notice: WindowCaptureNotice::Failed(error.detail().to_owned()),
+        },
+    }
+}
+
+/// Drain one finished capture, if any, into a typed notice.
+///
+/// `false` means "no frame change": no session, nothing drained, or a state
+/// that is still in flight. A frontend must not invent a message for those.
+pub fn drain_window_capture_completions<P: WindowCapturePort>(
+    session: Option<&mut WindowCaptureSession<P>>,
+) -> (bool, Option<WindowCaptureNotice>) {
+    let Some(session) = session else {
+        return (false, None);
+    };
+    if session.drain() == 0 {
+        return (false, None);
+    }
+    let state = session.state().clone();
+    match state {
+        WindowCaptureState::Ready {
+            destination,
+            width,
+            height,
+            ..
+        } => (
+            true,
+            Some(WindowCaptureNotice::Ready {
+                destination,
+                width,
+                height,
+            }),
+        ),
+        WindowCaptureState::Failed { error, .. } => (
+            true,
+            Some(WindowCaptureNotice::Failed(error.detail().to_owned())),
+        ),
+        WindowCaptureState::Closed
+        | WindowCaptureState::Queued(_)
+        | WindowCaptureState::Running(_) => (false, None),
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct WindowCaptureRequestId(u64);
 
@@ -220,6 +361,8 @@ pub struct WindowCaptureSession<P> {
     port: P,
 }
 
+use crate::session_slot::SessionClose;
+
 impl<P: WindowCapturePort> WindowCaptureSession<P> {
     #[must_use]
     pub fn new(port: P) -> Self {
@@ -265,6 +408,12 @@ impl<P: WindowCapturePort> WindowCaptureSession<P> {
 
     pub fn close(&mut self) {
         self.controller.close();
+    }
+}
+
+impl<P: WindowCapturePort> SessionClose for WindowCaptureSession<P> {
+    fn close_session(&mut self) {
+        self.close();
     }
 }
 

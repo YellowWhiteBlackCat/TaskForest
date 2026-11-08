@@ -79,7 +79,6 @@ fn empty_state_icon_preserves_no_rows_vs_no_match_semantics() {
 /// sources (failed OR stale-but-visible) read as "unavailable".
 #[test]
 fn banner_title_follows_the_neutral_merged_kind() {
-    use super::banner_title_key;
     use taskmanager_application::{SourceStateKind, merge_source_lines};
 
     let partial = source(SourceOutcome::Partial(FailureKind::TimedOut));
@@ -90,7 +89,7 @@ fn banner_title_follows_the_neutral_merged_kind() {
     let partial_kind = merge_source_lines(&[partial]).map(|merged| merged.kind);
     assert_eq!(partial_kind, Some(SourceStateKind::Degraded));
     assert_eq!(
-        partial_kind.map(banner_title_key),
+        partial_kind.map(SourceStateKind::banner_title_key),
         Some("source.partial_title")
     );
 
@@ -103,7 +102,7 @@ fn banner_title_follows_the_neutral_merged_kind() {
         let kind = merge_source_lines(&[fixture]).map(|merged| merged.kind);
         assert_eq!(kind, Some(expected));
         assert_eq!(
-            kind.map(banner_title_key),
+            kind.map(SourceStateKind::banner_title_key),
             Some("source.unavailable_title"),
             "unanswered sources keep the unavailable title"
         );
@@ -114,14 +113,13 @@ fn banner_title_follows_the_neutral_merged_kind() {
 
 /// Parity for the three list pages (Services / Startup / Users): every
 /// page renders its page-top notice through [`super::source_notice`],
-/// whose title comes from [`super::banner_title_key`] over the neutral
+/// whose title comes from [`SourceStateKind::banner_title_key`] over the neutral
 /// `merge_source_lines` kind — the same shared fold for all three. Given
 /// each page's mixed fixture, the banner decision must agree with the
 /// neutral VM entry by entry: headline kind, title family, typed notice,
 /// and retry policy. Healthy-only input must produce no banner at all.
 #[test]
 fn page_top_notice_agrees_with_the_neutral_merge_for_every_list_page() {
-    use super::banner_title_key;
     use taskmanager_application::{SourceNotice, SourceStateKind, merge_source_lines};
 
     fn page_source(provider: &'static str, outcome: SourceOutcome, rows: usize) -> SourceStatus {
@@ -187,7 +185,7 @@ fn page_top_notice_agrees_with_the_neutral_merge_for_every_list_page() {
         let merged = merge_source_lines(&fixture).unwrap_or_else(|| panic!("{page} must headline"));
         assert_eq!(merged.kind, expected_kind, "{page} headline kind");
         assert_eq!(merged.notice, expected_notice, "{page} typed notice");
-        assert_eq!(banner_title_key(merged.kind), expected_key, "{page} title");
+        assert_eq!(merged.kind.banner_title_key(), expected_key, "{page} title");
         assert_eq!(
             merged.notice.is_retryable(),
             expected_retry,

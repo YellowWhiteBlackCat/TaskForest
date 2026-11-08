@@ -45,7 +45,7 @@ pub use scheduler::{
 pub use source::{
     CompositeSourceSnapshot, DeviceDiscovery, DeviceSourceSnapshot, PartialSourceSnapshot,
 };
-pub use tray::TrayController;
+pub use tray::{TrayController, TrayControllerTarget, sync_tray_pause_checkmark};
 pub use window_capture::{
     InProcessCaptureFn, MAX_WINDOW_CAPTURE_FAILURE_CHARS, NativeWindowCapture,
     WindowCaptureBackend, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,

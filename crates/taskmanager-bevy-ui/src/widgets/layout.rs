@@ -4,23 +4,33 @@
 //! scenes consume the mode and bounds here, then express their hierarchy with
 //! `bsn!`; no layout system is allowed to fork a second set of breakpoints.
 
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, number};
+use taskmanager_ui_contract::presentation::vocabulary::{
+    PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_SIDEBAR_MAX_WIDTH, PERFORMANCE_SLOT_GAP,
+};
+use zhuge_ui_core::row_page::page_count;
+
 /// Below this content width the Performance surface becomes the compact
 /// device-detail layout: icon rail + device pills + one main graph.
 pub(crate) const COMPACT_BREAKPOINT_PX: f32 = 860.0;
 
-/// Wide-layout statistics rail width. It matches the reference surface's
-/// pinned ceiling, so both frontends agree on the detail column.
-pub(crate) const WIDE_STATS_WIDTH_PX: f32 = 280.0;
+/// Wide-layout statistics rail width: the registered pinned ceiling, bound
+/// from the threshold registry instead of restated here.
+pub(crate) const WIDE_STATS_WIDTH_PX: f32 =
+    number(FrontendShape::Bevy, LayoutAxis::PerformanceStatsMaxWidth);
 
 /// Device-sidebar budget bounds. The preferred width is NOT a frontend
 /// constant: it is the persisted `taskforest-core` config value (one fact,
 /// one authority), and these bounds only keep the main column and the
 /// statistics rail above their own floors.
-pub(crate) const PERFORMANCE_SIDEBAR_MIN_WIDTH_PX: f32 = 220.0;
-pub(crate) const PERFORMANCE_SIDEBAR_MAX_WIDTH_PX: f32 = 460.0;
+pub(crate) const PERFORMANCE_SIDEBAR_MIN_WIDTH_PX: f32 =
+    number(FrontendShape::Bevy, LayoutAxis::PerformanceSidebarMinWidth);
+pub(crate) const PERFORMANCE_SIDEBAR_MAX_WIDTH_PX: f32 = PERFORMANCE_SIDEBAR_MAX_WIDTH;
 /// Smallest statistics rail that still reads, and the gap between slots.
-pub(crate) const PERFORMANCE_STATS_MIN_WIDTH_PX: f32 = 236.0;
-pub(crate) const PERFORMANCE_SLOT_GAP_PX: f32 = 12.0;
+pub(crate) const PERFORMANCE_STATS_MIN_WIDTH_PX: f32 =
+    number(FrontendShape::Bevy, LayoutAxis::PerformanceStatsMinWidth);
+pub(crate) const PERFORMANCE_SLOT_GAP_PX: f32 = PERFORMANCE_SLOT_GAP;
 
 /// Resolve the device-sidebar width from the shared budget law.
 ///
@@ -47,10 +57,11 @@ pub(crate) fn performance_sidebar_width(preferred: f32, workspace_width: f32) ->
     wanted.clamp(PERFORMANCE_SIDEBAR_MIN_WIDTH_PX, max_width)
 }
 
-/// The minimum useful width of the CPU graph column. A page must switch to
-/// compact mode before this bound is violated; it must not squeeze labels or
-/// invent a horizontal overflow path.
-pub(crate) const MAIN_GRAPH_MIN_WIDTH_PX: f32 = 360.0;
+/// The minimum useful width of the CPU graph column: the shared main-column
+/// floor, bound from the vocabulary owner. A page must switch to compact mode
+/// before this bound is violated; it must not squeeze labels or invent a
+/// horizontal overflow path.
+pub(crate) const MAIN_GRAPH_MIN_WIDTH_PX: f32 = PERFORMANCE_MAIN_MIN_WIDTH;
 /// Minimum window height for the optional multi-row CPU core group. Below
 /// this threshold the whole optional group is hidden, so a short capture can
 /// never paint a partial final row at the window edge.
@@ -124,7 +135,8 @@ impl SystemDashboardBudget {
         }
         let rows = (available / 132.0).floor().clamp(1.0, 4.0) as usize;
         let count = (rows * columns).min(4);
-        let rows = count.div_ceil(columns);
+        // How many fixed-column rows a count needs is the shared page axis.
+        let rows = page_count(count, columns);
         let card_height =
             ((available - (rows.saturating_sub(1) as f32 * 8.0)) / rows as f32).clamp(92.0, 200.0);
         let chart_height = if card_height >= 124.0 {

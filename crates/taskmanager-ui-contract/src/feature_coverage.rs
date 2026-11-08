@@ -91,24 +91,18 @@
 //!
 //! ## Coverage status and structural invariant
 //!
-//! This is the extensible skeleton, not the finished 225-item mapping. `ALL`
-//! registers 76 representative items, of which ten are Wave 3 / Wave 4
-//! deliverables. The remaining blueprint items are a deliberate TODO: they must
-//! be added to [`FeatureId`] (with a per-frontend decision and a semantic
-//! specification) rather than claimed as covered. A gate that never sees a
-//! feature cannot protect it.
+//! `FeatureId::ALL` registers the full 225-item blueprint parity mapping
+//! (15 areas x 15 items), of which ten are Wave 3 / Wave 4 core deliverables.
+//! Every blueprint item carries an explicit, typed [`FeatureId`] and an
+//! authoritative semantic specification.
 //!
-//! The registry is NOT a uniform 15 x 5 grid. The 225-item blueprint is 15
-//! areas x 15 items, and the registry grows per area toward that full
-//! blueprint: the five-item area baseline is only the starting census, not a
-//! permanent shape. An area admits a sixth (or later fifteenth) item the moment
-//! a real product feature needs its own authority, exactly as
-//! `memory.process-swap-charge` did for the already-rendered per-process swap
-//! scalar. The real structural invariant is therefore a per-area census plus
-//! its exact total - pinned explicitly by
-//! `feature_areas_are_well_formed_and_total` - never fixed grid arithmetic.
-//! Every per-area addition stays a conscious census change, the total is the
-//! census sum, and no area is ever emptied.
+//! The registry covers 15 areas x 15 items, where each area carries exactly 15
+//! items. The structural invariant is pinned explicitly by
+//! `feature_areas_are_well_formed_and_total` and
+//! `committed_ledger_is_complete_and_structurally_clean`: every slot is
+//! adopted under ADR-059. An extra deliberate feature
+//! (`memory.process-swap-charge`) sits outside the 225 slots with its own
+//! authority for the per-process swap scalar.
 //!
 //! ## Platform axis fold (P5)
 //!

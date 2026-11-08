@@ -60,7 +60,7 @@ pub(super) fn handle_table_navigation(app: &mut TuiApp, key: &KeyEvent) -> Input
 /// Whether the active page is a TABLE page whose cursor ranges over a list of
 /// rows (Applications + Services + Users + Startup). Performance / System /
 /// AppHistory are fact or chart surfaces without a cursor.
-fn is_table_page(page: AppPage) -> bool {
+pub(crate) fn is_table_page(page: AppPage) -> bool {
     matches!(
         page,
         AppPage::Applications | AppPage::Services | AppPage::Users | AppPage::Startup

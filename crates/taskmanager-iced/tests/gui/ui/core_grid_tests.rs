@@ -8,27 +8,27 @@ use taskmanager_theme::Theme;
 fn tier_color_bands_match_the_grid_rule() {
     let theme = Theme::dark();
     assert_eq!(
-        tier_color(&theme, 0.0),
+        tier_color(&theme, Some(0.0)),
         crate::theme_binding::color(theme.success)
     );
     assert_eq!(
-        tier_color(&theme, 59.9),
+        tier_color(&theme, Some(59.9)),
         crate::theme_binding::color(theme.success)
     );
     assert_eq!(
-        tier_color(&theme, 60.0),
+        tier_color(&theme, Some(60.0)),
         crate::theme_binding::color(theme.warning)
     );
     assert_eq!(
-        tier_color(&theme, 84.9),
+        tier_color(&theme, Some(84.9)),
         crate::theme_binding::color(theme.warning)
     );
     assert_eq!(
-        tier_color(&theme, 85.0),
+        tier_color(&theme, Some(85.0)),
         crate::theme_binding::color(theme.danger)
     );
     assert_eq!(
-        tier_color(&theme, 100.0),
+        tier_color(&theme, Some(100.0)),
         crate::theme_binding::color(theme.danger)
     );
 }
@@ -39,13 +39,33 @@ fn tier_color_bands_match_the_grid_rule() {
 fn tier_color_clamps_out_of_range_readings_into_the_bands() {
     let theme = Theme::dark();
     assert_eq!(
-        tier_color(&theme, -50.0),
+        tier_color(&theme, Some(-50.0)),
         crate::theme_binding::color(theme.success)
     );
     assert_eq!(
-        tier_color(&theme, 250.0),
+        tier_color(&theme, Some(250.0)),
         crate::theme_binding::color(theme.danger)
     );
+}
+
+/// A non-finite or absent reading has no load tier: it wears the dim missing
+/// ink the cell paints for an unobserved core, never a fabricated calm band.
+#[test]
+fn tier_color_paints_missing_ink_for_unobserved_readings() {
+    let theme = Theme::dark();
+    let cases = [
+        None,
+        Some(f32::NAN),
+        Some(f32::INFINITY),
+        Some(f32::NEG_INFINITY),
+    ];
+    for value in cases {
+        assert_eq!(
+            tier_color(&theme, value),
+            crate::theme_binding::color(theme.fg_dim),
+            "{value:?} must not invent a tier"
+        );
+    }
 }
 
 /// A core window with one finite sample yields no strokeable polyline — the
@@ -82,8 +102,8 @@ fn core_cell_fingerprint_keys_on_snapshot_generation() {
 #[test]
 fn core_cell_program_fingerprint_tracks_history_not_color() {
     let theme = Theme::dark();
-    let green = tier_color(&theme, 30.0);
-    let red = tier_color(&theme, 90.0);
+    let green = tier_color(&theme, Some(30.0));
+    let red = tier_color(&theme, Some(90.0));
     let samples: Rc<[f32]> = Rc::from([10.0, 20.0, 30.0].as_slice());
     let chart = CoreCellChart::new(Rc::clone(&samples), green);
     // Same data + same color → same fingerprint.

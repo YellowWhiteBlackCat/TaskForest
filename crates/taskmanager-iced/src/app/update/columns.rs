@@ -26,6 +26,7 @@ use std::time::{Duration, Instant};
 use iced::Point;
 use taskforest_core::core::config::ColumnWidthConfig;
 use taskmanager_shell::SortCol;
+use taskmanager_shell::saved_views::sort_token;
 
 use super::super::{IcedApp, Message};
 use super::dispatch::UpdateDispatch;
@@ -101,7 +102,7 @@ impl ColumnWidthOverrides {
             .iter()
             .filter(|(column, _)| crate::ui::applications::column_resizable(**column))
             .map(|(column, width)| ColumnWidthConfig {
-                column: crate::ui::applications::sort_col_contract_id(*column).to_string(),
+                column: sort_token(*column).to_string(),
                 width: *width,
             })
             .collect();

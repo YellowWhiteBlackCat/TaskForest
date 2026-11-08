@@ -27,6 +27,7 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::finite_max_floored;
 use taskmanager_shell::presentation::power_w;
 
 use crate::app::ShellTrack;
@@ -63,12 +64,7 @@ pub(crate) struct NpuPowerRefresh(bool);
 /// An empty series has no scale to project against, so the ceiling stays at
 /// its floor — a full-width bar would claim a draw the host never reported.
 pub(crate) fn power_ceiling(samples: &[f32]) -> f32 {
-    samples
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite())
-        .fold(1.0_f32, f32::max)
-        * 1.1
+    finite_max_floored(1.0, samples) * 1.1
 }
 
 /// The NPU card's power section, or `None` when no accelerator reports the

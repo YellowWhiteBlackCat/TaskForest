@@ -294,7 +294,7 @@ impl TableDelegate for ServicesDelegate {
                 let mut cell = div()
                     .flex()
                     .items_center()
-                    .gap(px(4.0))
+                    .gap(definite_length(tokens::SPACE_4))
                     .min_w(px(0.0))
                     .text_size(font_size(tokens::FONT_12))
                     .text_color(hsla(theme.fg));
@@ -817,3 +817,7 @@ mod row_memo_tests;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/services_view/log_stream_tests.rs"]
 mod log_stream_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/services_view/tests.rs"]
+mod services_view_page_tests;

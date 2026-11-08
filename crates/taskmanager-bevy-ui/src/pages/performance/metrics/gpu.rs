@@ -1,6 +1,8 @@
 //! GPU device fact projections for the Performance page.
 
 use super::*;
+use taskforest_core::core::percent::percent_text;
+use taskmanager_shell::presentation::observed_percentage;
 
 /// One GPU block's joined fact line; each fact keeps its own dash-on-missing
 /// semantics (TUI `gpu_data` parity via the shared formatters).
@@ -52,7 +54,7 @@ pub(crate) fn gpu_fact_line(gpu: &GpuMetrics) -> String {
         .current_fan_speed_pct()
         .filter(|value| value.is_finite())
     {
-        values.push(format!("{} {pct:.0}%", t("fan.pwm")));
+        values.push(format!("{} {}", t("fan.pwm"), percent_text(pct)));
     }
     if let Some(bandwidth) = gpu
         .memory_bandwidth_gbps

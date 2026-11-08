@@ -15,6 +15,7 @@ use taskmanager_application::ConfirmationKind;
 use taskmanager_application::SurfaceKind;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_shell::presentation::system_information::SystemInformationGroup;
+use taskmanager_ui_contract::{OverlayEvent, OverlayKindOf, OverlaySlot, OverlayTransition};
 
 /// Stable identity of every Iced-owned primary surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -65,7 +66,7 @@ pub(crate) enum LocalSurface {
 }
 
 impl LocalSurface {
-    pub(crate) const fn kind(&self) -> LocalSurfaceKind {
+    pub(crate) fn kind(&self) -> LocalSurfaceKind {
         match self {
             Self::Settings => LocalSurfaceKind::Settings,
             Self::SidebarEditor => LocalSurfaceKind::SidebarEditor,
@@ -85,76 +86,42 @@ impl LocalSurface {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum LocalSurfaceEvent {
-    Open(LocalSurface),
-    DismissCurrent,
-    Dismiss(LocalSurfaceKind),
+impl OverlayKindOf for LocalSurface {
+    type Kind = LocalSurfaceKind;
+
+    fn kind(&self) -> Self::Kind {
+        LocalSurface::kind(self)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum LocalSurfaceTransition {
-    #[default]
-    Unchanged,
-    Opened(LocalSurfaceKind),
-    Replaced {
-        previous: LocalSurfaceKind,
-        current: LocalSurfaceKind,
-    },
-    Dismissed(LocalSurfaceKind),
-}
+pub(crate) type LocalSurfaceEvent = OverlayEvent<LocalSurface, LocalSurfaceKind, ()>;
+pub(crate) type LocalSurfaceTransition = OverlayTransition<LocalSurfaceKind, ()>;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct LocalSurfaceState {
-    active: Option<LocalSurface>,
+#[derive(Debug, Default)]
+pub(crate) struct LocalSurfaceState(OverlaySlot<LocalSurface>);
+
+impl std::ops::Deref for LocalSurfaceState {
+    type Target = OverlaySlot<LocalSurface>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for LocalSurfaceState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl LocalSurfaceState {
     pub(super) fn diagnostic_bundle_mut(&mut self) -> Option<&mut DiagnosticBundleUiState> {
-        match self.active.as_mut() {
+        match self.active_mut() {
             Some(LocalSurface::DiagnosticBundle(state)) => Some(state),
             _ => None,
         }
     }
-    pub(crate) const fn active(&self) -> Option<&LocalSurface> {
-        self.active.as_ref()
-    }
-
-    pub(crate) const fn kind(&self) -> Option<LocalSurfaceKind> {
-        match self.active.as_ref() {
-            Some(surface) => Some(surface.kind()),
-            None => None,
-        }
-    }
 
     pub(crate) fn reduce(&mut self, event: LocalSurfaceEvent) -> LocalSurfaceTransition {
-        match event {
-            LocalSurfaceEvent::Open(surface) => {
-                let current = surface.kind();
-                self.active.replace(surface).map_or(
-                    LocalSurfaceTransition::Opened(current),
-                    |previous| LocalSurfaceTransition::Replaced {
-                        previous: previous.kind(),
-                        current,
-                    },
-                )
-            }
-            LocalSurfaceEvent::Dismiss(expected) => {
-                if self.kind() != Some(expected) {
-                    return LocalSurfaceTransition::Unchanged;
-                }
-                self.dismiss_current()
-            }
-            LocalSurfaceEvent::DismissCurrent => self.dismiss_current(),
-        }
-    }
-
-    fn dismiss_current(&mut self) -> LocalSurfaceTransition {
-        self.active
-            .take()
-            .map_or(LocalSurfaceTransition::Unchanged, |surface| {
-                LocalSurfaceTransition::Dismissed(surface.kind())
-            })
+        self.0.apply(event)
     }
 }
 
@@ -189,7 +156,7 @@ pub(crate) enum ContextMenu {
 }
 
 impl ContextMenu {
-    pub(crate) const fn kind(&self) -> ContextMenuKind {
+    pub(crate) fn kind(&self) -> ContextMenuKind {
         match self {
             Self::User { .. } => ContextMenuKind::User,
             Self::Process { .. } => ContextMenuKind::Process,
@@ -200,71 +167,35 @@ impl ContextMenu {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ContextMenuEvent {
-    Open(Box<ContextMenu>),
-    DismissCurrent,
-    Dismiss(ContextMenuKind),
+impl OverlayKindOf for ContextMenu {
+    type Kind = ContextMenuKind;
+
+    fn kind(&self) -> Self::Kind {
+        ContextMenu::kind(self)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum ContextMenuTransition {
-    #[default]
-    Unchanged,
-    Opened(ContextMenuKind),
-    Replaced {
-        previous: ContextMenuKind,
-        current: ContextMenuKind,
-    },
-    Dismissed(ContextMenuKind),
-}
+pub(crate) type ContextMenuEvent = OverlayEvent<ContextMenu, ContextMenuKind, ()>;
+pub(crate) type ContextMenuTransition = OverlayTransition<ContextMenuKind, ()>;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ContextMenuState {
-    active: Option<ContextMenu>,
+#[derive(Debug, Default)]
+pub(crate) struct ContextMenuState(OverlaySlot<ContextMenu>);
+
+impl std::ops::Deref for ContextMenuState {
+    type Target = OverlaySlot<ContextMenu>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for ContextMenuState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl ContextMenuState {
-    pub(crate) const fn active(&self) -> Option<&ContextMenu> {
-        self.active.as_ref()
-    }
-
-    pub(crate) const fn kind(&self) -> Option<ContextMenuKind> {
-        match self.active.as_ref() {
-            Some(menu) => Some(menu.kind()),
-            None => None,
-        }
-    }
-
     pub(crate) fn reduce(&mut self, event: ContextMenuEvent) -> ContextMenuTransition {
-        match event {
-            ContextMenuEvent::Open(menu) => {
-                let menu = *menu;
-                let current = menu.kind();
-                self.active.replace(menu).map_or(
-                    ContextMenuTransition::Opened(current),
-                    |previous| ContextMenuTransition::Replaced {
-                        previous: previous.kind(),
-                        current,
-                    },
-                )
-            }
-            ContextMenuEvent::Dismiss(expected) => {
-                if self.kind() != Some(expected) {
-                    return ContextMenuTransition::Unchanged;
-                }
-                self.dismiss_current()
-            }
-            ContextMenuEvent::DismissCurrent => self.dismiss_current(),
-        }
-    }
-
-    fn dismiss_current(&mut self) -> ContextMenuTransition {
-        self.active
-            .take()
-            .map_or(ContextMenuTransition::Unchanged, |menu| {
-                ContextMenuTransition::Dismissed(menu.kind())
-            })
+        self.0.apply(event)
     }
 }
 
@@ -282,7 +213,7 @@ pub(crate) enum InputScope {
 }
 
 impl InputScope {
-    pub(crate) const fn modal_open(self) -> bool {
+    pub(crate) fn modal_open(self) -> bool {
         matches!(
             self,
             Self::SharedSurface(_)
@@ -293,7 +224,7 @@ impl InputScope {
         )
     }
 
-    pub(crate) const fn opaque_modal_open(self) -> bool {
+    pub(crate) fn opaque_modal_open(self) -> bool {
         match self {
             Self::SharedSurface(SurfaceKind::ProcessProperties) => true,
             Self::SharedSurface(SurfaceKind::Confirmation(kind)) => !matches!(
@@ -319,7 +250,7 @@ pub(crate) enum PresenceTransition {
 }
 
 impl PresenceTransition {
-    pub(crate) const fn between(previous: bool, current: bool) -> Self {
+    pub(crate) fn between(previous: bool, current: bool) -> Self {
         match (previous, current) {
             (false, false) => Self::StableClosed,
             (false, true) => Self::Opened,
@@ -328,11 +259,11 @@ impl PresenceTransition {
         }
     }
 
-    pub(crate) const fn is_open(self) -> bool {
+    pub(crate) fn is_open(self) -> bool {
         matches!(self, Self::Opened | Self::StableOpen)
     }
 
-    pub(crate) const fn was_open(self) -> bool {
+    pub(crate) fn was_open(self) -> bool {
         matches!(self, Self::StableOpen | Self::Closed)
     }
 }
@@ -344,26 +275,26 @@ pub(crate) struct InteractionSnapshot {
 }
 
 impl InteractionSnapshot {
-    pub(crate) const fn modal_open(self) -> bool {
+    pub(crate) fn modal_open(self) -> bool {
         self.scope.modal_open()
     }
 
-    pub(crate) const fn opaque_modal_open(self) -> bool {
+    pub(crate) fn opaque_modal_open(self) -> bool {
         self.scope.opaque_modal_open()
     }
 
-    pub(crate) const fn process_properties_open(self) -> bool {
+    pub(crate) fn process_properties_open(self) -> bool {
         matches!(
             self.scope,
             InputScope::SharedSurface(SurfaceKind::ProcessProperties)
         )
     }
 
-    pub(crate) const fn modal_transition(self, next: Self) -> PresenceTransition {
+    pub(crate) fn modal_transition(self, next: Self) -> PresenceTransition {
         PresenceTransition::between(self.modal_open(), next.modal_open())
     }
 
-    pub(crate) const fn process_properties_transition(self, next: Self) -> PresenceTransition {
+    pub(crate) fn process_properties_transition(self, next: Self) -> PresenceTransition {
         PresenceTransition::between(
             self.process_properties_open(),
             next.process_properties_open(),
@@ -374,87 +305,86 @@ impl InteractionSnapshot {
 use super::IcedApp;
 
 impl IcedApp {
-    pub(crate) const fn local_surface(&self) -> Option<&LocalSurface> {
-        self.local_surface.active()
+    pub(crate) fn local_surface(&self) -> Option<&LocalSurface> {
+        OverlaySlot::active(&self.local_surface)
     }
-
-    pub(crate) const fn local_surface_kind(&self) -> Option<LocalSurfaceKind> {
+    pub(crate) fn local_surface_kind(&self) -> Option<LocalSurfaceKind> {
         self.local_surface.kind()
     }
 
-    pub(crate) const fn context_menu(&self) -> Option<&ContextMenu> {
-        self.input.context_menu.active()
+    pub(crate) fn context_menu(&self) -> Option<&ContextMenu> {
+        OverlaySlot::active(&self.input.context_menu)
     }
 
-    pub(crate) const fn context_menu_kind(&self) -> Option<ContextMenuKind> {
+    pub(crate) fn context_menu_kind(&self) -> Option<ContextMenuKind> {
         self.input.context_menu.kind()
     }
 
-    pub(crate) const fn run_task_open(&self) -> bool {
+    pub(crate) fn run_task_open(&self) -> bool {
         matches!(self.local_surface(), Some(LocalSurface::RunTask))
     }
 
-    pub(crate) const fn affinity_target(&self) -> Option<&FrozenProcessIdentity> {
+    pub(crate) fn affinity_target(&self) -> Option<&FrozenProcessIdentity> {
         match self.local_surface() {
             Some(LocalSurface::ProcessAffinity { target }) => Some(target),
             _ => None,
         }
     }
 
-    pub(crate) const fn affinity_open(&self) -> bool {
+    pub(crate) fn affinity_open(&self) -> bool {
         self.affinity_target().is_some()
     }
 
-    pub(crate) const fn service_details_target(&self) -> Option<&ServiceId> {
+    pub(crate) fn service_details_target(&self) -> Option<&ServiceId> {
         match self.local_surface() {
             Some(LocalSurface::ServiceDetails { service_id }) => Some(service_id),
             _ => None,
         }
     }
 
-    pub(crate) const fn user_menu_session(&self) -> Option<&SessionItem> {
+    pub(crate) fn user_menu_session(&self) -> Option<&SessionItem> {
         match self.context_menu() {
             Some(ContextMenu::User { session, .. }) => Some(session),
             _ => None,
         }
     }
 
-    pub(crate) const fn process_menu_identity(&self) -> Option<ProcessLiveKey> {
+    pub(crate) fn process_menu_identity(&self) -> Option<ProcessLiveKey> {
         match self.context_menu() {
             Some(ContextMenu::Process { identity }) => Some(*identity),
             _ => None,
         }
     }
 
-    pub(crate) const fn service_menu_index(&self) -> Option<usize> {
+    pub(crate) fn service_menu_index(&self) -> Option<usize> {
         match self.context_menu() {
             Some(ContextMenu::Service { source_index, .. }) => Some(*source_index),
             _ => None,
         }
     }
 
-    pub(crate) const fn service_menu_target(&self) -> Option<&ServiceItem> {
+    pub(crate) fn service_menu_target(&self) -> Option<&ServiceItem> {
         match self.context_menu() {
             Some(ContextMenu::Service { service, .. }) => Some(service),
             _ => None,
         }
     }
 
-    pub(crate) const fn startup_menu_index(&self) -> Option<usize> {
+    pub(crate) fn startup_menu_index(&self) -> Option<usize> {
         match self.context_menu() {
             Some(ContextMenu::Startup { source_index, .. }) => Some(*source_index),
             _ => None,
         }
     }
 
-    pub(crate) const fn startup_menu_entry(&self) -> Option<&StartupEntry> {
+    pub(crate) fn startup_menu_entry(&self) -> Option<&StartupEntry> {
         match self.context_menu() {
             Some(ContextMenu::Startup { entry, .. }) => Some(entry),
             _ => None,
         }
     }
 
-    pub(crate) const fn process_columns_menu_open(&self) -> bool {
+    pub(crate) fn process_columns_menu_open(&self) -> bool {
         matches!(self.context_menu(), Some(ContextMenu::ProcessColumns))
     }
 
@@ -481,7 +411,9 @@ impl IcedApp {
         if previous == Some(LocalSurfaceKind::DiagnosticBundle) {
             self.diagnostics.close();
         }
-        let _ = self.local_surface.reduce(LocalSurfaceEvent::DismissCurrent);
+        let _ = self
+            .local_surface
+            .reduce(LocalSurfaceEvent::DismissCurrent(()));
         if previous == Some(LocalSurfaceKind::ServiceDetails) {
             self.shell.service_dependencies.close();
             self.service_details.close();
@@ -499,16 +431,16 @@ impl IcedApp {
         }
         let transition = self
             .local_surface
-            .reduce(LocalSurfaceEvent::Dismiss(expected));
+            .reduce(LocalSurfaceEvent::Dismiss(expected, ()));
         if matches!(
             transition,
-            LocalSurfaceTransition::Dismissed(LocalSurfaceKind::ProcessAffinity)
+            LocalSurfaceTransition::Dismissed(LocalSurfaceKind::ProcessAffinity, ())
         ) {
             self.process_presentation.affinity_cpus = None;
         }
         if matches!(
             transition,
-            LocalSurfaceTransition::Dismissed(LocalSurfaceKind::ServiceDetails)
+            LocalSurfaceTransition::Dismissed(LocalSurfaceKind::ServiceDetails, ())
         ) {
             self.shell.service_dependencies.close();
             self.service_details.close();
@@ -518,24 +450,21 @@ impl IcedApp {
     pub(super) fn open_context_menu(&mut self, menu: ContextMenu) {
         self.dismiss_local_surface();
         self.close_shell_modals();
-        let _ = self
-            .input
-            .context_menu
-            .reduce(ContextMenuEvent::Open(Box::new(menu)));
+        let _ = self.input.context_menu.reduce(ContextMenuEvent::Open(menu));
     }
 
     pub(super) fn dismiss_context_menu(&mut self) {
         let _ = self
             .input
             .context_menu
-            .reduce(ContextMenuEvent::DismissCurrent);
+            .reduce(ContextMenuEvent::DismissCurrent(()));
     }
 
     pub(super) fn dismiss_context_menu_kind(&mut self, expected: ContextMenuKind) {
         let _ = self
             .input
             .context_menu
-            .reduce(ContextMenuEvent::Dismiss(expected));
+            .reduce(ContextMenuEvent::Dismiss(expected, ()));
     }
 
     /// Derive the sole keyboard owner. The order is defensive; normal open

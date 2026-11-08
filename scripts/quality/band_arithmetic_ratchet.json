@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "gate": {
+    "source": "zhuge-ui-kit:crates/zhuge-ui-core/tools/check_band_arithmetic.py",
+    "sha256": "7c36cf479f2a8116dc5916ab4275ccbd0ddfeb93facd217fc5f38fd738374564"
+  },
+  "entries": {}
+}

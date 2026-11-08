@@ -3,12 +3,13 @@
 //! their focus ring. The value lives in [`crate::app::InputState`], not in a
 //! process-global variable.
 //!
-//! This is the iced counterpart of the GPUI root's `InputModality` tracker
-//! (taskmanager-gpui `gpui_app/root/input_modality.rs`, GPUI-05 reference
-//! semantics): neither toolkit attaches an input origin to focus state, so
-//! both synthesize focus-visible from one small tracker. The policy is strict
-//! and identical — only keyboard input paints focus rings; programmatic focus
-//! inherits the previous origin and never paints one by itself.
+//! The modality vocabulary and the focus-visible rule belong to the shared
+//! contract (`taskmanager_ui_contract::InputModality`); this module owns only
+//! the Iced capture wiring. Neither toolkit attaches an input origin to focus
+//! state, so both synthesize focus-visible from one small tracker. The policy
+//! is strict and identical — only keyboard input paints focus rings;
+//! programmatic focus inherits the previous origin and never paints one by
+//! itself.
 //!
 //! Observation points mirror the GPUI capture listeners:
 //! - every normalized key press (`Message::Key`, including unmappable keys
@@ -24,29 +25,6 @@ use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::{Element, Event, Length, Rectangle, Size, Vector};
 
 use crate::app::{FocusTarget, Message};
-
-/// The most recent input origin capable of changing focus. One-to-one with
-/// the GPUI root tracker's vocabulary.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub(crate) enum InputModality {
-    /// Initial state, and focus changes initiated by application code.
-    #[default]
-    Programmatic = 0,
-    /// A keyboard event was observed (any key, including bare modifiers).
-    Keyboard = 1,
-    /// A pointer button was pressed over the root surface.
-    Pointer = 2,
-}
-
-impl InputModality {
-    /// Strict focus-visible policy: only keyboard modality paints an outset
-    /// ring, matching the shared palette contract (ring alpha encodes
-    /// focus-visible) and the GPUI shell's decision.
-    #[must_use]
-    pub(crate) const fn shows_focus_ring(self) -> bool {
-        matches!(self, Self::Keyboard)
-    }
-}
 
 /// The root input observer: a transparent pass-through shell around the whole
 /// view tree that watches pointer presses and checks the tracked focus target

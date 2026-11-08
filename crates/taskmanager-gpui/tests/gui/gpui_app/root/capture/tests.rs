@@ -2,6 +2,7 @@ use taskforest_core::core::FilesystemHealthSnapshot;
 use taskforest_core::core::PowerSupplySnapshot;
 use taskforest_core::core::SensorCenterSnapshot;
 use taskforest_core::core::SensorQuantity;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history;
@@ -22,8 +23,8 @@ const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 
 use super::{
     CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
-    ProcessBatchAction, ProcessDetailsSection, ProcessItem, ServiceId, SystemHealthCaptureOutcome,
-    SystemSnapshot, TopPage,
+    ProcessBatchAction, ProcessItem, ServiceId, SystemHealthCaptureOutcome, SystemSnapshot,
+    TopPage,
 };
 use super::{WindowCaptureChain, WindowCaptureSchedule};
 use taskforest_core::core::process::ProcessLiveKey;

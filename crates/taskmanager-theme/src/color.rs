@@ -107,30 +107,7 @@ impl From<Weight> for f32 {
     }
 }
 
-/// WCAG relative luminance for an opaque sRGB token. Theme colors are all
-/// resolved before they reach callers, so alpha compositing is unnecessary for
-/// the accent/control pairs that use this helper.
-pub fn relative_luminance(color: Color) -> f32 {
-    fn linear(channel: f32) -> f32 {
-        if channel <= 0.04045 {
-            channel / 12.92
-        } else {
-            ((channel + 0.055) / 1.055).powf(2.4)
-        }
-    }
-
-    0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
-}
-
-/// WCAG contrast ratio between two opaque tokens.
-pub fn contrast_ratio(a: Color, b: Color) -> f32 {
-    let (lighter, darker) = {
-        let a = relative_luminance(a);
-        let b = relative_luminance(b);
-        if a >= b { (a, b) } else { (b, a) }
-    };
-    (lighter + 0.05) / (darker + 0.05)
-}
+use zhuge_ui_tokens::Rgba;
 
 /// Pick the higher-contrast control foreground for an accent fill. Several
 /// native palettes define a separate accent *link* color, but that token must
@@ -139,25 +116,28 @@ pub fn contrast_ratio(a: Color, b: Color) -> f32 {
 pub fn on_accent(accent: Color) -> Color {
     let dark = Color::BLACK;
     let light = Color::WHITE;
-    if contrast_ratio(accent, dark) >= contrast_ratio(accent, light) {
-        dark
+    let resolved = |color: Color| Rgba::new(color.r, color.g, color.b, color.a);
+    let accent = resolved(accent);
+    let dark = resolved(dark);
+    let light = resolved(light);
+    if accent.contrast_ratio(dark) >= accent.contrast_ratio(light) {
+        Color::BLACK
     } else {
-        light
+        Color::WHITE
     }
 }
 
 /// Linear sRGB interpolation between two tokens: `t = 0` → `a`, `t = 1` →
-/// `b`. Used by the derived surface tokens ([`crate::Theme::card_surface`]
-/// and friends) so derived colors stay channel-exact instead of re-inventing
-/// per-view blends.
-pub fn mix(a: Color, b: Color, t: f32) -> Color {
-    let t = t.clamp(0.0, 1.0);
-    Color {
-        r: a.r + (b.r - a.r) * t,
-        g: a.g + (b.g - a.g) * t,
-        b: a.b + (b.b - a.b) * t,
-        a: a.a + (b.a - a.a) * t,
-    }
+/// `b`, with `t` clamped to the unit interval. Used by the derived surface
+/// tokens ([`crate::Theme::card_surface`] and friends) so derived colors stay
+/// channel-exact instead of re-inventing per-view blends.
+///
+/// The blend formula has one authority: [`Rgba::lerp`] in `zhuge-ui-tokens`.
+/// This is an adapter that maps the neutral [`Color`] onto it and back; naming
+/// the four channels here again would be a second formula for one fact.
+pub const fn mix(a: Color, b: Color, t: f32) -> Color {
+    let mixed = Rgba::new(a.r, a.g, a.b, a.a).lerp(Rgba::new(b.r, b.g, b.b, b.a), t);
+    Color::new(mixed.r, mixed.g, mixed.b, mixed.a)
 }
 
 #[cfg(test)]

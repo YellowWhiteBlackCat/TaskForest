@@ -25,6 +25,7 @@ use taskmanager_theme::{Color, GlassTier, Theme, with_alpha};
 
 mod stats;
 use stats::{composition_labels, overview_stats, segment_shares, summary_tiles, swap_bar_stats};
+use taskforest_core::core::percent::percent_text;
 
 type CompositionSegment = (Color, f32, String, u64);
 
@@ -144,7 +145,7 @@ fn composition_legend(
                         .w(px(44.0))
                         .text_size(font_size(tokens::FONT_12))
                         .text_color(hsla(theme.fg_dim))
-                        .child(format!("{percent:>4.0}%")),
+                        .child(format!("{:>5}", percent_text(percent))),
                 )
                 .child(
                     div()

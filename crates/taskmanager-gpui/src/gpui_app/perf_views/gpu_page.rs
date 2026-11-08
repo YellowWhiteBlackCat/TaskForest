@@ -17,9 +17,7 @@ use taskmanager_application::GpuEngineRowsState;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting::{
-    GraphUnit, PerformanceSettings, gpu_identity_text, missing_value,
-};
+use crate::gpui_app::formatting::{GraphUnit, PerformanceSettings, gpu_identity_text};
 use crate::gpui_app::graph::{GraphCacheHandle, GraphHover, GraphSettings};
 use crate::gpui_app::history_samples::gpu_engine_samples;
 use crate::gpui_app::perf_views::gpu_stats::{
@@ -35,6 +33,7 @@ use taskmanager_application::i18n;
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, gpu_chart_metric_history,
 };
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -67,41 +66,10 @@ pub(crate) struct GpuRenderState<'a> {
     pub(crate) engine_session: &'a GpuEngineRowsState,
     pub(crate) engine_capability_status: Option<CapabilityStatus>,
     pub(crate) engine_device_id: DeviceId,
-    pub(crate) chart_layout: GpuChartLayout,
+    pub(crate) chart_inventory: PerformanceChartInventory,
     pub(crate) performance: PerformanceSettings,
     pub(crate) budget: PerformancePageBudget,
     pub(crate) graph_cache: GraphCacheHandle,
-}
-
-/// The complete GPU chart inventory selected by responsive layout alone.
-///
-/// This is deliberately not interaction state: a standard surface admits the
-/// complete reported engine inventory subject to the shared height budget,
-/// while a compact surface keeps one readable aggregate graph instead of
-/// compressing engine cards below their minimum useful height.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum GpuChartLayout {
-    AggregateOnly,
-    EngineInventory,
-}
-
-impl GpuChartLayout {
-    pub(crate) const fn for_chart_inventory(inventory: PerformanceChartInventory) -> Self {
-        match inventory {
-            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
-            PerformanceChartInventory::Full => Self::EngineInventory,
-        }
-    }
-
-    const fn shows_engine_inventory(self) -> bool {
-        matches!(self, Self::EngineInventory)
-    }
-}
-
-pub(crate) fn gpu_percentage_readout(value: Option<f32>) -> String {
-    value.map_or_else(missing_value, |percentage| {
-        format!("{:.0}%", percentage.round())
-    })
 }
 
 struct GpuEngineMiniGridProps<'a> {
@@ -190,8 +158,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                     metrics.device_generation,
                     name,
                 );
-                let cell_label =
-                    format!("{name}  {}", gpu_percentage_readout(cell.utilization_pct));
+                let cell_label = format!("{name}  {}", observed_percentage(cell.utilization_pct));
                 let graph_cell = elements::mini_graph_cell(
                     theme,
                     (
@@ -296,8 +263,8 @@ pub(crate) fn render_gpu(
             None
         };
     let engine_group = gpu_state
-        .chart_layout
-        .shows_engine_inventory()
+        .chart_inventory
+        .includes_extended_charts()
         .then(|| {
             render_gpu_engine_mini_grid(GpuEngineMiniGridProps {
                 theme,

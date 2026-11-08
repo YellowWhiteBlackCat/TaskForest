@@ -1,7 +1,13 @@
 use super::*;
-use crate::color::contrast_ratio;
 use crate::fonts::ResolvedFonts;
 use crate::theme::HighContrast;
+
+use zhuge_ui_tokens::Rgba;
+
+fn contrast_ratio(first: Color, second: Color) -> f32 {
+    Rgba::new(first.r, first.g, first.b, first.a)
+        .contrast_ratio(Rgba::new(second.r, second.g, second.b, second.a))
+}
 
 /// Product color modes own the backdrop; the native skin still owns the
 /// secondary chrome contract. Pin both properties so future token edits

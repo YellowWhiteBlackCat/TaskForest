@@ -366,6 +366,7 @@ impl IcedApp {
 
 use taskforest_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 
 /// One rendered rule row (pure seam the headless tests assert on).
@@ -417,13 +418,13 @@ fn rule_row_model(
     snapshot: Option<&SystemSnapshot>,
 ) -> AlertRuleRowModel {
     let rule = &managed.rule;
-    let unit = metric_unit(rule.metric);
+    let unit = rule.metric.unit_suffix();
     AlertRuleRowModel {
         rule_id: rule.id.clone(),
         metric: rule.metric,
-        metric_label: metric_label(rule.metric).to_owned(),
+        metric_label: i18n::alert_metric_label(rule.metric).to_owned(),
         severity: rule.severity,
-        severity_label: severity_label(rule.severity).to_owned(),
+        severity_label: i18n::alert_severity_label(rule.severity).to_owned(),
         threshold_text: format!("{:.1}{unit}", rule.threshold),
         current_text: current_value_text(rule, snapshot),
         enabled: managed.enabled,
@@ -435,7 +436,7 @@ fn rule_row_model(
 /// `None`, never zero); disk-family metrics show the rule's scope because a
 /// per-disk value would be ambiguous across several disks.
 fn current_value_text(rule: &AlertRule, snapshot: Option<&SystemSnapshot>) -> String {
-    if disk_scoped(rule.metric) {
+    if rule.metric.is_disk_scoped() {
         return rule
             .target
             .as_deref()
@@ -450,7 +451,7 @@ fn current_value_text(rule: &AlertRule, snapshot: Option<&SystemSnapshot>) -> St
     });
     observed.map_or_else(
         || t("common.none").to_owned(),
-        |value| format!("{value:.1}{}", metric_unit(rule.metric)),
+        |value| format!("{value:.1}{}", rule.metric.unit_suffix()),
     )
 }
 
@@ -469,59 +470,18 @@ pub(crate) fn active_alert_lines(app: &crate::IcedApp) -> Vec<ActiveAlertLine> {
 }
 
 fn active_line_text(alert: &Alert) -> String {
-    let unit = metric_unit(alert.metric);
+    let unit = alert.metric.unit_suffix();
     let base = format!(
         "{} {:.1}{unit} ≥ {:.1}{unit} · {}",
-        metric_label(alert.metric),
+        i18n::alert_metric_label(alert.metric),
         alert.value,
         alert.threshold,
-        severity_label(alert.severity),
+        i18n::alert_severity_label(alert.severity),
     );
-    if disk_scoped(alert.metric) && !alert.target.trim().is_empty() {
+    if alert.metric.is_disk_scoped() && !alert.target.trim().is_empty() {
         format!("{} · {}", alert.target, base)
     } else {
         base
-    }
-}
-
-const fn disk_scoped(metric: AlertMetric) -> bool {
-    matches!(
-        metric,
-        AlertMetric::DiskTemperatureC
-            | AlertMetric::SmartPercentUsed
-            | AlertMetric::SmartCriticalWarning
-    )
-}
-
-/// Metric label through the shared `alerts.metric_*` catalog keys (the same
-/// vocabulary the TUI alerts surface and threshold-suggestions overlay use).
-pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => t("alerts.metric_cpu"),
-        AlertMetric::MemoryUsagePercent => t("alerts.metric_memory"),
-        AlertMetric::DiskTemperatureC => t("alerts.metric_disk_temperature"),
-        AlertMetric::SmartPercentUsed => t("alerts.metric_smart_used"),
-        AlertMetric::SmartCriticalWarning => t("alerts.metric_smart_critical"),
-    }
-}
-
-/// Unit suffix, mirroring the TUI alerts overlay's unit semantics.
-pub(crate) const fn metric_unit(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => "%",
-        AlertMetric::DiskTemperatureC => "°C",
-        AlertMetric::SmartCriticalWarning => "",
-    }
-}
-
-/// Severity label through the shared `alert.*` catalog keys (GPUI parity).
-pub(crate) fn severity_label(severity: AlertSeverity) -> &'static str {
-    match severity {
-        AlertSeverity::Info => t("alert.info"),
-        AlertSeverity::Warning => t("alert.warning"),
-        AlertSeverity::Critical => t("alert.critical"),
     }
 }
 

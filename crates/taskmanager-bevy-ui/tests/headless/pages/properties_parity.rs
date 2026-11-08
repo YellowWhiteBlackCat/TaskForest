@@ -12,7 +12,7 @@ use super::quota::{QuotaGauge, QuotaMark};
 use super::tabs::{TabIndicator, TabIndicatorMotion};
 use super::{
     ProcessPropertiesDismissButton, ProcessPropertiesFacet, ProcessPropertiesPanel,
-    ProcessPropertiesSection, ProcessPropertiesTab, register,
+    ProcessPropertiesTab, register,
 };
 use crate::app::FrontendTrack;
 use crate::glass::{GlassNoiseLayer, OpticalGlassCard};
@@ -44,6 +44,7 @@ use taskforest_core::core::process_telemetry::{
     LimitValue, ProcessResourceSnapshot, ResourceObservation,
 };
 use taskforest_core::core::{ProcessResourceObservations, ScalarObservation};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::{
     AppAction, AppPage, ProcessInsightFacet, ProcessInsightFacetState, i18n::t,
 };
@@ -193,7 +194,7 @@ fn memory_quota(usage: Option<u64>, limit: Option<LimitValue>) -> ProcessResourc
 }
 
 /// Drive the tab strip the way a click does: the typed selection request.
-fn select_tab(app: &mut App, section: ProcessPropertiesSection) {
+fn select_tab(app: &mut App, section: ProcessDetailsSection) {
     let (tab, list) = {
         let world = app.world_mut();
         let mut found = None;
@@ -231,7 +232,7 @@ fn select_facet(app: &mut App, facet: ProcessInsightFacet) {
 
 /// Open the insights facet of the properties review and let it settle.
 fn open_insights_facet(app: &mut App, facet: ProcessInsightFacet) {
-    select_tab(app, ProcessPropertiesSection::Insights);
+    select_tab(app, ProcessDetailsSection::Insights);
     app.update();
     app.update();
     select_facet(app, facet);
@@ -360,16 +361,16 @@ fn the_modal_backdrop_is_an_honest_painted_fallback() {
 fn the_tab_indicator_slides_onto_the_selected_tab() {
     let mut app = properties_app(1280, 720);
     let motion = *app.world().resource::<TabIndicatorMotion>();
-    assert_eq!(motion.target, Some(ProcessPropertiesSection::Overview));
+    assert_eq!(motion.target, Some(ProcessDetailsSection::Overview));
     assert_eq!(
         motion.progress, 1.0,
         "the first mount lands directly on the overview tab"
     );
-    select_tab(&mut app, ProcessPropertiesSection::Insights);
+    select_tab(&mut app, ProcessDetailsSection::Insights);
     app.update();
     app.update();
     let motion = *app.world().resource::<TabIndicatorMotion>();
-    assert_eq!(motion.target, Some(ProcessPropertiesSection::Insights));
+    assert_eq!(motion.target, Some(ProcessDetailsSection::Insights));
     assert!(
         motion.progress < 1.0,
         "the indicator slides toward the new tab instead of jumping, progress {}",
@@ -387,7 +388,7 @@ fn the_tab_indicator_slides_onto_the_selected_tab() {
         .expect("the sliding indicator");
     let mut tab = None;
     for (entity, marker) in world.query::<(Entity, &ProcessPropertiesTab)>().iter(world) {
-        if marker.0 == ProcessPropertiesSection::Insights {
+        if marker.0 == ProcessDetailsSection::Insights {
             tab = Some(entity);
         }
     }

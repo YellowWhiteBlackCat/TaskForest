@@ -20,6 +20,7 @@ use taskmanager_theme::palette::SeverityPalette;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::{self, UiSize};
 use taskmanager_theme::{Color, GlassTier, Length, LightDark};
+use zhuge_ui_core::easing::lerp;
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
@@ -376,7 +377,7 @@ pub(crate) fn composite_over(
     let back = backdrop.to_srgba();
     let over = overlay.to_srgba();
     let alpha = over.alpha.clamp(0.0, 1.0);
-    let mix = |back: f32, over: f32| back + (over - back) * alpha;
+    let mix = |back: f32, over: f32| lerp(back, over, alpha);
     bevy::color::Color::srgba(
         mix(back.red, over.red),
         mix(back.green, over.green),

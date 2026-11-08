@@ -1,6 +1,12 @@
 use super::*;
-use crate::color::contrast_ratio;
 use crate::fonts::{FONT_MISANS_VF, FONT_ROBOTO_MONO};
+
+use zhuge_ui_tokens::Rgba;
+
+fn contrast_ratio(first: Color, second: Color) -> f32 {
+    Rgba::new(first.r, first.g, first.b, first.a)
+        .contrast_ratio(Rgba::new(second.r, second.g, second.b, second.a))
+}
 
 // ── GLASS-01: frosted-glass material tokens ────────────────────────────────
 

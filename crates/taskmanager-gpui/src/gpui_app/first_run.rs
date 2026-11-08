@@ -8,6 +8,8 @@ use gpui::{
     App, ClipboardItem, Context, Div, Entity, InteractiveElement, ParentElement, Styled, Window,
     div, px,
 };
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_assets::product::REPOSITORY_URL;
 use taskmanager_shell::presentation::first_run::first_run_failure_key;
 use taskmanager_ui::theme_binding::definite_length;
@@ -15,7 +17,7 @@ use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::root::{RootView, platform_submission_time_ms};
+use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::{WindowSurfaceDismissReason, WindowSurfaceKind};
 use taskforest_contract::OperationFailure;
 use taskforest_core::core::setup::SetupScriptAction;
@@ -381,7 +383,7 @@ pub(crate) fn render_settings_row(theme: &Theme, entity: Entity<RootView>) -> Di
 impl RootView {
     pub(crate) fn request_first_run_observation(&mut self, _cx: &mut Context<Self>) {
         self.first_run
-            .observe(self.platform.as_mut(), platform_submission_time_ms());
+            .observe(self.platform.as_mut(), unix_millis(SystemTime::now()));
     }
 
     pub(crate) fn request_first_run_action(
@@ -395,7 +397,7 @@ impl RootView {
         let accepted = self.first_run.request(
             action,
             self.platform.as_mut(),
-            platform_submission_time_ms(),
+            unix_millis(SystemTime::now()),
         );
         cx.notify();
         accepted

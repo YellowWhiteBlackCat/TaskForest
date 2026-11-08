@@ -1,6 +1,6 @@
 // test-intent: behavior
 //! Behavior tests for the iced chart window/hover upgrades: the unified
-//! `WindowSlots` mapping (right-anchored capacity slots, GPUI `sample_x`
+//! `ChartSlots` mapping (right-anchored capacity slots, GPUI `sample_x`
 //! parity), the windowed NaN-gap projection, the two-series device graph's
 //! fingerprints/colors/readout, and the y-axis tick ladder. All pure-function
 //! contracts — no renderer involved.
@@ -12,9 +12,9 @@ use iced::{Color, Length, Point, Rectangle, Size, mouse};
 
 use super::*;
 use crate::perf_chart::{
-    ChartOpts, WindowSlots, hovered_index, sample_x, scaled_y, series_point_runs_windowed,
-    y_axis_tick_values,
+    ChartOpts, hovered_index, sample_x, scaled_y, series_point_runs_windowed, y_axis_tick_values,
 };
+use taskmanager_shell::presentation::ChartSlots;
 use taskmanager_theme::Theme;
 
 const SIZE: Size = Size::new(100.0, 50.0);
@@ -27,7 +27,7 @@ const SIZE: Size = Size::new(100.0, 50.0);
 fn window_slots_pin_the_newest_sample_right_and_grow_leftward() {
     // Two samples of a five-slot window: the newest sits at the right edge,
     // the older one exactly one slot (width / 4) to its left.
-    let slots = WindowSlots::new(2, 5, 100.0);
+    let slots = ChartSlots::new(2, 5, 100.0);
     assert!((slots.x(1) - 100.0).abs() < 1e-4, "newest pinned right");
     assert!(
         (slots.x(0) - 75.0).abs() < 1e-4,
@@ -35,12 +35,12 @@ fn window_slots_pin_the_newest_sample_right_and_grow_leftward() {
         slots.x(0)
     );
     // Once the window fills, the mapping becomes the usual full-span spread.
-    let full = WindowSlots::new(5, 5, 100.0);
+    let full = ChartSlots::new(5, 5, 100.0);
     for index in 0..5 {
         assert!((full.x(index) - 100.0 * index as f32 / 4.0).abs() < 1e-4);
     }
     // A capacity below the sample count degrades safely to the full spread.
-    assert!((WindowSlots::new(6, 2, 100.0).x(5) - 100.0).abs() < 1e-4);
+    assert!((ChartSlots::new(6, 2, 100.0).x(5) - 100.0).abs() < 1e-4);
 }
 
 /// The full-window (`spread`) form IS the legacy projection: every existing
@@ -49,7 +49,7 @@ fn window_slots_pin_the_newest_sample_right_and_grow_leftward() {
 #[test]
 fn window_slots_spread_matches_the_legacy_projection() {
     for count in 2..8_usize {
-        let slots = WindowSlots::spread(count, 200.0);
+        let slots = ChartSlots::spread(count, 200.0);
         for index in 0..count {
             assert!(
                 (slots.x(index) - sample_x(index, count, 200.0)).abs() < 1e-4,
@@ -74,7 +74,7 @@ fn window_slots_spread_matches_the_legacy_projection() {
 #[test]
 fn window_slots_index_at_round_trips_every_slot() {
     for (count, capacity) in [(3_usize, 10_usize), (7, 7), (10, 10), (4, 64)] {
-        let slots = WindowSlots::new(count, capacity, 240.0);
+        let slots = ChartSlots::new(count, capacity, 240.0);
         for index in 0..count {
             let x = slots.x(index);
             let probe = if x >= 240.0 { 240.0 - 1e-3 } else { x };
@@ -87,20 +87,34 @@ fn window_slots_index_at_round_trips_every_slot() {
     }
 }
 
-/// Degenerate frames and windows resolve no hover: outside the frame, a
-/// non-positive or non-finite width, and fewer than two samples (nothing to
-/// plot or hover — the honest too-few-samples state).
+/// Degenerate frames resolve no hover: before the frame, a non-positive or
+/// non-finite width, a non-finite cursor, and an empty window. Inside the
+/// frame the cursor clamps into the grid, so the right edge is the newest
+/// slot and a one-sample window keeps that sample hoverable at the right edge
+/// — the answers the GPUI release surface has always given.
 #[test]
-fn window_slots_reject_degenerate_frames_and_windows() {
-    let slots = WindowSlots::new(4, 8, 200.0);
+fn window_slots_reject_degenerate_frames_and_clamp_inside_the_frame() {
+    let slots = ChartSlots::new(4, 8, 200.0);
     assert_eq!(slots.index_at(-0.5), None);
-    assert_eq!(slots.index_at(200.0), None);
     assert_eq!(slots.index_at(f32::NAN), None);
-    assert_eq!(WindowSlots::new(4, 8, 0.0).index_at(50.0), None);
-    assert_eq!(WindowSlots::new(4, 8, f32::NAN).index_at(50.0), None);
-    assert_eq!(WindowSlots::new(0, 8, 200.0).index_at(50.0), None);
-    assert_eq!(WindowSlots::new(1, 8, 200.0).index_at(50.0), None);
-    assert_eq!(WindowSlots::spread(1, 200.0).x(0), 0.0);
+    assert_eq!(ChartSlots::new(4, 8, 0.0).index_at(50.0), None);
+    assert_eq!(ChartSlots::new(4, 8, f32::NAN).index_at(50.0), None);
+    assert_eq!(ChartSlots::new(0, 8, 200.0).index_at(50.0), None);
+    assert_eq!(
+        slots.index_at(200.0),
+        Some(3),
+        "the right edge is the newest slot"
+    );
+    assert_eq!(
+        ChartSlots::new(1, 8, 200.0).index_at(50.0),
+        Some(0),
+        "a one-sample window keeps its sample hoverable"
+    );
+    assert_eq!(
+        ChartSlots::spread(1, 200.0).x(0),
+        200.0,
+        "the lone sample owns the right edge"
+    );
 }
 
 /// The windowed projection splits NaN gaps into separate runs and every
@@ -108,7 +122,7 @@ fn window_slots_reject_degenerate_frames_and_windows() {
 /// and never a shift that would reconnect the runs.
 #[test]
 fn windowed_runs_split_gaps_and_keep_slot_positions() {
-    let slots = WindowSlots::spread(4, SIZE.width);
+    let slots = ChartSlots::spread(4, SIZE.width);
     let runs = series_point_runs_windowed(&[10.0, 20.0, f32::NAN, 40.0], SIZE, 50.0, &slots);
     assert_eq!(runs.len(), 2, "the gap splits the window");
     assert_eq!(runs[0].len(), 2);
@@ -127,7 +141,7 @@ fn windowed_runs_split_gaps_and_keep_slot_positions() {
 /// share the one mapping.
 #[test]
 fn windowed_runs_use_the_right_anchor_for_partial_windows() {
-    let slots = WindowSlots::new(2, 5, SIZE.width);
+    let slots = ChartSlots::new(2, 5, SIZE.width);
     let runs = series_point_runs_windowed(&[10.0, 40.0], SIZE, 50.0, &slots);
     assert_eq!(runs.len(), 1);
     assert!((runs[0][0].x - 75.0).abs() < 1e-4);
@@ -139,7 +153,7 @@ fn windowed_runs_use_the_right_anchor_for_partial_windows() {
 #[test]
 fn scaled_y_matches_the_run_projection() {
     for (value, max) in [(0.0_f32, 50.0), (25.0, 50.0), (50.0, 50.0), (120.0, 50.0)] {
-        let runs = series_point_runs_windowed(&[value], SIZE, max, &WindowSlots::spread(2, 100.0));
+        let runs = series_point_runs_windowed(&[value], SIZE, max, &ChartSlots::spread(2, 100.0));
         assert_eq!(runs[0][0].y, scaled_y(value, max, SIZE.height));
     }
     // An idle/non-finite ceiling anchors at the baseline — never a fabricated

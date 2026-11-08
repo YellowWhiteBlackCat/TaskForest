@@ -28,28 +28,15 @@ use bevy::ecs::system::{NonSend, Res, ResMut};
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunUiState;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::diagnostics::{
     diagnostic_failure_message, diagnostic_redaction_summary,
 };
 use taskmanager_shell::presentation::system_information::copy_all_text;
-use taskmanager_ui_contract::{
-    ModalInput, ProcessRowInput, SemanticSnapshot, SemanticSnapshotBuilder, SemanticSnapshotError,
-};
+use taskmanager_shell::{ShellApp, base_semantic_snapshot_builder};
+use taskmanager_ui_contract::{ModalInput, SemanticSnapshot, SemanticSnapshotError};
 
 use crate::app::FrontendTrack;
 use crate::confirmation::PendingConfirmationView;
-use taskforest_core::core::process::ProcessLiveKey;
-use taskmanager_application::process_sort::ProcessSortAxis;
-use taskmanager_application::process_sort::compare_processes;
-use taskmanager_shell::ProcessRowId;
-use taskmanager_shell::process_semantic_key;
-use taskmanager_ui_contract::GraphSummary;
-
-/// Upper bound on rows in one semantic snapshot. Assistive technology reads
-/// the same visible-window discipline the renderer uses; a five-figure
-/// process list must never allocate an unbounded semantic tree.
-pub(crate) const MAX_SNAPSHOT_ROWS: usize = 64;
 
 /// The current snapshot plus the revision key it was built from.
 #[derive(Resource, Default)]
@@ -75,79 +62,7 @@ pub(crate) fn build_snapshot(
     surface: Option<&WindowSurface>,
     setup: Option<&FirstRunUiState>,
 ) -> Result<SemanticSnapshot, SemanticSnapshotError> {
-    let revision = shell.projection().process_revision;
-    let mut builder = SemanticSnapshotBuilder::new(revision).application_name("TaskForestB");
-
-    if let Some(cpu_current) = shell
-        .projection()
-        .snapshot
-        .as_ref()
-        .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-        .filter(|value| value.is_finite())
-    {
-        let current = f64::from(cpu_current.clamp(0.0, 100.0));
-        builder = builder.cpu_graph(GraphSummary {
-            current,
-            peak: current,
-            maximum: 100.0,
-        });
-    }
-
-    let memory_total = shell
-        .projection()
-        .snapshot
-        .as_ref()
-        .and_then(|snapshot| snapshot.memory.current_total_bytes());
-    let mut rows_vec = shell.visible_processes();
-    rows_vec.sort_by(|left, right| compare_processes(left, right, ProcessSortAxis::Cpu, false));
-
-    let rows: Vec<ProcessRowInput> = rows_vec
-        .into_iter()
-        .take(MAX_SNAPSHOT_ROWS)
-        .enumerate()
-        .map(|(index, process)| {
-            let name = if process.name.trim().is_empty() {
-                String::from("Unnamed process")
-            } else {
-                process.name.clone()
-            };
-            let memory_percent = memory_total.and_then(|total| {
-                if total == 0 {
-                    return None;
-                }
-                process
-                    .current_memory_bytes()
-                    .map(|bytes| (bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0))
-            });
-            let selected = match shell.selected_row {
-                Some(ProcessRowId::Process(identity)) => ProcessLiveKey::from_process(process)
-                    .is_some_and(|row_identity| row_identity == identity),
-                Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) => false,
-                None => index == shell.selected,
-            } || shell.is_process_selected(process);
-            ProcessRowInput {
-                id: process_semantic_key(process),
-                name,
-                cpu_percent: process
-                    .current_cpu_percentage()
-                    .filter(|value| value.is_finite())
-                    .map(|v| f64::from(v.clamp(0.0, 100.0))),
-                memory_percent,
-                selected,
-            }
-        })
-        .collect();
-    if !rows.is_empty() {
-        builder = builder.process_rows(rows);
-    }
-
-    let feedback = shell.feedback_text();
-    let status = if feedback.trim().is_empty() {
-        format!("{} processes", shell.visible_process_count())
-    } else {
-        feedback.to_owned()
-    };
-    builder = builder.status_announcement(status);
+    let mut builder = base_semantic_snapshot_builder(shell, "TaskForestB");
 
     if let Some(WindowSurface::Diagnostic(state)) = surface {
         let description = match state {
@@ -246,7 +161,7 @@ fn sync_semantic_snapshot(
     }
     state.snapshot = match build_snapshot(
         shell,
-        surface.as_ref().and_then(|surface| surface.0.as_ref()),
+        surface.as_ref().and_then(|surface| surface.active()),
         setup.as_ref().map(|setup| setup.0.view()),
     ) {
         Ok(snapshot) => Some(snapshot),

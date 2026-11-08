@@ -25,6 +25,7 @@ use bevy::picking::events::{PointerDrag, PointerDragEnd, PointerPress, PointerRe
 use bevy::scene::{Scene, bsn, on};
 use bevy::ui::prelude::{Node, PositionType, px};
 use bevy::window::SystemCursorIcon;
+use taskmanager_ui_contract::columns;
 use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::palette::space_8;
@@ -57,15 +58,6 @@ pub(crate) struct ColumnResizeSession {
     pub(crate) column: Option<&'static str>,
     pub(crate) start_width: f32,
     pub(crate) anchor_x: Option<f32>,
-}
-
-/// The anchored drag measurement (the shared reference semantics): the first
-/// sample anchors the session, later samples are measured from that fixed
-/// point. Pure, so the policy is testable without a world.
-#[must_use]
-pub(crate) fn width_from_drag(start_width: f32, anchor_x: &mut Option<f32>, cursor_x: f32) -> f32 {
-    let anchor = *anchor_x.get_or_insert(cursor_x);
-    start_width + (cursor_x - anchor)
 }
 
 /// The contract default width of one column, clamped to the supported range.
@@ -184,7 +176,7 @@ pub(crate) fn on_resize_handle_dragged(
         return;
     };
     let mut anchor = session.anchor_x;
-    let width = clamp_column_width(width_from_drag(
+    let width = clamp_column_width(columns::width_from_drag(
         session.start_width,
         &mut anchor,
         drag.pointer.position.x,

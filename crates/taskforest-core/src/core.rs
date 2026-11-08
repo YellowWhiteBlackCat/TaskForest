@@ -20,6 +20,7 @@ pub mod identity;
 pub mod kernel_log;
 pub mod metrics;
 pub mod npu;
+pub mod percent;
 pub mod power;
 pub mod process;
 pub mod process_batch_history;
@@ -197,9 +198,10 @@ pub use time::{
 };
 pub use tray::{
     MAX_TRAY_ICON_DIMENSION, MAX_TRAY_LABEL_CHARS, MAX_TRAY_MENU_DEPTH, MAX_TRAY_MENU_NODES,
-    MAX_TRAY_TITLE_CHARS, MAX_TRAY_TOOLTIP_CHARS, TrayActionId, TrayEvent, TrayIconData,
-    TrayIconError, TrayMenuItem, TrayMenuItemKind, TrayMenuSpec, TrayMenuSpecError, TraySpec,
-    TraySpecError,
+    MAX_TRAY_TITLE_CHARS, MAX_TRAY_TOOLTIP_CHARS, TRAY_ACTION_PAUSE, TRAY_ACTION_QUIT,
+    TRAY_ACTION_SHOW, TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayIntent,
+    TrayMenuItem, TrayMenuItemKind, TrayMenuSpec, TrayMenuSpecError, TraySpec, TraySpecError,
+    resolve_tray_action,
 };
 pub use units::{
     QuantityFamily, UnitPreferences, format_byte_rate, format_memory, format_quantity,

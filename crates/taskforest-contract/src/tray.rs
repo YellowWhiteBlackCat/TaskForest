@@ -37,3 +37,45 @@ pub trait TrayController: Send + Sync {
     /// Update the checked state of a checkmark or radio item.
     fn set_item_checked(&self, id: TrayActionId, checked: bool) -> Result<(), TrayFailure>;
 }
+
+/// Target that can provide an optional reference to a [`TrayController`].
+pub trait TrayControllerTarget {
+    fn controller(&self) -> Option<&dyn TrayController>;
+}
+
+impl TrayControllerTarget for dyn TrayController {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        Some(self)
+    }
+}
+
+impl TrayControllerTarget for Box<dyn TrayController> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        Some(&**self)
+    }
+}
+
+impl TrayControllerTarget for Option<Box<dyn TrayController>> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        self.as_deref()
+    }
+}
+
+impl TrayControllerTarget for Option<&dyn TrayController> {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        *self
+    }
+}
+
+impl<T: TrayControllerTarget + ?Sized> TrayControllerTarget for &T {
+    fn controller(&self) -> Option<&dyn TrayController> {
+        (*self).controller()
+    }
+}
+
+/// Update the pause checkmark state on a tray controller target.
+pub fn sync_tray_pause_checkmark<T: TrayControllerTarget + ?Sized>(target: &T, paused: bool) {
+    if let Some(controller) = target.controller() {
+        let _ = controller.set_item_checked(taskforest_core::tray::TRAY_ACTION_PAUSE, paused);
+    }
+}

@@ -7,7 +7,8 @@ use std::sync::{
     atomic::{AtomicU8, AtomicU64, Ordering},
 };
 use std::thread::JoinHandle;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
+use taskforest_core::core::time::unix_millis;
 
 use crossbeam_channel::{Receiver, Sender, bounded, select, tick};
 use taskforest_core::{HistoricalSample, HistoryRecordSink, HistorySeriesKey};
@@ -453,7 +454,7 @@ fn record_backend(
             health.record_failure = Some(HistoryPersistenceFailure {
                 operation: HistoryPersistenceOperation::Record,
                 kind: HistoryPersistenceFailureKind::Backpressure,
-                observed_at_ms: unix_now_ms(),
+                observed_at_ms: unix_millis(SystemTime::now()),
                 detail: Arc::from("history store dropped older pending samples under backpressure"),
             });
         }
@@ -465,7 +466,7 @@ fn record_backend(
             health.record_failure = Some(HistoryPersistenceFailure {
                 operation: HistoryPersistenceOperation::Record,
                 kind: HistoryPersistenceFailureKind::ResourceLimit,
-                observed_at_ms: unix_now_ms(),
+                observed_at_ms: unix_millis(SystemTime::now()),
                 detail: bounded_failure_detail(&detail),
             });
         }
@@ -476,7 +477,7 @@ fn flush_backend(
     backend: &mut dyn HistoryPersistenceBackend,
     health: &Mutex<HistoryPersistenceHealth>,
 ) {
-    let now_ms = unix_now_ms();
+    let now_ms = unix_millis(SystemTime::now());
     let outcome = backend.flush(now_ms);
     let mut health = health
         .lock()
@@ -507,15 +508,6 @@ fn map_start_error(error: HistoryStoreError) -> HistoryPersistenceStartError {
         },
         detail: bounded_failure_detail(error.detail()),
     }
-}
-
-fn unix_now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_millis()
-        .try_into()
-        .unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

@@ -22,6 +22,17 @@
 - `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral
   projections, including the product-first GPU display identity that keeps
   hardware names separate from driver names.
+- `src/presentation/percent.rs` owns the absence-aware percent readouts: an
+  unobserved or non-finite measurement renders the shared dash, never a
+  fabricated zero. The spellings themselves live in the shared floor
+  (`taskforest_core::core::percent`), so the four frontends, the export, the
+  accessibility snapshot and the desktop notification cannot disagree.
+- `src/presentation/chart_slots.rs` owns the sample-window → pixel-slot grid
+  every chart draws and hovers through: the newest sample pins to the right
+  edge, each sample owns one fixed slot, and the drawn x and the hover
+  resolution divide by the same denominator, so the crosshair can never point
+  beside the value it reports. GPUI, Iced and Bevy all bind it; a surface may
+  not declare its own grid (quick stage `chart-slot-owner`).
 - `src/presentation/privilege_center.rs` folds helper capability/request states
   once for all four renderers. Authorization is offered only when the catalog
   exposes a usable request seam; GPU actions retain the observed device

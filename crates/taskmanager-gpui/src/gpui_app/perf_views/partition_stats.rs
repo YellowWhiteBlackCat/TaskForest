@@ -24,6 +24,7 @@ use taskmanager_ui::primitives::tooltip::{Tooltip, TooltipHost};
 
 mod stats;
 use stats::{PartitionUsage, partition_usage};
+use taskforest_core::core::percent::percent_text;
 use taskmanager_theme::tokens;
 
 /// The Performance main viewport never scrolls. Keep the partition detail
@@ -134,11 +135,11 @@ fn partition_row(
             let percent = ratio * 100.0;
             (
                 format!(
-                    "{}  ·  {} {}  ·  {:.0}%",
+                    "{}  ·  {} {}  ·  {}",
                     units.format_quantity_pair(used, total, QuantityFamily::Drive, false),
                     units.format_quantity(free, QuantityFamily::Drive, false),
                     i18n::t("disk.free"),
-                    percent
+                    percent_text(percent)
                 ),
                 Some(ratio as f32),
             )

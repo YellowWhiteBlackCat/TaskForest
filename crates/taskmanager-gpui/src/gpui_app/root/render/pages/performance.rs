@@ -168,9 +168,7 @@ impl RootView {
                                 .projection()
                                 .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
                             engine_device_id,
-                            chart_layout: perf_views::GpuChartLayout::for_chart_inventory(
-                                performance_layout.chart_inventory,
-                            ),
+                            chart_inventory: performance_layout.chart_inventory,
                             performance,
                             budget: performance_layout,
                             graph_cache: graph_cache.clone(),

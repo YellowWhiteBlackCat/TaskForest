@@ -107,3 +107,26 @@ fn the_resize_policy_clamps_and_steps_in_the_callers_unit() {
         "an inverted bound pair still yields a legal width"
     );
 }
+
+#[test]
+fn the_drag_anchor_is_geometry_and_never_moves_before_the_drag_starts() {
+    let mut anchor = None;
+    assert_eq!(width_from_drag(120.0, &mut anchor, 300.0), 120.0);
+    assert_eq!(
+        anchor,
+        Some(300.0),
+        "the first cursor position is the anchor"
+    );
+    assert_eq!(width_from_drag(120.0, &mut anchor, 325.0), 145.0);
+    assert_eq!(width_from_drag(120.0, &mut anchor, 280.0), 100.0);
+    assert_eq!(
+        anchor,
+        Some(300.0),
+        "the anchor stays put for the whole drag"
+    );
+
+    // A new drag re-anchors; the policy clamp is a separate decision.
+    let mut next = None;
+    assert_eq!(width_from_drag(145.0, &mut next, 10.0), 145.0);
+    assert_eq!(ColumnResizePolicy::PROCESS.drag(145.0, 25.0), 170.0);
+}

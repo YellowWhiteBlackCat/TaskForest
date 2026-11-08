@@ -1,21 +1,19 @@
 //! Typed non-blocking persistent-history resources owned by one GPUI root.
+//!
+//! The session lifecycle (connect handshake, session state, writer/replay
+//! capabilities) is owned by [`taskmanager_app_host::HistoryFrontendRuntime`].
+//! This module only manages GPUI-specific presentation state (the replay toggle
+//! and performance presentation).
 
 use crate::gpui_app::perf_views::history_replay::HistoryReplayState;
 use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_app_host::{
-    HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
-    HistoryFrontendSession, HistoryReplayClient,
+    HistoryFrontendConnectOutcome, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
+    HistoryFrontendRuntime, HistoryReplayClient,
 };
 use taskmanager_application::ApplicationHistoryCapability;
 use taskmanager_application::ApplicationHistoryUnavailableReason;
 use taskmanager_application::HistoryReplayRequest;
-
-enum HistoryRuntimeResources {
-    Disabled,
-    Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(ApplicationHistoryUnavailableReason),
-    Active(HistoryFrontendSession),
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum PerformanceHistoryPresentation {
@@ -25,9 +23,7 @@ pub(super) enum PerformanceHistoryPresentation {
 }
 
 pub(in crate::gpui_app) struct HistoryRuntimeState {
-    requested: bool,
-    connector: Option<HistoryFrontendConnector>,
-    resources: HistoryRuntimeResources,
+    runtime: HistoryFrontendRuntime,
     replay: HistoryReplayState,
     performance_presentation: PerformanceHistoryPresentation,
 }
@@ -35,9 +31,7 @@ pub(in crate::gpui_app) struct HistoryRuntimeState {
 impl Default for HistoryRuntimeState {
     fn default() -> Self {
         Self {
-            requested: false,
-            connector: None,
-            resources: HistoryRuntimeResources::Disabled,
+            runtime: HistoryFrontendRuntime::default(),
             replay: HistoryReplayState::new(),
             performance_presentation: PerformanceHistoryPresentation::Live,
         }
@@ -46,77 +40,40 @@ impl Default for HistoryRuntimeState {
 
 impl HistoryRuntimeState {
     pub(in crate::gpui_app) const fn enabled_next_start(&self) -> bool {
-        self.requested
+        self.runtime.requested()
     }
 
     pub(in crate::gpui_app) fn install_connector(
         &mut self,
         connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     ) {
-        match connector {
-            Ok(connector) => {
-                self.connector = Some(connector);
-                self.request(self.requested);
-            }
-            Err(error) if self.requested => {
-                self.resources = HistoryRuntimeResources::Unavailable(error.into())
-            }
-            Err(_) => self.resources = HistoryRuntimeResources::Disabled,
-        }
+        self.runtime.install_connector(connector);
     }
 
     pub(in crate::gpui_app) fn request(&mut self, enabled: bool) {
-        self.requested = enabled;
+        self.runtime.request(enabled);
         if !enabled {
-            self.resources = HistoryRuntimeResources::Disabled;
             self.replay.close();
             self.performance_presentation = PerformanceHistoryPresentation::Live;
-            return;
         }
-        let Some(connector) = self.connector.as_mut() else {
-            self.resources = HistoryRuntimeResources::Unavailable(
-                ApplicationHistoryUnavailableReason::ConnectorStopped,
-            );
-            return;
-        };
-        self.resources = match connector.try_connect() {
-            Ok(request) => HistoryRuntimeResources::Connecting(request),
-            Err(error) => HistoryRuntimeResources::Unavailable(error.into()),
-        };
     }
 
     pub(in crate::gpui_app) fn drain_connector(&mut self) -> bool {
-        let mut changed = false;
-        if let Some(connector) = self.connector.as_mut() {
-            for completion in connector.drain() {
-                let HistoryRuntimeResources::Connecting(current) = self.resources else {
-                    continue;
-                };
-                if completion.request != current || !self.requested {
-                    continue;
-                }
-                self.resources = match completion.result {
-                    Ok(session) => HistoryRuntimeResources::Active(session),
-                    Err(error) => {
-                        tracing::warn!(
-                            kind = ?error.kind(),
-                            detail = error.detail(),
-                            "continuous history connection failed"
-                        );
-                        HistoryRuntimeResources::Unavailable(error.kind().into())
-                    }
-                };
-                if self.replay_available() && !self.replay.is_open() {
+        match self.runtime.drain_connector() {
+            HistoryFrontendConnectOutcome::Activated => {
+                if !self.replay.is_open() {
                     let request = self.replay.open();
                     self.submit_replay(request);
-                } else if !self.replay_available() {
-                    self.replay.close();
-                    self.performance_presentation = PerformanceHistoryPresentation::Live;
                 }
-                changed = true;
+                true
             }
+            HistoryFrontendConnectOutcome::Failed(_) => {
+                self.replay.close();
+                self.performance_presentation = PerformanceHistoryPresentation::Live;
+                true
+            }
+            HistoryFrontendConnectOutcome::Idle => false,
         }
-        changed
     }
 
     pub(in crate::gpui_app) const fn replay(&self) -> &HistoryReplayState {
@@ -128,7 +85,7 @@ impl HistoryRuntimeState {
     }
 
     pub(in crate::gpui_app) fn replay_available(&self) -> bool {
-        matches!(&self.resources, HistoryRuntimeResources::Active(_))
+        self.runtime.is_active()
     }
 
     pub(in crate::gpui_app) const fn performance_replay_visible(&self) -> bool {
@@ -145,46 +102,24 @@ impl HistoryRuntimeState {
         };
     }
 
-    pub(in crate::gpui_app) const fn unavailable_reason(
+    pub(in crate::gpui_app) fn unavailable_reason(
         &self,
     ) -> Option<ApplicationHistoryUnavailableReason> {
-        match self.resources {
-            HistoryRuntimeResources::Unavailable(reason) => Some(reason),
-            HistoryRuntimeResources::Disabled
-            | HistoryRuntimeResources::Connecting(_)
-            | HistoryRuntimeResources::Active(_) => None,
-        }
+        self.runtime.unavailable_reason()
     }
 
-    pub(in crate::gpui_app) const fn application_history_capability(
+    pub(in crate::gpui_app) fn application_history_capability(
         &self,
     ) -> ApplicationHistoryCapability {
-        match self.resources {
-            HistoryRuntimeResources::Disabled => ApplicationHistoryCapability::Disabled,
-            HistoryRuntimeResources::Connecting(_) => ApplicationHistoryCapability::Connecting,
-            HistoryRuntimeResources::Unavailable(reason) => {
-                ApplicationHistoryCapability::Unavailable(reason)
-            }
-            HistoryRuntimeResources::Active(_) => ApplicationHistoryCapability::Available,
-        }
+        self.runtime.capability()
     }
 
     pub(in crate::gpui_app) fn replay_client_mut(&mut self) -> Option<&mut HistoryReplayClient> {
-        if let HistoryRuntimeResources::Active(session) = &mut self.resources {
-            return Some(&mut session.replay);
-        }
-        None
+        self.runtime.replay_client_mut()
     }
 
     pub(in crate::gpui_app) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
-        match &self.resources {
-            HistoryRuntimeResources::Active(session) => {
-                Some(session.persistence.record_sink.clone())
-            }
-            HistoryRuntimeResources::Disabled
-            | HistoryRuntimeResources::Connecting(_)
-            | HistoryRuntimeResources::Unavailable(_) => None,
-        }
+        self.runtime.record_sink()
     }
 
     fn submit_replay(&mut self, request: Option<HistoryReplayRequest>) {

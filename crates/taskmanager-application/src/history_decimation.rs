@@ -48,6 +48,8 @@
 
 #![forbid(unsafe_code)]
 
+use zhuge_ui_core::downsample::{self, Point};
+
 /// Largest-triangle-three-buckets downsampling of one finite run.
 ///
 /// Returns strictly increasing POSITIONS into `run` (not original sample
@@ -77,55 +79,8 @@ pub fn lttb_indices(run: &[(usize, f32)], budget: usize) -> Vec<usize> {
     if budget < 3 || budget >= len {
         return (0..len).collect();
     }
-    let mut selected = Vec::with_capacity(budget);
-    selected.push(0);
-    let bucket = (len - 2) as f64 / (budget - 2) as f64;
-    let mut previous = 0usize;
-    for step in 0..budget - 2 {
-        let next_start = ((step + 1) as f64 * bucket).floor() as usize + 1;
-        let next_end = (((step + 2) as f64 * bucket).floor() as usize + 1).min(len - 1);
-        let next_end = next_end.max(next_start + 1).min(len);
-        let (mut sum_x, mut sum_y, mut count) = (0.0f64, 0.0f64, 0usize);
-        for &(index, sample) in &run[next_start..next_end] {
-            sum_x += index as f64;
-            sum_y += sample as f64;
-            count += 1;
-        }
-        let (avg_x, avg_y) = if count == 0 {
-            // Unreachable with the clamped bucket bounds above (every next
-            // bucket has at least one sample); kept as a typed fallback so
-            // the kernel has no panic path on any input.
-            (
-                run[(next_start + 1).min(len - 1)].0 as f64,
-                run[(next_start + 1).min(len - 1)].1 as f64,
-            )
-        } else {
-            (sum_x / count as f64, sum_y / count as f64)
-        };
-        let current_start = (step as f64 * bucket).floor() as usize + 1;
-        let current_end = (((step + 1) as f64 * bucket).floor() as usize + 1).min(len - 1);
-        let (px, py) = (run[previous].0 as f64, run[previous].1 as f64);
-        let mut best = current_start.min(len - 1);
-        let mut best_area = f64::MIN;
-        let candidates = run
-            .iter()
-            .enumerate()
-            .take(current_end.max(current_start + 1))
-            .skip(current_start);
-        for (position, &(x, y)) in candidates {
-            let (x, y) = (x as f64, y as f64);
-            // Cross-product triangle area (constant factor dropped).
-            let area = ((px - avg_x) * (y - py) - (px - x) * (avg_y - py)).abs();
-            if area > best_area {
-                best_area = area;
-                best = position;
-            }
-        }
-        selected.push(best);
-        previous = best;
-    }
-    selected.push(len - 1);
-    selected
+    let points: Vec<Point> = run.iter().copied().map(Into::into).collect();
+    downsample::lttb_indices(&points, budget)
 }
 
 /// Decimate a gapped series with LTTB while retaining every finite run as a

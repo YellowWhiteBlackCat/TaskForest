@@ -2,6 +2,11 @@
 //! (own implementation; state entity is the single source of truth).
 
 use std::rc::Rc;
+use zhuge_ui_core::easing::lerp;
+use zhuge_ui_core::value::interval_fraction;
+
+// A range that cannot travel leaves the thumb at the start of the axis.
+const FLAT_THUMB_AT_START: f32 = 0.0;
 
 use crate::OptCallback1;
 use gpui::{
@@ -138,8 +143,10 @@ impl RenderOnce for Slider {
             )
         });
         let palette = self.palette;
-        let span = (max - min).max(1e-6);
-        let frac = ((value - min) / span).clamp(0.0, 1.0);
+        // A range that cannot travel leaves the thumb at the start of the axis.
+        let frac = interval_fraction(value, min, max, FLAT_THUMB_AT_START);
+        // Pointer→value rides the same owner mix as that projection, so a
+        // zero-travel range resolves to `min` on every path.
         let on_change = self.on_change.clone();
         let on_drag_end = self.on_drag_end.clone();
         let state = self.state.clone();
@@ -274,7 +281,7 @@ impl RenderOnce for Slider {
                     let new_value = state.update(cx, |state, cx| {
                         let value = bounds
                             .borrow()
-                            .map(|bounds| pointer_value(event.position, &bounds, min, span))
+                            .map(|bounds| pointer_value(event.position, &bounds, min, max))
                             .unwrap_or(min);
                         state.set_value(value, cx);
                         state.value()
@@ -295,7 +302,7 @@ impl RenderOnce for Slider {
                     let new_value = state.update(cx, |state, cx| {
                         let value = bounds
                             .borrow()
-                            .map(|bounds| pointer_value(event.position, &bounds, min, span))
+                            .map(|bounds| pointer_value(event.position, &bounds, min, max))
                             .unwrap_or(min);
                         state.set_value(value, cx);
                         state.value()
@@ -319,10 +326,10 @@ impl RenderOnce for Slider {
 }
 
 /// Pointer position -> value, clamped to the track bounds.
-fn pointer_value(pos: Point<Pixels>, bounds: &Bounds<Pixels>, min: f32, span: f32) -> f32 {
+fn pointer_value(pos: Point<Pixels>, bounds: &Bounds<Pixels>, min: f32, max: f32) -> f32 {
     let w = f32::from(bounds.size.width).max(1.0);
     let rel = ((f32::from(pos.x) - f32::from(bounds.origin.x)) / w).clamp(0.0, 1.0);
-    min + span * rel
+    lerp(min, max, rel)
 }
 
 #[cfg(test)]

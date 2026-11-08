@@ -16,6 +16,7 @@ use super::raster::{
     y_axis_scale_ticks,
 };
 use super::*;
+use taskmanager_ui_contract::presentation::motion::CHART_SLIDE_DURATION;
 
 /// The render scales the alignment is proven at: the 1:1 grid, the app's own
 /// zoom (the 16/14 body scale), and the 125 % / 150 % desktop scales.
@@ -169,17 +170,17 @@ fn slide_projects_the_base_runs_at_the_interpolated_positions() {
 #[test]
 fn slide_progress_eases_in_and_out_over_the_shared_duration() {
     assert_eq!(slide_progress(Duration::ZERO), 0.0);
-    assert_eq!(slide_progress(super::motion::SLIDE_DURATION), 1.0);
-    assert_eq!(slide_progress(super::motion::SLIDE_DURATION * 2), 1.0);
-    let middle = slide_progress(super::motion::SLIDE_DURATION / 2);
+    assert_eq!(slide_progress(CHART_SLIDE_DURATION), 1.0);
+    assert_eq!(slide_progress(CHART_SLIDE_DURATION * 2), 1.0);
+    let middle = slide_progress(CHART_SLIDE_DURATION / 2);
     assert!(
         (0.0..1.0).contains(&middle),
         "the eased progress stays inside the transition: {middle}"
     );
     // The ramp is symmetric: the first and the second half take the same
     // time, so the curve neither lurches nor stalls at the midpoint.
-    let quarter = slide_progress(super::motion::SLIDE_DURATION / 4);
-    let three_quarters = slide_progress(super::motion::SLIDE_DURATION * 3 / 4);
+    let quarter = slide_progress(CHART_SLIDE_DURATION / 4);
+    let three_quarters = slide_progress(CHART_SLIDE_DURATION * 3 / 4);
     assert!(
         (quarter + three_quarters - 1.0).abs() < 1e-3,
         "the eased ramp is symmetric: {quarter} / {three_quarters}"

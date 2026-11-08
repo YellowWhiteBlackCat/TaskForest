@@ -181,6 +181,7 @@ fn the_shared_bands_are_stated_once_at_their_exact_values() {
     assert_eq!(PERFORMANCE_ULTRA_COMPACT_MAIN_MIN_WIDTH, 320.0);
     assert_eq!(PERFORMANCE_SLOT_GAP, 12.0);
     assert_eq!(PERFORMANCE_SIDEBAR_MAX_WIDTH, 460.0);
+    assert_eq!(PERFORMANCE_STATS_STACK_HEIGHT, 220.0);
     assert_eq!(PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);
     assert_eq!(BOTTOM_SAFETY_BAND, 8.0);
     assert_eq!(MIN_WINDOW_WIDTH, 720.0);

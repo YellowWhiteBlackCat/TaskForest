@@ -10,6 +10,7 @@
 //! never source text.
 
 use super::super::*;
+use taskmanager_application::ProcessDetailsSection;
 
 #[test]
 fn dedicated_process_selection_capture_keeps_the_selected_identity_in_the_main_table() {
@@ -36,8 +37,8 @@ use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 
+use crate::ProcessPropertiesTarget;
 use crate::process_view::ProcessRow;
-use crate::{ProcessDetailsSection, ProcessPropertiesTarget};
 use taskmanager_application::{InteractionEvent, PendingConfirmation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, fixture_start_token};

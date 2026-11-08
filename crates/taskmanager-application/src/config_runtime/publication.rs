@@ -93,6 +93,33 @@ impl ConfigRecovery {
         }
     }
 
+    /// Produce a diagnostic recovery message formatted with a caller's prefix.
+    #[must_use]
+    pub fn message_with_prefix(self, prefix: &str) -> String {
+        format!(
+            "{prefix}: source={:?}, primary={}, backup={}",
+            self.source,
+            self.primary_error
+                .map_or("none", ConfigStoreErrorKind::stable_code),
+            self.backup_error
+                .map_or("none", ConfigStoreErrorKind::stable_code),
+        )
+    }
+
+    /// Format the initial recovery notice copy if a non-silent notice is warranted.
+    #[must_use]
+    pub fn initial_message(self) -> Option<String> {
+        match self.initial_notice() {
+            ConfigRecoveryNotice::None => None,
+            ConfigRecoveryNotice::Recovered => {
+                Some(self.message_with_prefix(crate::i18n::t("settings.config_recovered")))
+            }
+            ConfigRecoveryNotice::Failed => {
+                Some(self.message_with_prefix(crate::i18n::t("settings.config_load_failed")))
+            }
+        }
+    }
+
     pub(super) const fn primary() -> Self {
         Self {
             source: ConfigLoadSource::Primary,

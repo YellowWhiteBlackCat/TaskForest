@@ -7,8 +7,10 @@ use crate::gpui_app::system_health_view::{
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use std::time::SystemTime;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::system_health::SmartSelfTestIntent;
+use taskforest_core::core::time::unix_millis;
 use taskforest_core::core::{DeviceGeneration, SmartSelfTestReport};
 use taskmanager_application::i18n;
 use taskmanager_application::{
@@ -72,7 +74,7 @@ impl RootView {
                 platform
                     .submit_smart_control(
                         SmartControlRequest::StartSelfTest(intent.clone()),
-                        super::platform_submission_time_ms(),
+                        unix_millis(SystemTime::now()),
                     )
                     .map_err(super::process_control::submission_failure_kind)
             },

@@ -4,6 +4,7 @@ use super::super::surface::InteractionSnapshot;
 use super::super::{FocusTarget, IcedApp, IcedKey, InputScope, LocalSurface, Message};
 use super::dispatch::UpdateDispatch;
 use taskmanager_application::SurfaceKind;
+use taskmanager_ui_contract::InputModality;
 
 impl IcedApp {
     /// The selectable value that owns the window's one active text selection;
@@ -25,7 +26,7 @@ impl IcedApp {
                 UpdateDispatch::none()
             }
             Message::Key(IcedKey::Fixed(event)) => {
-                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.input.modality = InputModality::Keyboard;
                 self.configuration.set_focus_visible(true);
                 if let Some(copy) = self.copy_selected_row_summary(&event) {
                     UpdateDispatch::task(copy)
@@ -34,7 +35,7 @@ impl IcedApp {
                 }
             }
             Message::Key(IcedKey::Character(character, modifiers)) => {
-                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.input.modality = InputModality::Keyboard;
                 self.configuration.set_focus_visible(true);
                 let effect = match self.input_scope() {
                     InputScope::ServiceLog => {
@@ -72,12 +73,12 @@ impl IcedApp {
             Message::Key(IcedKey::Other) => {
                 // Bare modifiers and other unmapped keys are still keyboard
                 // input to the focus-visible tracker.
-                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.input.modality = InputModality::Keyboard;
                 self.configuration.set_focus_visible(true);
                 UpdateDispatch::none()
             }
             Message::PointerPressed => {
-                self.input.modality = crate::input_modality::InputModality::Pointer;
+                self.input.modality = InputModality::Pointer;
                 self.configuration.set_focus_visible(false);
                 UpdateDispatch::none()
             }
@@ -116,7 +117,7 @@ impl IcedApp {
     /// Return focus-visible state to the programmatic baseline after the
     /// window or its tracked target stops being a valid keyboard focus owner.
     pub(super) fn reset_focus_visible(&mut self) {
-        self.input.modality = crate::input_modality::InputModality::Programmatic;
+        self.input.modality = InputModality::Programmatic;
         self.configuration.set_focus_visible(false);
     }
 }

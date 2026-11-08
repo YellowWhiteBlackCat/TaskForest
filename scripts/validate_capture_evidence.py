@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from unittest.mock import patch
 
 MANIFEST_FIELDS = (
     "captured_at",
@@ -227,16 +228,40 @@ def validate_run_identity(metadata: dict[str, str], repo_root: Path, metadata_pa
         raise EvidenceError("metadata cgroup_path is outside cgroup v2")
 
 
-def validate_source_manifest(path: Path, root: Path) -> None:
+def validate_source_manifest(path: Path, root: Path, frontend: str = "gpui") -> None:
+    """Validate every manifest row against the declared frontend source scope.
+
+    A Cargo-declared path dependency may live outside the product repository.
+    Its file is accepted only when ``frontend_source_manifest::source_paths``
+    still names that exact resolved path for the current locked graph. This keeps
+    external provenance honest without allowing arbitrary sibling files.
+    """
+
+    allowed_external: set[Path] | None = None
+    seen: set[Path] = set()
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         digest, separator, relative = line.partition("  ")
         if not separator or len(digest) != 64 or not relative:
             raise EvidenceError(f"invalid source manifest line {number}")
+        if Path(relative).is_absolute():
+            raise EvidenceError(f"source path is not repository-relative: {relative}")
         source = (root / relative).resolve()
         try:
             source.relative_to(root.resolve())
-        except ValueError as error:
-            raise EvidenceError(f"source path escapes repository: {relative}") from error
+        except ValueError:
+            if allowed_external is None:
+                try:
+                    sys.path.insert(0, str(Path(__file__).resolve().parent))
+                    from frontend_source_manifest import source_paths
+
+                    allowed_external = {entry.resolve() for entry in source_paths(root, frontend)}
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as error:
+                    raise EvidenceError(f"cannot resolve allowed source scope: {error}") from error
+            if source not in allowed_external:
+                raise EvidenceError(f"source path is outside {frontend} production scope: {relative}")
+        if source in seen:
+            raise EvidenceError(f"duplicate source manifest path: {relative}")
+        seen.add(source)
         if not source.is_file() or file_sha256(source) != digest:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 
@@ -573,6 +598,55 @@ def require_surface_presentation(name: str, scenario: str, markers: str) -> None
 
 
 def self_test() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory).resolve()
+        sibling = root.parent / f"{root.name}-external"
+        sibling.mkdir()
+        allowed = sibling / "allowed.rs"
+        allowed.write_text("pub fn allowed() {}\n", encoding="utf-8")
+        forbidden = sibling / "forbidden.rs"
+        forbidden.write_text("pub fn forbidden() {}\n", encoding="utf-8")
+        manifest = root / "source-manifest.sha256"
+        with patch("frontend_source_manifest.source_paths", return_value=[allowed]):
+            manifest.write_text(
+                f"{file_sha256(allowed)}  ../{sibling.name}/allowed.rs\n",
+                encoding="utf-8",
+            )
+            validate_source_manifest(manifest, root, "gpui")
+            manifest.write_text(
+                f"{file_sha256(forbidden)}  ../{sibling.name}/forbidden.rs\n",
+                encoding="utf-8",
+            )
+            try:
+                validate_source_manifest(manifest, root, "gpui")
+            except EvidenceError as error:
+                if "outside gpui production scope" not in str(error):
+                    raise
+            else:
+                raise EvidenceError("external sibling source outside production scope was accepted")
+            manifest.write_text(
+                f"{file_sha256(allowed)}  {allowed}\n",
+                encoding="utf-8",
+            )
+            try:
+                validate_source_manifest(manifest, root, "gpui")
+            except EvidenceError as error:
+                if "not repository-relative" not in str(error):
+                    raise
+            else:
+                raise EvidenceError("absolute source manifest path was accepted")
+            manifest.write_text(
+                f"{file_sha256(allowed)}  ../{sibling.name}/allowed.rs\n"
+                f"{file_sha256(allowed)}  ../{sibling.name}/allowed.rs\n",
+                encoding="utf-8",
+            )
+            try:
+                validate_source_manifest(manifest, root, "gpui")
+            except EvidenceError as error:
+                if "duplicate source manifest path" not in str(error):
+                    raise
+            else:
+                raise EvidenceError("duplicate source manifest path was accepted")
     for scenario in ("system-about", "process-properties-performance", "process-memory-pss-swap", "process-network-details", "process-gpu-details", "process-resource-limits", "process-isolation", "active-alert", "alert-rules-manager", "service-details-logs", "smart-missing-tool", "smart-permission", "battery-live-performance", "settings-switch-focus", "settings-zero-gray", "sidebar-edit"):
         ready_only = f"CAPTURE_MARKER event=scenario_ready scenario={scenario}"
         for markers in (ready_only, ready_only + "\nCAPTURE_MARKER event=surface_presented scenario=about"):

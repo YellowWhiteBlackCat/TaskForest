@@ -6,9 +6,9 @@
 
 use taskforest_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
 
-use crate::gpui_app::formatting;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
+use taskmanager_shell::presentation::observed_percentage;
 
 /// Render-neutral rows for one discovered accelerator.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,7 +35,7 @@ impl NpuDeviceViewModel {
         let identity = (prefix.clone(), format!("{brand}{driver}"));
         let utilization = (
             qualified_label(&prefix, i18n::t("common.utilization")),
-            percentage(device.utilization_pct.current_value().copied()),
+            observed_percentage(device.utilization_pct.current_value().copied()),
         );
         let engines = device
             .engines
@@ -43,7 +43,7 @@ impl NpuDeviceViewModel {
             .map(|engine| {
                 (
                     qualified_label(&prefix, engine_label(engine.kind)),
-                    percentage(engine.utilization_pct.current_value().copied()),
+                    observed_percentage(engine.utilization_pct.current_value().copied()),
                 )
             })
             .collect();
@@ -106,19 +106,6 @@ fn qualified_label(device: &str, fact: &str) -> String {
     format!("{device} · {fact}")
 }
 
-fn percentage(value: Option<f32>) -> String {
-    value.map_or_else(formatting::missing_value, |value| {
-        format!("{:.0}%", value.round())
-    })
-}
-
 fn engine_label(kind: NpuEngineKind) -> &'static str {
-    match kind {
-        NpuEngineKind::Compute => i18n::t("npu.engine_compute"),
-        NpuEngineKind::Matrix => i18n::t("npu.engine_matrix"),
-        NpuEngineKind::Vector => i18n::t("npu.engine_vector"),
-        NpuEngineKind::Video => i18n::t("npu.engine_video"),
-        NpuEngineKind::Copy => i18n::t("npu.engine_copy"),
-        NpuEngineKind::Unknown => i18n::t("npu.engine_unknown"),
-    }
+    i18n::npu_engine_kind_label(kind)
 }

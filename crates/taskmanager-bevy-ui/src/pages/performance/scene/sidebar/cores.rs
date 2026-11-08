@@ -43,16 +43,14 @@ use taskforest_core::core::hardware::CpuType;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::load_tiers::{LoadTier, load_tier};
 
 /// The widest column count the per-core grid lays out.
 pub(crate) const CORE_GRID_MAX_COLUMNS: usize = 4;
 /// The compact column count the grid folds to when the measured row width
 /// cannot afford the wide grid at a readable cell width.
 pub(crate) const CORE_GRID_COMPACT_COLUMNS: usize = 2;
-/// The utilization band above which a core bar warns (amber ink).
-pub(crate) const CORE_BAR_WARN_PCT: f32 = 80.0;
-/// The utilization band above which a core bar alarms (red ink).
-pub(crate) const CORE_BAR_DANGER_PCT: f32 = 95.0;
 /// The seconds the collapse/expand height easing runs.
 pub(crate) const CORE_GRID_REVEAL_SECONDS: f32 = 0.18;
 
@@ -219,20 +217,23 @@ pub(crate) fn core_cell_width_percent(columns: usize) -> f32 {
 }
 
 /// The ink of one core bar: the accent while the core is calm, the warning
-/// ink above the warn band, the danger ink above the alarm band. An
+/// ink above the warn band, the danger ink above the alarm band. The band
+/// edges, their exclusive membership and the percent clamp come from the
+/// shared load-tier contract, where this shape's wider bar band carries its
+/// registered driver. Which ink each tier wears stays a Bevy palette fact. An
 /// unobserved core keeps the calm ink — a missing fact is never painted as
 /// a warning.
 pub(crate) fn core_bar_ink(usage_pct: Option<f32>, palette: &UiPalette) -> bevy::color::Color {
     let Some(pct) = usage_pct.filter(|value| value.is_finite()) else {
         return palette.accent;
     };
-    let pct = pct.clamp(0.0, 100.0);
-    if pct > CORE_BAR_DANGER_PCT {
-        palette.danger_color
-    } else if pct > CORE_BAR_WARN_PCT {
-        palette.warning_color
-    } else {
-        palette.accent
+    match load_tier(FrontendShape::Bevy, pct) {
+        Some(LoadTier::Alarm) => palette.danger_color,
+        Some(LoadTier::Warning) => palette.warning_color,
+        Some(LoadTier::Calm) => palette.accent,
+        // The finite filter above already covers absence; a reading the shared
+        // fold cannot place keeps the calm ink rather than inventing a band.
+        None => palette.accent,
     }
 }
 

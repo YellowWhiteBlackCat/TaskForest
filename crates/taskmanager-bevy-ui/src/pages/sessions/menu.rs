@@ -14,6 +14,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, ResMut};
 use taskforest_core::core::session::{SessionControlAction, SessionIdentity, SessionItem};
 use taskmanager_application::PlatformEffect;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 
 use taskmanager_shell::ShellApp;
@@ -37,11 +38,13 @@ impl ActionMenuContext for SessionMenuCtx {
             title: t("users.session_actions").to_owned(),
             items: vec![
                 MenuItem {
-                    label: t("users.disconnect").to_owned(),
+                    label: i18n::session_control_action_label(SessionControlAction::Disconnect)
+                        .to_owned(),
                     enabled: true,
                 },
                 MenuItem {
-                    label: t("users.lock").to_owned(),
+                    label: i18n::session_control_action_label(SessionControlAction::Lock)
+                        .to_owned(),
                     enabled: true,
                 },
             ],

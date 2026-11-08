@@ -1,6 +1,7 @@
 //! Markdown diagnostic report formatting.
 
 use super::DiagnosticBundle;
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 
 /// Generate a human-readable Markdown diagnostic report.
 #[must_use]
@@ -53,7 +54,7 @@ pub fn format_markdown_report(bundle: &DiagnosticBundle) -> String {
         out.push_str(&format!("- CPU Cores: {cores}\n"));
     }
     if let Some(pct) = bundle.system_overview.cpu_usage_pct {
-        out.push_str(&format!("- CPU Total Usage: {pct:.1}%\n"));
+        out.push_str(&format!("- CPU Total Usage: {}\n", percent_text(pct)));
     }
     if let Some(total) = bundle.system_overview.memory_total_bytes {
         let used_str = bundle
@@ -134,7 +135,7 @@ pub fn format_markdown_report(bundle: &DiagnosticBundle) -> String {
         for top in &bundle.process_summary.top_cpu {
             let cpu_str = top
                 .cpu_pct
-                .map_or_else(|| "—".to_owned(), |c| format!("{c:.1}%"));
+                .map_or_else(|| "—".to_owned(), precise_percent_text);
             let user_str = top.user.as_deref().unwrap_or("—");
             out.push_str(&format!(
                 "  - [{}] {} (user: {user_str}, cpu: {cpu_str})\n",

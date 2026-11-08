@@ -4,12 +4,13 @@ use iced::advanced::widget::Id;
 use iced::widget::operation::{AbsoluteOffset, scroll_to};
 use iced::widget::{column, row, text};
 use iced::{Element, Length, Task};
-use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n::t;
 
+use taskmanager_shell::presentation::system_information::display_summary;
 use taskmanager_shell::presentation::{duration, missing_value};
 use taskmanager_theme::tokens;
 
@@ -361,11 +362,7 @@ pub(crate) fn hardware_info_rows(
         hardware.init_system.as_deref(),
     );
     for display in &hardware.displays {
-        push_value(
-            &mut rows,
-            t("system.display"),
-            Some(display_summary(display)),
-        );
+        push_value(&mut rows, t("system.display"), display_summary(display));
     }
     push_text(&mut rows, t("common.cpu"), hardware.cpu_brand.as_deref());
     push_text(
@@ -500,47 +497,6 @@ pub(crate) fn hardware_info_rows(
         });
     }
     rows
-}
-
-fn display_summary(display: &DisplayInfo) -> String {
-    let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
-        .into_iter()
-        .flatten()
-        .filter(|value| !value.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut parts = vec![display.connector.clone()];
-    if !identity.is_empty() {
-        parts.push(identity);
-    }
-    if let (Some(width), Some(height)) = (display.width_px, display.height_px) {
-        parts.push(format!("{width}×{height}"));
-    }
-    if let Some(refresh) = display
-        .refresh_hz
-        .filter(|value| value.is_finite() && *value > 0.0)
-    {
-        parts.push(format!("{refresh:.1} Hz"));
-    }
-    if let Some(hdr) = display_hdr_capability(display) {
-        parts.push(hdr);
-    }
-    if let (Some(width), Some(height)) = (display.width_mm, display.height_mm) {
-        parts.push(format!("{width}×{height} mm"));
-    }
-    if let Some(serial) = display.serial.as_deref().filter(|value| !value.is_empty()) {
-        parts.push(format!("S/N {serial}"));
-    }
-    parts.join(" · ")
-}
-
-fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
-    let state = match display.hdr_supported {
-        Some(true) => t("system.hdr_supported"),
-        Some(false) => t("system.hdr_unsupported"),
-        None => return None,
-    };
-    Some(format!("{} {state}", t("system.hdr")))
 }
 
 pub(super) fn telemetry_rows(snapshot: &SystemSnapshot) -> Vec<SystemInfoRow> {

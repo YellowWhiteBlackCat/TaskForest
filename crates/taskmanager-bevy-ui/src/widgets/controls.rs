@@ -13,12 +13,13 @@ use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
-    JustifyContent, Node, Overflow, UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, FlexDirection, JustifyContent, Node,
+    Overflow, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use zhuge_ui_kit_bevy::control::{ButtonLayout, button_scene};
+use zhuge_ui_kit_bevy::surface::{self, StatRowLayout};
 
 use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
@@ -116,6 +117,11 @@ pub(crate) enum SurfaceTone {
 }
 
 /// A token-backed panel that accepts a dynamic scene list as its children.
+///
+/// The panel geometry — the padded, bordered, optionally shadowed column — is
+/// owned by `zhuge-ui-kit-bevy::surface::card_surface_scene`. This function
+/// keeps only the product's material policy: which tone a panel wears, which
+/// glass material fills it, and whether a grain overlay leads its children.
 pub(crate) fn surface_scene(
     tone: SurfaceTone,
     children: Vec<Box<dyn Scene>>,
@@ -144,25 +150,26 @@ pub(crate) fn surface_scene(
             None,
         )
     };
-    bsn! {
-        Node {
+    let mut panel_children = children;
+    if let Some(grain) = grain {
+        panel_children.insert(0, grain);
+    }
+    surface::card_surface_scene(
+        surface::CardLayout {
             width: percent(100),
             min_width: Val::Auto,
             max_width: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Rem(surface_gap_rem),
+            direction: FlexDirection::Column,
+            gap: Val::Rem(surface_gap_rem),
             padding: UiRect::all(Val::Rem(surface_padding_rem)),
             border: UiRect::all(Val::Rem(edge_width_rem)),
-            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
-        }
-        BackgroundColor({ fill })
-        BorderColor::all(edge)
-        BoxShadow({ shadows })
-        Children [
-            @{ grain } --
-            { children }
-        ]
-    }
+            radius: BorderRadius::all(Val::Rem(radius_rem)),
+            shadow: shadows,
+        },
+        fill,
+        BorderColor::all(edge),
+        panel_children,
+    )
 }
 
 /// A compact key/value row. The label is caption ink; the value is body ink
@@ -173,33 +180,33 @@ pub(crate) fn stat_row_scene(
     value: Box<dyn Scene>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    bsn! {
-        Node {
+    surface::stat_row_scene(
+        StatRowLayout {
             width: percent(100),
-            min_height: rem(palette.control_height_rem),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::SpaceBetween,
-            column_gap: Val::Px(space_8()),
+            min_width: px(0.0),
+            max_width: percent(100),
+            height: rem(palette.control_height_rem),
             padding: UiRect::vertical(Val::Px(space_2())),
-        }
-        Children [
-                Node {
-                    min_width: px(0.0),
-                    flex_shrink: 1.0,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
-            --
-                Node {
-                    flex_shrink: 0.0,
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::FlexEnd,
-                    overflow: Overflow::clip_x(),
-                }
-                Children [  @{ value }  ]
-        ]
-    }
+            justify: JustifyContent::SpaceBetween,
+            align: AlignItems::Center,
+        },
+        bsn! {
+            Node {
+                flex_shrink: 1.0,
+                overflow: Overflow::clip_x(),
+            }
+            Children [ Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ]
+        },
+        bsn! {
+            Node {
+                flex_shrink: 0.0,
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::FlexEnd,
+                overflow: Overflow::clip_x(),
+            }
+            Children [ @{ value } ]
+        },
+    )
 }
 
 /// A complete inspection fact: the label and wrapped value own separate rows.

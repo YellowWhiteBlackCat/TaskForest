@@ -514,6 +514,91 @@ fi
 if maybe bevy-scene-gate-test; then
     run_stage bevy-scene-gate-test quick run_py scripts/quality/test_bevy_scene_gate.py
 fi
+if maybe bevy-guard-owner-binding; then
+    run_stage bevy-guard-owner-binding quick run_py scripts/quality/test_bevy_guard_owner_binding.py
+fi
+if maybe gpui-px-gate-self; then
+    run_stage gpui-px-gate-self quick run_py scripts/quality/gpui_px_gate.py --self-test
+fi
+if maybe gpui-px-gate; then
+    # UIFRAME-152：GPUI / `taskmanager-ui` 生产树的 raw `px(<literal>)` 棘轮门。
+    # 台账每条登记「文件 × 数值」组合 + 计数 + 类别 + 理由；新增/增长失败，
+    # 存量还清必须收台账（失效即红）。
+    run_stage gpui-px-gate quick run_py scripts/quality/gpui_px_gate.py \
+        --root crates/taskmanager-gpui/src/gpui_app \
+        --root crates/taskmanager-ui/src \
+        --baseline scripts/quality/gpui_px_ratchet.json
+fi
+if maybe gpui-px-gate-test; then
+    run_stage gpui-px-gate-test quick run_py scripts/quality/test_gpui_px_gate.py
+fi
+if maybe process-fixture-owner; then
+    run_stage process-fixture-owner quick run_py scripts/quality/test_process_fixture_owner.py
+fi
+if maybe release-pin-parity; then
+    run_stage release-pin-parity quick run_py scripts/quality/test_release_pin_parity.py
+fi
+if maybe semantic-tree-owner; then
+    run_stage semantic-tree-owner quick run_py scripts/quality/test_semantic_tree_owner.py
+fi
+if maybe i18n-vocabulary-owner; then
+    run_stage i18n-vocabulary-owner quick run_py scripts/quality/test_i18n_vocabulary_owner.py
+fi
+if maybe percent-readout-owner; then
+    run_stage percent-readout-owner quick run_py scripts/quality/test_percent_readout_owner.py
+fi
+if maybe wired-tests; then
+    run_stage wired-tests quick run_py scripts/quality/test_wired_tests.py
+fi
+if maybe chart-slot-owner; then
+    run_stage chart-slot-owner quick run_py scripts/quality/test_chart_slot_owner.py
+fi
+if maybe input-modality-owner; then
+    run_stage input-modality-owner quick run_py scripts/quality/test_input_modality_owner.py
+fi
+if maybe platform-axis-only; then
+    run_stage platform-axis-only quick run_py scripts/quality/test_platform_axis_only.py
+fi
+if maybe band-arithmetic-gate; then
+    # 带宽算术唯一律（最宽带只有一个 owner）的执行器随共享包 zhuge-ui-core 一起发布；
+    # 此处是同一份文件的拷贝，台账记录其摘要，改动必须同步。
+    run_stage band-arithmetic-gate quick run_py scripts/quality/band_arithmetic_gate.py \
+        --root crates \
+        --baseline scripts/quality/band_arithmetic_ratchet.json
+fi
+if maybe band-arithmetic-gate-self; then
+    run_stage band-arithmetic-gate-self quick run_py scripts/quality/test_band_arithmetic_gate.py
+fi
+if maybe interval-normalization-gate; then
+    # 区间归一化唯一律（进入单位区间的投影只有一个 owner）的执行器随共享包
+    # zhuge-ui-core 一起发布；此处是同一份文件的拷贝，台账记录其摘要，改动必须同步。
+    run_stage interval-normalization-gate quick run_py scripts/quality/interval_normalization_gate.py \
+        --root crates \
+        --baseline scripts/quality/interval_normalization_ratchet.json
+fi
+if maybe interval-normalization-gate-self; then
+    run_stage interval-normalization-gate-self quick run_py scripts/quality/test_interval_normalization_gate.py
+fi
+if maybe scalar-mix-gate; then
+    # 标量混合唯一律（`A + (B - A) * t` 只有一个 owner）的执行器随共享包 zhuge-ui-core
+    # 一起发布；此处是同一份文件的拷贝，台账记录其摘要，改动必须同步。
+    run_stage scalar-mix-gate quick run_py scripts/quality/scalar_mix_gate.py \
+        --root crates \
+        --baseline scripts/quality/scalar_mix_ratchet.json
+fi
+if maybe scalar-mix-gate-self; then
+    run_stage scalar-mix-gate-self quick run_py scripts/quality/test_scalar_mix_gate.py
+fi
+if maybe easing-owner-gate; then
+    # 缓动斜坡与 Bézier 求解唯一律（`smoothstep` 形状与「按进度解曲线参数」各只有一个 owner）
+    # 的执行器随共享包 zhuge-ui-core 一起发布；此处是同一份文件的拷贝，台账记录其摘要，改动必须同步。
+    run_stage easing-owner-gate quick run_py scripts/quality/easing_owner_gate.py \
+        --root crates \
+        --baseline scripts/quality/easing_owner_ratchet.json
+fi
+if maybe easing-owner-gate-self; then
+    run_stage easing-owner-gate-self quick run_py scripts/quality/test_easing_owner_gate.py
+fi
 if maybe bevy-world-access-self; then
     run_stage bevy-world-access-self quick run_py scripts/quality/bevy_world_access_guard.py --self-test
 fi

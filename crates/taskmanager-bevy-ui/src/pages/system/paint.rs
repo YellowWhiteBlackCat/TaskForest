@@ -117,6 +117,7 @@ fn paint_system(mut render: SystemRender) {
                 hardware,
                 smbios,
                 npu,
+                telemetry: projection.snapshot.as_ref(),
                 sensors,
                 summary: &summary,
                 disclosure,

@@ -50,9 +50,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::source::SourceStatus;
-use taskforest_core::core::startup::{
-    StartupBootEvidenceSnapshot, StartupEntry, StartupEntryId, StartupImpactEvidence, StartupScope,
-};
+use taskforest_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntryId};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 
@@ -116,41 +114,7 @@ pub(crate) fn startup_rows(shell: &ShellApp) -> Vec<StartupRowModel> {
         .collect()
 }
 
-/// Source column with its scope suffix (GPUI/TUI parity: the row reads
-/// `User Service · User` instead of the bare provider label).
-pub(crate) fn startup_source_text(entry: &StartupEntry) -> String {
-    format!(
-        "{} · {}",
-        entry.source.as_str(),
-        startup_scope_text(entry.scope)
-    )
-}
-
-fn startup_scope_text(scope: StartupScope) -> &'static str {
-    match scope {
-        StartupScope::User => t("startup.scope_user"),
-        StartupScope::System => t("startup.scope_system"),
-        StartupScope::Session => t("startup.scope_session"),
-        StartupScope::Unknown => t("startup.scope_unknown"),
-    }
-}
-
-/// Impact column with its evidence: a measured boot impact carries its
-/// duration, an unmeasured one says so — never a fabricated number.
-pub(crate) fn startup_impact_text(entry: &StartupEntry) -> String {
-    match entry.impact_evidence {
-        StartupImpactEvidence::Measured { duration_ms } => {
-            format!("{} · {duration_ms} ms", t(entry.impact.i18n_key()))
-        }
-        StartupImpactEvidence::Unknown { .. } => {
-            format!(
-                "{} · {}",
-                t(entry.impact.i18n_key()),
-                t("startup.impact_unmeasured")
-            )
-        }
-    }
-}
+pub(crate) use taskmanager_shell::presentation::{startup_impact_text, startup_source_text};
 
 /// Enabled-state chip: enabled is the positive attention state, disabled the
 /// idle one (the TUI renders plain text; the chip is this frontend's scannable

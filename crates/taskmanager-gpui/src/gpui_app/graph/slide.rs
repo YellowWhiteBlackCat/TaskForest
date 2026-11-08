@@ -9,10 +9,12 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use gpui::{ElementId, Window, ease_in_out};
+use gpui::{ElementId, Window};
+use taskmanager_ui_contract::presentation::motion::{CHART_SLIDE_DURATION, chart_slide_ramp};
+use zhuge_ui_core::easing::transition_progress;
 
 /// The freshly shifted series enters from the right by one sample slot.
-pub(super) const GRAPH_SLIDE_DURATION: Duration = Duration::from_millis(180);
+const GRAPH_SLIDE_DURATION: Duration = CHART_SLIDE_DURATION;
 
 const MAX_SLIDE_LEDGER_ENTRIES: usize = 1024;
 
@@ -86,13 +88,15 @@ fn samples_bit_eq(left: &[f32], right: &[f32]) -> bool {
 
 pub(super) fn slide_progress(started_at: Instant, window: &mut Window) -> f32 {
     let now = Instant::now();
-    if now.duration_since(started_at) < GRAPH_SLIDE_DURATION {
+    if now.saturating_duration_since(started_at) < GRAPH_SLIDE_DURATION {
         window.request_animation_frame();
     }
     slide_progress_value(started_at, now)
 }
 
 pub(super) fn slide_progress_value(started_at: Instant, now: Instant) -> f32 {
-    let raw = now.duration_since(started_at).as_secs_f32() / GRAPH_SLIDE_DURATION.as_secs_f32();
-    ease_in_out(raw.clamp(0.0, 1.0))
+    // A clock reading that lands before the transition started is "not started
+    // yet" (zero progress), never a panic and never a negative ramp.
+    let elapsed = now.saturating_duration_since(started_at);
+    chart_slide_ramp(transition_progress(elapsed, GRAPH_SLIDE_DURATION))
 }

@@ -8,6 +8,7 @@
 
 use crate::diagnostic_bundle::DiagnosticBundleTargetView;
 use taskmanager_application::SurfaceKind;
+use taskmanager_ui_contract::{OverlayEvent, OverlayKindOf, OverlaySlot, OverlayTransition};
 
 use crate::{
     BatchMenuTarget, CommandPalette, ProcessMenuTarget, ServiceMenuTarget, SessionMenuTarget,
@@ -15,6 +16,7 @@ use crate::{
 };
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskforest_core::core::target::ServiceId;
+use zhuge_ui_core::row_page::page_of;
 
 /// Target for the interactive service-dependencies modal.
 #[derive(Clone, Debug)]
@@ -129,7 +131,7 @@ impl AffinityModalState {
     }
 
     fn adjust_scroll(&mut self) {
-        let current_row = self.selected_cpu / AFFINITY_GRID_COLS;
+        let current_row = page_of(self.selected_cpu, AFFINITY_GRID_COLS);
         if current_row < self.scroll {
             self.scroll = current_row;
         }
@@ -188,7 +190,7 @@ pub(crate) enum TuiSurface {
 }
 
 impl TuiSurface {
-    pub(crate) const fn kind(&self) -> TuiSurfaceKind {
+    pub(crate) fn kind(&self) -> TuiSurfaceKind {
         match self {
             Self::Settings => TuiSurfaceKind::Settings,
             Self::SidebarEditor { .. } => TuiSurfaceKind::SidebarEditor,
@@ -212,81 +214,39 @@ impl TuiSurface {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) enum TuiSurfaceEvent {
-    Open(Box<TuiSurface>),
-    DismissCurrent,
-    Dismiss(TuiSurfaceKind),
+impl OverlayKindOf for TuiSurface {
+    type Kind = TuiSurfaceKind;
+
+    fn kind(&self) -> Self::Kind {
+        TuiSurface::kind(self)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum TuiSurfaceTransition {
-    #[default]
-    Unchanged,
-    Opened(TuiSurfaceKind),
-    Replaced {
-        previous: TuiSurfaceKind,
-        current: TuiSurfaceKind,
-    },
-    Dismissed(TuiSurfaceKind),
-}
+pub(crate) type TuiSurfaceEvent = OverlayEvent<TuiSurface, TuiSurfaceKind, ()>;
+pub(crate) type TuiSurfaceTransition = OverlayTransition<TuiSurfaceKind, ()>;
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct TuiSurfaceState {
-    active: Option<TuiSurface>,
+#[derive(Debug, Default)]
+pub(crate) struct TuiSurfaceState(OverlaySlot<TuiSurface>);
+
+impl std::ops::Deref for TuiSurfaceState {
+    type Target = OverlaySlot<TuiSurface>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl std::ops::DerefMut for TuiSurfaceState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl TuiSurfaceState {
-    pub(crate) const fn active(&self) -> Option<&TuiSurface> {
-        self.active.as_ref()
-    }
-
-    pub(crate) fn active_mut(&mut self) -> Option<&mut TuiSurface> {
-        self.active.as_mut()
-    }
-
-    pub(crate) const fn kind(&self) -> Option<TuiSurfaceKind> {
-        match self.active.as_ref() {
-            Some(surface) => Some(surface.kind()),
-            None => None,
-        }
-    }
-
     pub(crate) fn reduce(&mut self, event: TuiSurfaceEvent) -> TuiSurfaceTransition {
-        match event {
-            TuiSurfaceEvent::Open(surface) => {
-                let surface = *surface;
-                let current = surface.kind();
-                self.active.replace(surface).map_or(
-                    TuiSurfaceTransition::Opened(current),
-                    |previous| TuiSurfaceTransition::Replaced {
-                        previous: previous.kind(),
-                        current,
-                    },
-                )
-            }
-            TuiSurfaceEvent::Dismiss(expected) => {
-                if self.kind() != Some(expected) {
-                    return TuiSurfaceTransition::Unchanged;
-                }
-                self.dismiss_current()
-            }
-            TuiSurfaceEvent::DismissCurrent => self.dismiss_current(),
-        }
+        self.0.apply(event)
     }
 
     pub(crate) fn take(&mut self, expected: TuiSurfaceKind) -> Option<TuiSurface> {
-        (self.kind() == Some(expected))
-            .then(|| self.active.take())
-            .flatten()
-    }
-
-    fn dismiss_current(&mut self) -> TuiSurfaceTransition {
-        self.active
-            .take()
-            .map_or(TuiSurfaceTransition::Unchanged, |surface| {
-                TuiSurfaceTransition::Dismissed(surface.kind())
-            })
+        self.dismiss_expected(expected)
     }
 }
 
@@ -303,41 +263,40 @@ pub(crate) enum TuiInputScope {
 }
 
 impl TuiInputScope {
-    pub(crate) const fn blocks_pointer(self) -> bool {
+    pub(crate) fn blocks_pointer(self) -> bool {
         !matches!(self, Self::Content)
     }
 }
 
 impl TuiApp {
-    pub(crate) const fn local_surface(&self) -> Option<&TuiSurface> {
-        self.local_surface.active()
+    pub(crate) fn local_surface(&self) -> Option<&TuiSurface> {
+        OverlaySlot::active(&self.local_surface)
     }
-
     pub(crate) fn local_surface_mut(&mut self) -> Option<&mut TuiSurface> {
-        self.local_surface.active_mut()
+        OverlaySlot::active_mut(&mut self.local_surface)
     }
 
-    pub(crate) const fn local_surface_kind(&self) -> Option<TuiSurfaceKind> {
+    pub(crate) fn local_surface_kind(&self) -> Option<TuiSurfaceKind> {
         self.local_surface.kind()
     }
 
     #[must_use]
-    pub const fn settings_open(&self) -> bool {
+    pub fn settings_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::Settings))
     }
 
     #[must_use]
-    pub const fn about_open(&self) -> bool {
+    pub fn about_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::About(_)))
     }
 
     #[must_use]
-    pub const fn health_open(&self) -> bool {
+    pub fn health_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::Health))
     }
 
     #[must_use]
-    pub const fn containers_open(&self) -> bool {
+    pub fn containers_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::Containers))
     }
 
@@ -384,7 +343,7 @@ impl TuiApp {
     }
 
     #[must_use]
-    pub const fn process_affinity(&self) -> Option<&AffinityModalState> {
+    pub fn process_affinity(&self) -> Option<&AffinityModalState> {
         match self.local_surface() {
             Some(TuiSurface::ProcessAffinity(state)) => Some(state),
             _ => None,
@@ -399,11 +358,11 @@ impl TuiApp {
     }
 
     #[must_use]
-    pub const fn affinity_open(&self) -> bool {
+    pub fn affinity_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::ProcessAffinity(_)))
     }
 
-    pub(crate) const fn column_menu_selection(&self) -> Option<usize> {
+    pub(crate) fn column_menu_selection(&self) -> Option<usize> {
         match self.local_surface() {
             Some(TuiSurface::ColumnMenu { selection }) => Some(*selection),
             _ => None,
@@ -417,7 +376,7 @@ impl TuiApp {
         }
     }
 
-    pub(crate) const fn command_palette(&self) -> Option<&CommandPalette> {
+    pub(crate) fn command_palette(&self) -> Option<&CommandPalette> {
         match self.local_surface() {
             Some(TuiSurface::CommandPalette(palette)) => Some(palette),
             _ => None,
@@ -452,16 +411,16 @@ impl TuiApp {
         self.shell.dismiss_informational_overlay();
         self.shell.close_search();
         self.focus_panel = crate::FocusPanel::Table;
-        let _ = self
-            .local_surface
-            .reduce(TuiSurfaceEvent::Open(Box::new(surface)));
+        let _ = self.local_surface.reduce(TuiSurfaceEvent::Open(surface));
     }
 
     pub(crate) fn dismiss_local_surface(&mut self) {
         if self.local_surface_kind() == Some(TuiSurfaceKind::DiagnosticBundle) {
             self.diagnostics.close();
         }
-        let _ = self.local_surface.reduce(TuiSurfaceEvent::DismissCurrent);
+        let _ = self
+            .local_surface
+            .reduce(TuiSurfaceEvent::DismissCurrent(()));
     }
 
     pub(crate) fn dismiss_local_surface_kind(&mut self, expected: TuiSurfaceKind) {
@@ -472,7 +431,7 @@ impl TuiApp {
         }
         let _ = self
             .local_surface
-            .reduce(TuiSurfaceEvent::Dismiss(expected));
+            .reduce(TuiSurfaceEvent::Dismiss(expected, ()));
     }
 
     pub(crate) fn take_local_surface(&mut self, expected: TuiSurfaceKind) -> Option<TuiSurface> {

@@ -26,6 +26,7 @@ use taskmanager_shell::queue_effect;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
 use taskmanager_test_support::pin_english;
 use taskmanager_test_support::smbios_memory;
+use taskmanager_ui_contract::presentation::settings::REFRESH_CHOICES_MS;
 
 #[test]
 fn permission_center_enter_requests_only_an_offered_helper_lane() {
@@ -518,7 +519,7 @@ fn refresh_field_clamps_across_the_four_choices() {
     assert_eq!(form.refresh_ms(), 5_000);
     form.step_value(1);
     assert_eq!(form.refresh_ms(), 5_000, "the last choice is a hard bound");
-    assert_eq!(crate::ui::settings::REFRESH_MS.len(), 4);
+    assert_eq!(REFRESH_CHOICES_MS.len(), 4);
 }
 
 #[test]

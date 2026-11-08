@@ -324,11 +324,8 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
     fold_host(&mut folded, 42.5, Vec::new());
     let shell = &folded.shell;
     // CPU facts arrived: their values render.
-    assert_eq!(summary_value(shell, SummaryField::Cpu), "42.5%");
-    assert_eq!(
-        summary_value(shell, SummaryField::Cores),
-        "12.0% 4.0% 98.0%"
-    );
+    assert_eq!(summary_value(shell, SummaryField::Cpu), "43%");
+    assert_eq!(summary_value(shell, SummaryField::Cores), "12% 4% 98%");
     // An empty NIC list is not a measured zero-total: the summed rates stay
     // dashes while the memory facts did land.
     assert_eq!(
@@ -338,7 +335,7 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
     assert_eq!(summary_value(shell, SummaryField::NetSend), MISSING_VALUE);
     assert_eq!(
         summary_value(shell, SummaryField::Memory),
-        "4.0 GiB / 16.0 GiB · 25.0%"
+        "4.0 GiB / 16.0 GiB · 25%"
     );
     assert_eq!(
         summary_value(shell, SummaryField::Swap),
@@ -423,7 +420,7 @@ fn memory_summary_renders_the_observed_swap_throughput_rates() {
     assert_eq!(
         summary_value(&folded.shell, SummaryField::Memory),
         format!(
-            "4.0 GiB / 16.0 GiB · 25.0% · {} 2.0 MiB/s · {} 512.0 KiB/s",
+            "4.0 GiB / 16.0 GiB · 25% · {} 2.0 MiB/s · {} 512.0 KiB/s",
             t("mem.swap_in_rate"),
             t("mem.swap_out_rate"),
         ),
@@ -650,7 +647,7 @@ fn demo_snapshot_fallback_keeps_facts_and_real_gpu_presence() {
     // cold start; the fallback is a read-only projection bridge, not a
     // fabricated zero/default.
     let shell = demo_app();
-    assert_eq!(summary_value(&shell, SummaryField::Cpu), "37.4%");
+    assert_eq!(summary_value(&shell, SummaryField::Cpu), "37%");
     assert_ne!(summary_value(&shell, SummaryField::Memory), MISSING_VALUE);
     assert_eq!(section_keys(&shell, Section::Gpu).len(), 1);
     assert!(curve_wanted(&shell, SystemCurve::Gpu));
@@ -865,7 +862,7 @@ fn folded_projection_rewrites_the_mounted_page() {
     );
     assert_eq!(
         dyn_text_value(app.world_mut(), &cpu_field).as_deref(),
-        Some("42.5%"),
+        Some("43%"),
         "the folded CPU fact reached the mounted text through the observer"
     );
     let eth0_field = DynField::Device {

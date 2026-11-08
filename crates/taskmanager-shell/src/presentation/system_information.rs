@@ -222,7 +222,15 @@ fn format_memory(total_memory_mb: u64) -> String {
     }
 }
 
-fn display_summary(display: &DisplayInfo) -> Option<String> {
+/// One display's identity line, shared by every frontend's System page.
+///
+/// This is a typed fact projection, not a renderer shape: GPUI, Iced and TUI
+/// used to carry byte-identical private copies of this function. `None` means
+/// "no observable field at all", so a caller can omit the row rather than
+/// printing an empty value; the first field (`connector`) is always present
+/// because `DisplayInfo` requires it.
+#[must_use]
+pub fn display_summary(display: &DisplayInfo) -> Option<String> {
     let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
         .into_iter()
         .flatten()
@@ -254,7 +262,10 @@ fn display_summary(display: &DisplayInfo) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
 
-fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
+/// HDR capability text for one display. Copy stays in `i18n`; the rule for
+/// when it is present is this owner's, not each frontend's.
+#[must_use]
+pub fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
     let state = match display.hdr_supported {
         Some(true) => i18n::t("system.hdr_supported"),
         Some(false) => i18n::t("system.hdr_unsupported"),

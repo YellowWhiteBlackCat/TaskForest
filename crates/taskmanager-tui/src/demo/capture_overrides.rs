@@ -4,7 +4,7 @@
 
 use crate::command_palette::TuiSurfaceAction;
 use crate::health_review::HealthReviewMode;
-use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
+use crate::ui::process_properties::ProcessPropertiesTarget;
 use crate::{PerfDevice, TuiApp, TuiSurface};
 use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 use taskforest_core::core::failure::FailureKind;
@@ -15,6 +15,7 @@ use taskforest_core::core::process::{
 };
 use taskforest_core::core::smart::SmartSelfTestKind;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_application::first_run::FirstRunController;

@@ -51,6 +51,13 @@ Detail behind the README module map:
   applies. Attachment is a main-world fact, not GPU readiness. The Performance
   hero card is marked as a candidate; headless renders and high-contrast
   themes keep their painted or opaque fallback visible.
+- `src/glass/optical_wesl.rs` — the typed optical parameter projection between
+  the shared spec and the WESL uniform. `OpticalGlassParams` clamps what the
+  shader is allowed to read: index of refraction into the admitted glass band,
+  dispersion into `0..=1`, and a spec whose blur radius exceeds the
+  capability-ceiling pixels is refused rather than quietly rewritten. Non-finite
+  input fails closed, and the projection is only consulted after the capability
+  gate has already said `Gpu`; it grants no GPU ability of its own.
 - `src/window.rs` camera composition — the inactive `BackdropCaptureCamera`
   and explicitly targeted `BackdropCaptureRoot` are offscreen scaffolding;
   `PresentationCamera` owns the primary-window interactive shell. A chart-grid
@@ -95,8 +102,9 @@ Detail behind the README module map:
   between the track's ends, not a checkbox.
 - `src/widgets/focus_ring.rs` — the focus ring's layer model: an inner
   highlight plus an outer halo, with the shared hairline widths.
-- `src/widgets/easing.rs` — the shared `(0.16, 1, 0.3, 1)` ease-out curve and
-  the progress helper every micro-motion reads.
+- `src/widgets/easing.rs` — the one `(0.16, 1, 0.3, 1)` ease-out curve every
+  micro-motion rides, named here and solved by `zhuge-ui-core::easing`; this
+  crate carries no solver of its own.
 - `src/window/edge.rs` — the one-pixel edge highlight on an undecorated
   window.
 - `src/pages/settings/rows.rs` — the settings rows that mount the switch and
@@ -104,10 +112,15 @@ Detail behind the README module map:
 - `src/widgets/table.rs` + `src/widgets/table/` — the process table: the
   column-drag resize session, the shaped-paragraph ellipsis, the
   tabular-figures font features, the zero-value contrast calibration and the
-  visible cell selection with its row copy.
+  visible cell selection with its row copy. Which whole rows a page shows is
+  not computed here: the table consumes `zhuge-ui-core::row_page`.
 - `src/pages/system/` — the System page surfaces: `overview.rs` (the measured
   card grid, its 720×480 two-by-two fold and the memory-inventory capture
-  anchor), `topology.rs` (the SMBIOS slot and channel map), `privacy.rs` (the
+  anchor), `topology.rs` (the SMBIOS slot and channel map),
+  `topology_graph.rs` (the typed `HardwareTopologyGraph`: board, socket, memory
+  channel and PCIe device folded from the already-projected hardware, SMBIOS and
+  telemetry values, where a fact that cannot be stated becomes an explicit
+  unknown node instead of a dropped or invented one), `privacy.rs` (the
   serial masking toggle) plus the existing dashboard/thermal/health modules.
 - `src/widgets/chart.rs` + `src/widgets/chart/` — the chart family: a chart is
   ONE continuous, coverage-antialiased path per measured run, drawn by a

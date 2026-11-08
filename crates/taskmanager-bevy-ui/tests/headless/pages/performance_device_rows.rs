@@ -257,8 +257,8 @@ fn gpu_section_enumerates_every_projected_adapter() {
         "two adapters must mount two distinct device blocks"
     );
     for (device, expected) in [
-        ("gpu:pci:0000:01:00.0", "42.0%"),
-        ("gpu:pci:0000:00:02.0", "7.0%"),
+        ("gpu:pci:0000:01:00.0", "42%"),
+        ("gpu:pci:0000:00:02.0", "7%"),
     ] {
         let field = DynField::Device {
             section: Section::Gpu,
@@ -283,7 +283,7 @@ fn gpu_section_enumerates_every_projected_adapter() {
     }
     // Each adapter's per-engine utilization row paints that engine's own
     // percentage (the joined fact line is never exactly one percentage).
-    for expected in ["42.0%", "7.0%"] {
+    for expected in ["42%", "7%"] {
         assert!(
             texts.iter().any(|text| text == expected),
             "the per-engine utilization row must paint {expected}: {texts:?}"
@@ -332,7 +332,7 @@ fn battery_block_renders_voltage_health_and_cycles() {
     assert!(fact_line.contains("15.5 W"));
     assert!(fact_line.contains("11.40 V"));
     assert!(fact_line.contains("128"));
-    assert!(fact_line.contains("96.0%"));
+    assert!(fact_line.contains("96%"));
     assert!(fact_line.contains(&duration(7200)));
 
     let mut app = headless_scene_app();

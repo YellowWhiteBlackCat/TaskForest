@@ -101,7 +101,12 @@ fn saved_views_native_controls_transfer_apply_and_reject_invalid_import_atomical
         ProcessStatusFilter::Sleeping
     );
     assert_eq!(app.world().resource::<Route>().page, Page::Processes);
-    assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+    assert!(
+        app.world()
+            .resource::<WindowSurfaceState>()
+            .active()
+            .is_none()
+    );
     click(&mut app, SavedViewAction::Open);
     click(&mut app, SavedViewAction::Remove(id));
     assert_eq!(

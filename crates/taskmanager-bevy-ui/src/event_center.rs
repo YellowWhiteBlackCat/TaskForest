@@ -220,7 +220,8 @@ fn on_command(
     mut toast: Option<ResMut<crate::pages::alerts::toast::ExportToast>>,
     mut commands: Commands,
 ) {
-    if event.0 != EventAction::Open && !matches!(surface.0, Some(WindowSurface::EventCenter)) {
+    if event.0 != EventAction::Open && !matches!(surface.active(), Some(WindowSurface::EventCenter))
+    {
         return;
     }
     match event.0 {
@@ -272,7 +273,7 @@ fn on_fold(
     surface: Res<WindowSurfaceState>,
     mut commands: Commands,
 ) {
-    if matches!(surface.0, Some(WindowSurface::EventCenter)) {
+    if matches!(surface.active(), Some(WindowSurface::EventCenter)) {
         commands.trigger(WindowSurfaceChanged);
     }
 }

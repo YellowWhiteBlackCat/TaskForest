@@ -1,6 +1,8 @@
 //! System telemetry, dynamic-device and alert-watermark fold systems.
 
 use std::collections::BTreeSet;
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 
 use super::super::device_rows::DeviceRowFamily;
 use super::*;
@@ -186,7 +188,9 @@ pub(super) fn evaluate_new_snapshot(store: &mut SystemProjectionStore, fold: &mu
     }
 
     store.last_recorded_snapshot_ms = snapshot.timestamp_ms;
-    let evaluation: AlertEvaluation = store.alert_center.evaluate(snapshot, submission_time_ms());
+    let evaluation: AlertEvaluation = store
+        .alert_center
+        .evaluate(snapshot, unix_millis(SystemTime::now()));
     store.record_alert_projection_changes(evaluation.changes);
     for request in evaluation.notifications {
         if store.pending_notifications.len() < MAX_PENDING_NOTIFICATIONS {

@@ -6,6 +6,7 @@ use taskmanager_application::{ProcessInsightFacet, i18n::t};
 use taskmanager_shell::presentation::process_insight_facet_label;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui::theme_binding::definite_length;
+use zhuge_ui_core::row_page::{RowPage, page_of, row_budget, rows_per_page};
 
 pub(super) fn facet_controls(
     theme: &Theme,
@@ -70,27 +71,33 @@ pub(super) fn page_controls(
         .flex_row()
         .flex_wrap()
         .gap(definite_length(tokens::SPACE_6));
-    if total <= MAX_INSIGHT_CARD_ROWS {
+    let rows = rows_per_page(MAX_INSIGHT_CARD_ROWS);
+    if !row_budget(total, rows).truncated() {
         return row;
     }
     let previous = entity.clone();
     let next = entity.clone();
-    let end = first.saturating_add(MAX_INSIGHT_CARD_ROWS).min(total);
+    // Every bound the two pills and the range label read comes from the shared
+    // page axis, so the label, the next start and the disabled states agree.
+    let page_number = page_of(first, rows);
+    let page = RowPage::page(total, rows, page_number);
+    let previous_start = RowPage::page(total, rows, page_number.saturating_sub(1)).first();
+    let end = page.last();
     row.child(elements::pill(
         theme,
         "properties-list-previous",
         t("prop.previous_page"),
         false,
-        first == 0,
+        page.first() == 0,
         move |_, cx| {
             previous.update(cx, |view, cx| {
-                view.page_process_insights(first.saturating_sub(MAX_INSIGHT_CARD_ROWS));
+                view.page_process_insights(previous_start);
                 cx.notify();
             });
         },
         |_, _, _| {},
     ))
-    .child(format!("{}–{} / {total}", first + 1, end))
+    .child(format!("{}–{} / {total}", page.first() + 1, end))
     .child(elements::pill(
         theme,
         "properties-list-next",

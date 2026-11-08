@@ -24,6 +24,7 @@ pub(crate) use formatting::{
     capabilities_preview_lines_with_limit, environment_preview_lines_with_limit,
     format_engine_usage_line, format_gpu_device_row, open_files_preview_lines_with_limit,
 };
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_application::ProcessAffinityState;
 use taskmanager_shell::presentation::{
@@ -508,7 +509,7 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
         .map_or_else(missing_value, |value| format!("{value:.1}s"));
     let cpu_percent = thread
         .cpu_percent
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
+        .map_or_else(missing_value, precise_percent_text);
     let comm = if thread.comm.is_empty() {
         missing_value()
     } else {

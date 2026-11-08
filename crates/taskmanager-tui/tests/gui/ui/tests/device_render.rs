@@ -73,7 +73,7 @@ fn cpu_view_renders_all_facts_without_fabricated_zeroes() {
     let text = frame_text(&app, 120, 36);
 
     // The CPU fact strip carries the live reading.
-    assert!(text.contains("37.4%"));
+    assert!(text.contains("37%"));
     // No fabricated zero units may appear for the cold cpu fields.
     assert!(
         !text.contains("Frequency 0 MHz"),
@@ -147,7 +147,18 @@ fn missing_memory_denominators_render_as_dashes_instead_of_zero_percent() {
     let text = frame_text(&app, 120, 36);
 
     assert!(text.contains('—'));
+    // No readout may spell a percent with a decimal: the whole-percent
+    // spelling is the only level spelling.
     assert!(!text.contains("0.0%"));
+
+    // The Memory Performance page renders the same denominators: a missing
+    // swap denominator reads the shared dash, never a fabricated zero.
+    app.select_perf_device(crate::PerfDevice::Memory);
+    let memory_text = frame_text(&app, 120, 36);
+    assert!(
+        memory_text.contains("0 B / 0 B · —"),
+        "a missing memory denominator must read the dash, not a zero percent: {memory_text}"
+    );
 }
 
 /// The Memory Performance view renders the shared composition bar: a
@@ -319,7 +330,7 @@ fn gpu_detail_section_renders_utilization_vram_clocks_and_engines() {
         text.contains("Render/3D"),
         "per-engine name must render in the GPU panel"
     );
-    assert!(text.contains("42.0%"), "per-engine utilization must render");
+    assert!(text.contains("42%"), "per-engine utilization must render");
     // Dedicated VRAM pair (binary-unit formatted via the shared helper).
     assert!(text.contains("1.0 GiB"));
     assert!(text.contains("8.0 GiB"));
@@ -333,11 +344,11 @@ fn gpu_detail_section_renders_utilization_vram_clocks_and_engines() {
         "PCI marketing name must render in the GPU panel"
     );
     // Aggregate utilization from the typed accessor.
-    assert!(text.contains("73.0%"));
+    assert!(text.contains("73%"));
     // RC6 idle residency, power draw, driver, the shared VRAM aperture
     // (shown alongside dedicated) and the throttling reason are panel rows
     // the one-line summary never renders.
-    assert!(text.contains("78.0%"), "idle residency must render");
+    assert!(text.contains("78%"), "idle residency must render");
     assert!(text.contains("8.4 W"), "power draw must render");
     assert!(text.contains("xe"), "driver must render");
     assert!(
@@ -436,12 +447,12 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     assert!(text.contains("nvme0n1"), "disk name must render");
     assert!(text.contains("84.0 MiB"), "read rate must render");
     assert!(text.contains("31.0 MiB"), "write rate must render");
-    assert!(text.contains("12.7%"), "active time must render");
+    assert!(text.contains("13%"), "active time must render");
     assert!(
         text.contains("42 / 70°C"),
         "SMART temperature with critical must render"
     );
-    assert!(text.contains("5.0%"), "SMART endurance used must render");
+    assert!(text.contains("5%"), "SMART endurance used must render");
     assert!(
         text.contains("Available spare 4% ⚠ (≤10%)"),
         "available spare must render at its observed warning threshold: {text}"
@@ -582,7 +593,7 @@ fn network_detail_section_renders_rates_link_and_wireless_association() {
     );
     assert!(text.contains("12.0 MiB"), "rx rate must render");
     assert!(text.contains("2.0 MiB"), "tx rate must render");
-    assert!(text.contains("8.0%"), "utilization must render");
+    assert!(text.contains("8%"), "utilization must render");
     assert!(text.contains("1200 Mbps"), "link speed must render");
     assert!(text.contains("Connected"), "connection verdict must render");
     // Wireless association is panel-only.
@@ -718,7 +729,7 @@ fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
     // The degradation-health family: the shared energy_full/design ratio rule
     // must reach its own row, formatted as a percentage.
     assert!(
-        text.contains("Health 87.5%"),
+        text.contains("Health 88%"),
         "the battery health readout must render its derived percentage: {text}"
     );
     // The cold battery's unknown capacity is an honest dash, never 0%. The
@@ -989,7 +1000,7 @@ fn compact_gpu_frame_keeps_the_fixed_utilization_and_key_facts() {
     app.select_perf_device(crate::PerfDevice::Gpu);
     let compact = frame_text(&app, 54, 16);
 
-    for fact in ["18.0%", "48°C", "900 MHz", "Power —"] {
+    for fact in ["18%", "48°C", "900 MHz", "Power —"] {
         assert!(
             compact.contains(fact),
             "compact GPU frame lost primary fact {fact:?}:\n{compact}"
@@ -1002,7 +1013,7 @@ fn system_npu_facts_are_reachable_at_reference_and_compact_sizes() {
     let expected = [
         "Intel AI Boost",
         "intel_vpu",
-        "44.0%",
+        "44%",
         "Compute engine",
         "Matrix engine",
         "Vector engine",
@@ -1011,8 +1022,8 @@ fn system_npu_facts_are_reachable_at_reference_and_compact_sizes() {
         "Other engine",
         "512.0 MiB",
         "4.0 GiB",
-        "Utilization        44.0%",
-        "Compute engine     11.0%",
+        "Utilization        44%",
+        "Compute engine     11%",
         "Dedicated memory   512.0 MiB",
     ];
 

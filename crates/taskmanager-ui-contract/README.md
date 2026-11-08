@@ -11,7 +11,8 @@ difference is a reasoned, gate-checked registry entry, never prose parity
 claims), and the `presentation` layer (ADR-064): the one layout vocabulary
 and budget fold, the per-shape threshold registry, the control-role
 measurement matrix with a 44px hit-target floor, the motion-role/curve
-contract, and the cross-shape probe grid that computes parity instead of
+contract (including the chart-slide ramp and the stacked statistics band),
+and the cross-shape probe grid that computes parity instead of
 asserting it. Defines explicit, toolkit-neutral semantic specifications and
 the first-class divergence quality baselines under "求同存异" standards governance.
 
@@ -28,6 +29,11 @@ and aggregate coverage survive the shared projection.
 `navigation::NavOrientation` is the single horizontal/vertical vocabulary. A native
 control changes presentation while application page identity, selection and telemetry
 remain under their existing authorities; each renderer budgets its own bounded rail.
+
+`focus::InputModality` is the single input-origin vocabulary. No toolkit attaches an
+input origin to focus state, so every graphical frontend tracks the origin itself and
+asks this contract whether the focus ring should be painted: only keyboard modality
+paints one. The frontends own only their capture wiring, never a second rule.
 
 Keep command IDs, page order, focus reachability, semantic roles, localized
 message keys and product intents exhaustive and stable. Verify enum coverage,
@@ -59,7 +65,7 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
 src/accessibility/               neutral accessibility model and snapshots
 src/conformance.rs               conformance suite contracts and test helpers
 src/presentation.rs              ADR-064: vocabulary → thresholds → budget →
-                                 parity; sizes/motion/resolution in
+                                 parity; sizes/motion/resolution/load_tiers in
                                  src/presentation/
 ```
 

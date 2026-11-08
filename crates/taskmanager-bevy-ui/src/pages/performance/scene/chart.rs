@@ -15,6 +15,8 @@ use crate::widgets::chart::{
 use crate::window::CustomTextInk;
 use bevy::picking::Pickable;
 use bevy::text::TextColor;
+use taskforest_core::core::percent::percent_text;
+use taskmanager_shell::presentation::GraphSummaryItem;
 use taskmanager_shell::presentation::bytes;
 use taskmanager_theme::GlassTier;
 
@@ -27,8 +29,7 @@ const CURVE_BADGE_WASH_ALPHA: f32 = 0.18;
 /// curve: a grid rule is chart geometry, not a layout length.
 const GRID_LINE_PX: f32 = 1.0;
 
-/// The percentage ceiling a percent curve is projected against.
-const PERCENT_CEILING: f32 = 100.0;
+use taskforest_core::core::percent::MAX_PERCENT;
 
 /// The grid's division count, matching the reference surface.
 const GRID_DIVISIONS: usize = 5;
@@ -54,9 +55,7 @@ const SUMMARY_MAX_WIDTH_PX: f32 = 320.0;
 /// utilization curves, the measured peak for the throughput curve.
 pub(crate) fn curve_ceiling(curve: SystemCurve, samples: &[f32]) -> f32 {
     match curve {
-        SystemCurve::Cpu | SystemCurve::Memory | SystemCurve::Gpu | SystemCurve::Npu => {
-            PERCENT_CEILING
-        }
+        SystemCurve::Cpu | SystemCurve::Memory | SystemCurve::Gpu | SystemCurve::Npu => MAX_PERCENT,
         SystemCurve::Network => {
             samples
                 .iter()
@@ -70,7 +69,7 @@ pub(crate) fn curve_ceiling(curve: SystemCurve, samples: &[f32]) -> f32 {
 
 /// The percent readout the hover pill and value badge print.
 fn percent_readout(value: f32) -> String {
-    format!("{value:.0}%")
+    percent_text(value)
 }
 
 /// The throughput readout the hover pill and value badge print.
@@ -223,9 +222,9 @@ fn summary_pill_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette)
         grain: _,
     } = card_material(palette);
     let items = [
-        SummaryItem::Latest,
-        SummaryItem::Average,
-        SummaryItem::Maximum,
+        GraphSummaryItem::Latest,
+        GraphSummaryItem::Average,
+        GraphSummaryItem::Maximum,
     ]
     .into_iter()
     .map(|item| {

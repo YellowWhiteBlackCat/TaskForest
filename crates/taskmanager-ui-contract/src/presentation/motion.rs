@@ -28,6 +28,57 @@ pub struct MotionDurations {
     pub medium: Duration,
 }
 
+/// The chart series slide-in: when a sampled graph shifts its window by one
+/// slot, the freshly shifted series enters from the right and eases into
+/// place over this duration. One fact for every animated chart surface, so
+/// the slide rhythm cannot drift per toolkit. This duration paces data
+/// motion, not an interaction state, which is why it is chart vocabulary
+/// instead of a theme control token. The curve the graphical surfaces ease the
+/// raw progress with is owned by [`chart_slide_ramp`]; the one surface that
+/// eases differently states so at its own binding.
+pub const CHART_SLIDE_DURATION: Duration = Duration::from_millis(180);
+
+/// The chart slide's eased progress: a symmetric quadratic ease-in-out on the
+/// raw transition fraction, so the slide starts and ends gently with no
+/// overshoot and spends the same time in each half.
+///
+/// This was previously spelled twice — the GPUI graph read its toolkit's
+/// `ease_in_out`, and the Iced chart carried a hand-written ramp that
+/// documented itself as the GPUI parity. Probing both formulas over every
+/// reachable input of the shared duration (each microsecond of 180 ms, in
+/// `f32`) shows they are bit-exact identical, so the two spellings were one
+/// fact in two addresses, not a divergence: binding both here changes no
+/// painted pixel and owes no capture. The out-of-range clamp and the
+/// non-finite-means-finished answer follow the house rule the shared
+/// `smoothstep` ramp already applies, so a ramp never paints an overshoot and
+/// never propagates a `NaN` into a layout length.
+///
+/// The one surface still easing this slide differently is Bevy: it advances a
+/// per-frame accumulator rather than an absolute clock and shapes it with the
+/// shared `smoothstep` ramp, which is a different curve — at progress 0.25 it
+/// answers 0.15625 against this ramp's 0.125, and at 0.75 it answers 0.84375
+/// against 0.875. That is a visible paint difference, so binding it here waits
+/// for a capture comparison; the two graphical surfaces that already agreed
+/// are folded now.
+#[must_use]
+pub fn chart_slide_ramp(progress: f32) -> f32 {
+    let t = if progress.is_finite() {
+        progress.clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    if t < 0.5 {
+        2.0 * t * t
+    } else {
+        let x = -2.0 * t + 2.0;
+        1.0 - x * x / 2.0
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui_motion_chart_slide.rs"]
+mod chart_slide_tests;
+
 impl MotionDurations {
     /// The token the class spends.
     #[must_use]

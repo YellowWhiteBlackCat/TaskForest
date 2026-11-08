@@ -16,10 +16,9 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskforest_core::core::process_telemetry::{
-    OpenFileEntry, ProcessOpenFiles, ProcessResourceSnapshot,
-};
+use taskforest_core::core::process_telemetry::{ProcessOpenFiles, ProcessResourceSnapshot};
 use taskmanager_application::project_process_resources;
+use taskmanager_shell::presentation::format_open_file_row;
 use taskmanager_shell::presentation::format_open_files_saturation;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -31,25 +30,7 @@ use taskmanager_theme::tokens;
 
 use super::ProcessInsightsLabels;
 use crate::gpui_app::theme::mono_font_with_fallback;
-
-/// Render one descriptor as `fd [kind]  target`, with the target falling back
-/// to the typed "unreadable" marker when procfs could not resolve the symlink.
-fn format_open_file(entry: &OpenFileEntry, unreadable: &str) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| unreadable.to_string());
-    if entry.deleted {
-        format!(
-            "{} [{}]  {} [deleted]",
-            entry.fd,
-            entry.resolved_kind(),
-            target
-        )
-    } else {
-        format!("{} [{}]  {}", entry.fd, entry.resolved_kind(), target)
-    }
-}
+use zhuge_ui_core::row_page::row_budget;
 
 /// The open-files card. Surfaces the per-process descriptor list or an explicit
 /// typed message when the source is unavailable, denied, or empty.
@@ -112,7 +93,11 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
             .text_color(hsla(header_color))
             .child(header),
     );
-    let (shown, hidden) = super::capped_card_rows(open_files.entries.len().saturating_sub(first));
+    let budget = row_budget(
+        open_files.entries.len().saturating_sub(first),
+        super::MAX_INSIGHT_CARD_ROWS,
+    );
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     content = content.child(
         div()
             .flex()
@@ -127,9 +112,9 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                     .take(shown)
                     .map(|(index, entry)| {
                         // The selector token comes from the same typed
-                        // predicate `format_open_file` renders, so a render
-                        // test can prove this row's own typed unreadable
-                        // branch reached the painted row.
+                        // predicate `format_open_file_row` renders, so a
+                        // render test can prove this row's own typed
+                        // unreadable branch reached the painted row.
                         let token = if entry.target.is_none() {
                             "unreadable"
                         } else {
@@ -140,7 +125,7 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
                             .text_size(font_size(tokens::FONT_10))
                             .font(mono_font_with_fallback(theme))
                             .whitespace_normal()
-                            .child(format_open_file(entry, labels.unreadable));
+                            .child(format_open_file_row(entry, labels.unreadable));
                         super::insight_row(row, "open-file", index, token)
                     }),
             ),

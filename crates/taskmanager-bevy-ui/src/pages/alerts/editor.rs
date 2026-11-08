@@ -1,5 +1,4 @@
 //! Mounted rule controls edit the shared authority through explicit access sets.
-use super::{metric_label, metric_unit, severity_label};
 use crate::app::{FrontendTrack, RouteChanged};
 use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_4, space_8};
@@ -32,9 +31,14 @@ use taskforest_core::core::alerts::{
     AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
     AlertSeverity, export_alert_rules_json, import_alert_rules_json,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
+use zhuge_ui_core::value::interval_fraction;
+
+// A threshold range that cannot travel puts the handle at the axis start.
+const FLAT_HANDLE_AT_START: f32 = 0.0;
 
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub(crate) enum RuleControl {
@@ -96,25 +100,6 @@ impl Default for ThresholdPart {
     }
 }
 
-/// The continuous range one metric's threshold may take: the minimum, the
-/// maximum and the step. The binary SMART warning bit has no continuous
-/// range — it keeps the step buttons alone.
-fn threshold_range(metric: AlertMetric) -> Option<(f32, f32, f32)> {
-    match metric {
-        AlertMetric::CpuUsagePercent
-        | AlertMetric::MemoryUsagePercent
-        | AlertMetric::SmartPercentUsed => Some((0.0, 100.0, 1.0)),
-        AlertMetric::DiskTemperatureC => Some((0.0, 200.0, 1.0)),
-        AlertMetric::SmartCriticalWarning => None,
-    }
-}
-
-/// The metric's threshold ceiling. A rule may never ask for more than the
-/// metric can express.
-fn threshold_ceiling(metric: AlertMetric) -> f32 {
-    threshold_range(metric).map_or(1.0, |(_, max, _)| max)
-}
-
 /// The canonical edit that moves one rule's threshold to `value`.
 fn threshold_edit(
     shell: &ShellApp,
@@ -126,7 +111,7 @@ fn threshold_edit(
         .iter()
         .find(|managed| &managed.rule.id == rule_id)?
         .clone();
-    let ceiling = threshold_ceiling(managed.rule.metric);
+    let ceiling = managed.rule.metric.threshold_ceiling();
     managed.rule.threshold = value.clamp(0.0, ceiling);
     managed.rule.hysteresis = managed.rule.hysteresis.min(managed.rule.threshold);
     Some(ManagedAlertRuleEdit::Update {
@@ -268,7 +253,7 @@ fn edit(shell: &ShellApp, action: &RuleControl) -> Option<ManagedAlertRuleEdit> 
         }
         RuleControl::Threshold(_, delta) => {
             managed.rule.threshold = (managed.rule.threshold + f32::from(*delta))
-                .clamp(0.0, threshold_ceiling(managed.rule.metric));
+                .clamp(0.0, managed.rule.metric.threshold_ceiling());
             managed.rule.hysteresis = managed.rule.hysteresis.min(managed.rule.threshold);
         }
         RuleControl::Duration(_, delta) => {
@@ -391,21 +376,16 @@ pub(super) fn threshold_slider_observer(
     else {
         return;
     };
-    let text = format!("{:.1}{}", threshold, metric_unit(metric));
+    let text = format!("{:.1}{}", threshold, metric.unit_suffix());
     for (target, mut value) in &mut values {
         if target.0.as_ref() == Some(&rule_id) {
             value.0 = text.clone();
         }
     }
-    let Some((min, max, _)) = threshold_range(metric) else {
+    let Some((min, max, _)) = metric.threshold_range() else {
         return;
     };
-    let span = max - min;
-    let ratio = if span > 0.0 {
-        ((threshold - min) / span).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
+    let ratio = interval_fraction(threshold, min, max, FLAT_HANDLE_AT_START);
     for (target, mut node) in &mut parts {
         if target.0.as_ref() != Some(&rule_id) {
             continue;
@@ -469,17 +449,12 @@ fn numeric(
 /// scene only dresses the widget: the track, the filled portion and the
 /// thumb all ride the rem axis.
 fn threshold_slider(managed: &ManagedAlertRule, palette: &UiPalette) -> Box<dyn Scene> {
-    let Some((min, max, step)) = threshold_range(managed.rule.metric) else {
+    let Some((min, max, step)) = managed.rule.metric.threshold_range() else {
         return Box::new(bsn! { Node { width: rem(0.0), height: rem(0.0) } });
     };
     let id = managed.rule.id.clone();
     let value = managed.rule.threshold.clamp(min, max);
-    let span = max - min;
-    let ratio = if span > 0.0 {
-        ((value - min) / span).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
+    let ratio = interval_fraction(value, min, max, FLAT_HANDLE_AT_START);
     let filled = ratio * 100.0;
     let track_rem = palette.control_height_rem * 4.0;
     let thumb_rem = palette.icon_rem * 0.6;
@@ -536,7 +511,7 @@ fn threshold_control(managed: &ManagedAlertRule, palette: &UiPalette) -> Box<dyn
     let value = format!(
         "{:.1}{}",
         managed.rule.threshold,
-        metric_unit(managed.rule.metric)
+        managed.rule.metric.unit_suffix()
     );
     let minus = button("−".into(), RuleControl::Threshold(id.clone(), -1), palette);
     let plus = button("+".into(), RuleControl::Threshold(id.clone(), 1), palette);
@@ -561,7 +536,7 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
     let title = format!(
         "{} · {} · {}",
         id,
-        metric_label(managed.rule.metric),
+        i18n::alert_metric_label(managed.rule.metric),
         super::managed_rule_line(managed)
     );
     let threshold = threshold_control(managed, palette);
@@ -577,19 +552,19 @@ pub(super) fn row(managed: &ManagedAlertRule, palette: &UiPalette) -> impl Scene
         format!(
             "{:.1}{}",
             managed.rule.hysteresis,
-            metric_unit(managed.rule.metric)
+            managed.rule.metric.unit_suffix()
         ),
         RuleControl::Hysteresis(id.clone(), -1),
         RuleControl::Hysteresis(id.clone(), 1),
         palette,
     );
     let metric = button(
-        metric_label(managed.rule.metric).into(),
+        i18n::alert_metric_label(managed.rule.metric).into(),
         RuleControl::Metric(id.clone()),
         palette,
     );
     let severity = button(
-        severity_label(managed.rule.severity).into(),
+        i18n::alert_severity_label(managed.rule.severity).into(),
         RuleControl::Severity(id.clone()),
         palette,
     );

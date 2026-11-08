@@ -6,9 +6,11 @@
 //! reused by pointer input until the next frame is painted.
 
 use ratatui::layout::{Constraint, Layout, Rect};
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_application::{AppPage, SurfaceKind};
 use taskmanager_ui_contract::navigation::NavOrientation;
+use zhuge_ui_core::row_page::RowPage;
 
 use crate::{TuiApp, TuiInputScope};
 mod focus;
@@ -16,7 +18,7 @@ pub(crate) mod overlays;
 use focus::local_surface_focus_control;
 use overlays::{TuiOverlayControls, TuiOverlayPlan, overlay_plan};
 
-use super::{pages, process_properties::ProcessDetailsSection, process_table};
+use super::{pages, process_table};
 
 /// Rows occupied by the table border, header, and the header's bottom margin
 /// before the first data row. The hit-test rule belongs to the frame plan so
@@ -75,7 +77,9 @@ pub(crate) fn centered_popup(area: Rect, width: u16, height: u16) -> Rect {
 }
 
 /// A bounded slice of a table's canonical row order plus the selected index
-/// relative to that slice.
+/// relative to that slice. The slice and the cursor's place in it come from
+/// `zhuge-ui-core::row_page`; this record only carries them to the painter and
+/// the pointer hit-test, so neither re-derives the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct TableWindow {
     pub(crate) start: usize,
@@ -84,27 +88,19 @@ pub(crate) struct TableWindow {
 }
 
 /// Compute the row window for a bordered table with one header row and the
-/// shared header bottom margin. The selected row remains global while only
-/// this bounded slice is materialized by the renderer.
+/// shared header bottom margin, centered on the selected row by the shared
+/// row-page owner. The selected row stays global while only this bounded
+/// slice is materialized by the renderer.
 #[must_use]
 pub(crate) fn table_window(total: usize, selected: usize, area: Rect) -> TableWindow {
-    if total == 0 {
-        return TableWindow {
-            start: 0,
-            end: 0,
-            selected: 0,
-        };
-    }
+    // The bordered table spends four terminal rows on chrome and always paints
+    // at least one row; the shared owner turns that capacity into the page.
     let body_rows = usize::from(area.height.saturating_sub(4)).max(1);
-    let visible = body_rows.min(total);
-    let selected = selected.min(total - 1);
-    let start = selected
-        .saturating_sub(visible / 2)
-        .min(total.saturating_sub(visible));
+    let reveal = RowPage::reveal_centered(total, body_rows, selected);
     TableWindow {
-        start,
-        end: start + visible,
-        selected: selected - start,
+        start: reveal.page().first(),
+        end: reveal.page().last(),
+        selected: reveal.focus_offset(),
     }
 }
 

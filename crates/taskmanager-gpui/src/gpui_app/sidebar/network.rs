@@ -1,6 +1,7 @@
 //! Renderer-edge network category labels and visibility classification helpers.
 
 use taskforest_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n;
 use taskmanager_shell::presentation::optional_wifi_signal_quality_percent;
 
@@ -61,7 +62,7 @@ pub(crate) fn nic_caption_line2(n: &NetworkMetrics) -> String {
             parts.push(ssid.to_string());
         }
         if let Some(pct) = optional_wifi_signal_quality_percent(n.current_signal_dbm()) {
-            parts.push(format!("{pct:.0}%"));
+            parts.push(percent_text(pct));
         }
     } else {
         parts.push(n.interface_name.as_ref().to_owned());

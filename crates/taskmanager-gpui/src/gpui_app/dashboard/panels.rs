@@ -9,7 +9,7 @@ use gpui::{
     ParentElement, ScrollHandle, Styled, Window, div, px,
 };
 use taskforest_core::core::AlertEventKind;
-use taskforest_core::core::{AlertEvent, AlertMetric, AlertSeverity};
+use taskforest_core::core::{AlertEvent, AlertSeverity};
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::i18n;
 use taskmanager_shell::ProcessStatusFilter;
@@ -182,7 +182,7 @@ fn render_events(
                                 .child(format!(
                                     "{} · {}",
                                     event_kind_label(event.kind),
-                                    metric_label(event.alert.metric)
+                                    i18n::alert_metric_label(event.alert.metric)
                                 )),
                         )
                         .child(
@@ -460,24 +460,6 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
         );
     }
     content.child(rows)
-}
-
-fn metric_label(metric: AlertMetric) -> &'static str {
-    match metric {
-        AlertMetric::CpuUsagePercent => i18n::t("common.cpu"),
-        AlertMetric::MemoryUsagePercent => i18n::t("common.memory"),
-        AlertMetric::DiskTemperatureC => i18n::t("alert.disk_temperature"),
-        AlertMetric::SmartPercentUsed => i18n::t("alert.smart_wear"),
-        AlertMetric::SmartCriticalWarning => i18n::t("alert.smart_critical"),
-    }
-}
-
-pub(super) fn severity_label(severity: AlertSeverity) -> &'static str {
-    match severity {
-        AlertSeverity::Info => i18n::t("alert.info"),
-        AlertSeverity::Warning => i18n::t("alert.warning"),
-        AlertSeverity::Critical => i18n::t("alert.critical"),
-    }
 }
 
 fn event_filter_id(filter: EventFilter) -> &'static str {

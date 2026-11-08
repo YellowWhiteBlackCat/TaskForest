@@ -8,12 +8,12 @@ use taskmanager_ui_contract::{PROCESS_COLUMNS, find};
 /// the neutral `PROCESS_COLUMNS` inventory — position for position, with no
 /// orphan rows on either side.
 ///
-/// Variant coverage is compiler-anchored: the exhaustive
-/// [`SortCol::contract_id`] match makes adding a variant without a token a
-/// build error, this test iterates [`columns()`] and asserts each
-/// token resolves to exactly one contract row, and the position-wise id
-/// equality plus length/distinctness checks make an orphan contract row
-/// (or a variant missing from the contract) impossible to miss.
+/// Variant coverage is compiler-anchored: the shell's canonical
+/// `sort_token` mapping makes adding a variant without a token a build
+/// error, this test iterates [`columns()`] and asserts each token resolves
+/// to exactly one contract row, and the position-wise id equality plus
+/// length/distinctness checks make an orphan contract row (or a variant
+/// missing from the contract) impossible to miss.
 #[test]
 fn sort_col_semantics_delegate_to_the_process_column_contract() {
     assert_eq!(
@@ -23,7 +23,7 @@ fn sort_col_semantics_delegate_to_the_process_column_contract() {
     );
     let mut seen: HashSet<&str> = HashSet::new();
     for (position, &col) in columns().iter().enumerate() {
-        let id = contract_id(col);
+        let id = sort_token(col);
         assert_eq!(
             PROCESS_COLUMNS[position].id, id,
             "canonical order broke at position {position}"

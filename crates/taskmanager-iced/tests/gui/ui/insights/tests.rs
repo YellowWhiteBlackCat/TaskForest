@@ -189,8 +189,8 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         target: None,
         deleted: false,
     };
-    assert!(format_open_file_row(&readable).contains("/dev/null"));
-    let denied_line = format_open_file_row(&unreadable);
+    assert!(format_open_file_row(&readable, t("proc_insights.unreadable")).contains("/dev/null"));
+    let denied_line = format_open_file_row(&unreadable, t("proc_insights.unreadable"));
     assert!(
         denied_line.contains(t("proc_insights.unreadable")),
         "an unreadable fd must surface the typed marker, got: {denied_line}"
@@ -255,7 +255,7 @@ fn engine_usage_keeps_a_cold_start_gap_honest() {
         !gap_line.contains("0.0%"),
         "cold-start gap must not fabricate 0%: {gap_line}"
     );
-    assert!(warm_line.contains("12.5%"));
+    assert!(warm_line.contains("13%"));
     // The cumulative readout prefers busy-nanoseconds (i915) and falls
     // back to the cycle counter (xe), never showing both. The duration
     // template and the cycle wording are locale-owned, so the test pins the

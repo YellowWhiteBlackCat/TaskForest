@@ -482,3 +482,42 @@ mod sensor_state_aggregation_tests {
         );
     }
 }
+
+#[test]
+fn sensor_center_snapshot_fan_pwm_percent_extracts_matching_duty_cycle() {
+    use crate::core::FailureKind;
+    use crate::core::identity::DeviceId;
+    use crate::core::sensors::{
+        SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+        SensorReading,
+    };
+
+    let dev = DeviceId::new("fan1");
+    let reading = fan_reading(dev.clone(), "fan1", 1200, 100);
+    let descriptor = SensorDescriptor::pwm_duty_cycle();
+    let pwm_obs = SensorMeasurementObservation::available(
+        descriptor.clone(),
+        SensorMagnitude::DutyCycle {
+            value: 128,
+            maximum: 255,
+        },
+        100,
+    )
+    .unwrap_or_else(|_| {
+        SensorMeasurementObservation::unavailable(descriptor, FailureKind::ProviderFault)
+    });
+    let pwm_reading = SensorReading::from_measurement_observation(
+        dev.clone(),
+        "pwm1".into(),
+        "Fan PWM".into(),
+        pwm_obs,
+    );
+    let snapshot = SensorCenterSnapshot {
+        readings: vec![reading.clone(), pwm_reading],
+        ..Default::default()
+    };
+    let percent = snapshot
+        .fan_pwm_percent(&reading)
+        .expect("fan pwm resolved");
+    assert!((percent - (128.0 * 100.0 / 255.0)).abs() < 0.01);
+}

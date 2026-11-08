@@ -6,6 +6,7 @@ use gpui::{
 use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::InputModality;
 
 struct FocusTargetHarness {
     focus_handle: Option<FocusHandle>,
@@ -88,8 +89,6 @@ fn inherited_ui_font_declares_the_bundled_cjk_fallback() {
 /// snapshot consumes `shows_focus_ring()` through `Theme::with_focus_visible`.
 #[test]
 fn input_modality_only_keyboard_paints_the_focus_ring() {
-    use super::super::InputModality;
-
     let mut modality = InputModality::default();
     assert!(
         !modality.shows_focus_ring(),
@@ -97,7 +96,7 @@ fn input_modality_only_keyboard_paints_the_focus_ring() {
     );
 
     assert!(
-        modality.observe_keyboard(),
+        modality.transition(InputModality::Keyboard),
         "the keyboard origin must be a real transition"
     );
     assert!(
@@ -105,12 +104,12 @@ fn input_modality_only_keyboard_paints_the_focus_ring() {
         "keyboard navigation must paint the ring"
     );
     assert!(
-        !modality.observe_keyboard(),
+        !modality.transition(InputModality::Keyboard),
         "a repeated key must not churn the render"
     );
 
     assert!(
-        modality.observe_pointer(),
+        modality.transition(InputModality::Pointer),
         "the pointer origin must be a real transition"
     );
     assert!(
@@ -118,12 +117,12 @@ fn input_modality_only_keyboard_paints_the_focus_ring() {
         "pointer-driven focus must suppress the ring"
     );
     assert!(
-        !modality.observe_pointer(),
+        !modality.transition(InputModality::Pointer),
         "a repeated press must not churn the render"
     );
 
     assert!(
-        modality.observe_keyboard(),
+        modality.transition(InputModality::Keyboard),
         "the next keyboard origin must ring again"
     );
     assert!(modality.shows_focus_ring());
@@ -182,7 +181,7 @@ async fn input_modality_clears_when_focused_target_unmounts(cx: &mut TestAppCont
     window
         .update(cx, |_view, window, cx| {
             root.update(cx, |root, cx| {
-                assert!(root.input_modality.observe_keyboard());
+                assert!(root.input_modality.transition(InputModality::Keyboard));
                 root.ensure_input_modality_observers(window, cx);
             });
         })

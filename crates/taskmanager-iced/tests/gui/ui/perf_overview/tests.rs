@@ -376,15 +376,9 @@ mod cpu_frequency_source_tests {
     }
 
     #[test]
-    fn cpu_chart_layout_keeps_secondary_surfaces_out_of_compact_space() {
-        assert_eq!(
-            projection::CpuChartLayout::for_inventory(PerformanceChartInventory::Full),
-            projection::CpuChartLayout::AggregateWithPerCore
-        );
-        assert_eq!(
-            projection::CpuChartLayout::for_inventory(PerformanceChartInventory::AggregateOnly),
-            projection::CpuChartLayout::AggregateOnly
-        );
+    fn the_full_inventory_earns_the_extended_chart_composition() {
+        assert!(PerformanceChartInventory::Full.includes_extended_charts());
+        assert!(!PerformanceChartInventory::AggregateOnly.includes_extended_charts());
     }
 
     #[derive(Debug, Default)]

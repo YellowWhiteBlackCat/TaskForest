@@ -31,6 +31,7 @@ use taskforest_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKe
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::i18n::t;
 
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::time::LocalTimeRulesCacheKey;
 use taskmanager_shell::presentation::start_clock_local;
 use taskmanager_shell::presentation::{
@@ -384,7 +385,9 @@ pub(crate) fn build_row_cells_with_rules(
         pid: process.pid.to_string(),
         cpu: process
             .current_cpu_percentage()
-            .map_or_else(missing_value, |cpu| format!("{cpu:>5.1}%")),
+            .map_or_else(missing_value, |cpu| {
+                format!("{:>5}", precise_percent_text(cpu))
+            }),
         memory: process
             .current_memory_bytes()
             .map_or_else(missing_value, bytes),

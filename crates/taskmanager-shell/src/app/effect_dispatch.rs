@@ -3,8 +3,10 @@
 //! helper it shares with the platform-batch fold. Split out of the parent app
 //! module so the file stays under the source-line ceiling.
 use super::{ProcessControlKind, ShellApp};
+use std::time::SystemTime;
 use taskforest_contract::{RequestId, SubmissionError, SubmissionErrorKind};
 use taskforest_core::core::services::{ServiceLogErrorKind, ServiceLogFailure};
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::{
     DesktopAppearanceRequest, PlatformClient, PlatformEffect, PlatformEventBatch,
     ProcessControlRequest, ServiceControlRequest, SessionControlRequest, ShellUiActionIntent,
@@ -77,7 +79,7 @@ pub fn queue_effect_result(
     platform: &mut PlatformClient,
     effect: PlatformEffect,
 ) -> Result<Vec<RequestId>, SubmissionErrorKind> {
-    let now_ms = submission_time_ms();
+    let now_ms = unix_millis(SystemTime::now());
     let results = match &effect {
         PlatformEffect::ObserveDesktopAppearance => {
             vec![platform.submit_desktop_appearance(DesktopAppearanceRequest::Observe, now_ms)]
@@ -473,11 +475,3 @@ pub fn queue_effect_result(
 /// Bounded notification queue so a pathological evaluation burst cannot grow
 /// the shell state without limit; the frontend drains every frame.
 pub(super) const MAX_PENDING_NOTIFICATIONS: usize = 32;
-
-pub(super) fn submission_time_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
-}

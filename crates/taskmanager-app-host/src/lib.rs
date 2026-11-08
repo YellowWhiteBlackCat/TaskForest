@@ -28,7 +28,9 @@ use taskmanager_platform_native::{
 use taskmanager_platform_runtime::CompositionError;
 
 mod diagnostic_bundle_runtime;
+mod frame_timing_sink;
 mod history_frontend;
+mod history_frontend_runtime;
 mod history_persistence_runtime;
 mod history_replay_runtime;
 mod mode;
@@ -42,12 +44,18 @@ mod window_capture_runtime;
 mod worker_fault;
 use diagnostic_bundle_runtime::DiagnosticBundleCoordinator;
 pub use diagnostic_bundle_runtime::{DiagnosticBundleClient, DiagnosticBundleRuntimeStartError};
+pub use frame_timing_sink::FrameTimingSink;
+pub use frame_timing_sink::observe_opt_in_frame;
+pub use frame_timing_sink::{
+    DEFAULT_GRAPHICAL_BUDGET_MS, DEFAULT_MAX_SAMPLES, SINK_ENV, sink_requested,
+};
 pub use history_frontend::{
     HistoryFrontendConnectCompletion, HistoryFrontendConnectRequestId,
     HistoryFrontendConnectSubmitError, HistoryFrontendConnector,
     HistoryFrontendConnectorStartError, HistoryFrontendSession, HistoryFrontendStartError,
     HistoryFrontendStartErrorKind,
 };
+pub use history_frontend_runtime::{HistoryFrontendConnectOutcome, HistoryFrontendRuntime};
 use history_persistence_runtime::HistoryPersistenceCoordinator;
 pub use history_persistence_runtime::{
     HistoryPersistenceFailure, HistoryPersistenceFailureKind, HistoryPersistenceOperation,

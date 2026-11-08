@@ -64,21 +64,6 @@ use taskmanager_theme::tokens;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::PerformanceChartInventory;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum CpuChartLayout {
-    AggregateWithPerCore,
-    AggregateOnly,
-}
-
-impl CpuChartLayout {
-    fn for_inventory(inventory: PerformanceChartInventory) -> Self {
-        match inventory {
-            PerformanceChartInventory::AggregateOnly => Self::AggregateOnly,
-            PerformanceChartInventory::Full => Self::AggregateWithPerCore,
-        }
-    }
-}
-
 pub(super) fn cpu_frequency_readout(frequency_mhz: Option<u64>) -> String {
     crate::gpui_app::formatting::optional_ghz(frequency_mhz)
 }
@@ -100,16 +85,6 @@ pub(super) fn cpu_temperature_readout(temperature_c: Option<f32>) -> String {
     })
 }
 
-/// i18n note key for a temperature source tier that needs a visible
-/// qualifier; native chip drivers stay unqualified.
-fn cpu_temperature_source_note_key(source: CpuTemperatureSource) -> Option<&'static str> {
-    match source {
-        CpuTemperatureSource::PackageHwmon => Some("cpu.temperature_source.package_hwmon"),
-        CpuTemperatureSource::ThermalZone => Some("cpu.temperature_source.thermal_zone"),
-        _ => None,
-    }
-}
-
 /// One temperature readout formatted for its source (the BogoMIPS
 /// `cpu_frequency_readout_for_source` counterpart): a labeled-fallback tier
 /// appends the source qualifier so a CPU-package-labeled channel on another
@@ -120,7 +95,7 @@ fn cpu_temperature_readout_for_source(
     source: CpuTemperatureSource,
 ) -> String {
     let readout = cpu_temperature_readout(temperature_c);
-    match cpu_temperature_source_note_key(source) {
+    match source.qualifier_note_key() {
         Some(key) if temperature_c.is_some() => format!("{readout} · {}", i18n::t(key)),
         _ => readout,
     }
@@ -177,7 +152,6 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     };
     let cpu = &snap.cpu;
     let stats = CpuLiveStats::from_snapshot(snap);
-    let chart_layout = CpuChartLayout::for_inventory(layout.chart_inventory);
     let aggregate_series = core_history.aggregate(telemetry);
     let core_series = core_history.refresh(telemetry);
     // The per-core matrix is the Full-inventory companion; an aggregate-only
@@ -196,21 +170,22 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     // smoothly enough to retain the small-core matrix, while a truly short
     // frame still drops the whole matrix before any row can clip.
     let matrix_headline_height = cpu_matrix_headline_height(layout, matrix_min_height);
-    let below = match chart_layout {
-        CpuChartLayout::AggregateOnly => None,
-        CpuChartLayout::AggregateWithPerCore if matrix_headline_height.is_some() => Some(
-            per_core_grid::render(
-                theme,
-                &stats,
-                hardware,
-                &core_series,
-                graph_settings,
-                graph_cache.clone(),
+    let below =
+        if layout.chart_inventory.includes_extended_charts() && matrix_headline_height.is_some() {
+            Some(
+                per_core_grid::render(
+                    theme,
+                    &stats,
+                    hardware,
+                    &core_series,
+                    graph_settings,
+                    graph_cache.clone(),
+                )
+                .into_any_element(),
             )
-            .into_any_element(),
-        ),
-        CpuChartLayout::AggregateWithPerCore => None,
-    };
+        } else {
+            None
+        };
     // Headline-stays-small: while the matrix carries the page, the aggregate
     // chart is capped — it is the clear-at-a-glance surface. When the matrix
     // hides, the cap lifts and the headline fills the viewport.

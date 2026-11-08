@@ -17,7 +17,7 @@ use bevy::ui::UiSystems;
 use bevy::ui::prelude::{ComputedNode, FlexDirection, FlexWrap, Node, UiRect, Val, percent};
 use bevy::ui::widget::Text;
 use taskforest_core::core::hardware::HardwareInfo;
-use taskforest_core::core::metrics::SmbiosMemorySnapshot;
+use taskforest_core::core::metrics::{SmbiosMemorySnapshot, SystemSnapshot};
 use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskforest_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_application::i18n::t;
@@ -29,6 +29,7 @@ use super::privacy::{SerialDisclosure, identity_fact_rows, module_serial_rows};
 use super::thermal::thermal_zone_card_scene;
 use super::thermal::{gpu_temperature_card_scene, sensor_temperature_projection};
 use super::topology::{memory_topology, topology_card_scene};
+use super::topology_graph::{hardware_topology_graph, topology_graph_card_scene};
 use super::{
     MemoryInventoryAnchor, SystemBody, SystemFactGroup, SystemFactRow, SystemSummaryModel,
     clean_memory_size, fact_row_scene, kpi_tile_scene, section_card_scene, system_fact_rows,
@@ -91,6 +92,9 @@ pub(crate) struct OverviewInputs<'a> {
     pub(crate) smbios: Option<&'a SmbiosMemorySnapshot>,
     /// The accepted NPU inventory, when the lane answered.
     pub(crate) npu: Option<&'a NpuInventorySnapshot>,
+    /// The live telemetry snapshot, when a projection has arrived; the
+    /// PCIe topology folds from its GPU and disk facts.
+    pub(crate) telemetry: Option<&'a SystemSnapshot>,
     /// The sensor-center snapshot, when the lane answered.
     pub(crate) sensors: Option<&'a SensorCenterSnapshot>,
     /// The KPI summary values.
@@ -243,6 +247,7 @@ pub(crate) fn system_body_scene(
     rows.extend(module_serial_rows(inputs.smbios, inputs.disclosure));
     let projection = inputs.sensors.map(sensor_temperature_projection);
     let topology = inputs.smbios.map(memory_topology);
+    let graph = hardware_topology_graph(inputs.hardware, inputs.smbios, inputs.telemetry);
     let zones_present = projection
         .as_ref()
         .is_some_and(|projection| !projection.zones.rows.is_empty());
@@ -252,7 +257,8 @@ pub(crate) fn system_body_scene(
     let topology_present = topology
         .as_ref()
         .is_some_and(|topology| !topology.slots.is_empty());
-    if rows.is_empty() && !zones_present && !gpu_present && !topology_present {
+    let graph_present = graph.states_known_facts();
+    if rows.is_empty() && !zones_present && !gpu_present && !topology_present && !graph_present {
         return Box::new(bsn! {
             Node {
                 width: percent(100),
@@ -291,7 +297,8 @@ pub(crate) fn system_body_scene(
     let card_count = drafts.len()
         + usize::from(zones_present)
         + usize::from(gpu_present)
-        + usize::from(topology_present);
+        + usize::from(topology_present)
+        + usize::from(graph_present);
     let grid = OverviewGrid::resolve(
         inputs.content_width.unwrap_or(0.0),
         space_8(),
@@ -339,6 +346,10 @@ pub(crate) fn system_body_scene(
     if let Some(topology) = topology.as_ref()
         && topology_present
         && let Some(card) = topology_card_scene(topology, grid.card_width, palette)
+    {
+        cards.push(card);
+    }
+    if graph_present && let Some(card) = topology_graph_card_scene(&graph, grid.card_width, palette)
     {
         cards.push(card);
     }

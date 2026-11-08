@@ -577,7 +577,7 @@ impl Tree {
         let _ = selected;
         div()
             .h_full()
-            .pl(px(4.0) + indent)
+            .pl(crate::theme_binding::pixels(tokens::SPACE_4) + indent)
             .pr(crate::theme_binding::definite_length(tokens::SPACE_8))
             .flex()
             .flex_row()

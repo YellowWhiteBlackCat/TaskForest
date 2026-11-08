@@ -31,7 +31,7 @@ use taskmanager_ui_contract::presentation::budget::{
 use taskmanager_ui_contract::presentation::budget::{
     PageLayoutBudget, PerformancePageBudget, SystemPageBudget,
 };
-use taskmanager_ui_contract::presentation::thresholds::{LayoutBands, bands};
+use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, LayoutBands, bands, number};
 use taskmanager_ui_contract::presentation::vocabulary::{
     LayoutProfile, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, NAV_RAIL_WIDTH, NavigationPresentation,
     VerticalSpace,
@@ -45,24 +45,19 @@ pub(crate) use dashboard::{DashboardBudget, DashboardSummaries};
 
 pub const MIN_WIDTH: f32 = MIN_WINDOW_WIDTH;
 pub const MIN_HEIGHT: f32 = MIN_WINDOW_HEIGHT;
-pub const PERFORMANCE_STATS_MIN_WIDTH: f32 = 236.0;
-pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 280.0;
-pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 220.0;
-pub const PERFORMANCE_RUNWAY_CHARTS_HEIGHT: f32 = 520.0;
-pub const CONSTRAINED_CONTENT_HEIGHT: f32 = 640.0;
-pub const GENEROUS_CONTENT_HEIGHT: f32 = 900.0;
+// The registered layout bands resolve through the threshold registry — this
+// shape never restates a number it has already declared there (ADR-064).
+pub const PERFORMANCE_STATS_MIN_WIDTH: f32 =
+    number(FrontendShape::Gpui, LayoutAxis::PerformanceStatsMinWidth);
+pub const PERFORMANCE_STATS_MAX_WIDTH: f32 =
+    number(FrontendShape::Gpui, LayoutAxis::PerformanceStatsMaxWidth);
 pub const NAVIGATION_VERTICAL_INSET: f32 = 14.0;
 pub const ACTIVE_ALERT_HEIGHT: f32 = 32.0;
-pub const PERFORMANCE_STACKED_DETAILS_MIN_HEIGHT: f32 = 520.0;
-pub const NAVIGATION_HORIZONTAL_INSET: f32 = 12.0;
+pub const NAVIGATION_HORIZONTAL_INSET: f32 =
+    number(FrontendShape::Gpui, LayoutAxis::NavigationHorizontalInset);
 
 fn shape_bands() -> LayoutBands {
     bands(FrontendShape::Gpui)
-}
-
-#[must_use]
-pub fn performance_budget_from_page_layout(layout: PageLayoutBudget) -> PerformancePageBudget {
-    PerformancePageBudget::coarse(layout, &shape_bands())
 }
 
 #[must_use]

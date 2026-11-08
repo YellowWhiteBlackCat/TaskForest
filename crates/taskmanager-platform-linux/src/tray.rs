@@ -20,6 +20,7 @@ use taskforest_contract::{TrayController, TrayFailure};
 use taskforest_core::tray::{
     TrayActionId, TrayEvent, TrayIconData, TrayMenuItem, TrayMenuSpec, TraySpec,
 };
+use zhuge_ui_core::pixel::rgba8_to_argb32;
 
 /// Stable StatusNotifierItem id; consistent across sessions.
 const TRAY_ID: &str = "TaskForest";
@@ -288,16 +289,12 @@ fn flush_radio_group(
     );
 }
 
-/// RGBA (non-premultiplied) to ksni ARGB32 network byte order.
+/// Assemble the native ksni icon around the shared ARGB32 pixel transform.
 fn to_ksni_icon(icon: &TrayIconData) -> Icon {
-    let mut data = icon.pixels().to_vec();
-    for pixel in data.as_chunks_mut::<4>().0 {
-        pixel.rotate_right(1);
-    }
     Icon {
         width: icon.width() as i32,
         height: icon.height() as i32,
-        data,
+        data: rgba8_to_argb32(icon.pixels()),
     }
 }
 

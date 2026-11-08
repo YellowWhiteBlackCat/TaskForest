@@ -19,7 +19,8 @@ use super::cpu_topology::{
 };
 
 const GIB: u64 = 1024 * 1024 * 1024;
-const MIB: u64 = 1024 * 1024;
+
+use taskforest_core::core::units::BYTES_PER_MIB;
 
 pub(super) fn snapshot() -> SystemSnapshot {
     let mut cpu = CpuMetrics::from_observations(CpuScalarObservations {
@@ -101,27 +102,39 @@ pub(super) fn snapshot() -> SystemSnapshot {
         memory: MemoryMetrics::from_observations(
             MemoryScalarObservations {
                 total_bytes: ScalarObservation::available(32 * GIB, 1_785_292_800_000),
-                used_bytes: ScalarObservation::available(12 * GIB + 640 * MIB, 1_785_292_800_000),
+                used_bytes: ScalarObservation::available(
+                    12 * GIB + 640 * BYTES_PER_MIB,
+                    1_785_292_800_000,
+                ),
                 available_bytes: ScalarObservation::available(
-                    19 * GIB + 384 * MIB,
+                    19 * GIB + 384 * BYTES_PER_MIB,
                     1_785_292_800_000,
                 ),
                 swap_total_bytes: ScalarObservation::available(8 * GIB, 1_785_292_800_000),
-                swap_used_bytes: ScalarObservation::available(620 * MIB, 1_785_292_800_000),
+                swap_used_bytes: ScalarObservation::available(
+                    620 * BYTES_PER_MIB,
+                    1_785_292_800_000,
+                ),
                 used_rate_mib_per_sec: ScalarObservation::available(180.2, 1_785_292_800_000),
                 ..Default::default()
             },
             MemoryOptionalObservations {
                 composition: MemoryCompositionObservations {
                     cached_bytes: OptionalObservation::present(7 * GIB, 1_785_292_800_000),
-                    buffers_bytes: OptionalObservation::present(24 * MIB, 1_785_292_800_000),
+                    buffers_bytes: OptionalObservation::present(
+                        24 * BYTES_PER_MIB,
+                        1_785_292_800_000,
+                    ),
                     free_bytes: OptionalObservation::present(
-                        12 * GIB + 384 * MIB,
+                        12 * GIB + 384 * BYTES_PER_MIB,
                         1_785_292_800_000,
                     ),
                     ..Default::default()
                 },
-                hardware_reserved_bytes: OptionalObservation::present(128 * MIB, 1_785_292_800_000),
+                hardware_reserved_bytes: OptionalObservation::present(
+                    128 * BYTES_PER_MIB,
+                    1_785_292_800_000,
+                ),
                 modules: MemoryModuleObservations {
                     speed_mhz: OptionalObservation::present(5600, 1_785_292_800_000),
                     slots_used: OptionalObservation::present(2, 1_785_292_800_000),
@@ -132,18 +145,18 @@ pub(super) fn snapshot() -> SystemSnapshot {
                 },
                 virtual_memory_commit: VirtualMemoryCommitObservations {
                     committed_bytes: OptionalObservation::present(
-                        18 * GIB + 800 * MIB,
+                        18 * GIB + 800 * BYTES_PER_MIB,
                         1_785_292_800_000,
                     ),
                     limit_bytes: OptionalObservation::present(78 * GIB, 1_785_292_800_000),
                 },
                 compression: MemoryCompressionObservations {
                     compressed_swap_used_bytes: OptionalObservation::present(
-                        8 * GIB + 600 * MIB,
+                        8 * GIB + 600 * BYTES_PER_MIB,
                         1_785_292_800_000,
                     ),
                     compressed_swap_capacity_bytes: OptionalObservation::present(
-                        30 * GIB + 900 * MIB,
+                        30 * GIB + 900 * BYTES_PER_MIB,
                         1_785_292_800_000,
                     ),
                     compressed_swap_original_bytes: OptionalObservation::present(
@@ -176,8 +189,14 @@ pub(super) fn snapshot() -> SystemSnapshot {
             disk.apply_scalar_observations(DiskScalarObservations {
                 capacity_bytes: ScalarObservation::available(2_000 * GIB, 1_785_292_800_000),
                 available_bytes: ScalarObservation::available(1_240 * GIB, 1_785_292_800_000),
-                read_bytes_per_sec: ScalarObservation::available(84 * MIB, 1_785_292_800_000),
-                write_bytes_per_sec: ScalarObservation::available(31 * MIB, 1_785_292_800_000),
+                read_bytes_per_sec: ScalarObservation::available(
+                    84 * BYTES_PER_MIB,
+                    1_785_292_800_000,
+                ),
+                write_bytes_per_sec: ScalarObservation::available(
+                    31 * BYTES_PER_MIB,
+                    1_785_292_800_000,
+                ),
                 active_time_pct: ScalarObservation::available(12.7, 1_785_292_800_000),
                 average_queue_depth: ScalarObservation::available(0.42, 1_785_292_800_000),
                 service_time_ms: ScalarObservation::available(1.8, 1_785_292_800_000),
@@ -193,8 +212,14 @@ pub(super) fn snapshot() -> SystemSnapshot {
             network.apply_observations(
                 NetworkAdapterType::WiFi,
                 NetworkScalarObservations {
-                    rx_bytes_per_sec: ScalarObservation::available(12 * MIB, 1_785_292_800_000),
-                    tx_bytes_per_sec: ScalarObservation::available(2 * MIB, 1_785_292_800_000),
+                    rx_bytes_per_sec: ScalarObservation::available(
+                        12 * BYTES_PER_MIB,
+                        1_785_292_800_000,
+                    ),
+                    tx_bytes_per_sec: ScalarObservation::available(
+                        2 * BYTES_PER_MIB,
+                        1_785_292_800_000,
+                    ),
                     link_up: ScalarObservation::available(true, 1_785_292_800_000),
                     ..Default::default()
                 },

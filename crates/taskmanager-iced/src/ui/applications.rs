@@ -14,7 +14,10 @@ use iced::widget::{Space, Stack, button, container, mouse_area, row, text};
 use std::rc::Rc;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessStatusFilter;
-use taskmanager_shell::{SortCol, SortDir};
+use taskmanager_shell::{
+    SortCol, SortDir,
+    saved_views::{sort_from_legacy_token, sort_token},
+};
 use taskmanager_ui_contract::ProcessColumnSpec;
 
 use super::process_projection::ProcessProjection;
@@ -70,7 +73,7 @@ pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64
     let widths = render
         .column_widths
         .iter()
-        .map(|(column, width)| (sort_col_contract_id(column), width.to_bits()))
+        .map(|(column, width)| (sort_token(column), width.to_bits()))
         .collect::<Vec<_>>();
     super::lazy_key::LazyKey::new("applications-table")
         .revision(generation)
@@ -217,73 +220,40 @@ pub(crate) fn sort_arrow(active: (SortCol, SortDir), column: SortCol) -> Option<
 /// `SortCol` variant without an arm is a build error, and the contract gate
 /// test in `tests/gui/ui/table_columns_tests.rs` then forces the matching
 /// contract row.
-pub(crate) fn sort_col_contract_id(column: SortCol) -> &'static str {
-    match column {
-        SortCol::Name => "Name",
-        SortCol::User => "User",
-        SortCol::Pid => "PID",
-        SortCol::Threads => "Threads",
-        SortCol::StartTime => "StartTime",
-        SortCol::State => "Status",
-        SortCol::Cpu => "CPU",
-        SortCol::Memory => "Memory",
-        SortCol::Swap => "Swap",
-        SortCol::DiskRead => "DiskRead",
-        SortCol::DiskWrite => "DiskWrite",
-        SortCol::Network => "Network",
-        SortCol::CpuTime => "CPUTime",
-        SortCol::Fds => "FDs",
-        SortCol::Nice => "Nice",
-        SortCol::Pss => "MemoryPss",
-    }
-}
-
 /// Inverse of [`sort_col_contract_id`] for the persisted column-width tokens
-/// (`Config::process_col_widths`). The spelling is exact (no fuzzy matching),
-/// so an unknown token maps to `None` and the load path drops it instead of
+/// (`Config::process_col_widths`). The canonical spelling is exact (no fuzzy
+/// matching), and the shell owner additionally accepts the historical
+/// spellings a config file written by an older build may still carry, so an
+/// unknown token maps to `None` and the load path drops it instead of
 /// fabricating state. `Name` resolves like every other token; the resizable
 /// gate at the caller keeps the identity column out of the width store.
 #[must_use]
 pub(crate) fn sort_col_from_contract_id(token: &str) -> Option<SortCol> {
-    match token {
-        "Name" => Some(SortCol::Name),
-        "User" => Some(SortCol::User),
-        "PID" => Some(SortCol::Pid),
-        "Threads" => Some(SortCol::Threads),
-        "StartTime" => Some(SortCol::StartTime),
-        "Status" => Some(SortCol::State),
-        "CPU" => Some(SortCol::Cpu),
-        "Memory" => Some(SortCol::Memory),
-        "Swap" => Some(SortCol::Swap),
-        "DiskRead" => Some(SortCol::DiskRead),
-        "DiskWrite" => Some(SortCol::DiskWrite),
-        "Network" => Some(SortCol::Network),
-        "CPUTime" => Some(SortCol::CpuTime),
-        "FDs" => Some(SortCol::Fds),
-        "Nice" => Some(SortCol::Nice),
-        "MemoryPss" | "PSS" => Some(SortCol::Pss),
-        _ => None,
-    }
+    sort_from_legacy_token(token)
 }
 
-/// The neutral contract row for this column. `None` is reachable only for the
-/// shell-superset `Pss` column (no contract row by design); a miss for any
-/// other variant is a programming error the `debug_assert` gate and the
-/// contract gate test both catch, while the accessors below keep panic-free
-/// page-local fallbacks so rendering survives a release build.
+/// The neutral contract row for this column, resolved through the shell's
+/// canonical `sort_token` — the same string the persisted sort / hidden-column
+/// tokens use, so persistence, the contract, and the shell enum cannot
+/// disagree. A miss means a variant without a contract row: a programming
+/// error the `debug_assert` gate and the contract gate test both catch, while
+/// the accessors below keep panic-free page-local fallbacks so rendering
+/// survives a release build.
 fn contract_spec(column: SortCol) -> Option<&'static ProcessColumnSpec> {
-    let spec = find(sort_col_contract_id(column));
+    let spec = find(sort_token(column));
     debug_assert!(
         column == SortCol::Pss || spec.is_some(),
         "SortCol {column:?} ({}) is missing from PROCESS_COLUMNS",
-        sort_col_contract_id(column)
+        sort_token(column)
     );
     spec
 }
 
-/// Page-local default width of the shell-superset `Pss` column — the only
-/// column without a contract row. Every other column's width is contract
-/// truth; do not add more literals here.
+/// Page-local fallback width for a column whose contract row is missing.
+/// Every column's width is contract truth (the `Pss` column included — the
+/// contract carries a `MemoryPss` row); this literal only keeps a release
+/// build renderable if the contract ever loses a row. Do not add more
+/// literals here.
 const PSS_LOCAL_WIDTH: f32 = 90.0;
 
 /// Default pixel width of this column's header AND body cell — delegated to
@@ -299,10 +269,9 @@ pub(crate) fn column_width(column: SortCol) -> f32 {
 
 /// Horizontal cell alignment: numeric contract columns right-align so digits
 /// line up vertically tick-to-tick; text columns stay left-aligned. The
-/// shell-superset `Pss` column (no contract row) still renders byte values,
-/// so it keeps the numeric alignment. This is an alignment concern only,
-/// independent of the shell's sort-direction classification (contract parity
-/// with the GPUI accessor).
+/// `Pss` column renders byte values, so it keeps the numeric alignment. This
+/// is an alignment concern only, independent of the shell's sort-direction
+/// classification (contract parity with the GPUI accessor).
 pub(crate) fn column_alignment(column: SortCol) -> Horizontal {
     match contract_spec(column) {
         Some(spec) if spec.numeric => Horizontal::Right,

@@ -23,6 +23,7 @@ use taskforest_core::core::process_telemetry::{ProcessThreadInfo, ProcessThreads
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
+use zhuge_ui_core::row_page::row_budget;
 
 use crate::gpui_app::formatting;
 use taskforest_core::core::device_state::DeviceStatus;
@@ -31,6 +32,7 @@ use taskmanager_theme::tokens;
 
 use super::ProcessInsightsLabels;
 use crate::gpui_app::theme::mono_font_with_fallback;
+use taskforest_core::core::percent::precise_percent_text;
 
 /// Render one thread as `tid  comm  state  cpu-time`. The cpu-time field falls
 /// back to an explicit dash when the source did not parse CPU counters, so a
@@ -44,7 +46,7 @@ fn format_thread(thread: &ProcessThreadInfo) -> String {
         .unwrap_or_else(formatting::missing_value);
     let cpu_percent = thread
         .cpu_percent
-        .map(|value| format!("{value:.1}%"))
+        .map(precise_percent_text)
         .unwrap_or_else(formatting::missing_value);
     let comm = if thread.comm.is_empty() {
         formatting::missing_value()
@@ -137,7 +139,11 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
                 labels.thread_cpu_percent
             )),
     );
-    let (shown, hidden) = super::capped_card_rows(threads.threads.len().saturating_sub(first));
+    let budget = row_budget(
+        threads.threads.len().saturating_sub(first),
+        super::MAX_INSIGHT_CARD_ROWS,
+    );
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     content = content.child(
         div()
             .flex()

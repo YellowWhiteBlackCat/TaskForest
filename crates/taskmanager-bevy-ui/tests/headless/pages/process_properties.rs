@@ -1,11 +1,12 @@
 //! Frozen process properties follow canonical identity across filtering and PID reuse.
 
-use super::{ProcessPropertiesSection, view_model};
+use super::view_model;
 use taskforest_core::core::ScalarObservation;
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskforest_core::core::process_telemetry::ConnectionTransport;
 use taskforest_core::core::process_telemetry::ProcessEnvironmentEntry;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::{AppAction, AppPage, i18n::t};
 use taskmanager_shell::{ShellApp, fixture};
@@ -35,7 +36,7 @@ fn properties_never_display_a_reused_pid_and_do_not_depend_on_the_table_filter()
     shell.query = "hidden by filter".to_owned();
     let current = view_model(
         &shell,
-        ProcessPropertiesSection::Overview,
+        ProcessDetailsSection::Overview,
         ProcessInsightFacet::Network,
     )
     .expect("properties remain open");
@@ -53,7 +54,7 @@ fn properties_never_display_a_reused_pid_and_do_not_depend_on_the_table_filter()
     shell.query.clear();
     let gone = view_model(
         &shell,
-        ProcessPropertiesSection::Overview,
+        ProcessDetailsSection::Overview,
         ProcessInsightFacet::Network,
     )
     .expect("old frozen review remains open");
@@ -117,7 +118,7 @@ fn performance_and_memory_views_keep_real_zeros_gaps_peaks_and_unavailable_value
     let _ = shell.apply_action(AppAction::OpenProperties);
     let overview = view_model(
         &shell,
-        ProcessPropertiesSection::Overview,
+        ProcessDetailsSection::Overview,
         ProcessInsightFacet::Network,
     )
     .expect("overview");
@@ -141,7 +142,7 @@ fn performance_and_memory_views_keep_real_zeros_gaps_peaks_and_unavailable_value
     );
     let performance = view_model(
         &shell,
-        ProcessPropertiesSection::Performance,
+        ProcessDetailsSection::Performance,
         ProcessInsightFacet::Network,
     )
     .expect("performance");
@@ -231,7 +232,7 @@ fn complete_inspection_preserves_tail_entries_and_separates_resource_and_securit
         (ProcessInsightFacet::Network, vec!["tail-7", "12.4 ms"]),
         (
             ProcessInsightFacet::Gpu,
-            vec!["tail-device-4", "tail-engine-4", "0.0%"],
+            vec!["tail-device-4", "tail-engine-4", "0%"],
         ),
         (ProcessInsightFacet::Threads, vec!["tail-thread-7", "poll"]),
         (
@@ -298,7 +299,7 @@ fn independent_availability_and_mismatched_targets_remain_honest() {
         fixture::ProjectionSeedFact::ProcessInsights(Box::new(Some(projection.clone()))),
     );
     let view = |shell: &ShellApp, facet| {
-        view_model(shell, ProcessPropertiesSection::Insights, facet).expect("view")
+        view_model(shell, ProcessDetailsSection::Insights, facet).expect("view")
     };
     assert!(view(&shell, ProcessInsightFacet::Network).authorize_network);
     assert!(

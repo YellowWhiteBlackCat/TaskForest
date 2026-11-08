@@ -91,6 +91,21 @@ fn tooltip_dismisses_on_pointer_escape_or_focus_loss_without_focus_ownership() {
 }
 
 #[test]
+fn the_named_tooltip_helper_agrees_with_the_cause_table() {
+    for cause in [
+        OverlayDismissCause::PointerExit,
+        OverlayDismissCause::PointerPress,
+        OverlayDismissCause::Escape,
+        OverlayDismissCause::FocusLoss,
+    ] {
+        assert!(tooltip_dismisses(cause), "{cause:?} must dismiss a tooltip");
+    }
+    assert!(!tooltip_dismisses(OverlayDismissCause::OutsidePress));
+    assert!(!tooltip_dismisses(OverlayDismissCause::ItemActivation));
+    assert!(!tooltip_dismisses(OverlayDismissCause::WindowBlur));
+}
+
+#[test]
 fn an_unlisted_pair_is_a_noop() {
     assert_eq!(
         outcome(OverlayKind::Modal, OverlayDismissCause::PointerExit),
@@ -99,5 +114,64 @@ fn an_unlisted_pair_is_a_noop() {
             restore_focus: false,
             forward_outside_press: false,
         }
+    );
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FixtureSurface {
+    Settings,
+    About,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FixtureKind {
+    Settings,
+    About,
+}
+
+impl OverlayKindOf for FixtureSurface {
+    type Kind = FixtureKind;
+
+    fn kind(&self) -> Self::Kind {
+        match self {
+            Self::Settings => FixtureKind::Settings,
+            Self::About => FixtureKind::About,
+        }
+    }
+}
+
+fn open(surface: FixtureSurface) -> OverlaySlotCommand<FixtureSurface, FixtureKind, ()> {
+    OverlaySlotCommand::Open(surface)
+}
+
+#[test]
+fn one_slot_opens_replaces_and_dismisses_without_a_second_owner() {
+    let mut slot = OverlaySlot::default();
+    assert_eq!(
+        slot.reduce(open(FixtureSurface::Settings)),
+        OverlaySlotOutcome::Opened(FixtureKind::Settings)
+    );
+    assert_eq!(slot.kind(), Some(FixtureKind::Settings));
+    assert_eq!(
+        slot.reduce(open(FixtureSurface::About)),
+        OverlaySlotOutcome::Replaced {
+            previous: FixtureKind::Settings,
+            current: FixtureKind::About,
+        }
+    );
+    assert_eq!(
+        slot.reduce(OverlaySlotCommand::Dismiss(FixtureKind::Settings, ())),
+        OverlaySlotOutcome::Unchanged,
+        "a stale close must not consume the current surface"
+    );
+    assert_eq!(slot.kind(), Some(FixtureKind::About));
+    assert_eq!(
+        slot.reduce(OverlaySlotCommand::Dismiss(FixtureKind::About, ())),
+        OverlaySlotOutcome::Dismissed(FixtureKind::About, ())
+    );
+    assert_eq!(slot.kind(), None);
+    assert_eq!(
+        slot.reduce(OverlaySlotCommand::DismissCurrent(())),
+        OverlaySlotOutcome::Unchanged
     );
 }

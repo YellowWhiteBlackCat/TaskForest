@@ -125,7 +125,7 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
     // Health derives through the shared ratio rule from the observed µWh pair.
     assert_eq!(
         lookup(&rows, "Health"),
-        "87.5%",
+        "88%",
         "the derived battery health must reach its own row"
     );
     assert_eq!(lookup(&rows, "Technology"), "Li-ion");

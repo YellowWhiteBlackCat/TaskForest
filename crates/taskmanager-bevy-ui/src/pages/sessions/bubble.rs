@@ -28,6 +28,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::ConfirmationKind;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 
@@ -55,10 +56,7 @@ pub(crate) struct SessionBubbleTarget {
 impl SessionBubbleTarget {
     /// The shared label of the frozen verb.
     pub(crate) fn action_label(&self) -> &'static str {
-        match self.action {
-            SessionControlAction::Disconnect => t("users.disconnect"),
-            SessionControlAction::Lock => t("users.lock"),
-        }
+        i18n::session_control_action_label(self.action)
     }
 }
 

@@ -145,7 +145,7 @@ pub(super) fn processes() -> Vec<ProcessItem> {
                 1,
             ),
             cpu_percentage: ScalarObservation::available(cpu, 1),
-            memory_bytes: ScalarObservation::available(memory_mib * MIB, 1),
+            memory_bytes: ScalarObservation::available(memory_mib * BYTES_PER_MIB, 1),
             start_time_secs: ScalarObservation::available(start_time_secs, 1),
             ..Default::default()
         });

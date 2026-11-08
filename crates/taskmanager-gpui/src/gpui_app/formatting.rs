@@ -23,11 +23,10 @@
 
 use crate::gpui_app::graph::GraphSettings;
 use taskforest_core::core::metrics::GpuMetrics;
+use taskforest_core::core::units::BYTES_PER_MIB;
 use taskforest_core::core::units::{self, QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{gigahertz, gpu_display_identity};
-
-const MIB_BYTES: u64 = 1024 * 1024;
 
 /// The single missing-value placeholder for GPUI readouts (an em dash),
 /// forwarded from the ADR-020 single-source home in `taskmanager-shell`.
@@ -125,7 +124,7 @@ pub(crate) fn format_signed_memory_rate_mib(
         "+"
     };
     let magnitude = units::format_quantity_f64(
-        f64::from(rate_mib_per_second.abs()) * MIB_BYTES as f64,
+        f64::from(rate_mib_per_second.abs()) * BYTES_PER_MIB as f64,
         QuantityFamily::Memory,
         true,
         &preferences,

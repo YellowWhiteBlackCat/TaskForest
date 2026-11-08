@@ -27,41 +27,24 @@ use bevy::text::{Font, FontFeatureTag, FontFeatures, TextFont};
 use bevy::ui::prelude::{BackgroundColor, Node, TextBackgroundColor, Val};
 use bevy::ui::widget::Text;
 use taskforest_core::core::metrics::ScalarObservation;
-use taskforest_core::core::process::{
-    ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation, ProcessScalarObservations,
-};
-use taskmanager_application::{AppAction, AppPage};
-use taskmanager_shell::{ShellApp, fixture};
+use taskforest_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskmanager_shell::ShellApp;
 use taskmanager_theme::LightDark;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
 use super::ProcessRowLink;
+use super::process_fixture_support::{applications_shell, process};
 use crate::app::FrontendTrack;
 use crate::palette::ui_palette;
 use crate::widgets::bounded_text::ELLIPSIS;
-use crate::widgets::table::contrast::{AA_CONTRAST_RATIO, contrast_ratio};
+use crate::widgets::table::contrast::contrast_ratio;
 use crate::widgets::table::resize::{ColumnResizeHandle, ColumnWidthNode, ColumnWidthOverrides};
 use crate::widgets::table::selection::CellSelection;
 use crate::window::FrontendWindowPlugin;
+use zhuge_ui_tokens::WCAG_AA_NORMAL;
 
 // ---- fixtures -----------------------------------------------------------
-
-fn process(pid: u32, name: &str) -> ProcessItem {
-    let mut item = ProcessItem::new(pid, name);
-    item.apply_scalar_observations(ProcessScalarObservations {
-        start_token: ScalarObservation::available(u64::from(pid), 1),
-        ..ProcessScalarObservations::default()
-    });
-    item
-}
-
-fn shell_with(items: Vec<ProcessItem>) -> ShellApp {
-    let mut shell = ShellApp::new();
-    fixture::edit_processes(&mut shell, |processes| *processes = Some(items));
-    let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
-    shell
-}
 
 /// The table app: the real window composition (fonts, palette, page mount)
 /// plus the UI layout and the text pipeline, so the measured slot and the
@@ -218,7 +201,7 @@ fn cell_text(app: &mut App, cell: Entity) -> String {
 
 #[test]
 fn dragging_the_header_gutter_changes_the_column_width() {
-    let mut app = table_app(shell_with(vec![process(11, "alpha")]));
+    let mut app = table_app(applications_shell(vec![process(11, "alpha")]));
     let handle = {
         let world = app.world_mut();
         world
@@ -288,7 +271,7 @@ fn dragging_the_header_gutter_changes_the_column_width() {
 #[test]
 fn an_overflowing_cell_ends_with_an_ellipsis() {
     let long_name = "a-very-long-process-name-that-does-not-fit-the-name-column".repeat(4);
-    let mut app = table_app(shell_with(vec![process(12, &long_name)]));
+    let mut app = table_app(applications_shell(vec![process(12, &long_name)]));
     // The layout settles over a few frames: the shaped width is measured
     // after the first layout, and the ellipsis width is measured on the pass
     // that follows it.
@@ -316,7 +299,7 @@ fn the_app_icon_flows_inline_with_the_process_name() {
     let identity =
         ProcessApplicationIdentity::new("cargo.desktop", "Cargo", None).expect("a real desktop id");
     item.apply_application_identity(ProcessMetadataObservation::available(identity, 1));
-    let mut app = table_app(shell_with(vec![item]));
+    let mut app = table_app(applications_shell(vec![item]));
     for _ in 0..3 {
         app.update();
     }
@@ -352,7 +335,7 @@ fn numeric_values_force_the_tabular_figures() {
     let mut scalars = *item.scalar_observations();
     scalars.cpu_percentage = ScalarObservation::available(12.5, 1);
     item.apply_scalar_observations(scalars);
-    let mut app = table_app(shell_with(vec![item]));
+    let mut app = table_app(applications_shell(vec![item]));
     for _ in 0..3 {
         app.update();
     }
@@ -375,7 +358,7 @@ fn numeric_values_force_the_tabular_figures() {
 
 #[test]
 fn a_double_click_selects_a_cell_visibly_and_a_secondary_click_copies_the_row() {
-    let mut app = table_app(shell_with(vec![process(15, "alpha")]));
+    let mut app = table_app(applications_shell(vec![process(15, "alpha")]));
     for _ in 0..3 {
         app.update();
     }
@@ -463,12 +446,12 @@ fn the_dimmed_zero_value_ink_clears_the_aa_contrast_ratio() {
     let body = bevy::color::Color::srgba(1.0, 1.0, 1.0, 1.0);
     let dim = bevy::color::Color::srgba(0.16, 0.16, 0.18, 1.0);
     assert!(
-        contrast_ratio(dim, surface) < AA_CONTRAST_RATIO,
+        contrast_ratio(dim, surface) < WCAG_AA_NORMAL,
         "the fixture's dim ink really is below AA"
     );
     let calibrated = crate::widgets::table::contrast::calibrate_muted_ink(dim, body, &[surface]);
     assert!(
-        contrast_ratio(calibrated, surface) >= AA_CONTRAST_RATIO,
+        contrast_ratio(calibrated, surface) >= WCAG_AA_NORMAL,
         "the calibrated ink clears AA on its surface"
     );
     assert_ne!(
@@ -487,8 +470,8 @@ fn the_dimmed_zero_value_ink_clears_the_aa_contrast_ratio() {
     for surface in surfaces {
         let ratio = contrast_ratio(calibrated, surface);
         assert!(
-            ratio >= AA_CONTRAST_RATIO,
-            "the dimmed ink clears AA on the row surface ({ratio} < {AA_CONTRAST_RATIO})"
+            ratio >= WCAG_AA_NORMAL,
+            "the dimmed ink clears AA on the row surface ({ratio} < {WCAG_AA_NORMAL})"
         );
     }
     // The light skin is calibrated too.
@@ -505,7 +488,7 @@ fn the_dimmed_zero_value_ink_clears_the_aa_contrast_ratio() {
     for surface in light_surfaces {
         let ratio = contrast_ratio(light_ink, surface);
         assert!(
-            ratio >= AA_CONTRAST_RATIO,
+            ratio >= WCAG_AA_NORMAL,
             "the dimmed ink clears AA on the light row surface ({ratio})"
         );
     }
@@ -515,7 +498,7 @@ fn the_dimmed_zero_value_ink_clears_the_aa_contrast_ratio() {
 
 #[test]
 fn the_search_match_carries_a_background_highlight() {
-    let mut app = table_app(shell_with(vec![process(16, "cargo-build")]));
+    let mut app = table_app(applications_shell(vec![process(16, "cargo-build")]));
     for _ in 0..3 {
         app.update();
     }

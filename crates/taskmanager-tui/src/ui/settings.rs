@@ -69,13 +69,10 @@ const DEVICE_LABEL_KEYS: [&str; 10] = [
     "settings.show_gpus",
 ];
 
-/// The telemetry refresh-interval choices (ms), in display order.
-pub const REFRESH_MS: [u64; 4] = [500, 1_000, 2_000, 5_000];
+use taskmanager_ui_contract::presentation::settings::{CAPACITY_CHOICES, REFRESH_CHOICES_MS};
+
 pub const REFRESH_LABELS: [&str; 4] = ["0.5 s", "1 s", "2 s", "5 s"];
 
-/// The Performance sparkline window choices (samples), in display order
-/// (GPUI's 10..=600 range as discrete steps; 60 is the historical default).
-pub const GRAPH_POINTS: [usize; 4] = [60, 120, 300, 600];
 pub const GRAPH_LABELS: [&str; 4] = ["60", "120", "300", "600"];
 
 /// The persisted `Config::language` token for each language index (G-22).
@@ -151,7 +148,7 @@ pub struct SettingsForm {
     /// composition edge (G-22); an unrecorded preference keeps the
     /// host-detected locale.
     pub language: usize,
-    /// Index into REFRESH_MS (the telemetry refresh interval).
+    /// Index into `REFRESH_CHOICES_MS` (the telemetry refresh interval).
     pub refresh: usize,
     /// Device-family visibility toggles (field 8..18, order = DEVICE_FIELDS).
     pub show: [bool; 10],
@@ -160,7 +157,7 @@ pub struct SettingsForm {
     pub units: [bool; 6],
     /// Gray-out zero values on the process table (field 24).
     pub gray_zero: bool,
-    /// Index into GRAPH_POINTS (field 25, the Performance sparkline window).
+    /// Index into `CAPACITY_CHOICES` (field 25, the Performance sparkline window).
     pub graph_points: usize,
     /// Desktop notifications opt-in (field 26, BN-07).
     pub notify_enabled: bool,
@@ -279,13 +276,13 @@ impl SettingsForm {
     /// The selected Performance sparkline window (samples).
     #[must_use]
     pub const fn graph_points(&self) -> usize {
-        GRAPH_POINTS[self.graph_points]
+        CAPACITY_CHOICES[self.graph_points]
     }
 
     /// The persisted refresh interval (ms) for the current selection.
     #[must_use]
     pub const fn refresh_ms(&self) -> u64 {
-        REFRESH_MS[self.refresh]
+        REFRESH_CHOICES_MS[self.refresh]
     }
 
     /// Move focus to the next (delta +1) or previous (delta -1) field,
@@ -327,7 +324,7 @@ impl SettingsForm {
             4 => self.mono_font = wrap(self.mono_font, delta, FontChoice::PICKER_LADDER.len()),
             5 => self.density = wrap(self.density, delta, RowDensity::ALL.len()),
             6 => self.language = wrap(self.language, delta, LANGUAGE_TOKENS.len()),
-            7 => self.refresh = clamp(self.refresh, delta, REFRESH_MS.len()),
+            7 => self.refresh = clamp(self.refresh, delta, REFRESH_CHOICES_MS.len()),
             8..=17 => {
                 let index = self.field - 8;
                 self.show[index] = !self.show[index];
@@ -337,7 +334,7 @@ impl SettingsForm {
                 self.units[index] = !self.units[index];
             }
             24 => self.gray_zero = !self.gray_zero,
-            25 => self.graph_points = clamp(self.graph_points, delta, GRAPH_POINTS.len()),
+            25 => self.graph_points = clamp(self.graph_points, delta, CAPACITY_CHOICES.len()),
             26 => self.notify_enabled = !self.notify_enabled,
             27 => {
                 self.quiet_start = clamp(

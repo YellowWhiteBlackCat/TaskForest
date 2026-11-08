@@ -9,11 +9,12 @@ use iced::Length;
 use iced::widget::{canvas, column, container, row, text};
 use std::rc::Rc;
 use taskforest_core::core::history::HistoryWindow;
-use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus};
+use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus, i18n};
 use taskmanager_shell::presentation::bytes;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::virtual_table_body;
 
+use taskforest_core::core::percent::precise_percent_text;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -62,7 +63,7 @@ pub(super) fn app_history_page(
     .spacing(8);
 
     if projection.status != ApplicationHistoryStatus::Ready {
-        let (heading, detail) = history_state_copy(projection.status);
+        let (heading, detail) = projection.status.copy_text();
         let detail = projection.unavailable_reason.map_or_else(
             || detail.to_owned(),
             |reason| format!("{detail} ({})", reason.stable_code()),
@@ -121,7 +122,7 @@ fn history_window_controls<'a>(
         controls = controls.push(focus::choice_pill(
             theme_snapshot,
             crate::app::FocusTarget::HistoryReplayWindow(window),
-            t(history_window_key(window)).to_owned(),
+            i18n::history_window_label(window).to_owned(),
             selected == window,
             Message::SelectHistoryReplayWindow(window),
         ));
@@ -134,36 +135,6 @@ fn history_window_controls<'a>(
         false,
     ));
     controls.into()
-}
-
-fn history_window_key(window: HistoryWindow) -> &'static str {
-    match window {
-        HistoryWindow::OneHour => "perf.replay.window.1h",
-        HistoryWindow::TwentyFourHours => "perf.replay.window.24h",
-        HistoryWindow::SevenDays => "perf.replay.window.7d",
-    }
-}
-
-fn history_state_copy(status: ApplicationHistoryStatus) -> (&'static str, &'static str) {
-    match status {
-        ApplicationHistoryStatus::Disabled => (
-            t("history.application.disabled"),
-            t("history.application.disabled_detail"),
-        ),
-        ApplicationHistoryStatus::Unavailable => (
-            t("history.application.unavailable"),
-            t("history.application.unavailable_detail"),
-        ),
-        ApplicationHistoryStatus::Connecting => (
-            t("history.application.connecting"),
-            t("history.application.connecting_detail"),
-        ),
-        ApplicationHistoryStatus::Collecting => (
-            t("history.application.collecting"),
-            t("history.application.collecting_detail"),
-        ),
-        ApplicationHistoryStatus::Ready => (t("history.application.title"), ""),
-    }
 }
 
 const APP_HISTORY_CPU_WIDTH: f32 = 90.0;
@@ -218,7 +189,7 @@ fn app_history_row(
     let cpu = row_model
         .peak_cpu_usage_pct()
         .filter(|value| value.is_finite())
-        .map_or_else(missing, |value| format!("{value:.1}%"));
+        .map_or_else(missing, precise_percent_text);
     let memory = row_model
         .peak_memory_bytes()
         .filter(|value| value.is_finite() && *value >= 0.0)

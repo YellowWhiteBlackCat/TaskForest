@@ -11,9 +11,7 @@ use iced::keyboard::{self, Key};
 use iced::{Element, Event, Length, Rectangle, Size, Vector, mouse};
 use std::path::PathBuf;
 use taskmanager_theme::tokens;
-use taskmanager_ui_contract::{
-    OverlayDismissCause, OverlayDismissContext, OverlayKind, dismiss_outcome,
-};
+use taskmanager_ui_contract::{OverlayDismissCause, tooltip_dismisses};
 
 use crate::app::Message;
 
@@ -70,10 +68,6 @@ impl<'a> Tooltip<'a> {
         self.capture_open_marker = Some(marker);
         self
     }
-}
-
-fn tooltip_dismisses(cause: OverlayDismissCause) -> bool {
-    dismiss_outcome(OverlayKind::Tooltip, cause, OverlayDismissContext::single()).dismiss
 }
 
 fn sync_focus(state: &mut State, focus_open: bool) {

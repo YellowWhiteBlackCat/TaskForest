@@ -228,10 +228,13 @@ impl TableDelegate for UsersDelegate {
         });
         let items = [
             (
-                i18n::t("users.disconnect"),
+                i18n::session_control_action_label(SessionControlAction::Disconnect),
                 SessionControlAction::Disconnect,
             ),
-            (i18n::t("users.lock"), SessionControlAction::Lock),
+            (
+                i18n::session_control_action_label(SessionControlAction::Lock),
+                SessionControlAction::Lock,
+            ),
         ]
         .into_iter()
         .map(|(label, action)| {
@@ -545,7 +548,7 @@ fn action_bar(
 
     Toolbar::new()
         .child({
-            let label = i18n::t("users.disconnect");
+            let label = i18n::session_control_action_label(SessionControlAction::Disconnect);
             let session = selected_session.clone();
             let enabled = session.is_some();
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
@@ -584,7 +587,7 @@ fn action_bar(
             )
         })
         .child({
-            let label = i18n::t("users.lock");
+            let label = i18n::session_control_action_label(SessionControlAction::Lock);
             let session = selected_session;
             let enabled = session.is_some();
             let hovered_bool = enabled && hovered == Some(&Hover::Static(label));

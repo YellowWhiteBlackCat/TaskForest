@@ -1,5 +1,4 @@
 //! Measured Applications slots own table capacity; optional chrome yields as whole groups.
-use super::centered_scroll_top;
 use super::{
     ProcessOptionalChrome, ProcessPageRoot, ProcessRowsRoot, ProcessScrollState, TableSurface,
     rebuild_table,
@@ -13,6 +12,7 @@ use bevy::ecs::query::{With, Without};
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, NonSend, Query, Res};
 use bevy::ui::{ComputedNode, Display, Node, UiSystems, px};
+use zhuge_ui_core::row_page::RowPage;
 type ChromeNodes<'w, 's> =
     Query<'w, 's, &'static mut Node, (With<ProcessOptionalChrome>, Without<ProcessPageRoot>)>;
 fn sync_chrome(
@@ -63,11 +63,13 @@ fn sync_rows(
         return;
     };
     surface.scroll.viewport_rows = capacity;
-    surface.scroll.top = centered_scroll_top(
+    surface.scroll.top = RowPage::reveal_centered(
         track.shell.visible_processes().len(),
         capacity,
         track.shell.selected,
-    );
+    )
+    .page()
+    .first();
     rebuild_table(&mut commands, root, &track.shell, &mut surface);
 }
 pub(crate) fn register(app: &mut App) {

@@ -6,7 +6,7 @@ use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_shell::SortCol;
 
-use super::DetailsSection;
+use taskmanager_application::ProcessDetailsSection;
 
 pub(crate) struct ProcessPresentationState {
     pub(crate) affinity_cpus: Option<HashSet<u32>>,
@@ -16,7 +16,7 @@ pub(crate) struct ProcessPresentationState {
     pub(crate) env_filter: String,
     pub(crate) last_insights_target: Option<FrozenProcessIdentity>,
     pub(crate) hidden_columns: HashSet<SortCol>,
-    pub(crate) details_section: DetailsSection,
+    pub(crate) details_section: ProcessDetailsSection,
     pub(crate) insights_facet: ProcessInsightFacet,
 }
 
@@ -30,7 +30,7 @@ impl ProcessPresentationState {
             env_filter: String::new(),
             last_insights_target: None,
             hidden_columns: HashSet::new(),
-            details_section: DetailsSection::default(),
+            details_section: ProcessDetailsSection::default(),
             insights_facet: ProcessInsightFacet::Network,
         }
     }

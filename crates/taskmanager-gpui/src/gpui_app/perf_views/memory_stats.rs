@@ -9,6 +9,7 @@ use taskmanager_shell::viewmodel::StatRow;
 use super::memory_details::{
     compressed_swap_readout, compression_ratio_readout, virtual_memory_commit_readout,
 };
+use taskforest_core::core::percent::percent_text;
 
 pub(super) struct MemoryPageStats {
     pub rows: Vec<StatRow>,
@@ -25,8 +26,9 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: UnitPreferences) 
                 memory.used_percentage_observed(),
             ) {
                 (Some(used), Some(percentage)) => Some(format!(
-                    "{} ({percentage:.0}%)",
-                    units.format_quantity(used, QuantityFamily::Memory, false)
+                    "{} ({})",
+                    units.format_quantity(used, QuantityFamily::Memory, false),
+                    percent_text(percentage)
                 )),
                 (Some(used), None) => {
                     Some(units.format_quantity(used, QuantityFamily::Memory, false))

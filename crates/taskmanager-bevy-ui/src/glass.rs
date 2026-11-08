@@ -29,6 +29,7 @@ use crate::palette::UiPalette;
 
 pub(crate) mod optical;
 pub(crate) use optical::{OpticalBackdropSource, OpticalGlassCard};
+pub(crate) mod optical_wesl;
 
 /// Decode the shared neutral grain into a runtime image. The packaging test
 /// owns the plate contract; a wrong-sized blob is an honest absence rather

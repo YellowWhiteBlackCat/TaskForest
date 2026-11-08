@@ -31,25 +31,22 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use taskforest_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 use taskmanager_app_host::{
-    HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
-    HistoryFrontendSession,
+    HistoryFrontendConnector, HistoryFrontendConnectorStartError, HistoryFrontendRuntime,
 };
 use taskmanager_application::history_decimation::lttb_gap_preserving;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     ApplicationHistoryCapability, ApplicationHistoryMetricSeries, ApplicationHistoryProjection,
-    ApplicationHistoryStatus, HistoryReplayCompletionDisposition, HistoryReplayController,
-    MAX_HISTORY_REPLAY_POINTS, PerformanceHistoryProjection,
+    ApplicationHistoryStatus, MAX_HISTORY_REPLAY_POINTS, PerformanceHistoryProjection,
 };
 
+pub(crate) use taskmanager_shell::presentation::scalar_text;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::palette::{UiPalette, space_2, space_8, space_24};
 use crate::window::{Role, TextRole};
 use taskforest_core::core::history::HistoryRecordSink;
 use taskmanager_application::ApplicationHistoryRow;
-use taskmanager_application::ApplicationHistoryUnavailableReason;
-use taskmanager_application::HistoryReplayRequest;
 
 pub(crate) mod control;
 pub(crate) mod scene;
@@ -210,14 +207,6 @@ fn bounded_samples(samples: &[f32]) -> Arc<[f32]> {
     lttb_gap_preserving(samples, MAX_RENDERED_HISTORY_POINTS).into()
 }
 
-/// Format a scalar without converting unavailable, negative-count, or
-/// non-finite facts into zero.
-pub(crate) fn scalar_text(value: Option<f64>, suffix: &str) -> String {
-    value
-        .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.1}{suffix}"))
-}
-
 /// Format a byte peak with the same neutral missing-value semantics as the
 /// other frontends.
 pub(crate) fn memory_text(value: Option<f64>) -> String {
@@ -239,28 +228,6 @@ fn window_label(window: HistoryWindow) -> &'static str {
         HistoryWindow::OneHour => t("perf.replay.window.1h"),
         HistoryWindow::TwentyFourHours => t("perf.replay.window.24h"),
         HistoryWindow::SevenDays => t("perf.replay.window.7d"),
-    }
-}
-
-fn status_copy(status: ApplicationHistoryStatus) -> (&'static str, &'static str) {
-    match status {
-        ApplicationHistoryStatus::Disabled => (
-            t("history.application.disabled"),
-            t("history.application.disabled_detail"),
-        ),
-        ApplicationHistoryStatus::Unavailable => (
-            t("history.application.unavailable"),
-            t("history.application.unavailable_detail"),
-        ),
-        ApplicationHistoryStatus::Connecting => (
-            t("history.application.connecting"),
-            t("history.application.connecting_detail"),
-        ),
-        ApplicationHistoryStatus::Collecting => (
-            t("history.application.collecting"),
-            t("history.application.collecting_detail"),
-        ),
-        ApplicationHistoryStatus::Ready => (t("history.application.title"), ""),
     }
 }
 
@@ -315,32 +282,15 @@ fn row_annotation(row: &HistoryRowModel) -> String {
 
 // ---- read-only app-host connector lifecycle ----
 
-enum HistoryResources {
-    Disabled,
-    Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(ApplicationHistoryUnavailableReason),
-    Active(HistoryFrontendSession),
-}
-
-/// Bevy-side lifecycle for the frontend-owned history capabilities. There is
-/// intentionally no path or storage handle in this type. The active session
-/// retains the writer and submits bounded replay requests.
+/// Bevy's view of the shared history session lifecycle.
+///
+/// The lifecycle itself (connect handshake, capability projection, record
+/// sink, replay request rule) belongs to
+/// [`taskmanager_app_host::HistoryFrontendRuntime`]; this type only names the
+/// frontend's entry point to it.
+#[derive(Default)]
 pub(crate) struct HistoryRuntime {
-    resources: HistoryResources,
-    controller: HistoryReplayController,
-    connector: Option<HistoryFrontendConnector>,
-    requested: bool,
-}
-
-impl Default for HistoryRuntime {
-    fn default() -> Self {
-        Self {
-            resources: HistoryResources::Disabled,
-            controller: HistoryReplayController::default(),
-            connector: None,
-            requested: false,
-        }
-    }
+    runtime: HistoryFrontendRuntime,
 }
 
 impl HistoryRuntime {
@@ -351,146 +301,63 @@ impl HistoryRuntime {
         &mut self,
         result: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     ) {
-        match result {
-            Ok(connector) => {
-                self.connector = Some(connector);
-                self.request(self.requested);
-            }
-            Err(error) if self.requested => {
-                self.resources = HistoryResources::Unavailable(error.into());
-            }
-            Err(_) => {
-                self.resources = HistoryResources::Disabled;
-            }
-        }
+        self.runtime.install_connector(result);
     }
 
     /// Change the canonical enabled preference without touching storage. The
     /// connector performs bounded persistence/replay bootstrap away from the
     /// UI thread.
     pub(crate) fn request(&mut self, enabled: bool) {
-        self.requested = enabled;
-        if !enabled {
-            self.resources = HistoryResources::Disabled;
-            self.controller.close();
-            return;
-        }
-        if matches!(
-            &self.resources,
-            HistoryResources::Connecting(_) | HistoryResources::Active(_)
-        ) {
-            return;
-        }
-        let Some(connector) = self.connector.as_mut() else {
-            self.resources = HistoryResources::Unavailable(
-                ApplicationHistoryUnavailableReason::ConnectorStopped,
-            );
-            return;
-        };
-        self.resources = match connector.try_connect() {
-            Ok(request) => HistoryResources::Connecting(request),
-            Err(error) => HistoryResources::Unavailable(error.into()),
-        };
+        self.runtime.request(enabled);
+    }
+
+    /// Whether the frontend asked for history persistence in this run.
+    pub(crate) fn requested(&self) -> bool {
+        self.runtime.requested()
     }
 
     #[must_use]
     pub(crate) fn projection(&self) -> ApplicationHistoryProjection {
-        self.controller
-            .application_history_projection(self.capability())
+        self.runtime.application_history_projection()
     }
 
     pub(crate) fn performance_projection(&self) -> PerformanceHistoryProjection {
-        self.controller
-            .performance_history_projection(self.capability())
+        self.runtime.performance_history_projection()
     }
+
     pub(crate) fn available(&self) -> bool {
-        matches!(self.resources, HistoryResources::Active(_))
+        self.runtime.is_active()
     }
+
     pub(crate) fn select_window(&mut self, window: HistoryWindow) {
-        if self.available()
-            && let Ok(request) = self.controller.select_window(window)
-        {
-            self.submit(request);
-        }
+        self.runtime.select_window(window);
     }
+
     pub(crate) fn refresh(&mut self) {
-        if self.available()
-            && let Ok(request) = self.controller.refresh()
-        {
-            self.submit(request);
-        }
+        self.runtime.refresh_replay();
     }
 
     /// Drain only non-blocking completion lanes. The returned flag is an ECS
     /// change fact for the projection system; idle frames do no scene work.
+    /// Whether the history runtime's state advanced since the last drain.
+    ///
+    /// The answer belongs to the runtime owner
+    /// ([`taskmanager_app_host::HistoryFrontendRuntime::drain_changes`]): the
+    /// connector's outcome and the replay's completions are one question, not
+    /// two answers each frontend has to combine.
     pub(crate) fn drain(&mut self) -> bool {
-        let mut changed = false;
-        if let Some(connector) = self.connector.as_mut() {
-            for completion in connector.drain() {
-                let HistoryResources::Connecting(current) = self.resources else {
-                    continue;
-                };
-                if completion.request != current || !self.requested {
-                    continue;
-                }
-                self.resources = match completion.result {
-                    Ok(session) => HistoryResources::Active(session),
-                    Err(error) => HistoryResources::Unavailable(error.kind().into()),
-                };
-                if let HistoryResources::Active(_) = &self.resources {
-                    if let Ok(request) = self.controller.open() {
-                        self.submit(request);
-                    }
-                } else {
-                    self.controller.close();
-                }
-                changed = true;
-            }
-        }
-        if let HistoryResources::Active(session) = &mut self.resources {
-            let completions = session.replay.drain();
-            for completion in completions {
-                changed |= self.controller.complete(completion)
-                    == HistoryReplayCompletionDisposition::Applied;
-            }
-        }
-        changed
+        self.runtime.drain_changes()
     }
 
-    fn capability(&self) -> ApplicationHistoryCapability {
-        match self.resources {
-            HistoryResources::Disabled => ApplicationHistoryCapability::Disabled,
-            HistoryResources::Connecting(_) => ApplicationHistoryCapability::Connecting,
-            HistoryResources::Unavailable(reason) => {
-                ApplicationHistoryCapability::Unavailable(reason)
-            }
-            HistoryResources::Active(_) => ApplicationHistoryCapability::Available,
-        }
-    }
-
-    fn submit(&mut self, request: HistoryReplayRequest) {
-        let error = match &mut self.resources {
-            HistoryResources::Active(session) => session.replay.try_request(request).err(),
-            HistoryResources::Disabled
-            | HistoryResources::Connecting(_)
-            | HistoryResources::Unavailable(_) => None,
-        };
-        if let Some(error) = error {
-            let _ = self.controller.reject_submission(request, error);
-        }
+    pub(crate) fn capability(&self) -> ApplicationHistoryCapability {
+        self.runtime.capability()
     }
 
     pub(crate) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
-        match &self.resources {
-            HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
-            HistoryResources::Disabled
-            | HistoryResources::Connecting(_)
-            | HistoryResources::Unavailable(_) => None,
-        }
+        self.runtime.record_sink()
     }
 }
 
-/// The immutable projection resource that the future window composition
 /// updates after [`HistoryRuntime::drain`] reports a completion.
 #[derive(Clone, Resource)]
 pub(crate) struct HistoryProjectionResource(pub(crate) ApplicationHistoryProjection);
@@ -529,7 +396,7 @@ pub(crate) fn drain_history_system(
         if let Some(client) = config.as_mut() {
             let _ = client.drain();
             if let Some(snapshot) = client.snapshot()
-                && runtime.requested != snapshot.history_persistence
+                && runtime.requested() != snapshot.history_persistence
             {
                 runtime.request(snapshot.history_persistence);
             }

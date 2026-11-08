@@ -9,6 +9,8 @@
 //! scan ids are monotonically issued request ids, and the apply path rejects
 //! older ids.
 
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::DirectoryUsageRequest;
 
 use crate::gpui_app::root::RootView;
@@ -33,7 +35,7 @@ impl RootView {
         platform
             .submit_directory_usage(
                 DirectoryUsageRequest::StartScan(spec),
-                super::platform_submission_time_ms(),
+                unix_millis(SystemTime::now()),
             )
             .is_ok()
     }
@@ -51,7 +53,7 @@ impl RootView {
         platform
             .submit_directory_usage(
                 DirectoryUsageRequest::Cancel(scan_id),
-                super::platform_submission_time_ms(),
+                unix_millis(SystemTime::now()),
             )
             .is_ok()
     }

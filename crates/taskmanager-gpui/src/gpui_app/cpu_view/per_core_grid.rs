@@ -22,6 +22,7 @@ use taskmanager_theme::Theme;
 use super::per_core::PerCoreSeries;
 use super::stats::CpuLiveStats;
 use taskmanager_theme::tokens;
+use zhuge_ui_core::row_page::page_count;
 
 /// One per-core sparkline row's floor. A row may grow when the page has
 /// surplus height, but never compresses below this — unsatisfiable budgets
@@ -58,7 +59,7 @@ pub(super) fn min_height(stats: &CpuLiveStats, hardware: &HardwareInfo) -> f32 {
             continue;
         }
         let columns = compute_column_count(indices.len()).max(1);
-        let row_count = indices.len().div_ceil(columns) as f32;
+        let row_count = page_count(indices.len(), columns) as f32;
         total += SECTION_LABEL_HEIGHT
             + INNER_GAP
             + row_count * ROW_HEIGHT

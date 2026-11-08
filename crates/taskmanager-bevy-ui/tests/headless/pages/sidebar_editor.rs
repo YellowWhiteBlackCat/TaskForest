@@ -36,7 +36,7 @@ fn native_editor_hides_restores_and_reorders_specific_devices() {
     route_to_performance(&mut app);
     activate(&mut app, |action| matches!(action, SidebarAction::Open));
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::SidebarDevices)
     ));
     activate(&mut app, |action| {
@@ -81,7 +81,12 @@ fn native_editor_hides_restores_and_reorders_specific_devices() {
         Some("memory")
     );
     activate(&mut app, |action| matches!(action, SidebarAction::Close));
-    assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+    assert!(
+        app.world()
+            .resource::<WindowSurfaceState>()
+            .active()
+            .is_none()
+    );
     app.world_mut().trigger(RouteChanged);
     app.update();
     assert_eq!(

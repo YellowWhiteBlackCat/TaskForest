@@ -168,7 +168,7 @@ TaskForest 践行“求同存异”端际契约治理：四端（GPUI、Iced、T
 - 可选择的应用汇总行使用 `ProcessRowId::Application(root_identity)`；root identity 仅是实时树查找键，
   不是代表 PID。分类标题是结构行，真实进程行才使用 `ProcessRowId::Process(identity)`。
 - 渲染入口先完成数据 fold；同一 projection 同时服务鼠标、键盘和辅助技术。
-- 组件不复制 core 文本匹配、时间、格式化或可用性规则；共享规则只有一个实现。
+- 组件不复制 core 文本匹配、时间、格式化或可用性规则；共享规则只有一个实现。typed vocabulary（告警指标、严重级别、服务动作、会话动作、NPU 引擎、开机档位与范围）的目录键由 `taskforest-core` 拥有，本地化解析由 `taskmanager-application::i18n` 的具名解析器拥有；前端只调用解析器，不自己写 `t(<x>.i18n_key())`，也不自己持有第二套词汇表。
 - 组件层保持零第三方 GPUI 组件依赖；上游代码只作研究材料，不复制 GPL UI 源码。
 
 ## 交互状态机合同

@@ -7,10 +7,10 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Query, Res, ResMut, SystemParam};
 use bevy::ui::prelude::{ComputedNode, Node, UiGlobalTransform, Val};
+use taskmanager_application::ProcessDetailsSection;
+use zhuge_ui_core::easing::{lerp, smoothstep};
 
-use super::{
-    ProcessPropertiesPresentation, ProcessPropertiesSection, ProcessPropertiesTab, PropertiesPaint,
-};
+use super::{ProcessPropertiesPresentation, ProcessPropertiesTab, PropertiesPaint};
 
 /// The height of the sliding indicator, in px.
 ///
@@ -47,7 +47,7 @@ pub(crate) struct IndicatorPlacement {
 #[derive(Resource, Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TabIndicatorMotion {
     /// The section the indicator is sliding toward.
-    pub(crate) target: Option<ProcessPropertiesSection>,
+    pub(crate) target: Option<ProcessDetailsSection>,
     /// The horizontal offset the slide starts from, in px.
     pub(crate) from_x: f32,
     /// The horizontal offset the slide ends at, in px.
@@ -76,18 +76,17 @@ impl Default for TabIndicatorMotion {
 impl TabIndicatorMotion {
     /// The eased slide progress, in 0.0..=1.0.
     fn eased(&self) -> f32 {
-        let progress = self.progress.clamp(0.0, 1.0);
-        progress * progress * (3.0 - 2.0 * progress)
+        smoothstep(self.progress)
     }
 
     /// The horizontal offset the indicator currently stands at, in px.
     pub(crate) fn current_x(&self) -> f32 {
-        self.from_x + (self.to_x - self.from_x) * self.eased()
+        lerp(self.from_x, self.to_x, self.eased())
     }
 
     /// The width the indicator currently has, in px.
     pub(crate) fn current_width(&self) -> f32 {
-        self.from_width + (self.to_width - self.from_width) * self.eased()
+        lerp(self.from_width, self.to_width, self.eased())
     }
 
     /// Where the indicator stands when a surface is mounted.

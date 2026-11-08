@@ -1,7 +1,7 @@
 //! Renderer-local focus, modifier, context-menu and motion ownership.
 
 use super::{ContextMenuState, FocusTarget, ModalAppear, WarmupSpin};
-use crate::input_modality::InputModality;
+use taskmanager_ui_contract::InputModality;
 
 #[derive(Default)]
 pub(crate) struct InputState {

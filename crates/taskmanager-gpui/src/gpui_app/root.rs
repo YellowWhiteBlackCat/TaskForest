@@ -10,9 +10,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::SystemTime;
 use std::time::{Duration, Instant};
+use taskforest_core::core::time::unix_millis;
 use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_telemetry_store::HistoryRetention;
 use taskmanager_ui_contract::navigation::NavOrientation;
@@ -42,6 +45,7 @@ use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::overlays::toast::ToastState;
 #[cfg(not(target_os = "linux"))]
 use taskmanager_ui_contract::DetachedAccessibilityBridge;
+use taskmanager_ui_contract::InputModality;
 use taskmanager_ui_contract::SemanticSnapshot;
 
 use taskmanager_ui::data::table::TableState;
@@ -157,7 +161,6 @@ use capture::{CaptureEvidence, CaptureProcessAction};
 pub use chrome::*;
 use dialog_scroll_state::DialogScrollState;
 pub use dispatch::*;
-pub use input_modality::InputModality;
 pub(crate) use interaction_state::wire_debounced_search;
 pub use interaction_state::{Hover, ProcMenuAction};
 use interaction_state::{init_run_entity, init_search_entity};
@@ -880,7 +883,7 @@ impl RootView {
     /// filesystem access and is safe to call from any GPUI event closure.
     pub(crate) fn request_refresh(&mut self, request: RefreshRequest) {
         if let Some(platform) = &mut self.platform {
-            let _ = platform.request_refresh(request, platform_submission_time_ms());
+            let _ = platform.request_refresh(request, unix_millis(SystemTime::now()));
         }
     }
 
@@ -924,12 +927,4 @@ impl RootView {
             let _ = window_handle.update(cx, |_, window, _| window.activate_window());
         }
     }
-}
-
-pub(crate) fn platform_submission_time_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
 }

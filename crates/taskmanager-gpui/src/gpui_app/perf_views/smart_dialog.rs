@@ -3,6 +3,8 @@
 use crate::gpui_app::root::prop_row;
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskforest_core::core::metrics::DiskMetrics;
+use taskforest_core::core::percent::percent_text;
+use taskforest_core::core::storage_health::is_nvme_wear_critical;
 use taskmanager_application::i18n;
 use taskmanager_shell::presentation::smart_availability_i18n_key;
 use taskmanager_theme::tokens;
@@ -63,22 +65,27 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
         }
     }
     if let Some(percent) = disk.smart_percent_used {
-        let value = if percent >= 100.0 {
+        let value = if is_nvme_wear_critical(percent) {
             format!(
-                "{percent:.0}% \u{26a0} {}",
+                "{} \u{26a0} {}",
+                percent_text(percent),
                 i18n::t("disk.exceeded_rated_life"),
             )
         } else {
-            format!("{percent:.0}%")
+            percent_text(percent)
         };
         column = column.child(prop_row(theme, i18n::t("disk.endurance_used"), value));
     }
     if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
-        let value = if spare <= threshold {
-            format!("{spare:.0}%  ⚠ (warning ≤ {threshold:.0}%)")
+        let threshold = disk.smart_spare_warning_threshold_pct();
+        let value = if disk.smart_spare_pool_needs_warning() {
+            format!(
+                "{}  ⚠ (warning ≤ {})",
+                percent_text(spare),
+                percent_text(threshold)
+            )
         } else {
-            format!("{spare:.0}%")
+            percent_text(spare)
         };
         column = column.child(prop_row(theme, i18n::t("disk.available_spare"), value));
     }

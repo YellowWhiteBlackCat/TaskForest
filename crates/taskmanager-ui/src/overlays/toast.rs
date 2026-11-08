@@ -13,41 +13,15 @@ use gpui::{
     Styled, Task, Window, div, px, rems,
 };
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier, Palette};
+use taskmanager_theme::{GlassTier, Palette};
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_tokens::{StatusColors, StatusKind};
 
-/// Toast severity; each maps to a palette semantic color.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ToastKind {
-    /// `palette.accent` (default).
-    Info,
-    /// `palette.success`.
-    Success,
-    /// `palette.warning`.
-    Warning,
-    /// `palette.danger`.
-    Danger,
-}
-
-impl ToastKind {
-    /// The palette color for this kind.
-    pub fn color(self, palette: &Palette) -> Color {
-        match self {
-            ToastKind::Info => palette.accent,
-            ToastKind::Success => palette.success,
-            ToastKind::Warning => palette.warning,
-            ToastKind::Danger => palette.danger,
-        }
-    }
-
-    /// A semantic icon for this kind.
-    pub fn icon(self) -> IconId {
-        match self {
-            ToastKind::Info => IconId::Health,
-            ToastKind::Success => IconId::Health,
-            ToastKind::Warning => IconId::Alert,
-            ToastKind::Danger => IconId::Alert,
-        }
+/// A product semantic icon for this kind.
+fn status_icon(kind: StatusKind) -> IconId {
+    match kind {
+        StatusKind::Info | StatusKind::Success => IconId::Health,
+        StatusKind::Warning | StatusKind::Danger => IconId::Alert,
     }
 }
 
@@ -62,7 +36,7 @@ pub enum ToastEvent {
 pub struct ToastState {
     id: u64,
     message: SharedString,
-    kind: ToastKind,
+    kind: StatusKind,
     dismiss_focus: FocusHandle,
     auto_dismiss: Option<Duration>,
     _task: Option<Task<()>>,
@@ -73,7 +47,7 @@ impl ToastState {
     pub fn new(
         id: u64,
         message: impl Into<SharedString>,
-        kind: ToastKind,
+        kind: StatusKind,
         cx: &mut Context<Self>,
     ) -> Self {
         Self {
@@ -97,7 +71,7 @@ impl ToastState {
     }
 
     /// The kind.
-    pub fn kind(&self) -> ToastKind {
+    pub fn kind(&self) -> StatusKind {
         self.kind
     }
 
@@ -172,7 +146,13 @@ impl RenderOnce for Toast {
             (state.message(), state.kind(), state.dismiss_focus.clone())
         });
         let palette = self.palette;
-        let accent = kind.color(&palette);
+        let accent = StatusColors {
+            accent: palette.accent,
+            success: palette.success,
+            warning: palette.warning,
+            danger: palette.danger,
+        }
+        .resolve(kind);
         let on_dismiss = self.on_dismiss.clone();
         let single_line = self.single_line;
         let indicator = self.indicator;
@@ -205,7 +185,7 @@ impl RenderOnce for Toast {
             .text_sm()
             .text_color(crate::theme_binding::hsla(palette.fg))
             .child(
-                icon(kind.icon())
+                icon(status_icon(kind))
                     .size(crate::theme_binding::rem_value(16.0))
                     .text_color(crate::theme_binding::hsla(accent)),
             )

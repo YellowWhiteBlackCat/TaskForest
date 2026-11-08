@@ -26,7 +26,7 @@ fn normal_about_control_renders_build_metadata_and_exports_reviewed_values() {
     app.world_mut().trigger(Activate { entity: control });
     app.update();
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::About)
     ));
     let expected = about_text();
@@ -90,7 +90,7 @@ fn independent_system_information_copies_the_frozen_review_and_ignores_stale_abo
     app.world_mut().trigger(AboutCommand::SystemInformation);
     app.update();
     let Some(WindowSurface::SystemInformation(facts)) =
-        &app.world().resource::<WindowSurfaceState>().0
+        app.world().resource::<WindowSurfaceState>().active()
     else {
         panic!("independent system information");
     };
@@ -105,7 +105,7 @@ fn independent_system_information_copies_the_frozen_review_and_ignores_stale_abo
     app.world_mut().trigger(AboutCommand::Close);
     app.update();
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::SystemInformation(_))
     ));
     app.world_mut().trigger(SystemInformationCommand::Copy);
@@ -125,7 +125,12 @@ fn independent_system_information_copies_the_frozen_review_and_ignores_stale_abo
     assert_eq!(written, [expected]);
     app.world_mut().trigger(SystemInformationCommand::Close);
     app.update();
-    assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+    assert!(
+        app.world()
+            .resource::<WindowSurfaceState>()
+            .active()
+            .is_none()
+    );
 }
 
 #[test]
@@ -159,7 +164,7 @@ fn shared_show_system_about_command_opens_the_mounted_system_information_surface
     app.update();
 
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::SystemInformation(_))
     ));
     assert!(
@@ -202,7 +207,7 @@ fn native_boot_observes_desktop_appearance_once_and_information_uses_the_respons
         .trigger(crate::system_information_modal::SystemInformationCommand::Open);
     app.update();
     let Some(WindowSurface::SystemInformation(facts)) =
-        &app.world().resource::<WindowSurfaceState>().0
+        app.world().resource::<WindowSurfaceState>().active()
     else {
         panic!("native information");
     };

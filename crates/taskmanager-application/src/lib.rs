@@ -16,17 +16,6 @@ pub use alert_dispatch::AlertDispatcher;
 /// count explicitly.
 pub const MAX_CONTAINER_ROWS: usize = 200;
 
-/// Split a container inventory into the materialized prefix and the explicit
-/// overflow count used by all frontends.
-#[must_use]
-pub const fn container_row_window(total: usize) -> (usize, usize) {
-    let shown = if total < MAX_CONTAINER_ROWS {
-        total
-    } else {
-        MAX_CONTAINER_ROWS
-    };
-    (shown, total - shown)
-}
 mod alert_suggestion_window;
 mod application_history_projection;
 mod boot_baseline;
@@ -60,11 +49,16 @@ mod ports;
 /// process hierarchy (bucket order, empty-bucket omission, member order,
 /// aggregate helpers, and the locale-neutral expansion key).
 pub mod process_category_projection;
+/// The process-properties section tabs: one product vocabulary (which
+/// sections exist, in which order, which stable token and catalog key names
+/// one) shared by every frontend's properties surface.
+pub mod process_details_section;
 /// Neutral process-details row ViewModel: the single fold from a typed
 /// `ProcessItem` to the label/value rows every frontend's details panel and
 /// properties dialog renders (field vocabulary, missing semantics, unit and
 /// time formats).
 pub mod process_details_vm;
+pub use process_details_section::ProcessDetailsSection;
 pub mod process_resource_projection;
 pub use process_resource_projection::{ProjectedProcessResources, project_process_resources};
 /// Neutral process-table sort comparator shared by every frontend: the single
@@ -76,6 +70,7 @@ mod refresh;
 mod request_session;
 mod router;
 mod service_lifecycle;
+pub mod session_slot;
 pub mod snapshot_export;
 mod source_status;
 pub mod system_timeline;
@@ -220,7 +215,7 @@ pub use request_session::{
     MsrReadoutSession, MsrReadoutState, NetworkEscalationFailed, NetworkEscalationReady,
     NetworkEscalationSession, NetworkEscalationState, ProcessAffinityReady, ProcessAffinitySession,
     ProcessAffinityState, ProcessBatchFailed, ProcessBatchLoading, ProcessBatchReady,
-    ProcessBatchSession, ProcessBatchState, RaplPowerFailed, RaplPowerReady,
+    ProcessBatchSession, ProcessBatchState, REFRESH_CADENCE, RaplPowerFailed, RaplPowerReady,
     RaplPowerRequestFailure, RaplPowerSession, RaplPowerState, RequestAttemptId,
     RequestCorrelation, ShellUiActionFailed, ShellUiActionIntent, ShellUiActionReady,
     ShellUiActionReceipt, ShellUiActionSession, ShellUiActionState, SmartSelfTestFailed,
@@ -231,7 +226,7 @@ pub use request_session::{
 
 pub use platform::{
     AutomaticSchedule, AutomaticScheduleProfile, automatic_cadence_ms, automatic_schedules,
-    default_automatic_cadence_ms,
+    critical_chain_summary, default_automatic_cadence_ms, failed_units_summary,
 };
 pub use ports::{PlatformEffect, ServiceControlTarget, SessionControlTarget};
 pub use reducer::{AppState, Reduction, UiEffect, reduce};

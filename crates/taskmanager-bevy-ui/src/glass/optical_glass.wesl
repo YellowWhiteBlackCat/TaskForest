@@ -7,6 +7,7 @@ struct OpticalGlassUniform {
     grain: vec4<f32>,
     element: vec4<f32>,
     viewport: vec4<f32>,
+    ior: f32,
 }
 
 @group(1) @binding(0)
@@ -53,6 +54,18 @@ fn blurred_backdrop(uv: vec2<f32>, radius_px: f32) -> vec4<f32> {
     return sum / total;
 }
 
+// One Snell step: the incident view ray bends through the rounded-SDF
+// surface normal, scaled by the glass IOR the uniform states. The lateral
+// component is negated so samples pull toward the edge — the
+// magnifying-glass reading the proven pipeline established.
+fn refracted_offset(normal2: vec2<f32>, edge_band: f32, strength_px: f32) -> vec2<f32> {
+    let incident = vec3<f32>(0.0, 0.0, -1.0);
+    let surface = normalize(vec3<f32>(normal2 * edge_band, 1.0));
+    let ratio = 1.0 / max(glass.ior, 1.0);
+    let bent = refract(incident, surface, ratio);
+    return -bent.xy * strength_px;
+}
+
 @fragment
 fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let half_size = in.size * 0.5;
@@ -96,7 +109,8 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let mask = 1.0 - smoothstep(-1.0, 0.0, distance);
     let backdrop_uv = (glass.element.xy + in.uv * glass.element.zw)
         / glass.viewport.xy;
-    let shift = normal * refraction_edge * glass.optics.y / glass.viewport.xy;
+    let shift = refracted_offset(normal, refraction_edge, glass.optics.y)
+        / glass.viewport.xy;
     let dispersion = glass.optics.w;
 
     let red = blurred_backdrop(

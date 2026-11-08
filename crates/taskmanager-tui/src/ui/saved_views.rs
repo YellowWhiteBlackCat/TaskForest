@@ -10,6 +10,7 @@ use ratatui::{
 };
 use taskmanager_application::i18n::t;
 use taskmanager_shell::saved_views::{feedback_text, review_rows};
+use zhuge_ui_core::row_page::RowPage;
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, popup: Rect) {
     frame.render_widget(Clear, popup);
@@ -29,12 +30,18 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, popup
     let index = selected
         .and_then(|id| rows.iter().position(|entry| entry.id == id))
         .unwrap_or(0);
-    let start = index.saturating_sub(capacity.saturating_sub(1));
+    // The product keeps the cursor on the page's bottom edge; the shared
+    // row-page owner turns that request into a full, in-bounds page.
+    let page = RowPage::pin(
+        rows.len(),
+        capacity,
+        index.saturating_sub(capacity.saturating_sub(1)),
+    );
     let mut lines = Vec::new();
     if let Some(status) = status {
         lines.push(Line::from(status));
     }
-    for preset in rows.iter().skip(start).take(capacity) {
+    for preset in rows.iter().skip(page.first()).take(page.len()) {
         lines.push(Line::from(format!(
             "{} {}",
             if *selected == Some(preset.id) {

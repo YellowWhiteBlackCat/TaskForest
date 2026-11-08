@@ -3,7 +3,7 @@
 //! `Program` edge as the single-series [`DeviceChart`] in the parent module.
 //!
 //! Each series keeps its OWN polyline + Mission-Center area fill, drawn from
-//! the shared [`WindowSlots`] grid — the newest sample pins to the right edge
+//! the shared [`ChartSlots`] grid — the newest sample pins to the right edge
 //! and every sample owns a fixed slot of the configured capacity, so a
 //! warming window grows right-to-left (GPUI `sample_x` parity) and BOTH
 //! series, the hover crosshair, and the readout pill resolve through the ONE
@@ -36,23 +36,20 @@ use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry, Path, Stroke};
 use iced::widget::{column, text};
 use iced::{Color, Point, Rectangle, Size};
+use taskmanager_theme::palette::tint_channel_toward_white;
 use taskmanager_theme::{Theme, tokens};
 
 use super::{GraphPrefs, ReadoutColors, mini_graph_caption};
 use crate::app::Message;
 use crate::perf_chart::{
-    ChartOpts, HoverState, SeriesGeneration, WindowSlots, area_path, draw_grid_opts,
-    draw_hover_sample_mark, draw_readout_pill, draw_y_axis_ticks, line_path, scaled_y,
-    series_point_runs_windowed, smooth_area_path, smooth_line_path, vertical_area_gradient,
-    y_axis_tick_values,
+    ChartOpts, HoverState, SeriesGeneration, area_path, draw_grid_opts, draw_hover_sample_mark,
+    draw_readout_pill, draw_y_axis_ticks, line_path, scaled_y, series_point_runs_windowed,
+    smooth_area_path, smooth_line_path, vertical_area_gradient, y_axis_tick_values,
 };
 use crate::text_metrics::measured_text_width;
-use crate::trend_strip::finite_peak;
+use taskmanager_shell::presentation::ChartSlots;
+use taskmanager_shell::presentation::finite_peak;
 
-/// How far the secondary series' color is lifted toward white from the family
-/// token — a tint of the SAME color (lighter reads as the paired direction,
-/// e.g. solid "read" vs light "write"), never a new product color.
-const SECONDARY_TINT_LIFT: f32 = 0.32;
 /// The legend swatch size and the legend label font size.
 const LEGEND_SWATCH: f32 = 8.0;
 /// The legend's text size on the public type scale (the shared caption tier).
@@ -74,10 +71,14 @@ pub(crate) fn legend_label_width(label: &str) -> f32 {
 /// white on every channel, alpha untouched).
 #[must_use]
 pub(crate) fn dual_series_colors(base: Color) -> (Color, Color) {
-    let lift = |channel: f32| channel + (1.0 - channel) * SECONDARY_TINT_LIFT;
     (
         base,
-        Color::from_rgba(lift(base.r), lift(base.g), lift(base.b), base.a),
+        Color::from_rgba(
+            tint_channel_toward_white(base.r),
+            tint_channel_toward_white(base.g),
+            tint_channel_toward_white(base.b),
+            base.a,
+        ),
     )
 }
 
@@ -130,8 +131,8 @@ impl DeviceMultiChart {
         self.primary.samples.len().max(self.secondary.samples.len())
     }
 
-    fn slots(&self, width: f32) -> WindowSlots {
-        WindowSlots::new(self.sample_count(), self.capacity, width)
+    fn slots(&self, width: f32) -> ChartSlots {
+        ChartSlots::new(self.sample_count(), self.capacity, width)
     }
 
     /// The data fingerprint identifying the grid + ticks + two-series +
@@ -271,7 +272,7 @@ impl canvas::Program<Message> for DeviceMultiChart {
             // Secondary first (drawn under primary) so the family-solid
             // series sits on top at any crossing. Each series splits its own
             // NaN gaps and keeps its own slot positions.
-            let slots = WindowSlots::new(sample_count, capacity, size.width);
+            let slots = ChartSlots::new(sample_count, capacity, size.width);
             draw_multi_series(frame, size, &slots, secondary, max, smooth, opts);
             draw_multi_series(frame, size, &slots, primary, max, smooth, opts);
             draw_chart_legend(
@@ -296,7 +297,7 @@ impl canvas::Program<Message> for DeviceMultiChart {
                 return;
             };
             let size = frame.size();
-            let slots = WindowSlots::new(sample_count, capacity, size.width);
+            let slots = ChartSlots::new(sample_count, capacity, size.width);
             let x = slots.x(index);
             // GPUI-parity crosshair: the vertical rule comes from the shared
             // pill; each series that holds a finite value at the index gets a
@@ -371,7 +372,7 @@ impl canvas::Program<Message> for DeviceMultiChart {
 fn draw_multi_series(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
-    slots: &WindowSlots,
+    slots: &ChartSlots,
     series: &DeviceMultiSeries,
     max: f32,
     smooth: bool,

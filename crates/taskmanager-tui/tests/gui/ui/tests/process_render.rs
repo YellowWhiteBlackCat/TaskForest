@@ -362,7 +362,7 @@ fn process_details_panel_renders_the_observed_anonymous_huge_page_charge() {
         "the observed anonymous huge-page charge must paint its real value: {row:?}"
     );
     assert!(
-        row.contains("8.0% RSS"),
+        row.contains("8% RSS"),
         "the charge's share of RSS must paint: {row:?}"
     );
 

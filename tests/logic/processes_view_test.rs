@@ -21,9 +21,8 @@
 use std::collections::HashSet;
 
 use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
-use taskmanager_gpui::gpui_app::processes_view::{
-    VisibleRow, category_tree_rows, default_category_expansions,
-};
+use taskmanager_application::process_category_projection::default_category_expansions;
+use taskmanager_gpui::gpui_app::processes_view::{VisibleRow, category_tree_rows};
 use taskmanager_shell::{
     ProcessStatusFilter, ProcessViewing, SortCol, SortDir, matches_process_query,
 };

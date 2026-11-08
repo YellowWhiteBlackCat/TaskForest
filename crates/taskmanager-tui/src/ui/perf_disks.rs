@@ -24,6 +24,7 @@ use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_shell::presentation::smart::smart_section_visible;
 
 use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
@@ -491,11 +492,11 @@ fn disk_lines(
                 )));
             }
             if let Some(spare) = disk.smart_available_spare_pct {
-                let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
-                let value = if spare <= threshold {
-                    format!("{spare:.0}% ⚠ (≤{threshold:.0}%)")
+                let threshold = disk.smart_spare_warning_threshold_pct();
+                let value = if disk.smart_spare_pool_needs_warning() {
+                    format!("{} ⚠ (≤{})", percent_text(spare), percent_text(threshold))
                 } else {
-                    format!("{spare:.0}%")
+                    percent_text(spare)
                 };
                 lines.push(ratatui::text::Line::from(format!(
                     "  {} {}",

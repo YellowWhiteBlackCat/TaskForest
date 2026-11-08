@@ -21,7 +21,8 @@
 
 use std::ffi::OsStr;
 use std::io;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::AppAction;
 use taskmanager_application::i18n::current_language;
 use taskmanager_shell::SearchSlot;
@@ -50,8 +51,9 @@ use crate::{TuiApp, TuiTerminalProfile, TuiTheme};
 
 use super::{
     DrawCycleInputs, EVENT_DRAIN_BATCH, EVENT_POLL, capture_page_name, drain_process_refresh,
-    handle_key, should_draw, submit_alert_notifications, unix_now_ms,
+    handle_key, should_draw, submit_alert_notifications,
 };
+use taskmanager_application::REFRESH_CADENCE;
 use taskmanager_application::{AppPage, GpuEngineRowsState};
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp, queue_effect,
@@ -566,7 +568,7 @@ impl RefreshPacing {
             GpuEngineRowsState::Loading { .. } | GpuEngineRowsState::Ready(_)
         ) && app.page() == AppPage::Performance
             && app.perf_device == crate::PerfDevice::Gpu
-            && now.saturating_duration_since(self.gpu_engine_rows) >= super::GPU_ENGINE_ROWS_REFRESH
+            && now.saturating_duration_since(self.gpu_engine_rows) >= REFRESH_CADENCE
     }
 }
 
@@ -595,6 +597,7 @@ where
 {
     let mut pacing = RefreshPacing::starting(Instant::now());
     let mut capture_profile_receipt = CaptureProfileReceipt::new(capture_marker);
+    let mut frame_timing = super::frame_timing::FrameTimingSink::from_env();
     // The frame area the user currently SEES: captured from every paint and
     // used to project pointer clicks onto the painted rows (a resize updates
     // it on the next paint, which the resize event itself forces).
@@ -663,7 +666,7 @@ where
             let now = Instant::now();
             if !app.shell.paused() {
                 platform.set_telemetry_interval(app.shell.telemetry_interval());
-                let scheduled = platform.run_scheduled_refresh(unix_now_ms());
+                let scheduled = platform.run_scheduled_refresh(unix_millis(SystemTime::now()));
                 cycle.refresh_queued |= !scheduled.is_empty();
             }
             let gpu_engine_rows_due = pacing.due(app, now);
@@ -688,7 +691,7 @@ where
                 queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }
-            let now_ms = unix_now_ms();
+            let now_ms = unix_millis(SystemTime::now());
             app.service_log_now_micros = now_ms.saturating_mul(1_000);
             if let Some(effect) = app.shell.poll_service_log(now_ms) {
                 queue_effect(app, platform, effect);
@@ -709,6 +712,7 @@ where
             let language = current_language();
             let theme = TuiTheme::from_params_with_profile(app.theme_params, profile);
             let mut painted_plan = None;
+            let work_started_at = Instant::now();
             terminal
                 .draw(|frame| {
                     frame_area = frame.area();
@@ -718,6 +722,9 @@ where
                     painted_plan = Some(plan);
                 })
                 .map_err(BackendErrorIntoIo::into_io)?;
+            if let Some(sink) = frame_timing.as_mut() {
+                sink.record_draw(work_started_at);
+            }
             if let Some(plan) = painted_plan {
                 committed_plan = plan;
             }
@@ -751,7 +758,7 @@ where
                         app.submit_first_run_action(
                             request.action,
                             platform.as_deref_mut(),
-                            unix_now_ms(),
+                            unix_millis(SystemTime::now()),
                         );
                     } else {
                         match platform.as_deref_mut() {

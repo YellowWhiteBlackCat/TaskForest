@@ -134,7 +134,7 @@ fn fully_observed_row_folds_every_field_to_text() {
         );
         assert_eq!(
             value(&rows, ProcessDetailsField::AnonHugePages),
-            &DetailValue::Text("8.0 MiB (8.0% RSS)".to_owned())
+            &DetailValue::Text("8.0 MiB (8% RSS)".to_owned())
         );
         assert_eq!(
             value(&rows, ProcessDetailsField::Swap),

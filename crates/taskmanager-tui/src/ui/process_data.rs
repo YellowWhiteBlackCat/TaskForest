@@ -4,7 +4,7 @@
 //! read boundary. Ratatui code receives owned strings or primitive display
 //! facts and never reaches into `ProcessItem::current_*` observations.
 
-use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
@@ -65,8 +65,7 @@ pub(super) struct ProcessPerformancePeaks {
 pub(super) fn process_performance_peaks(item: &ProcessItem) -> ProcessPerformancePeaks {
     let units = UnitPreferences::default();
     ProcessPerformancePeaks {
-        cpu: peak_of(&item.cpu_history, item.current_cpu_percentage())
-            .map(|peak| format!("{peak:.1}%")),
+        cpu: peak_of(&item.cpu_history, item.current_cpu_percentage()).map(precise_percent_text),
         memory: peak_of(
             &item.mem_history,
             item.current_memory_bytes().map(|bytes| bytes as f32),
@@ -85,10 +84,4 @@ pub(super) fn process_performance_peaks(item: &ProcessItem) -> ProcessPerformanc
         )
         .map(|peak| format_quantity_f64(f64::from(peak), QuantityFamily::Drive, true, &units)),
     }
-}
-
-/// Unknown swap capacity keeps the column visible; only a confirmed zero
-/// proves that the host has no swap device.
-pub(super) fn swap_column_visible(snapshot: Option<&SystemSnapshot>) -> bool {
-    snapshot.is_none_or(|snapshot| snapshot.memory.current_swap_total_bytes() != Some(0))
 }

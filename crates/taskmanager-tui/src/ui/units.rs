@@ -95,24 +95,13 @@ pub(super) fn observed_temperature_for_source(
     source: CpuTemperatureSource,
 ) -> String {
     let readout = observed_temperature(temperature_c);
-    match (temperature_source_note_key(source), temperature_c) {
+    match (source.qualifier_note_key(), temperature_c) {
         (Some(key), Some(_)) => format!("{readout} · {}", t(key)),
         _ => readout,
     }
 }
 
-/// The i18n qualifier for a fallback temperature source, if it needs one.
-fn temperature_source_note_key(source: CpuTemperatureSource) -> Option<&'static str> {
-    match source {
-        CpuTemperatureSource::PackageHwmon => Some("cpu.temperature_source.package_hwmon"),
-        CpuTemperatureSource::ThermalZone => Some("cpu.temperature_source.thermal_zone"),
-        _ => None,
-    }
-}
-
-pub(super) fn observed_percentage(percentage: Option<f32>) -> String {
-    percentage.map_or_else(missing_value, |value| format!("{value:.1}%"))
-}
+pub(super) use taskmanager_shell::presentation::observed_percentage;
 
 #[cfg(test)]
 #[path = "../../tests/gui/ui/units_tests.rs"]

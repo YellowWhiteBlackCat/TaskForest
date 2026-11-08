@@ -1,9 +1,9 @@
 //! Modality-aware high-contrast keyboard focus indication (CORE-08 / FocusVisible).
 //!
-//! Delivers true parity with GPUI (`RootView::InputModality`) and Iced (`input_modality::InputModality`):
-//! interactive controls and navigation items only paint a high-contrast focus ring when navigating
-//! via keyboard. Pointer clicks switch the modality to [`InputModality::Pointer`], suppressing the focus
-//! ring immediately to avoid distracting outlines on mouse activation.
+//! Delivers true parity with GPUI and Iced: interactive controls and navigation items only paint a
+//! high-contrast focus ring when navigating via keyboard. Pointer clicks switch the modality to
+//! [`InputModality::Pointer`], suppressing the focus ring immediately to avoid distracting outlines
+//! on mouse activation.
 //!
 //! # Architecture
 //!
@@ -11,6 +11,10 @@
 //! transitions ([`InputModality`]: `Programmatic`, `Keyboard`, `Pointer`). Zero scattered booleans.
 //! Actual widgets opt into toolkit Tab navigation; the single [`InputFocus`] resource
 //! selects the one control whose outline is painted. No second focus marker exists.
+//!
+//! The modality vocabulary and the focus-visible rule belong to the shared contract
+//! (`taskmanager_ui_contract::InputModality`); this module owns only the Bevy ECS adapter and the
+//! observation systems.
 
 use bevy::app::{App, PostUpdate, Update};
 use bevy::ecs::component::Component;
@@ -40,32 +44,10 @@ use crate::pages::processes::columns_modal::ProcessColumnsPopover;
 use crate::pages::processes::properties_modal::ProcessPropertiesOverlay;
 use crate::pages::settings::SettingsChoice;
 use crate::scene_attach::insert_into;
+use crate::spatial_focus::FocusTarget;
 use crate::widgets::scene_paint::ScenePaint;
 use crate::window::{AppShellRoot, DemoMode, WindowPalette};
-
-/// The most recent origin capable of changing focus in the window.
-///
-/// Strictly mirrors the GPUI root tracker (`RootView::InputModality`) and
-/// the Iced renderer-local tracker (`taskmanager_iced::input_modality::InputModality`).
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash)]
-pub(crate) enum InputModality {
-    /// Initial state and focus changes initiated directly by application code.
-    #[default]
-    Programmatic = 0,
-    /// A keyboard event was observed (any key or modifier).
-    Keyboard = 1,
-    /// A pointer event (press/click) was observed over the window surface.
-    Pointer = 2,
-}
-
-impl InputModality {
-    /// Strict focus-visible policy: only keyboard modality paints a focus ring,
-    /// matching the shared theme palette contract where ring alpha encodes focus-visible.
-    #[must_use]
-    pub(crate) const fn shows_focus_ring(self) -> bool {
-        matches!(self, Self::Keyboard)
-    }
-}
+use taskmanager_ui_contract::InputModality;
 
 /// Explicit discrete state machine resource tracking the active input modality.
 #[derive(Resource, Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -87,11 +69,7 @@ impl InputModalityState {
     /// Transition to a new input modality.
     /// Returns true if the state changed, allowing caller to trigger an observer event.
     pub(crate) fn transition(&mut self, next: InputModality) -> bool {
-        if self.modality == next {
-            return false;
-        }
-        self.modality = next;
-        true
+        self.modality.transition(next)
     }
 }
 
@@ -124,6 +102,7 @@ fn decorate_controls(mut commands: Commands, controls: UndecoratedControls) {
             entity,
             (
                 FocusRing,
+                FocusTarget,
                 TabIndex(0),
                 // The inner ring's width comes from the shared focus-ring
                 // seam (the same 2px the halo layer is measured against) — a

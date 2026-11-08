@@ -1,9 +1,9 @@
-//! GPUI-aligned layout primitives for the Iced Performance page.
+//! The Iced Performance page's layout primitives.
 //!
 //! The data stays in the sibling performance modules; this file only owns the
-//! renderer geometry every device detail shares: the GPUI `perf_page` slot
-//! contract (title row → vital line → left graph column → pinned/stacked
-//! statistics rail with an optional footer), driven by the one typed
+//! renderer geometry every device detail shares: Iced's slot order (title row →
+//! vital line → left graph column → pinned/stacked statistics rail with an
+//! optional footer), driven by the one typed
 //! [`PerformancePageBudget`] instead of a local compact flag. Statistics rows
 //! consume the shared shell [`StatRow`] contract so missing values render the
 //! ONE shared dash in a dim style — the same fold all frontend renderers read.
@@ -15,13 +15,12 @@ use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::{FontSize, Weight, tokens};
 
-use super::responsive::PERFORMANCE_STATS_STACK_HEIGHT;
 use crate::app::Message;
 use crate::theme;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
-    DeviceNavigationPresentation, PerformanceDetailsPresentation,
+    DeviceNavigationPresentation, PERFORMANCE_STATS_STACK_HEIGHT, PerformanceDetailsPresentation,
 };
 
 type Elem<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;

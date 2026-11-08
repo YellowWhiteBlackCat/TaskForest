@@ -2,6 +2,7 @@
 
 use super::super::{ContextMenu, ContextMenuKind, IcedApp, Message};
 use super::dispatch::UpdateDispatch;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_shell::ProcessRowId;
 
 impl IcedApp {
@@ -65,7 +66,7 @@ impl IcedApp {
             }
             Message::SelectDetailsSection(section) => {
                 self.process_presentation.details_section = section;
-                if section == super::super::DetailsSection::Insights {
+                if section == ProcessDetailsSection::Insights {
                     return UpdateDispatch::effect(
                         self.shell.request_properties_process_insights(),
                     );

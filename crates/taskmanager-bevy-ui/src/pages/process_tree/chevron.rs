@@ -19,6 +19,7 @@ use bevy::prelude::Visibility;
 use bevy::scene::{Scene, bsn};
 use bevy::time::Time;
 use bevy::ui::prelude::{AlignSelf, Node, UiTransform, rem};
+use zhuge_ui_core::easing::{lerp, smoothstep};
 
 use taskmanager_ui_contract::IconId;
 
@@ -89,8 +90,7 @@ impl ChevronAnimation {
         }
         self.elapsed += delta;
         let progress = (self.elapsed / CHEVRON_TWEEN_SECONDS).min(1.0);
-        let eased = progress * progress * (3.0 - 2.0 * progress);
-        self.current = self.from + (self.target - self.from) * eased;
+        self.current = lerp(self.from, self.target, smoothstep(progress));
     }
 }
 

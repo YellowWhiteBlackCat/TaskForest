@@ -11,6 +11,7 @@ use taskmanager_ui_contract::IconId;
 use super::containers::{KeyHint, Modal};
 use crate::surface::AFFINITY_GRID_COLS;
 use crate::{AffinityModalState, TuiApp, TuiTheme};
+use zhuge_ui_core::row_page::{RowPage, page_count, page_of};
 
 /// Render the interactive CPU affinity editor modal overlay.
 pub(super) fn render_affinity_modal_at(
@@ -64,22 +65,17 @@ pub(super) fn render_affinity_modal_at(
     ];
     frame.render_widget(Paragraph::new(header_lines), header);
 
-    let total_rows = state.logical_cpu_count.div_ceil(AFFINITY_GRID_COLS);
+    let total_rows = page_count(state.logical_cpu_count, AFFINITY_GRID_COLS);
     let visible_height = usize::from(body.height);
-    let current_row = state.selected_cpu / AFFINITY_GRID_COLS;
-    let scroll = if current_row < state.scroll {
-        current_row
-    } else if current_row >= state.scroll.saturating_add(visible_height) {
-        current_row.saturating_add(1).saturating_sub(visible_height)
-    } else {
-        state.scroll
-    };
-    let scroll = scroll.min(total_rows.saturating_sub(visible_height));
+    let current_row = page_of(state.selected_cpu, AFFINITY_GRID_COLS);
+    // The shared row-page owner reveals the cursor with the smallest shift that
+    // keeps it painted, so the grid never travels further than the cursor did.
+    let page = RowPage::reveal(total_rows, visible_height, state.scroll, current_row).page();
 
-    let mut lines = Vec::with_capacity(visible_height);
-    let end_row = (scroll + visible_height).min(total_rows);
+    let mut lines = Vec::with_capacity(page.len());
+    let end_row = page.last();
 
-    for row in scroll..end_row {
+    for row in page.first()..end_row {
         let mut spans = Vec::with_capacity(AFFINITY_GRID_COLS);
         for col in 0..AFFINITY_GRID_COLS {
             let cpu = row * AFFINITY_GRID_COLS + col;

@@ -2,6 +2,8 @@ use super::*;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process_telemetry::{ContainerQuota, ContainerSummary};
 use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_application::i18n::more_rows_label;
+use zhuge_ui_core::row_page::row_budget;
 
 fn healthy_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);
@@ -25,10 +27,10 @@ fn container_rows_render_typed_values_and_no_fabricated_zeros() {
     let row = &rollup.containers[0];
     assert_eq!(runtime_label(row.runtime.as_ref()), "Docker");
     assert_eq!(
-        scalar_text(row.cpu_percentage, |value| format!("{value:.1}%")),
+        observed_precise_percentage(row.cpu_percentage.current_value().copied()),
         "120.5%"
     );
-    assert_eq!(scalar_text(row.memory_bytes, bytes), "3.0 MiB");
+    assert_eq!(observed_scalar_text(row.memory_bytes, bytes), "3.0 MiB");
     assert_eq!(row.member_pids.len(), 3);
 }
 
@@ -40,12 +42,13 @@ fn unavailable_scalars_render_dash_not_zero() {
     rollup.containers[0].memory_bytes =
         ScalarObservation::unavailable(FailureKind::PermissionDenied);
     assert_eq!(
-        scalar_text(rollup.containers[0].cpu_percentage, |value| format!(
-            "{value:.1}%"
-        )),
+        observed_precise_percentage(rollup.containers[0].cpu_percentage.current_value().copied()),
         "—"
     );
-    assert_eq!(scalar_text(rollup.containers[0].memory_bytes, bytes), "—");
+    assert_eq!(
+        observed_scalar_text(rollup.containers[0].memory_bytes, bytes),
+        "—"
+    );
 }
 
 #[test]
@@ -60,9 +63,11 @@ fn healthy_empty_rollup_is_not_a_blank_panel() {
 
 #[test]
 fn container_table_caps_materialized_rows_and_reports_the_overflow() {
-    let (shown, hidden) = container_row_window(203);
+    let budget = row_budget(203, MAX_CONTAINER_ROWS);
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     assert_eq!(shown, MAX_CONTAINER_ROWS);
     assert_eq!(hidden, 3);
+    assert!(budget.truncated() && budget.total() == 203);
     let label = more_rows_label(hidden);
     assert!(label.contains('3'));
     assert!(!label.contains("{count}"));

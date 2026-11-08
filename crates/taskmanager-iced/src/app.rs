@@ -19,6 +19,7 @@ use taskforest_core::core::appearance::DesktopAppearance;
 use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
+use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::first_run::FirstRunController;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
@@ -57,6 +58,7 @@ mod constructors;
 mod diagnostics;
 mod focus_state;
 mod focus_targets;
+mod frame_timing;
 pub(crate) mod history_replay;
 mod history_series;
 mod input_state;
@@ -112,7 +114,7 @@ pub use motion::{ModalAppear, PageNav, WarmupSpin};
 pub use preferences::PresentationPreferences;
 pub use process_menu::ProcessMenuAction;
 pub use service_details::ServiceDetailsSnapshot;
-pub use settings_types::{DetailsSection, DeviceKind, SettingsChange};
+pub use settings_types::{DeviceKind, SettingsChange};
 // Session-local process-table column sizing (drag overrides + the open drag
 // session), reduced by `update::columns`.
 pub(crate) use surface::{
@@ -447,7 +449,7 @@ pub enum Message {
     RequestProcessNetworkEscalation,
     /// Switch the process-details modal's section tab (Overview /
     /// Performance / Command / Insights).
-    SelectDetailsSection(DetailsSection),
+    SelectDetailsSection(ProcessDetailsSection),
     SelectInsightsFacet(ProcessInsightFacet),
     RefreshProcessInsights,
     /// Open the frontend-local settings modal.
@@ -604,7 +606,7 @@ pub struct IcedApp {
     pub(crate) system_dashboard_first_metric: usize,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.
-    history_runtime: history_replay::IcedHistoryRuntime,
+    history_runtime: history_replay::IcedHistoryReplay,
     /// Application-correlated export lifecycle with the app-host's named
     /// worker client; unavailable demo/test instances perform no file I/O.
     snapshot_export: snapshot_export::IcedSnapshotExportRuntime,

@@ -9,33 +9,30 @@
 //! so the semantic tree advances on actual data changes rather than on every
 //! hover/focus repaint.
 
-use std::cmp::Ordering;
 // Linux-only dependency: the bridge exists only on Linux, and the type alias
 // below is the only consumer.
 use taskforest_core::core::process::ProcessLiveKey;
-use taskforest_core::core::session::SessionControlAction;
 #[cfg(target_os = "linux")]
 use taskmanager_accessibility_linux::LinuxAccessKitBridge;
 use taskmanager_application::AppAction;
 use taskmanager_application::AppPage;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
-use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
-use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
+use taskmanager_shell::{
+    ProcessRowId, ShellApp, base_semantic_snapshot_builder, process_semantic_key,
+};
 #[cfg(not(target_os = "linux"))]
 use taskmanager_ui_contract::DetachedAccessibilityBridge;
 use taskmanager_ui_contract::{
     AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, AlertRuleInput,
-    GraphSummary, ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot,
-    SemanticSnapshotBuilder,
+    ModalInput, SemanticAction, SemanticSnapshot, SemanticSnapshotBuilder,
 };
 
 #[cfg(target_os = "linux")]
 pub type AppAccessibilityBridge = LinuxAccessKitBridge;
 #[cfg(not(target_os = "linux"))]
 pub type AppAccessibilityBridge = DetachedAccessibilityBridge;
-
-const MAX_PUBLISHED_ROWS: usize = 64;
 
 /// Build the current Iced semantic tree without performing native I/O.
 #[must_use]
@@ -117,66 +114,7 @@ pub fn apply_accessibility_action(
 /// The shell-level semantic facts (table, graph, status, modal) as a
 /// pre-build builder shared by both projections.
 fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
-    let mut builder = SemanticSnapshotBuilder::new(shell.projection().refresh_count)
-        .application_name(product::ICED_NAME)
-        .status_announcement(status_text(shell));
-
-    if let Some(current) = shell
-        .projection()
-        .snapshot
-        .as_ref()
-        .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-        .filter(|value| value.is_finite())
-    {
-        let current = f64::from(current.clamp(0.0, 100.0));
-        builder = builder.cpu_graph(GraphSummary {
-            current,
-            peak: current,
-            maximum: 100.0,
-        });
-    }
-
-    let memory_total = shell
-        .projection()
-        .snapshot
-        .as_ref()
-        .and_then(|snapshot| snapshot.memory.current_total_bytes());
-    let processes = shell.projection().processes_slice();
-    let mut visible_indices: Vec<usize> = shell.visible_process_indices().to_vec();
-    visible_indices.sort_by(|&left, &right| {
-        let left_p = processes.get(left);
-        let right_p = processes.get(right);
-        match (left_p, right_p) {
-            (Some(l), Some(r)) => compare_processes(l, r, ProcessSortAxis::Cpu, false),
-            _ => Ordering::Equal,
-        }
-    });
-
-    for (index, &raw_index) in visible_indices.iter().take(MAX_PUBLISHED_ROWS).enumerate() {
-        let Some(process) = processes.get(raw_index) else {
-            continue;
-        };
-        let name = if process.name.trim().is_empty() {
-            String::from("Unnamed process")
-        } else {
-            process.name.clone()
-        };
-        builder = builder.process_row(ProcessRowInput {
-            id: process_semantic_key(process),
-            name,
-            cpu_percent: process
-                .current_cpu_percentage()
-                .filter(|value| value.is_finite())
-                .map(|value| f64::from(value.clamp(0.0, 100.0))),
-            memory_percent: memory_percentage(process.current_memory_bytes(), memory_total),
-            selected: match shell.selected_row {
-                Some(ProcessRowId::Process(identity)) => ProcessLiveKey::from_process(process)
-                    .is_some_and(|row_identity| row_identity == identity),
-                Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) => false,
-                None => index == shell.selected,
-            } || shell.is_process_selected(process),
-        });
-    }
+    let mut builder = base_semantic_snapshot_builder(shell, product::ICED_NAME);
 
     if let Some(modal) = active_modal(shell) {
         builder = builder.modal(modal);
@@ -218,20 +156,6 @@ fn alert_rule_inputs(app: &crate::IcedApp) -> Vec<AlertRuleInput> {
         .collect()
 }
 
-fn memory_percentage(value: Option<u64>, total: Option<u64>) -> Option<f64> {
-    let (value, total) = (value?, total.filter(|total| *total > 0)?);
-    let percentage = (value as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
-    percentage.is_finite().then_some(percentage)
-}
-
-fn status_text(shell: &ShellApp) -> String {
-    if shell.feedback_text().trim().is_empty() {
-        format!("{} processes visible", shell.visible_process_count())
-    } else {
-        shell.feedback_text().to_owned()
-    }
-}
-
 fn active_modal(shell: &ShellApp) -> Option<ModalInput> {
     if let Some(target) = shell.pending_end() {
         return Some(ModalInput {
@@ -254,10 +178,7 @@ fn active_modal(shell: &ShellApp) -> Option<ModalInput> {
         });
     }
     if let Some(target) = shell.pending_session() {
-        let action = match target.action {
-            SessionControlAction::Disconnect => t("users.disconnect"),
-            SessionControlAction::Lock => t("users.lock"),
-        };
+        let action = i18n::session_control_action_label(target.action);
         return Some(ModalInput {
             id: String::from("session-control-confirmation"),
             name: String::from("Session control confirmation"),

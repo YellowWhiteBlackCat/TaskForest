@@ -279,7 +279,7 @@ pub(crate) fn render_sidebar(
                 .gap(definite_length(tokens::SPACE_6))
                 .font_weight(font_weight(tokens::FONT_WEIGHT_STRONG))
                 .text_color(hsla(theme.fg_dim))
-                .child(icon(IconId::System).size(px(18.0)))
+                .child(icon(IconId::System).size(definite_length(tokens::ICON_STANDALONE)))
                 .child(div().flex_1().child(i18n::t("sidebar.devices")))
                 .child(edit::edit_button(theme, edit_mode, cx)),
         );

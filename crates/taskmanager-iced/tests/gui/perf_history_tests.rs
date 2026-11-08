@@ -1,5 +1,6 @@
 use super::*;
 use taskforest_core::core::process::ProcessLiveKey;
+use taskmanager_shell::presentation::MAX_GRAPH_WINDOW_SAMPLES;
 
 fn identity(pid: u32) -> ProcessLiveKey {
     ProcessLiveKey::from_parts(pid, u64::from(pid)).expect("fixture identity")
@@ -80,7 +81,7 @@ fn seed_from_provider_clamps_capacity_and_stays_empty_without_provider_data() {
     let mut history = ProcessPerfHistory::new(60);
     history.seed_from_provider(identity(300), 100_000, &[1.0, 2.0], &[3.0], &[4.0], &[5.0]);
     assert!(
-        history.capacity() <= MAX_HISTORY_CAPACITY,
+        history.capacity() <= MAX_GRAPH_WINDOW_SAMPLES,
         "a hostile capacity cannot allocate an unbounded ring"
     );
     assert_eq!(history.cpu_samples().len(), 2);

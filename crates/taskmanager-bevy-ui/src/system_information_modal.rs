@@ -51,7 +51,7 @@ fn on_command(
         commands.trigger(WindowSurfaceCommand::SystemInformation);
         return;
     }
-    let Some(WindowSurface::SystemInformation(facts)) = &state.0 else {
+    let Some(WindowSurface::SystemInformation(facts)) = state.active() else {
         return;
     };
     match command {

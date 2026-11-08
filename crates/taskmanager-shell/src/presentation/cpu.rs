@@ -9,6 +9,7 @@ use taskmanager_application::MsrReadoutState;
 use taskmanager_application::i18n;
 
 use super::{MISSING_VALUE, megahertz, missing_value};
+use taskforest_core::core::percent::percent_text;
 
 /// Compact, renderer-neutral summary of the package topology collected by the
 /// native adapter. It intentionally uses only proven fields: a missing NUMA,
@@ -105,7 +106,7 @@ pub fn cpu_idle_state_summary(cpu: &CpuMetrics) -> Option<String> {
                         compact_counter,
                     )
                 },
-                |value| format!("{value:.1}%"),
+                percent_text,
             );
             format!("{} {value}", state.name)
         })
@@ -195,7 +196,7 @@ pub fn cpu_interrupt_summary(cpu: &CpuMetrics) -> Option<String> {
                     } else {
                         0.0
                     };
-                    format!("CPU{index} {pct:.0}%")
+                    format!("CPU{index} {}", percent_text(pct))
                 })
                 .collect::<Vec<_>>()
                 .join(",");
@@ -205,8 +206,9 @@ pub fn cpu_interrupt_summary(cpu: &CpuMetrics) -> Option<String> {
                 format!(" · {distribution}")
             };
             Some(format!(
-                "{} {total} · CPU{cpu} {count} ({busiest_pct:.0}%){distribution}",
-                i18n::t("cpu.interrupt_total")
+                "{} {total} · CPU{cpu} {count} ({busiest}){distribution}",
+                i18n::t("cpu.interrupt_total"),
+                busiest = percent_text(busiest_pct),
             ))
         }
         (Some(total), None) => Some(format!("{} {total}", i18n::t("cpu.interrupt_total"))),
@@ -244,8 +246,9 @@ pub fn cpu_interrupt_compact_summary(cpu: &CpuMetrics) -> Option<String> {
                 0.0
             };
             Some(format!(
-                "{} {total} · CPU{logical_cpu} {count} ({percent:.0}%)",
-                i18n::t("cpu.interrupt_total")
+                "{} {total} · CPU{logical_cpu} {count} ({busiest})",
+                i18n::t("cpu.interrupt_total"),
+                busiest = percent_text(percent),
             ))
         }
         None => Some(format!("{} {total}", i18n::t("cpu.interrupt_total"))),

@@ -31,6 +31,7 @@
 //! [`taskforest_core::core::process::ProcessCategory`] facts directly from their owner
 //! module in `taskforest-core`.
 
+use std::collections::HashSet;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::aggregate::{AggregateMetric, aggregate_f32, aggregate_u64};
 use taskforest_core::core::process::{ProcessCategory, ProcessItem};
@@ -46,6 +47,24 @@ pub const CATEGORY_EXPANSION_KEY_PREFIX: &str = "category:";
 #[must_use]
 pub fn category_expansion_key(category: ProcessCategory) -> String {
     format!("{CATEGORY_EXPANSION_KEY_PREFIX}{}", category.stable_key())
+}
+
+/// The canonical category tree expanded on first use: every
+/// [`ProcessCategory`] of [`ProcessCategory::ALL`], keyed by
+/// [`category_expansion_key`].
+///
+/// This is the SINGLE default expansion set (ADR-020): the GPUI Processes
+/// view, the TUI Applications page, and the Iced Applications page must start
+/// from the same visible hierarchy, so a persisted collapse state means the
+/// same thing in every frontend. The set is also used by capture/bootstrap
+/// paths, which is why it lives here and not in a renderer.
+#[must_use]
+pub fn default_category_expansions() -> HashSet<String> {
+    ProcessCategory::ALL
+        .iter()
+        .copied()
+        .map(category_expansion_key)
+        .collect()
 }
 
 /// One non-empty [`ProcessCategory`] bucket over the caller's items: the

@@ -36,6 +36,19 @@ Keep real terminal evidence separate from deterministic frames; shared
 boundaries are defined in `../../docs/ARCH.md` and
 `../../docs/screenshots/README.md`.
 
+`src/ui/sparkline.rs` keeps the published Unicode and ASCII ramps byte-for-byte
+and adds an explicit `TuiSparklineMode::Braille16` path. That path returns a
+typed two-line `TuiSparklineCurve`: one Braille cell per sample pair on each
+row, with exact dot masks and no fabricated points for gaps. It is opt-in and
+does not change any existing painted surface. `src/runtime/keys/vim.rs` owns a
+finite contextual chord state machine for `gg` (first table row), `G` (last
+table row), `dd` (clear batch marks) and `/` (page-owned search). It stays
+behind the existing binding owners: an existing `d` command, the Applications
+prefix jump, or an overlay-owned input scope keeps precedence. A pending chord
+carries its page/device context and cancels on any other key, so replay is
+idempotent and no process-control effect is emitted. Behavior is pinned by the
+`vim`, `braille16` and `sparkline_mode_preserves` nextest suites.
+
 ## Module map
 
 ```text
@@ -60,6 +73,7 @@ src/ui.rs                                     page rendering root
 │   ├── startup_menu.rs  batch_menu.rs  column_menu.rs  affinity_modal.rs
 │   ├── confirmations.rs  header.rs  footer.rs  frame_plan.rs
 │   ├── sparkline.rs  chart_cursor.rs  highlight.rs  table_hit.rs  text.rs  units.rs
+│   │   (Braille16 typed mode + 2×8 dot curve path)
 src/command_palette/  (+ surface_protocol.rs) command palette
 src/bindings.rs  capabilities.rs  functional.rs  feature_coverage.rs  keys, capabilities, CORE-04
 src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs  sidebar.rs

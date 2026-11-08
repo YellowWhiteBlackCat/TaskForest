@@ -21,9 +21,6 @@ const DEBT_BASELINE: &[LayoutDebtCell] = &[
     cell(FrontendShape::Bevy, LayoutAxis::ChartsRungContentHeight),
     cell(FrontendShape::Bevy, LayoutAxis::StackedDetailsMinHeight),
     cell(FrontendShape::Bevy, LayoutAxis::RootChromeSingleRowWidth),
-    cell(FrontendShape::Bevy, LayoutAxis::PerformanceStatsMinWidth),
-    cell(FrontendShape::Bevy, LayoutAxis::PerformanceStatsMaxWidth),
-    cell(FrontendShape::Bevy, LayoutAxis::PerformanceSidebarMinWidth),
     cell(FrontendShape::Bevy, LayoutAxis::NavigationHorizontalInset),
     cell(FrontendShape::Bevy, LayoutAxis::VerticalChromeReserve),
     cell(FrontendShape::Bevy, LayoutAxis::HorizontalChromeReserve),
@@ -129,6 +126,50 @@ fn the_two_recorded_legacy_differences_are_registered_not_erased() {
         number(FrontendShape::Iced, LayoutAxis::ChartsRungContentHeight),
         650.0,
         "the per-core matrix rung keeps its measured Iced band"
+    );
+    // The bands the frontends bind into their own `const` lengths. Each value
+    // used to be restated as a frontend mirror constant, so the registry row
+    // is now the only address — and this is where the number is pinned.
+    assert_eq!(
+        number(FrontendShape::Gpui, LayoutAxis::PerformanceStatsMinWidth),
+        236.0
+    );
+    assert_eq!(
+        number(FrontendShape::Gpui, LayoutAxis::PerformanceStatsMaxWidth),
+        280.0
+    );
+    assert_eq!(
+        number(FrontendShape::Iced, LayoutAxis::PerformanceStatsMinWidth),
+        260.0
+    );
+    assert_eq!(
+        number(FrontendShape::Iced, LayoutAxis::PerformanceStatsMaxWidth),
+        320.0
+    );
+    assert_eq!(
+        number(FrontendShape::Iced, LayoutAxis::PerformanceSidebarMinWidth),
+        248.0
+    );
+    assert_eq!(
+        number(FrontendShape::Gpui, LayoutAxis::NavigationHorizontalInset),
+        12.0
+    );
+    assert_eq!(
+        number(FrontendShape::Gpui, LayoutAxis::PerformanceSidebarMinWidth),
+        220.0
+    );
+    assert_eq!(
+        number(FrontendShape::Gpui, LayoutAxis::StackedDetailsMinHeight),
+        520.0,
+        "the reference rail floor the GPUI mirror used to restate"
+    );
+    assert_eq!(
+        number(FrontendShape::Iced, LayoutAxis::VerticalChromeReserve),
+        128.0
+    );
+    assert_eq!(
+        number(FrontendShape::Iced, LayoutAxis::HorizontalChromeReserve),
+        20.0
     );
     let registered = divergent_axes(FrontendShape::Gpui, FrontendShape::Iced);
     for axis in [

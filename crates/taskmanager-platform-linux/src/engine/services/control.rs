@@ -179,11 +179,11 @@ fn successful(result: ControlCommandResult) -> Result<(), ProviderFailure> {
 
 const fn service_action_name(action: ServiceAction) -> &'static str {
     match action {
-        ServiceAction::Start => "start",
-        ServiceAction::Stop => "stop",
-        ServiceAction::Restart => "restart",
-        ServiceAction::Enable => "enable",
-        ServiceAction::Disable => "disable",
+        ServiceAction::Start
+        | ServiceAction::Stop
+        | ServiceAction::Restart
+        | ServiceAction::Enable
+        | ServiceAction::Disable => action.stable_token(),
         ServiceAction::ReloadDaemon => "daemon-reload",
     }
 }

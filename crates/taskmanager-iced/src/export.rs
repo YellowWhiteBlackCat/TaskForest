@@ -1,28 +1,6 @@
 //! Structured clipboard process export for Iced.
 
 use taskforest_core::core::process::ProcessItem;
-use taskmanager_shell::presentation::{bytes, missing_value};
-
-/// Format a single process item as tab-separated values (TSV).
-#[must_use]
-pub fn process_to_tsv(process: &ProcessItem) -> String {
-    let user = process.current_user().unwrap_or_else(missing_value);
-    let cpu = process
-        .current_cpu_percentage()
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
-    let memory = process
-        .current_memory_bytes()
-        .map_or_else(missing_value, bytes);
-    format!(
-        "{}\t{}\t{}\t{}\t{}\t{}",
-        process.pid,
-        process.name,
-        cpu,
-        memory,
-        if user.is_empty() { "—" } else { &user },
-        process.status,
-    )
-}
 
 /// One JSON string literal, escaped by serde (quotes, backslashes, and every
 /// control character) instead of a hand-rolled rule.

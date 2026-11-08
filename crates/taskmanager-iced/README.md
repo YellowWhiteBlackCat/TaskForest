@@ -43,7 +43,7 @@ src/a11y.rs                    accessibility bridge
 src/app.rs (+ app/)            IcedApp root, navigation, input_state, refresh, projection
 src/ui.rs (+ ui/)              page layouts, modal dialogues, and responsive scaffolds
 src/focus.rs (+ focus/)        focus ring management and navigation focus models
-src/keys.rs  input_modality.rs keyboard event normalization and input modality state
+src/keys.rs  input_modality.rs keyboard event normalization and the root input-modality observer
 src/perf_chart.rs  perf_history.rs  app_history_chart.rs  trend_strip.rs
                                canvas charts, historical series and mini sparklines
 src/capabilities.rs  functional.rs  feature_coverage.rs

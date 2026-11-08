@@ -254,8 +254,5 @@ pub(crate) fn boot_timeline_scene(
 /// A zero total yields `0.0` for every window: there is nothing to scale by,
 /// and a full-width bar would be a fabricated measurement.
 fn share_of_total(value_ms: u64, total_ms: u64) -> f32 {
-    if total_ms == 0 {
-        return 0.0;
-    }
-    (value_ms as f32 / total_ms as f32).clamp(0.0, 1.0)
+    zhuge_ui_core::value::interval_fraction(value_ms as f32, 0.0, total_ms as f32, 0.0)
 }

@@ -11,6 +11,16 @@ use gpui::{
 };
 use std::rc::Rc;
 use std::time::Instant;
+use taskforest_core::core::percent::MAX_PERCENT;
+use taskmanager_shell::presentation::{ChartSlots, graph_window_samples, latest_samples};
+use taskmanager_telemetry_store::live_graph::{MAX_HISTORY_CAPACITY, MIN_HISTORY_CAPACITY};
+use taskmanager_theme::palette::tint_channel_toward_white;
+use zhuge_ui_core::curve::catmull_rom_windows;
+use zhuge_ui_core::value::interval_fraction;
+
+// The zero-travel branch is handled before the projection, so this answer is
+// unreachable; naming it keeps the declared policy visible at the call.
+const FLAT_DEGENERATE_ALREADY_HANDLED: f64 = 0.0;
 
 pub(crate) mod cache;
 mod hover;
@@ -24,8 +34,8 @@ pub(crate) use hover::{
 
 use slide::slide_progress;
 
-pub(crate) const MIN_GRAPH_DATA_POINTS: usize = 10;
-pub(crate) const MAX_GRAPH_DATA_POINTS: usize = 600;
+pub(crate) const MIN_GRAPH_DATA_POINTS: usize = MIN_HISTORY_CAPACITY;
+pub(crate) const MAX_GRAPH_DATA_POINTS: usize = MAX_HISTORY_CAPACITY;
 pub(crate) const DEFAULT_GRAPH_DATA_POINTS: usize = 60;
 pub(crate) const DEFAULT_GRAPH_DATA_POINTS_CONFIG: u32 = 60;
 
@@ -141,6 +151,11 @@ pub struct GraphOpts {
 }
 
 impl GraphOpts {
+    /// Where `value` sits on this graph's axis, as `0.0..=1.0`.
+    ///
+    /// The declared bounds are canonicalized first (`max` is never below
+    /// `floor`, a non-finite bound collapses to the floor), and the division
+    /// into the unit interval is the shared projection's.
     fn normalized(&self, value: f32) -> f32 {
         let floor = if self.min.is_finite() { self.min } else { 0.0 };
         let ceiling = if self.max.is_finite() {
@@ -148,8 +163,25 @@ impl GraphOpts {
         } else {
             floor
         };
-        let span = (f64::from(ceiling) - f64::from(floor)).max(1e-6);
-        ((f64::from(value) - f64::from(floor)) / span).clamp(0.0, 1.0) as f32
+        // A caller-supplied `max == min` leaves the axis with no travel, and this
+        // surface reads such a sample as the side of the axis it sits on: above
+        // the floor is the top, at or below it is the baseline. That answer is
+        // stated here rather than left to a floored denominator, so the division
+        // itself stays with the projection's owner.
+        if ceiling == floor {
+            return if f64::from(value) > f64::from(floor) {
+                1.0
+            } else {
+                0.0
+            };
+        }
+        // The degenerate answer is already handled above, so `flat` is unreachable.
+        interval_fraction(
+            f64::from(value),
+            f64::from(floor),
+            f64::from(ceiling),
+            FLAT_DEGENERATE_ALREADY_HANDLED,
+        ) as f32
     }
 }
 
@@ -161,7 +193,7 @@ impl Default for GraphOpts {
             hlines: 5,
             vlines: 6,
             stroke_width: 1.5,
-            max: 100.0,
+            max: MAX_PERCENT,
             min: 0.0,
             // All refinements OFF → existing callers render exactly as before.
             gradient_fill: false,
@@ -193,11 +225,6 @@ impl GraphOpts {
     }
 }
 
-/// Capacity for a rendered series; preference validation belongs to GraphSettings.
-pub(super) fn graph_capacity(data_points: usize) -> usize {
-    data_points.clamp(2, MAX_GRAPH_DATA_POINTS)
-}
-
 /// The graph-element variant of the slice-tail limit helper: callers often pre-limit
 /// (the Performance layout does, for its summary row), so when the window
 /// already fits the samples are reused as-is — the old unconditional
@@ -209,11 +236,11 @@ pub(super) fn graph_capacity(data_points: usize) -> usize {
 /// and no per-frame copy happens. Only a series longer than the configured
 /// window pays the tail-slice.
 pub fn latest_samples_rc(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
-    let limit = graph_capacity(data_points);
+    let limit = graph_window_samples(data_points);
     if samples.len() <= limit {
         samples
     } else {
-        Rc::from(&samples[samples.len() - limit..])
+        Rc::from(latest_samples(&samples, limit))
     }
 }
 
@@ -221,14 +248,14 @@ pub fn latest_samples_rc(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
 /// Without it, translating the curve would only reveal blank space on the
 /// right — the “shrinking back” artifact the first implementation showed.
 fn graph_slide_supported(samples: &[f32], data_points: usize) -> bool {
-    samples.len() > graph_capacity(data_points)
+    samples.len() > graph_window_samples(data_points)
 }
 
 /// Horizontal distance one sample slot occupies in a `data_points`-wide
 /// graph. The slide moves exactly one of these slots; the settled frame
 /// matches the static map (`width / (capacity - 1)`).
 fn graph_slide_spacing(bounds: Bounds<Pixels>, data_points: usize) -> Pixels {
-    let capacity = graph_capacity(data_points).max(1);
+    let capacity = graph_window_samples(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     px(f32::from(bounds.size.width) / denom)
 }
@@ -247,7 +274,7 @@ fn sample_x_slide(
     data_points: usize,
     progress: f32,
 ) -> Pixels {
-    let capacity = graph_capacity(data_points).max(1);
+    let capacity = graph_window_samples(data_points).max(1);
     let denom = capacity.saturating_sub(1).max(1) as f32;
     let slot = f32::from(width) / denom;
     px(f32::from(left) + (index as f32 - progress.clamp(0.0, 1.0)) * slot)
@@ -258,26 +285,19 @@ fn sample_x_slide(
 /// that still tracks sharp transitions without overshoot ringing.
 const SMOOTH_TENSION: f32 = 0.5;
 
-/// How far a two-series graph lifts the secondary series' color toward white
-/// from the device-family token — iced-parity (`device_chart::multi`'s
-/// `SECONDARY_TINT_LIFT`): a tint of the SAME color (solid "read"/"receive"
-/// vs light "write"/"send"), never a new product color.
-pub(crate) const SECONDARY_TINT_LIFT: f32 = 0.32;
-
 /// The (primary, secondary) color pair for one device family's two-series
 /// graph: the family token as-is, and the same token lifted toward white by
-/// [`SECONDARY_TINT_LIFT`]. Pure so the "no new product color" rule is
+/// the theme's tint law. Pure so the "no new product color" rule is
 /// unit-tested headlessly (the secondary is strictly between the base and
 /// white on every channel, alpha untouched).
 #[must_use]
 pub(crate) fn dual_series_colors(base: Rgba) -> (Rgba, Rgba) {
-    let lift = |channel: f32| channel + (1.0 - channel) * SECONDARY_TINT_LIFT;
     (
         base,
         Rgba {
-            r: lift(base.r),
-            g: lift(base.g),
-            b: lift(base.b),
+            r: tint_channel_toward_white(base.r),
+            g: tint_channel_toward_white(base.g),
+            b: tint_channel_toward_white(base.b),
             a: base.a,
         },
     )
@@ -334,6 +354,10 @@ pub fn compute_column_count(n: usize) -> usize {
 /// window fills (`n >= capacity`) the mapping becomes the usual full-span
 /// spread. Drawing and hover use this one mapping, so a tooltip can never
 /// disagree with the visible sample.
+///
+/// The mapping itself is the shared owner's
+/// ([`taskmanager_shell::presentation::ChartSlots`]): the GPUI, Iced and Bevy
+/// surfaces resolve their slots through it, so the three cannot drift.
 #[must_use]
 pub(crate) fn sample_x(
     left: Pixels,
@@ -342,9 +366,7 @@ pub(crate) fn sample_x(
     n: usize,
     capacity: usize,
 ) -> Pixels {
-    let denom = n.saturating_sub(1).max(capacity.saturating_sub(1)).max(1) as f32;
-    let slots_from_right = (n - 1 - index) as f32;
-    px(f32::from(left) + f32::from(width) * (1.0 - slots_from_right / denom))
+    px(f32::from(left) + ChartSlots::new(n, capacity, f32::from(width)).x(index))
 }
 
 #[derive(Clone)]
@@ -566,7 +588,6 @@ pub(crate) fn build_graph_dynamic_geometry(
                     GraphXMapping::Normal => sample_x(left, w, index, n, opts.data_points),
                     GraphXMapping::Slide => sample_x_slide(left, w, index, opts.data_points, 0.0),
                 };
-                // `.max(1e-6)` guards a caller-supplied `opts.max == 0.0`.
                 let yv = opts.normalized(value);
                 point(x, bottom - h * yv)
             })
@@ -737,11 +758,11 @@ fn catmull_rom_controls(pts: &[Point<Pixels>], tension: f32) -> Option<SmoothCon
     let f = |p: Point<Pixels>| (f32::from(p.x), f32::from(p.y));
     let mut ctrl_a = Vec::with_capacity(n - 1);
     let mut ctrl_b = Vec::with_capacity(n - 1);
-    for i in 0..n - 1 {
-        let (x1, y1) = f(pts[i]);
-        let (x2, y2) = f(pts[i + 1]);
-        let (x0, y0) = if i == 0 { (x1, y1) } else { f(pts[i - 1]) };
-        let (x3, y3) = if i + 2 < n { f(pts[i + 2]) } else { (x2, y2) };
+    for window in catmull_rom_windows(n) {
+        let (x1, y1) = f(pts[window.start]);
+        let (x2, y2) = f(pts[window.end]);
+        let (x0, y0) = f(pts[window.previous]);
+        let (x3, y3) = f(pts[window.next]);
         let ca = point(
             px(x1 + (x2 - x0) / 6.0 * tension),
             px(y1 + (y2 - y0) / 6.0 * tension),

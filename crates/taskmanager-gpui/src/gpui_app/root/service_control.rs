@@ -119,10 +119,7 @@ impl ServiceControlConfirmation {
                 template.replace("{name}", &entry.name)
             }
             Self::Session { intent } => {
-                let action = match intent.action {
-                    SessionControlAction::Disconnect => i18n::t("users.disconnect"),
-                    SessionControlAction::Lock => i18n::t("users.lock"),
-                };
+                let action = i18n::session_control_action_label(intent.action);
                 let headline = i18n::t("confirm.session_headline")
                     .replace("{action}", action)
                     .replace("{id}", intent.session.id.as_str())
@@ -149,10 +146,7 @@ impl ServiceControlConfirmation {
                     i18n::t("common.disable")
                 }
             }
-            Self::Session { intent } => match intent.action {
-                SessionControlAction::Disconnect => i18n::t("users.disconnect"),
-                SessionControlAction::Lock => i18n::t("users.lock"),
-            },
+            Self::Session { intent } => i18n::session_control_action_label(intent.action),
         }
     }
 }

@@ -180,3 +180,9 @@ fn extreme_counts_never_panic() {
     }
     assert_eq!(format_memory(u64::MAX, &prefs), "17179869184.0 GiB");
 }
+
+#[test]
+fn bytes_per_mib_is_the_binary_unit_the_rate_lifts_use() {
+    assert_eq!(BYTES_PER_MIB, 1_048_576);
+    assert_eq!(bytes_to_mib(2 * BYTES_PER_MIB), 2.0);
+}

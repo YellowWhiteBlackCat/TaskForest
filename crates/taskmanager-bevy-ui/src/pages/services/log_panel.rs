@@ -26,16 +26,18 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use std::time::SystemTime;
 use taskforest_core::core::services::{
     ServiceLogAvailability, ServiceLogEntry, ServiceLogErrorKind, ServiceLogLevelFilter,
     ServiceLogProviderState, ServiceLogTimeFilter,
 };
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::app::OpenServiceLog;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::app::FrontendTrack;
-use crate::drain::{ShellProjectionFolded, unix_now_ms};
+use crate::drain::ShellProjectionFolded;
 use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::input::PendingEffects;
 use crate::pages::services::{log_follow, log_text};
@@ -287,7 +289,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
         .unwrap_or_default();
     let title = format!("{} — {service}", t("svc.logs"));
     let visible = shell
-        .visible_service_log_entries(unix_now_ms() * 1_000)
+        .visible_service_log_entries(unix_millis(SystemTime::now()) * 1_000)
         .unwrap_or_default();
     let rows: Vec<Box<dyn Scene>> = visible
         .iter()
@@ -514,7 +516,7 @@ pub(crate) fn export_service_log(shell: &mut ShellApp, export_dir: Option<&std::
         return;
     };
     let entries = shell
-        .visible_service_log_entries(crate::drain::unix_now_ms() * 1_000)
+        .visible_service_log_entries(unix_millis(SystemTime::now()) * 1_000)
         .unwrap_or_default()
         .into_iter()
         .cloned()

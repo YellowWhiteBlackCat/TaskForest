@@ -3,8 +3,15 @@
 use iced::widget::canvas::Path;
 use iced::{Point, Size};
 use taskmanager_application::history_decimation::lttb_gap_preserving_runs;
+use taskmanager_shell::presentation::ChartSlots;
+use zhuge_ui_core::curve::catmull_rom_windows;
+use zhuge_ui_core::value::interval_fraction;
 
-use super::{WindowSlots, sample_x};
+// A point that cannot be placed or a range that cannot travel parks on the
+// baseline, the answer this chart always drew.
+const FLAT_POINT_PARKS_ON_BASELINE: f64 = 0.0;
+
+use super::sample_x;
 
 /// The Catmull-Rom tension for [`smooth_line_path`] (matches GPUI's
 /// `SMOOTH_TENSION` — the curve passes through the sample points).
@@ -22,11 +29,11 @@ pub(crate) fn smooth_line_path(points: &[Point]) -> Option<Path> {
     }
     Some(Path::new(|builder| {
         builder.move_to(points[0]);
-        for index in 0..points.len() - 1 {
-            let previous = points[index.saturating_sub(1)];
-            let start = points[index];
-            let end = points[index + 1];
-            let next = points.get(index + 2).copied().unwrap_or(end);
+        for window in catmull_rom_windows(points.len()) {
+            let previous = points[window.previous];
+            let start = points[window.start];
+            let end = points[window.end];
+            let next = points[window.next];
             let ctrl_a = Point::new(
                 start.x + (end.x - previous.x) * SMOOTH_TENSION,
                 start.y + (end.y - previous.y) * SMOOTH_TENSION,
@@ -52,11 +59,11 @@ pub(crate) fn smooth_area_path(points: &[Point], baseline_y: f32) -> Option<Path
     let last = points[points.len() - 1];
     Some(Path::new(|builder| {
         builder.move_to(first);
-        for index in 0..points.len() - 1 {
-            let previous = points[index.saturating_sub(1)];
-            let start = points[index];
-            let end = points[index + 1];
-            let next = points.get(index + 2).copied().unwrap_or(end);
+        for window in catmull_rom_windows(points.len()) {
+            let previous = points[window.previous];
+            let start = points[window.start];
+            let end = points[window.end];
+            let next = points[window.next];
             let ctrl_a = Point::new(
                 start.x + (end.x - previous.x) * SMOOTH_TENSION,
                 start.y + (end.y - previous.y) * SMOOTH_TENSION,
@@ -148,7 +155,7 @@ pub(crate) fn series_point_runs_for(samples: &[f32], size: Size, max: f32) -> Ve
 
 /// The windowed projection: the same value normalization and NaN-gap
 /// splitting as [`series_point_runs_for`], but the x coordinates come from the
-/// caller's [`WindowSlots`] grid — the identical mapping the chart's hover
+/// caller's [`ChartSlots`] grid — the identical mapping the chart's hover
 /// resolves through, so a capacity-windowed graph and its readout cannot
 /// disagree about where a sample sits.
 #[must_use]
@@ -156,7 +163,7 @@ pub(crate) fn series_point_runs_windowed(
     samples: &[f32],
     size: Size,
     max: f32,
-    slots: &WindowSlots,
+    slots: &ChartSlots,
 ) -> Vec<Vec<Point>> {
     series_point_runs_with(samples, size, 0.0, max, &|index| slots.x(index))
 }
@@ -218,11 +225,15 @@ pub(crate) fn scaled_y_in_range(value: f32, min: f32, max: f32, height: f32) -> 
     let height = finite_nonnegative(height);
     let floor = if min.is_finite() { min.min(0.0) } else { 0.0 };
     let ceiling = if max.is_finite() { max.max(floor) } else { 0.0 };
-    let span = f64::from(ceiling) - f64::from(floor);
-    if !value.is_finite() || span <= 0.0 {
-        return height;
-    }
-    height * (1.0 - ((f64::from(value) - f64::from(floor)) / span).clamp(0.0, 1.0) as f32)
+    // A value that cannot be placed, or a range that cannot travel, parks the
+    // point on the baseline — the answer this surface always drew.
+    let fraction = interval_fraction(
+        f64::from(value),
+        f64::from(floor),
+        f64::from(ceiling),
+        FLAT_POINT_PARKS_ON_BASELINE,
+    );
+    height * (1.0 - fraction as f32)
 }
 
 fn finite_nonnegative(value: f32) -> f32 {

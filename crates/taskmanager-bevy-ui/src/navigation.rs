@@ -52,7 +52,7 @@ fn toggle(
     surface: Option<Res<WindowSurfaceState>>,
     mut state: ResMut<NavigationState>,
 ) {
-    if surface.as_ref().is_some_and(|surface| surface.0.is_some()) {
+    if surface.as_ref().is_some_and(|surface| surface.is_open()) {
         return;
     }
     state.0 = state.0.toggled();

@@ -1,48 +1,14 @@
 //! Frontend-local settings types: the persisted-token mutation enum, the
 //! color-scheme choice, the device-visibility toggle vocabulary, and the
-//! process-details section tabs. These are renderer-local vocabulary the
-//! shared shell never sees (ADR-027), extracted from [`super`] so the state
-//! module stays under the repository's source-size budget.
+//! re-exports of the shared process-details section vocabulary. These are
+//! renderer-local vocabulary the shared shell never sees (ADR-027),
+//! extracted from [`super`] so the state module stays under the repository's
+//! source-size budget.
 
 use taskmanager_theme::tokens::{MotionPolicy, UiSize};
 use taskmanager_theme::{FontChoice, ModePreference, Skin};
 
 use taskmanager_application::i18n::Language;
-
-/// The process-details modal's section tab (GPUI `ProcessDetailsSection`
-/// parity: Overview / Performance / Command / Insights). Frontend-local —
-/// the shell only knows the properties overlay is open, never which tab
-/// renders.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum DetailsSection {
-    #[default]
-    Overview,
-    Performance,
-    Command,
-    Insights,
-}
-
-impl DetailsSection {
-    /// Every tab in selector order (the anti-报菜名 rule: the tab row, the
-    /// focus-target registry and the tests iterate this list).
-    pub const ALL: [Self; 4] = [
-        Self::Overview,
-        Self::Performance,
-        Self::Command,
-        Self::Insights,
-    ];
-
-    /// Stable non-localized identifier for focus-operation IDs.
-    #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::Overview => "overview",
-            Self::Performance => "performance",
-            Self::Command => "command",
-            Self::Insights => "insights",
-        }
-    }
-}
 
 /// One settings mutation: the persisted token change plus the resolved theme
 /// axis. The token↔enum mapping is the theme owner's public codec (ADR-063);

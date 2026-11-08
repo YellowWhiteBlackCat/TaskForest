@@ -59,7 +59,7 @@ use taskmanager_application::{
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 
-const MIB: u64 = 1024 * 1024;
+use taskforest_core::core::units::BYTES_PER_MIB;
 
 /// Typed deterministic facts accepted by the shell's fixture boundary.
 ///

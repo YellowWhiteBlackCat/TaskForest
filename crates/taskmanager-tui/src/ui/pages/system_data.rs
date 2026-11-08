@@ -3,15 +3,17 @@
 //! The renderer consumes ordered sections and a bounded viewport; observation
 //! availability and NPU engine/memory folds live here instead of paint code.
 
-use taskforest_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::SmbiosMemorySnapshot;
 use taskforest_core::core::metrics::SystemSnapshot;
-use taskforest_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
+use taskforest_core::core::npu::NpuInventorySnapshot;
 use taskforest_core::core::units::UnitPreferences;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::system_information::display_summary;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, duration, health_score_for_snapshot, health_score_summary, missing_value,
-    optional_bytes,
+    observed_percentage, optional_bytes,
 };
 use taskmanager_shell::presentation::{kernel_error_summary, smbios_memory_inventory_rows};
 
@@ -307,7 +309,7 @@ pub(crate) fn system_sections(
             );
             for engine in &device.engines {
                 graphics.push(
-                    t(npu_engine_label_key(engine.kind)),
+                    i18n::npu_engine_kind_label(engine.kind),
                     observed_percentage(engine.utilization_pct.current_value().copied()),
                 );
             }
@@ -323,7 +325,9 @@ pub(crate) fn system_sections(
     }
     if let Some(hardware) = hardware {
         for display in &hardware.displays {
-            graphics.push(t("system.display"), display_summary(display));
+            if let Some(summary) = display_summary(display) {
+                graphics.push(t("system.display"), summary);
+            }
         }
     }
 
@@ -382,62 +386,4 @@ pub(crate) fn system_sections(
         sections.push(storage);
     }
     sections
-}
-
-fn observed_percentage(value: Option<f32>) -> String {
-    value
-        .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.1}%"))
-}
-
-const fn npu_engine_label_key(kind: NpuEngineKind) -> &'static str {
-    match kind {
-        NpuEngineKind::Compute => "npu.engine_compute",
-        NpuEngineKind::Matrix => "npu.engine_matrix",
-        NpuEngineKind::Vector => "npu.engine_vector",
-        NpuEngineKind::Video => "npu.engine_video",
-        NpuEngineKind::Copy => "npu.engine_copy",
-        NpuEngineKind::Unknown => "npu.engine_unknown",
-    }
-}
-
-fn display_summary(display: &DisplayInfo) -> String {
-    let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
-        .into_iter()
-        .flatten()
-        .filter(|value| !value.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut parts = vec![display.connector.clone()];
-    if !identity.is_empty() {
-        parts.push(identity);
-    }
-    if let (Some(width), Some(height)) = (display.width_px, display.height_px) {
-        parts.push(format!("{width}×{height}"));
-    }
-    if let Some(refresh) = display
-        .refresh_hz
-        .filter(|value| value.is_finite() && *value > 0.0)
-    {
-        parts.push(format!("{refresh:.1} Hz"));
-    }
-    if let Some(hdr) = display_hdr_capability(display) {
-        parts.push(hdr);
-    }
-    if let (Some(width), Some(height)) = (display.width_mm, display.height_mm) {
-        parts.push(format!("{width}×{height} mm"));
-    }
-    if let Some(serial) = display.serial.as_deref().filter(|value| !value.is_empty()) {
-        parts.push(format!("S/N {serial}"));
-    }
-    parts.join(" · ")
-}
-
-fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
-    let state = match display.hdr_supported {
-        Some(true) => t("system.hdr_supported"),
-        Some(false) => t("system.hdr_unsupported"),
-        None => return None,
-    };
-    Some(format!("{} {state}", t("system.hdr")))
 }

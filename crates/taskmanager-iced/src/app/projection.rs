@@ -10,6 +10,7 @@ use crate::ui::process_projection::{ProcessProjection, ProcessProjectionFingerpr
 
 use super::{IcedApp, PerfDevice};
 use taskforest_core::core::history::HistoryWindow;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_application::ApplicationHistoryRow;
 use taskmanager_application::ApplicationHistoryStatus;
@@ -150,10 +151,10 @@ impl IcedApp {
         match device {
             PerfDevice::Cpu => snapshot
                 .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
-                .map(|value| format!("{value:.0}%")),
+                .map(percent_text),
             PerfDevice::Memory => snapshot
                 .and_then(|snapshot| snapshot.memory.used_percentage_observed())
-                .map(|value| format!("{value:.0}%")),
+                .map(percent_text),
             PerfDevice::Disk(index) => snapshot
                 .and_then(|snapshot| snapshot.disks.get(index))
                 .map(|disk| disk.name.clone()),

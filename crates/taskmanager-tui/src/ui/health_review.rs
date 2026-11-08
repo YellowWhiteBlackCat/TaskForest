@@ -1,5 +1,4 @@
 //! Complete selected health groups in a bounded terminal modal.
-use super::alerts::{metric_label, metric_unit};
 use super::containers::KeyHint;
 use crate::command_palette::{TuiSurfaceAction, TuiSurfaceScope, surface_hint_pairs};
 use crate::health_review::HealthReviewMode;
@@ -12,6 +11,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 use taskforest_core::core::alerts::Alert;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::truncate_text;
 use taskmanager_shell::presentation::health_review::{
@@ -76,9 +76,9 @@ pub(crate) fn groups(app: &TuiApp) -> Vec<HealthReviewGroup> {
     }
 }
 fn alert_group(alert: &Alert, context: &str) -> HealthReviewGroup {
-    let unit = metric_unit(alert.metric);
+    let unit = alert.metric.unit_suffix();
     HealthReviewGroup {
-        title: format!("{context} · {}", metric_label(alert.metric)),
+        title: format!("{context} · {}", i18n::alert_metric_label(alert.metric)),
         rows: vec![
             HealthReviewRow {
                 label: "Severity".into(),

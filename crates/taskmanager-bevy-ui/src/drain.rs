@@ -16,7 +16,8 @@ use crate::window_surface::{
     WindowSurfaceState,
 };
 use crossbeam_channel::Receiver;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
@@ -212,17 +213,6 @@ pub(crate) fn capability_summary_line(snapshot: &CapabilitySnapshot) -> String {
     )
 }
 
-/// Wall-clock milliseconds for the scheduler submission timestamps; the
-/// scheduler compares against observation timestamps, so virtual time is not
-/// a substitute. Saturates at `u64::MAX` past the epoch instead of panicking.
-pub(crate) fn unix_now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
-}
-
 /// The optional appearance authorities a folded platform appearance event is
 /// written through: the operator's theme preferences, the resolved window
 /// palette, and the camera clear color.
@@ -336,15 +326,15 @@ pub(crate) fn drain_system(
         tray_res.sync_pause_checkmark(track.shell.paused());
         for event in tray_res.drain_events() {
             if let TrayEvent::MenuActivated { id } = event
-                && let Some(intent) = crate::tray::resolve_tray_action(id)
+                && let Some(intent) = taskforest_core::core::tray::resolve_tray_action(id)
             {
                 match intent {
-                    crate::tray::TrayIntent::Show => {}
-                    crate::tray::TrayIntent::TogglePause => {
+                    taskforest_core::core::tray::TrayIntent::ShowWindow => {}
+                    taskforest_core::core::tray::TrayIntent::TogglePause => {
                         let _ = track.shell.apply_action(AppAction::TogglePause);
                         tray_res.sync_pause_checkmark(track.shell.paused());
                     }
-                    crate::tray::TrayIntent::Quit => {
+                    taskforest_core::core::tray::TrayIntent::Quit => {
                         track.shell.request_quit(QuitReason::Tray);
                     }
                 }
@@ -355,7 +345,9 @@ pub(crate) fn drain_system(
     let mut client = runtime.shared.lock_client();
     if !track.initial_refresh_submitted {
         if let Some(setup) = appearance_targets.setup.as_deref_mut() {
-            setup.0.observe(Some(&mut client), unix_now_ms());
+            setup
+                .0
+                .observe(Some(&mut client), unix_millis(SystemTime::now()));
         }
         queue_effect(
             &mut track.shell,
@@ -372,7 +364,7 @@ pub(crate) fn drain_system(
     let cycle = run_drain_cycle(
         &mut client,
         &mut track.shell,
-        unix_now_ms(),
+        unix_millis(SystemTime::now()),
         appearance_targets
             .setup
             .as_deref_mut()
@@ -386,12 +378,14 @@ pub(crate) fn drain_system(
             if appearance_targets
                 .surface
                 .as_ref()
-                .is_some_and(|surface| matches!(surface.0, Some(WindowSurface::FirstRun)))
+                .is_some_and(|surface| matches!(surface.active(), Some(WindowSurface::FirstRun)))
                 && let Some(setup) = appearance_targets.setup.as_deref_mut()
             {
-                setup
-                    .0
-                    .request(request.action, Some(&mut client), unix_now_ms());
+                setup.0.request(
+                    request.action,
+                    Some(&mut client),
+                    unix_millis(SystemTime::now()),
+                );
                 commands.trigger(WindowSurfaceChanged);
             }
         } else {
@@ -453,9 +447,11 @@ pub(crate) fn drain_demo_effects(
 ) {
     for effect in pending.0.drain(..) {
         if let PlatformEffect::SetupScript(request) = effect
-            && matches!(surface.0, Some(WindowSurface::FirstRun))
+            && matches!(surface.active(), Some(WindowSurface::FirstRun))
         {
-            setup.0.request(request.action, None, unix_now_ms());
+            setup
+                .0
+                .request(request.action, None, unix_millis(SystemTime::now()));
             commands.trigger(WindowSurfaceChanged);
         }
     }

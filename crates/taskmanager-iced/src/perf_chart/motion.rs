@@ -7,9 +7,9 @@
 //! assert the resolved phase (or the resolved axis value) instead of
 //! sleeping for a wall-clock interval.
 //!
-//! The slide follows the GPUI reference: the outgoing frame keeps its
-//! positions while the incoming sample enters from the right, and the whole
-//! curve eases into the incoming frame over [`SLIDE_DURATION`]. The
+//! The slide eases through the shared [`chart_slide_ramp`]: the outgoing frame
+//! keeps its positions while the incoming sample enters from the right, and the
+//! whole curve settles into the incoming frame over [`SLIDE_DURATION`]. The
 //! outgoing frame is reproduced EXACTLY at progress 0 and the incoming
 //! frame EXACTLY at progress 1, so the transition never introduces a jump
 //! of its own.
@@ -17,40 +17,26 @@
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
+use taskmanager_ui_contract::presentation::motion::{CHART_SLIDE_DURATION, chart_slide_ramp};
+use zhuge_ui_core::easing::{lerp, transition_progress};
 
 use iced::{Point, Size};
 
 use super::series_point_runs;
 
-/// The slide transition duration (the GPUI graph-slide parity).
-pub(crate) const SLIDE_DURATION: Duration = Duration::from_millis(180);
+/// The slide transition duration, bound to the shared chart vocabulary.
+const SLIDE_DURATION: Duration = CHART_SLIDE_DURATION;
 
 /// The dynamic value-range transition duration: the Y ceiling eases over
 /// 120 ms so a rate spike never snaps the graph to a new scale.
 pub(crate) const RANGE_DAMP_DURATION: Duration = Duration::from_millis(120);
 
-/// The symmetric quadratic ease-in-out ramp (the GPUI `ease_in_out`
-/// parity): a gentle start and stop with no overshoot.
-#[must_use]
-pub(crate) fn ease_in_out(raw: f32) -> f32 {
-    let t = if raw.is_finite() {
-        raw.clamp(0.0, 1.0)
-    } else {
-        1.0
-    };
-    if t < 0.5 {
-        2.0 * t * t
-    } else {
-        1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
-    }
-}
-
 /// The eased slide progress for an elapsed time: 0 at the start of the
 /// transition, 1 once it has run its course.
 #[must_use]
 pub(crate) fn slide_progress(elapsed: Duration) -> f32 {
-    let raw = (elapsed.as_secs_f32() / SLIDE_DURATION.as_secs_f32()).clamp(0.0, 1.0);
-    ease_in_out(raw)
+    let raw = transition_progress(elapsed, SLIDE_DURATION);
+    chart_slide_ramp(raw)
 }
 
 /// The phase of one series' slide.
@@ -221,7 +207,7 @@ pub(crate) fn slide_positions(
                 width + current_slot
             };
             let to = (index as isize - offset) as f32 * current_slot;
-            from + (to - from) * progress
+            lerp(from, to, progress)
         })
         .collect()
 }
@@ -271,9 +257,9 @@ pub(crate) fn damped_range_value(from: f32, to: f32, elapsed: Duration) -> f32 {
     if !from.is_finite() || !to.is_finite() {
         return to;
     }
-    let raw = (elapsed.as_secs_f32() / RANGE_DAMP_DURATION.as_secs_f32()).clamp(0.0, 1.0);
+    let raw = transition_progress(elapsed, RANGE_DAMP_DURATION);
     let eased = 1.0 - (1.0 - raw) * (1.0 - raw);
-    from + (to - from) * eased
+    lerp(from, to, eased)
 }
 
 /// The damped value-range state: the range the chart shows now and the

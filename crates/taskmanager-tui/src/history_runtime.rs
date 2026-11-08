@@ -1,26 +1,21 @@
 //! Read-only persistent-history adapter for the terminal frontend.
+//!
+//! The session lifecycle (which history session is live, which window it
+//! replays, whether a request was accepted) belongs to
+//! [`taskmanager_app_host::HistoryFrontendRuntime`]. This module owns only
+//! the terminal's own replay surface state: whether the replay panel is open
+//! and how far its rows are scrolled.
 
 use taskforest_core::core::history::HistoryWindow;
 use taskmanager_app_host::{
-    HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
+    HistoryFrontendConnector, HistoryFrontendConnectorStartError, HistoryFrontendRuntime,
 };
 use taskmanager_application::{
-    ApplicationHistoryCapability, ApplicationHistoryProjection,
-    ApplicationHistoryUnavailableReason, HistoryReplayCompletionDisposition,
-    HistoryReplayController, HistoryReplayRequest, PerformanceHistoryProjection,
+    ApplicationHistoryProjection, ApplicationHistoryUnavailableReason, PerformanceHistoryProjection,
 };
 
 use crate::TuiApp;
-use taskforest_core::core::history::HistoryRecordSink;
-use taskmanager_app_host::HistoryFrontendSession;
 use taskmanager_application::AppPage;
-
-enum HistoryResources {
-    Disabled,
-    Connecting(HistoryFrontendConnectRequestId),
-    Unavailable(ApplicationHistoryUnavailableReason),
-    Active(HistoryFrontendSession),
-}
 
 #[derive(Default)]
 enum PerformancePresentation {
@@ -32,20 +27,14 @@ enum PerformancePresentation {
 }
 
 pub(crate) struct TuiHistoryRuntime {
-    resources: HistoryResources,
-    controller: HistoryReplayController,
-    connector: Option<HistoryFrontendConnector>,
-    requested: bool,
+    runtime: HistoryFrontendRuntime,
     performance: PerformancePresentation,
 }
 
 impl Default for TuiHistoryRuntime {
     fn default() -> Self {
         Self {
-            resources: HistoryResources::Disabled,
-            controller: HistoryReplayController::default(),
-            connector: None,
-            requested: false,
+            runtime: HistoryFrontendRuntime::default(),
             performance: PerformancePresentation::Live,
         }
     }
@@ -54,49 +43,20 @@ impl Default for TuiHistoryRuntime {
 impl TuiHistoryRuntime {
     pub(crate) fn install_connector(
         &mut self,
-        result: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
+        connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
     ) {
-        match result {
-            Ok(connector) => {
-                self.connector = Some(connector);
-                self.request(self.requested);
-            }
-            Err(error) if self.requested => {
-                self.resources = HistoryResources::Unavailable(error.into())
-            }
-            Err(_) => self.resources = HistoryResources::Disabled,
-        }
+        self.runtime.install_connector(connector);
     }
 
     pub(crate) fn request(&mut self, enabled: bool) {
-        self.requested = enabled;
+        self.runtime.request(enabled);
         if !enabled {
-            self.resources = HistoryResources::Disabled;
-            self.controller.close();
             self.performance = PerformancePresentation::Live;
-            return;
         }
-        if matches!(
-            self.resources,
-            HistoryResources::Connecting(_) | HistoryResources::Active(_)
-        ) {
-            return;
-        }
-        let Some(connector) = self.connector.as_mut() else {
-            self.resources = HistoryResources::Unavailable(
-                ApplicationHistoryUnavailableReason::ConnectorStopped,
-            );
-            return;
-        };
-        self.resources = match connector.try_connect() {
-            Ok(request) => HistoryResources::Connecting(request),
-            Err(error) => HistoryResources::Unavailable(error.into()),
-        };
     }
 
     pub(crate) fn projection(&self) -> ApplicationHistoryProjection {
-        self.controller
-            .application_history_projection(self.capability())
+        self.runtime.application_history_projection()
     }
 
     pub(crate) const fn is_open(&self) -> bool {
@@ -104,12 +64,11 @@ impl TuiHistoryRuntime {
     }
 
     pub(crate) fn available(&self) -> bool {
-        matches!(self.resources, HistoryResources::Active(_))
+        self.runtime.is_active()
     }
 
     pub(crate) fn performance_projection(&self) -> PerformanceHistoryProjection {
-        self.controller
-            .performance_history_projection(self.capability())
+        self.runtime.performance_history_projection()
     }
 
     pub(crate) fn open(&mut self) -> bool {
@@ -117,10 +76,7 @@ impl TuiHistoryRuntime {
             return false;
         }
         self.performance = PerformancePresentation::Replay { row_scroll: 0 };
-        if !self.controller.is_open() {
-            let request = self.controller.open().ok();
-            self.submit_new_request(request);
-        }
+        self.runtime.open_replay();
         true
     }
 
@@ -129,10 +85,7 @@ impl TuiHistoryRuntime {
     }
 
     pub(crate) fn refresh(&mut self) {
-        if self.available() {
-            let request = self.controller.refresh().ok();
-            self.submit_new_request(request);
-        }
+        self.runtime.refresh_replay();
     }
 
     pub(crate) fn row_scroll(&self) -> usize {
@@ -150,91 +103,31 @@ impl TuiHistoryRuntime {
     }
 
     pub(crate) const fn window(&self) -> HistoryWindow {
-        self.controller.selected_window()
+        self.runtime.window()
     }
 
     pub(crate) fn select_window(&mut self, window: HistoryWindow) -> bool {
-        let request = self.controller.select_window(window).ok();
-        let changed = request.is_some();
-        self.submit_new_request(request);
-        changed
+        self.runtime.select_window(window)
     }
 
+    /// Whether the history runtime's state advanced since the last drain.
+    ///
+    /// The answer belongs to the runtime owner
+    /// ([`taskmanager_app_host::HistoryFrontendRuntime::drain_changes`]): the
+    /// connector's outcome and the replay's completions are one question, not
+    /// two answers each frontend has to combine.
     pub(crate) fn drain(&mut self) -> bool {
-        let mut changed = false;
-        if let Some(connector) = self.connector.as_mut() {
-            for completion in connector.drain() {
-                let HistoryResources::Connecting(current) = self.resources else {
-                    continue;
-                };
-                if completion.request != current || !self.requested {
-                    continue;
-                }
-                self.resources = match completion.result {
-                    Ok(session) => HistoryResources::Active(session),
-                    Err(error) => HistoryResources::Unavailable(error.kind().into()),
-                };
-                if matches!(self.resources, HistoryResources::Active(_)) {
-                    let request = self.controller.open().ok();
-                    self.submit_new_request(request);
-                } else {
-                    self.controller.close();
-                }
-                changed = true;
-            }
-        }
-        if let HistoryResources::Active(client) = &mut self.resources {
-            let completions = client.replay.drain();
-            for completion in completions {
-                changed |= self.controller.complete(completion)
-                    == HistoryReplayCompletionDisposition::Applied;
-            }
-        }
-        changed
-    }
-
-    fn capability(&self) -> ApplicationHistoryCapability {
-        match self.resources {
-            HistoryResources::Disabled => ApplicationHistoryCapability::Disabled,
-            HistoryResources::Connecting(_) => ApplicationHistoryCapability::Connecting,
-            HistoryResources::Unavailable(reason) => {
-                ApplicationHistoryCapability::Unavailable(reason)
-            }
-            HistoryResources::Active(_) => ApplicationHistoryCapability::Available,
-        }
-    }
-
-    fn submit_new_request(&mut self, request: Option<HistoryReplayRequest>) {
-        let Some(request) = request else {
-            return;
-        };
-        let error = match &mut self.resources {
-            HistoryResources::Active(session) => session.replay.try_request(request).err(),
-            HistoryResources::Disabled
-            | HistoryResources::Connecting(_)
-            | HistoryResources::Unavailable(_) => None,
-        };
-        if let Some(error) = error {
-            let _ = self.controller.reject_submission(request, error);
-        }
+        self.runtime.drain_changes()
     }
 
     pub(crate) fn unavailable_reason(&self) -> Option<ApplicationHistoryUnavailableReason> {
-        match self.resources {
-            HistoryResources::Unavailable(reason) => Some(reason),
-            HistoryResources::Disabled
-            | HistoryResources::Connecting(_)
-            | HistoryResources::Active(_) => None,
-        }
+        self.runtime.unavailable_reason()
     }
 
-    pub(crate) fn record_sink(&self) -> Option<std::sync::Arc<dyn HistoryRecordSink>> {
-        match &self.resources {
-            HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
-            HistoryResources::Disabled
-            | HistoryResources::Connecting(_)
-            | HistoryResources::Unavailable(_) => None,
-        }
+    pub(crate) fn record_sink(
+        &self,
+    ) -> Option<std::sync::Arc<dyn taskforest_core::core::history::HistoryRecordSink>> {
+        self.runtime.record_sink()
     }
 }
 

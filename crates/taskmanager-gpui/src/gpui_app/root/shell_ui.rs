@@ -2,7 +2,9 @@
 //! completion of command-launch, resource-reveal, and URL-open intents, plus
 //! failure feedback.
 
+use std::time::SystemTime;
 use taskforest_contract::{CapabilityId, OperationFailure, RequestId, SubmissionErrorKind};
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::RequestCorrelation;
 use taskmanager_application::{
     CommandLaunchRequest, CorrelatedShellEvent, RefreshRequest, RequestAttemptId,
@@ -13,8 +15,8 @@ use taskmanager_application::{
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
 
+use super::RootView;
 use super::clipboard::process_failure_message;
-use super::{RootView, platform_submission_time_ms};
 use gpui::Context;
 
 impl RootView {
@@ -53,7 +55,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_command_launch(request, platform_submission_time_ms())
+                    .submit_command_launch(request, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );
@@ -91,7 +93,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_resource_reveal(request, platform_submission_time_ms())
+                    .submit_resource_reveal(request, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );
@@ -107,7 +109,7 @@ impl RootView {
             || Err(SubmissionErrorKind::RuntimeStopped),
             |platform| {
                 platform
-                    .submit_url_open(request, platform_submission_time_ms())
+                    .submit_url_open(request, unix_millis(SystemTime::now()))
                     .map_err(|error| error.kind)
             },
         );

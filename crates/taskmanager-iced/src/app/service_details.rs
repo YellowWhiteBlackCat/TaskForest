@@ -26,7 +26,7 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, She
 use super::{IcedApp, LocalSurface, Message, PlatformEffect};
 use taskmanager_application::AppAction;
 use taskmanager_application::ServiceAttemptId;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{service_log_rejection_detail, t};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceDetailsSnapshot {
@@ -132,7 +132,7 @@ impl ServiceDetailsState {
     pub(crate) fn reject_stream(&mut self, attempt_id: ServiceAttemptId, failure: FailureKind) {
         let failure = ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
-            format!("service log request was rejected: {failure:?}"),
+            service_log_rejection_detail(failure),
         );
         self.stream.reject_attempt(attempt_id, failure);
     }

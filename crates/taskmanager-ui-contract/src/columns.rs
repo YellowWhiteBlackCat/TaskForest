@@ -69,6 +69,21 @@ impl ColumnResizePolicy {
     }
 }
 
+/// The width after moving `start_width` by `cursor - anchor`.
+///
+/// This is geometry, not [`ColumnResizePolicy::drag`]: the policy applies the
+/// shared min/max/step decision, while this function only turns a pointer
+/// position into a delta from the position where the drag began. The first
+/// cursor position *is* the anchor and produces no movement: a drag that has
+/// not started cannot pretend to have moved the column. Both the GPUI
+/// component layer and the Bevy table used to carry byte-identical private
+/// copies of this law.
+#[must_use]
+pub fn width_from_drag(start_width: f32, anchor: &mut Option<f32>, cursor: f32) -> f32 {
+    let origin = *anchor.get_or_insert(cursor);
+    start_width + (cursor - origin)
+}
+
 /// One process-table column, described toolkit-neutrally.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProcessColumnSpec {

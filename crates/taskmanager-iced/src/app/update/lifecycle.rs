@@ -1,14 +1,14 @@
 //! Before/after systems surrounding one Iced message reduction.
 
 use std::time::Instant;
+use taskmanager_application::ProcessDetailsSection;
 
 use iced::Task;
+use taskforest_contract::sync_tray_pause_checkmark;
 use taskmanager_application::{FocusDirection, KeyCode};
 
 use super::super::surface::InteractionSnapshot;
-use super::super::{
-    DetailsSection, FocusTarget, IcedApp, IcedKey, Message, ModalAppear, PresenceTransition,
-};
+use super::super::{FocusTarget, IcedApp, IcedKey, Message, ModalAppear, PresenceTransition};
 use super::dispatch::UpdateDispatch;
 use super::window_events::{close_latest_window, restore_latest_window};
 use taskmanager_application::ProcessInsightFacet;
@@ -72,7 +72,7 @@ impl IcedApp {
         self.converge_shared_interaction_surface();
         self.assert_surface_invariants();
         if prelude.paused != self.shell.paused() {
-            crate::tray::sync_tray_pause_checkmark(self, self.shell.paused());
+            sync_tray_pause_checkmark(self, self.shell.paused());
         }
         if self.shell.should_quit() {
             return close_latest_window();
@@ -143,7 +143,7 @@ impl IcedApp {
         if !matches!(transition, PresenceTransition::Opened) {
             return;
         }
-        self.process_presentation.details_section = DetailsSection::default();
+        self.process_presentation.details_section = ProcessDetailsSection::default();
         self.process_presentation.insights_facet = ProcessInsightFacet::Network;
         self.process_presentation.env_filter.clear();
         self.seed_process_perf_history_from_provider();

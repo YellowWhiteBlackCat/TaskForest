@@ -1,4 +1,9 @@
 use super::{boot_timeline_rows, critical_chain_summary, failed_units_summary};
+use taskmanager_shell::presentation::missing_value;
+
+fn dash() -> String {
+    missing_value()
+}
 use taskforest_core::core::startup::{
     BootTimeline, StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
     StartupFailedUnit,
@@ -26,15 +31,15 @@ fn chain(unit: &str, duration_ms: Option<u64>) -> StartupCriticalChainNode {
 #[test]
 fn failed_units_summary_stays_honest_for_empty_failure_and_populated_states() {
     let empty = StartupBootEvidenceSnapshot::default();
-    assert_eq!(failed_units_summary(&empty).as_deref(), Some("0"));
+    assert_eq!(failed_units_summary(&empty), "0");
 
     let failing = StartupBootEvidenceSnapshot {
         failed_units_failure: Some(StartupEvidenceFailure::MissingTool),
         ..Default::default()
     };
     assert_eq!(
-        failed_units_summary(&failing).as_deref(),
-        Some(i18n::t("startup.evidence_unavailable"))
+        failed_units_summary(&failing),
+        i18n::t("startup.evidence_unavailable")
     );
 
     let populated = StartupBootEvidenceSnapshot {
@@ -42,8 +47,8 @@ fn failed_units_summary_stays_honest_for_empty_failure_and_populated_states() {
         ..Default::default()
     };
     assert_eq!(
-        failed_units_summary(&populated).as_deref(),
-        Some("2 · acpid.service · bluetooth.service")
+        failed_units_summary(&populated),
+        "2 · acpid.service · bluetooth.service"
     );
 }
 
@@ -55,7 +60,7 @@ fn failed_units_summary_truncates_long_name_lists() {
             .failed_units
             .push(failed(&format!("unit{index}.service")));
     }
-    let summary = failed_units_summary(&populated).expect("populated summary");
+    let summary = failed_units_summary(&populated);
     assert!(summary.contains("unit0.service"), "{summary}");
     assert!(summary.contains("unit1.service"), "{summary}");
     assert!(!summary.contains("unit2.service"), "{summary}");
@@ -71,18 +76,18 @@ fn critical_chain_summary_totals_measured_time_and_drops_gaps() {
         ],
         ..Default::default()
     };
-    let summary = critical_chain_summary(&snapshot).expect("measured chain");
+    let summary = critical_chain_summary(&snapshot, &dash());
     assert_eq!(summary, "150 ms · systemd-journald.service");
 
     snapshot.critical_chain_failure = Some(StartupEvidenceFailure::PermissionDenied);
     assert_eq!(
-        critical_chain_summary(&snapshot).as_deref(),
-        Some(i18n::t("startup.evidence_unavailable"))
+        critical_chain_summary(&snapshot, &dash()),
+        i18n::t("startup.evidence_unavailable")
     );
 
     snapshot.critical_chain_failure = None;
     snapshot.critical_chain = vec![chain("graphical.target", None)];
-    assert_eq!(critical_chain_summary(&snapshot).as_deref(), Some("—"));
+    assert_eq!(critical_chain_summary(&snapshot, &dash()), dash());
 }
 
 #[test]

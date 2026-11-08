@@ -14,6 +14,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use taskforest_core::core::services::{ServiceAction, ServiceItem};
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
@@ -71,7 +72,7 @@ pub(super) fn render_service_menu_at(
     let focused = focus.menu_item(crate::TuiSurfaceKind::ServiceMenu);
     for (index, action) in MENU_ACTIONS.into_iter().enumerate() {
         let selected = focused == Some(index);
-        let label = action_label(action);
+        let label = i18n::service_action_label(action);
         lines.push(Line::from(vec![
             Span::styled(
                 if selected { "▸ " } else { "  " },
@@ -103,19 +104,6 @@ pub(super) fn render_service_menu_at(
         .alignment(Alignment::Center),
         footer,
     );
-}
-
-/// TUI-local display label for one gated service action, resolved through the
-/// shared catalog so it localizes with the active language.
-pub fn action_label(action: ServiceAction) -> &'static str {
-    match action {
-        ServiceAction::Start => t("svc.start"),
-        ServiceAction::Stop => t("svc.stop"),
-        ServiceAction::Restart => t("svc.restart"),
-        ServiceAction::Enable => t("svc.enable"),
-        ServiceAction::Disable => t("svc.disable"),
-        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
-    }
 }
 
 fn status_color(status: &str, theme: TuiTheme) -> Color {

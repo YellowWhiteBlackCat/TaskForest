@@ -16,6 +16,7 @@ use taskmanager_application::{RefreshRequest, SourceNotice, SourceStateKind, mer
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_kit_iced::surface;
 
 use crate::app::{FocusTarget, Message};
 use crate::theme;
@@ -110,6 +111,11 @@ pub(crate) fn chart_inset(theme_snapshot: &Theme) -> f32 {
 /// token-bound: SPACE_* padding and title/body gutter, the body role's type
 /// size for the title, and the palette's panel radius through
 /// [`card_surface`].
+///
+/// The layout is owned by `zhuge_ui_kit_iced::surface::titled_card`; this
+/// function only binds TaskForest's tokens and palette onto it. A second
+/// copy of the column-plus-container composition would be a second address
+/// for one card fact.
 #[must_use]
 pub(crate) fn titled_card<'a>(
     theme_snapshot: &'a Theme,
@@ -133,31 +139,46 @@ fn titled_surface<'a>(
     body: impl Into<IcedElement<'a>>,
     chart: bool,
 ) -> IcedElement<'a> {
-    container(
-        column![text(title).size(f32::from(tokens::FONT_BODY)), body.into()]
-            .spacing(f32::from(tokens::SPACE_6)),
+    surface::titled_card(
+        title,
+        f32::from(tokens::FONT_BODY),
+        f32::from(tokens::SPACE_6),
+        body.into(),
+        surface::CardGeometry::new(card_padding(theme_snapshot, chart).into())
+            // TaskForest's cards do not clip an overflowing child; the kit's
+            // default does. The product's own behaviour is the fact here.
+            .clip(false),
+        move |_| {
+            if chart {
+                chart_surface(theme_snapshot)
+            } else {
+                card_surface(theme_snapshot)
+            }
+        },
     )
-    .style(move |_| {
-        if chart {
-            chart_surface(theme_snapshot)
-        } else {
-            card_surface(theme_snapshot)
-        }
-    })
-    .padding(if chart {
+}
+
+/// The card's inner padding.
+///
+/// A chart card keeps the card material but drops its shadow, so it also
+/// reserves the rounded content inset — a chart's plot area must not touch
+/// the panel's rounded corner. A plain card uses the plain spacing token.
+fn card_padding(theme_snapshot: &Theme, chart: bool) -> f32 {
+    if chart {
         chart_inset(theme_snapshot).max(f32::from(tokens::SPACE_10))
     } else {
         f32::from(tokens::SPACE_10)
-    })
-    .width(Length::Fill)
-    .into()
+    }
 }
 
 /// A centered, neutral state panel for loading, empty, and collecting states.
 /// The caller owns the localized message; this component owns the geometry and
 /// the visual state grammar. A thin wrapper over [`state_panel`]: the shared
 /// empty-state grammar (Applications, the GPUI empty-state default icon) with
-/// no detail and no action.
+/// no detail and no action. [`state_panel`] builds on
+/// [`zhuge_ui_kit_iced::surface::state_panel`], so this wrapper reaches the
+/// shared kit layout container through that one seam rather than forking a
+/// second empty-state surface.
 #[must_use]
 pub(crate) fn message_panel<'a>(
     theme_snapshot: &'a Theme,
@@ -185,7 +206,7 @@ pub(crate) fn source_state_panel<'a>(
     request: RefreshRequest,
 ) -> Option<IcedElement<'a>> {
     let merged = merge_source_lines(sources?)?;
-    let title = t(banner_title_key(merged.kind));
+    let title = t(merged.kind.banner_title_key());
     let reason = control_error_detail(merged.notice.failure());
     let action = source_notice_action(theme_snapshot, merged.notice, request);
     Some(state_panel(
@@ -221,7 +242,7 @@ pub(crate) fn source_notice_banner<'a>(
     request: RefreshRequest,
 ) -> Option<IcedElement<'a>> {
     let merged = merge_source_lines(sources?)?;
-    let title = t(banner_title_key(merged.kind));
+    let title = t(merged.kind.banner_title_key());
     let reason = control_error_detail(merged.notice.failure());
     let action = source_notice_action(theme_snapshot, merged.notice, request);
     Some(
@@ -247,14 +268,6 @@ pub(crate) fn source_notice_banner<'a>(
         .width(Length::Fill)
         .into(),
     )
-}
-
-pub(super) fn banner_title_key(kind: SourceStateKind) -> &'static str {
-    if kind == SourceStateKind::Degraded {
-        "source.partial_title"
-    } else {
-        "source.unavailable_title"
-    }
 }
 
 fn source_notice_action<'a>(

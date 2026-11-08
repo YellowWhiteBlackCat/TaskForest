@@ -272,7 +272,7 @@ pub fn gear_btn(
         .justify_center()
         .child(
             icons_binding::icon(IconId::Settings)
-                .size(px(16.0))
+                .size(definite_length(tokens::ICON_INLINE))
                 .text_color(hsla(color)),
         )
 }
@@ -339,7 +339,7 @@ pub fn nav_orientation_btn(
         .justify_center()
         .child(
             icons_binding::icon(IconId::Sidebar)
-                .size(px(16.0))
+                .size(definite_length(tokens::ICON_INLINE))
                 .text_color(hsla(color)),
         )
 }

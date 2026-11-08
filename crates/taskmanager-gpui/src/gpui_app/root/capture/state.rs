@@ -1,6 +1,5 @@
 //! Explicit capture lifecycle state owned by the capture coordinator.
 
-use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use gpui::{Pixels, Point};
@@ -8,6 +7,7 @@ use taskforest_core::core::SmartSelfTestObservation;
 use taskforest_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskforest_core::core::startup::BootTimeline;
 use taskmanager_application::AlertEventSeed;
+use taskmanager_application::ProcessDetailsSection;
 
 #[derive(Debug, PartialEq)]
 pub enum CaptureProcessAction {

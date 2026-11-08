@@ -2,42 +2,42 @@ use super::*;
 use taskmanager_application::{AppPage, SurfaceKind};
 
 impl TuiApp {
-    pub(crate) const fn service_menu(&self) -> Option<&ServiceMenuTarget> {
+    pub(crate) fn service_menu(&self) -> Option<&ServiceMenuTarget> {
         match self.local_surface() {
             Some(TuiSurface::ServiceMenu(menu)) => Some(menu),
             _ => None,
         }
     }
 
-    pub(crate) const fn process_menu(&self) -> Option<&ProcessMenuTarget> {
+    pub(crate) fn process_menu(&self) -> Option<&ProcessMenuTarget> {
         match self.local_surface() {
             Some(TuiSurface::ProcessMenu(menu)) => Some(menu),
             _ => None,
         }
     }
 
-    pub(crate) const fn batch_menu(&self) -> Option<&BatchMenuTarget> {
+    pub(crate) fn batch_menu(&self) -> Option<&BatchMenuTarget> {
         match self.local_surface() {
             Some(TuiSurface::BatchMenu(menu)) => Some(menu),
             _ => None,
         }
     }
 
-    pub(crate) const fn session_menu(&self) -> Option<&SessionMenuTarget> {
+    pub(crate) fn session_menu(&self) -> Option<&SessionMenuTarget> {
         match self.local_surface() {
             Some(TuiSurface::SessionMenu(menu)) => Some(menu),
             _ => None,
         }
     }
 
-    pub(crate) const fn startup_menu(&self) -> Option<&StartupMenuTarget> {
+    pub(crate) fn startup_menu(&self) -> Option<&StartupMenuTarget> {
         match self.local_surface() {
             Some(TuiSurface::StartupMenu(menu)) => Some(menu),
             _ => None,
         }
     }
 
-    pub(crate) const fn column_menu_open(&self) -> bool {
+    pub(crate) fn column_menu_open(&self) -> bool {
         matches!(self.local_surface(), Some(TuiSurface::ColumnMenu { .. }))
     }
 }
@@ -46,20 +46,20 @@ impl TuiApp {
 fn local_surface_replaces_atomically_and_stale_close_is_rejected() {
     let mut state = TuiSurfaceState::default();
     assert_eq!(
-        state.reduce(TuiSurfaceEvent::Open(Box::new(TuiSurface::Settings))),
+        state.reduce(TuiSurfaceEvent::Open(TuiSurface::Settings)),
         TuiSurfaceTransition::Opened(TuiSurfaceKind::Settings)
     );
     assert_eq!(
-        state.reduce(TuiSurfaceEvent::Open(Box::new(TuiSurface::About(
-            crate::information::AboutTargetView::default()
-        )))),
+        state.reduce(TuiSurfaceEvent::Open(TuiSurface::About(
+            crate::information::AboutTargetView::default(),
+        ))),
         TuiSurfaceTransition::Replaced {
             previous: TuiSurfaceKind::Settings,
             current: TuiSurfaceKind::About,
         }
     );
     assert_eq!(
-        state.reduce(TuiSurfaceEvent::Dismiss(TuiSurfaceKind::Settings)),
+        state.reduce(TuiSurfaceEvent::Dismiss(TuiSurfaceKind::Settings, ())),
         TuiSurfaceTransition::Unchanged
     );
     assert_eq!(state.kind(), Some(TuiSurfaceKind::About));

@@ -55,20 +55,13 @@ mod theme;
 mod ui;
 mod window_capture;
 
-pub use preferences::AppliedPrefs;
-
-pub use bindings::binding_declaration;
-
-pub use capabilities::capability_declaration;
-
-pub use feature_coverage::feature_coverage_declaration;
-
-pub use functional::functional_declaration;
-
+pub use crate::{
+    bindings::binding_declaration, capabilities::capability_declaration,
+    feature_coverage::feature_coverage_declaration, functional::functional_declaration,
+    preferences::AppliedPrefs,
+};
+pub use crate::{demo::demo_app, menus::BatchMenuTarget};
 pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
-
-pub use demo::demo_app;
-pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
 pub use surface::{AffinityModalState, ServiceDependenciesTarget};
@@ -76,12 +69,13 @@ pub(crate) use surface::{TuiInputScope, TuiSurface, TuiSurfaceKind, TuiSurfaceSt
 pub use terminal::{TuiColorMode, TuiGlyphMode, TuiTerminalProfile};
 pub use theme::{ThemeParams, TuiTheme};
 pub use ui::process_menu::ProcessMenuTarget;
-pub use ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
+pub use ui::process_properties::ProcessPropertiesTarget;
 pub use ui::render;
 pub use ui::service_menu::ServiceMenuTarget;
 pub use ui::session_menu::SessionMenuTarget;
 pub use ui::settings::SettingsForm;
 pub use ui::startup_menu::StartupMenuTarget;
+pub use ui::{TuiSparklineCurve, TuiSparklineMode, braille16_sparkline, render_sparkline};
 
 fn run_gui(app_id: Option<String>, demo: bool) {
     let _ = app_id;
@@ -104,6 +98,7 @@ pub fn run_cli(binary_name: &'static str) {
     );
 }
 
+use runtime::keys::vim::VimPending;
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -115,19 +110,15 @@ use taskmanager_ui_contract::navigation::NavOrientation;
 use taskforest_core::core::appearance::DesktopAppearance;
 use taskforest_core::core::config::Config;
 use taskforest_core::core::metrics::SystemSnapshot;
-use taskforest_core::core::process::ProcessCategory;
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskforest_core::core::target::ServiceId;
 use taskforest_core::core::text::contains_ascii_ci;
 use taskforest_core::core::time::LocalTimeRulesObservation;
-use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::process_category_projection::default_category_expansions;
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{
-    AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
-    RefreshRequest, i18n::t,
-};
-use taskmanager_application::{
-    DesktopAppearanceEvent, KeyCode, Modifiers, SurfaceKind, source_notice,
+    AppAction, AppPage, ConfigClient, ConfigRevision, DesktopAppearanceEvent, KeyCode, Modifiers,
+    PlatformEffect, PlatformEventBatch, RefreshRequest, SurfaceKind, i18n::t, source_notice,
 };
 use taskmanager_cli::{FrontendHandlers, run};
 use taskmanager_shell::{
@@ -140,14 +131,6 @@ use taskmanager_shell::{ShellApp, gpu_chart_metric_gate};
 /// resets: two consecutive bare characters within the window extend the
 /// prefix (htop-style), a pause longer than this starts a fresh jump.
 pub(crate) const PREFIX_JUMP_WINDOW_MICROS: u64 = 2_000_000;
-
-fn default_category_expansions() -> std::collections::HashSet<String> {
-    ProcessCategory::ALL
-        .iter()
-        .copied()
-        .map(category_expansion_key)
-        .collect()
-}
 
 /// The terminal frontend's complete state: the shared shell state machine
 /// plus renderer-specific surface state (ADR-027 keeps the latter out of
@@ -301,6 +284,11 @@ pub struct TuiApp {
     /// runtime-updated clock as `service_log_now_micros` so the reset window
     /// is deterministic under TestBackend. Zero means "no jump key yet".
     pub(crate) prefix_jump_at_micros: u64,
+    /// Finite pending state for the contextual Vi-style chord layer. This is
+    /// frontend navigation state, not a shell command or OS binding. The state
+    /// is cleared whenever the next input event does not complete the same
+    /// context, making stale sequences unable to leak across pages or surfaces.
+    pub(crate) vim_pending: VimPending,
     /// The APPLIED preference mirrors the renderer reads (device visibility,
     /// unit matrix, gray-zero policy). Refreshed by [`Self::load_config`] and
     /// by a successful settings save — an unsaved form edit never leaks into
@@ -394,6 +382,7 @@ impl TuiApp {
             service_log_now_micros: 0,
             prefix_jump: String::new(),
             prefix_jump_at_micros: 0,
+            vim_pending: VimPending::default(),
             prefs: AppliedPrefs::default(),
             page_row_anchors: std::collections::HashMap::new(),
             is_daemon_connected: false,

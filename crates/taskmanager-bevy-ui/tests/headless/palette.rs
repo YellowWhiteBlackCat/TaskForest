@@ -252,12 +252,12 @@ fn control_rows_ride_the_rem_axis_across_every_ui_size_step() {
             .get::<bevy::ui::Node>(root)
             .expect("the stat row mounts a layout node");
         assert_eq!(
-            node.min_height,
+            node.height,
             bevy::ui::Val::Rem(palette.control_height_rem),
             "the row height is declared on the rem axis, not in px"
         );
         assert_eq!(
-            resolve_px(node.min_height, palette.rem_px),
+            resolve_px(node.height, palette.rem_px),
             palette.control_height_px(),
             "the declared ratio resolves to the {size:?} control height"
         );

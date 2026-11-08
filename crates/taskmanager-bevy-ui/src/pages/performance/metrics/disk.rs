@@ -15,6 +15,7 @@
 
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::storage_health::{
     FilesystemHealthSnapshot, FilesystemHealthStatus, is_nvme_wear_critical, is_nvme_wear_warning,
 };
@@ -74,10 +75,10 @@ pub(in crate::pages::performance) fn partition_donut_models(
                         key,
                         name,
                         usage_text: format!(
-                            "{} / {} ({:.0}%)",
+                            "{} / {} ({})",
                             bytes(used),
                             bytes(capacity),
-                            fraction * 100.0
+                            percent_text(fraction * 100.0)
                         ),
                         used_fraction: Some(fraction),
                     }

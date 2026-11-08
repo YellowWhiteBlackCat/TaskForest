@@ -10,6 +10,7 @@ use taskmanager_shell::presentation::cpu_interrupt_compact_summary;
 use taskmanager_shell::presentation::cpu_power_limits_summary;
 use taskmanager_shell::presentation::cpu_thermal_throttle_summary;
 use taskmanager_shell::presentation::cpu_topology_summary;
+use taskmanager_shell::presentation::finite_peak;
 use taskmanager_shell::presentation::load_average_basis_summary;
 use taskmanager_shell::presentation::load_average_summary;
 use taskmanager_shell::presentation::msr_thermal_status_segments;
@@ -34,6 +35,7 @@ use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
 use stats::memory_stats_rows;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::duration;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
@@ -101,10 +103,9 @@ fn cpu_detail(
     let headline = projection::cpu_headline_metrics(observed);
     // The chart inventory comes from the typed frame budget (both axes); no
     // local compact-flag derivation remains.
-    let chart_layout = projection::CpuChartLayout::for_inventory(budget.chart_inventory);
     let extent = perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation);
-    let per_core_composes = chart_layout == projection::CpuChartLayout::AggregateWithPerCore
-        && budget.vertical.carries_core_stack();
+    let per_core_composes =
+        budget.chart_inventory.includes_extended_charts() && budget.vertical.carries_core_stack();
     let chart_extent = extent.for_primary_chart(per_core_composes);
     let chart_height = if per_core_composes {
         // GPUI's CPU page pins the headline tier to a fixed height so the
@@ -165,30 +166,29 @@ fn cpu_detail(
         chart_extent,
         if per_core_composes { 4 } else { 8 },
     );
-    match chart_layout {
-        projection::CpuChartLayout::AggregateWithPerCore => {
-            let selector =
-                performance_graph_resolution_selector(theme_snapshot, app.graph_data_points());
-            if per_core_composes {
-                left.push(column![selector, chart_panel].spacing(0).into());
-            } else {
-                left.push(selector);
-                left.push(chart_panel);
-            }
-            // The below band renders from the Core rung up (GPUI parity).
-            if budget.vertical.carries_core_stack() {
-                // The family-trend strip is the Strip-frame carrier of the
-                // rail sparks (its registered driver): at sidebar widths the
-                // rail's own sparks carry the trends, and rendering the strip
-                // here pushed the per-core matrix below the fold
-                // (ICED-024-8).
-                if budget.device_navigation == DeviceNavigationPresentation::Strip {
-                    left.push(trend_strip_panel(app, theme_snapshot));
-                }
-                left.push(core_grid::per_core_grid_panel(app, theme_snapshot));
-            }
+    if budget.chart_inventory.includes_extended_charts() {
+        let selector =
+            performance_graph_resolution_selector(theme_snapshot, app.graph_data_points());
+        if per_core_composes {
+            left.push(column![selector, chart_panel].spacing(0).into());
+        } else {
+            left.push(selector);
+            left.push(chart_panel);
         }
-        projection::CpuChartLayout::AggregateOnly => left.push(chart_panel),
+        // The below band renders from the Core rung up (GPUI parity).
+        if budget.vertical.carries_core_stack() {
+            // The family-trend strip is the Strip-frame carrier of the
+            // rail sparks (its registered driver): at sidebar widths the
+            // rail's own sparks carry the trends, and rendering the strip
+            // here pushed the per-core matrix below the fold
+            // (ICED-024-8).
+            if budget.device_navigation == DeviceNavigationPresentation::Strip {
+                left.push(trend_strip_panel(app, theme_snapshot));
+            }
+            left.push(core_grid::per_core_grid_panel(app, theme_snapshot));
+        }
+    } else {
+        left.push(chart_panel);
     }
     if !per_core_composes {
         // RAPL/MSR facts remain in the independently scrollable stats rail;
@@ -311,7 +311,7 @@ fn memory_detail(
         if budget.vertical.carries_core_stack() {
             let mut summary = Vec::new();
             cpu::push_graph_summary(&mut summary, t("mem.swap"), &swap_samples, |value| {
-                format!("{value:.0}%")
+                percent_text(value)
             });
             swap_content = swap_content.push(column(summary).spacing(2));
         }
@@ -385,7 +385,7 @@ pub(crate) fn cpu_memory_header_and_stats(
         let mut stats = vec![
             StatRow::text(
                 t("common.utilization"),
-                observed.usage_pct.map(|value| format!("{value:.0}%")),
+                observed.usage_pct.map(percent_text),
             ),
             cpu::cpu_speed_row(observed.frequency_mhz, cpu.frequency_source.is_bogomips()),
             cpu::cpu_temperature_row(observed.temperature_c, cpu.temperature_source),
@@ -564,9 +564,9 @@ fn trend_strip_panel(
     // at 100. Each series wears its own semantic theme color so the five mini
     // polylines read apart at a glance (matching the gpui sidebar).
     let disk = app.cached_metric_series(TrendSeries::DiskBytesPerSec);
-    let disk_max = crate::trend_strip::finite_peak(&disk);
+    let disk_max = finite_peak(&disk);
     let net = app.cached_metric_series(TrendSeries::NetworkBytesPerSec);
-    let net_max = crate::trend_strip::finite_peak(&net);
+    let net_max = finite_peak(&net);
     let entries = vec![
         crate::trend_strip::TrendEntry {
             caption: "CPU",

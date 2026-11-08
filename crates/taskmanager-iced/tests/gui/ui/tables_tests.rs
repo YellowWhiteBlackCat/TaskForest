@@ -1,4 +1,3 @@
-use super::super::components::banner_title_key;
 use super::super::tests::filtered_services;
 use super::*;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
@@ -165,7 +164,7 @@ fn page_top_banner_agrees_with_the_neutral_merge_for_every_list_page() {
         let merged = merge_source_lines(&fixture).unwrap_or_else(|| panic!("{page} must headline"));
         assert_eq!(merged.kind, expected_kind, "{page} headline kind");
         assert_eq!(merged.notice, expected_notice, "{page} typed notice");
-        assert_eq!(banner_title_key(merged.kind), expected_key, "{page} title");
+        assert_eq!(merged.kind.banner_title_key(), expected_key, "{page} title");
         assert_eq!(
             merged.notice.is_retryable(),
             expected_retry,

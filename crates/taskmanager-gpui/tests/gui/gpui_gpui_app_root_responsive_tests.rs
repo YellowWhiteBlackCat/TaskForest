@@ -1,12 +1,15 @@
 use gpui::{px, size};
+use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 use super::{
     FrameBudget, FrameChromeBudget, layout_profile, page_layout_for_frame,
     page_layout_for_viewport, parse_window_size, performance_budget_from_frame,
-    performance_budget_from_page_layout, settings_content_max_height,
+    settings_content_max_height,
 };
-use taskmanager_ui_contract::presentation::budget::{PageLayoutBudget, SystemPageBudget};
+use taskmanager_ui_contract::presentation::budget::{
+    PageLayoutBudget, PerformancePageBudget, SystemPageBudget,
+};
 use taskmanager_ui_contract::presentation::vocabulary::{
     DeviceNavigationPresentation, LayoutProfile, NavigationPresentation,
     PERFORMANCE_MAIN_MIN_WIDTH, PerformanceChartInventory, PerformanceDetailsPresentation,
@@ -19,7 +22,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(ultra.profile, LayoutProfile::UltraCompact);
     assert_eq!(ultra.vertical_space, VerticalSpace::Constrained);
     assert_eq!(ultra.navigation, NavigationPresentation::IconOnly);
-    let ultra_performance = performance_budget_from_page_layout(ultra);
+    let ultra_performance = PerformancePageBudget::for_page_layout(ultra, FrontendShape::Gpui);
     assert_eq!(
         ultra_performance.device_navigation,
         DeviceNavigationPresentation::Strip
@@ -42,7 +45,7 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(standard.vertical_space, VerticalSpace::Standard);
     assert_eq!(standard.page_padding, 16.0);
     assert_eq!(
-        performance_budget_from_page_layout(standard).chart_inventory,
+        PerformancePageBudget::for_page_layout(standard, FrontendShape::Gpui).chart_inventory,
         PerformanceChartInventory::Full
     );
     assert_eq!(
@@ -56,7 +59,8 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
     assert_eq!(wide_short.profile, LayoutProfile::Wide);
     assert_eq!(wide_short.vertical_space, VerticalSpace::Constrained);
     assert_eq!(wide_short.navigation, NavigationPresentation::Labeled);
-    let wide_short_performance = performance_budget_from_page_layout(wide_short);
+    let wide_short_performance =
+        PerformancePageBudget::for_page_layout(wide_short, FrontendShape::Gpui);
     assert_eq!(
         wide_short_performance.device_navigation,
         DeviceNavigationPresentation::Sidebar
@@ -229,7 +233,7 @@ fn every_performance_and_system_profile_state_has_one_explicit_allocation() {
                 content_height: 0.0,
                 chrome: None,
             };
-            let performance = performance_budget_from_page_layout(layout);
+            let performance = PerformancePageBudget::for_page_layout(layout, FrontendShape::Gpui);
             assert_eq!(
                 performance.device_navigation,
                 match profile {

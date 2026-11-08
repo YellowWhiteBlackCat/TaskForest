@@ -13,8 +13,8 @@
 use gpui::{Hsla, transparent_black};
 
 use taskmanager_theme::color::mix;
-use taskmanager_theme::color::relative_luminance;
 use taskmanager_theme::{Color, Palette};
+use zhuge_ui_tokens::Rgba;
 
 /// Composite `a` over `b` with `t` in [0, 1] (linear sRGB channels) — the
 /// theme's `mix`, re-exported under the historical component-library name.
@@ -27,7 +27,8 @@ pub fn blend(a: Color, b: Color, t: f32) -> Color {
 /// light fills (gc's `background.blend(0.9)` equivalent).
 #[must_use]
 pub fn hover_fill(color: Color) -> Color {
-    let toward = if relative_luminance(color) > 0.5 {
+    let luminance = Rgba::new(color.r, color.g, color.b, color.a).relative_luminance();
+    let toward = if luminance > 0.5 {
         Color::BLACK
     } else {
         Color::WHITE

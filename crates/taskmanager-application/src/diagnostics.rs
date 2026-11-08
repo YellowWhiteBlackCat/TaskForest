@@ -169,6 +169,8 @@ pub struct DiagnosticBundleSession<P> {
     next_request: Option<u64>,
 }
 
+use crate::session_slot::SessionClose;
+
 impl<P: DiagnosticBundlePort> DiagnosticBundleSession<P> {
     #[must_use]
     pub fn new(port: P) -> Self {
@@ -223,6 +225,12 @@ impl<P: DiagnosticBundlePort> DiagnosticBundleSession<P> {
 
     pub fn close(&mut self) {
         self.active = None;
+    }
+}
+
+impl<P: DiagnosticBundlePort> SessionClose for DiagnosticBundleSession<P> {
+    fn close_session(&mut self) {
+        self.close();
     }
 }
 

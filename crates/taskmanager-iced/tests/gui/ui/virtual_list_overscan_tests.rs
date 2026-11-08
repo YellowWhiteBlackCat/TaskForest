@@ -6,17 +6,15 @@
 use super::window::{
     FLICK_TOLERANCE_ROWS, MATERIALIZED_BAND_ROWS, OVERSCAN_ROWS, resolve_table_window,
 };
-use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, VirtualListConfig};
+use zhuge_ui_core::virtual_list::{DEFAULT_OVERSCAN, VirtualWindow, max_band_rows};
 
 /// The band the product promises: the shared geometry kit's default band plus
 /// this product's own pre-render rows.
 const PRODUCT_BAND_ROWS: usize = DEFAULT_OVERSCAN + OVERSCAN_ROWS;
 
-/// The visible band of a list, resolved from the shared geometry kit.
+/// The visible band of a list, resolved by the shared geometry kit's own face.
 fn visible_at(total_rows: usize, offset: f32, viewport: f32, row: f32) -> (usize, usize) {
-    let window = VirtualListConfig::new(total_rows, row, viewport)
-        .with_scroll_offset(offset)
-        .compute_visible_viewport();
+    let window = VirtualWindow::visible_for_sticky_rows(total_rows, offset, viewport, row);
     (window.start, window.end)
 }
 
@@ -95,8 +93,9 @@ fn the_pre_render_band_keeps_the_materialized_range_bounded() {
     let total_rows = 50_000_usize;
     let row_height = 24.0_f32;
     let viewport_height = 800.0_f32;
-    let visible_rows = (viewport_height / row_height).ceil() as usize;
-    let bound = visible_rows + 2 * MATERIALIZED_BAND_ROWS + 1;
+    // The bound is the shared rule, not a re-derived formula: this product's
+    // pre-render band is the overscan the window is resolved with.
+    let bound = max_band_rows(row_height, viewport_height, MATERIALIZED_BAND_ROWS);
 
     for offset in [0.0_f32, 9_999.0, 1.9e6, f32::MAX] {
         let window = resolve_table_window(total_rows, offset, viewport_height, row_height);

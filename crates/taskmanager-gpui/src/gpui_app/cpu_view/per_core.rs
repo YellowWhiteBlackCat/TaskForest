@@ -1,6 +1,7 @@
 //! Per-core and aggregate utilization cache consumed by the fixed CPU page.
 
 use std::rc::Rc;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation;
 
 use taskmanager_telemetry_store::TelemetryStore;
@@ -103,7 +104,7 @@ pub(crate) fn per_core_cell_label(
 ) -> String {
     let usage = usage_pct
         .filter(|value| value.is_finite())
-        .map(|value| format!("{value:.0} %"));
+        .map(percent_text);
     let frequency =
         frequency_mhz.map(|value| crate::gpui_app::formatting::optional_ghz(Some(value)));
     let temperature = temperature_c

@@ -76,7 +76,7 @@ fn format_keeps_cold_start_gap_honest() {
         !gap_line.contains("0.0%"),
         "cold-start gap must not fabricate 0%"
     );
-    assert!(warm_line.contains("12.5%"));
+    assert!(warm_line.contains("13%"));
 }
 
 /// Minimal root view that renders one card frame, so the gpu_engines card

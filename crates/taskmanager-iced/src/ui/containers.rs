@@ -24,10 +24,12 @@ use iced::{Element, Length, Point, Rectangle, Size};
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskforest_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
-use taskmanager_application::container_row_window;
+use taskmanager_application::MAX_CONTAINER_ROWS;
+use zhuge_ui_core::row_page::row_budget;
 
 // Shared locale catalog: the page title, the scope subtitle, the per-container
 // table column headers and the typed source states all resolve here.
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 
 use crate::app::Message;
@@ -36,12 +38,12 @@ use taskmanager_theme::tokens;
 
 use super::components::{message_panel, styled_scrollable};
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_shell::presentation::{bytes, missing_value, observed_precise_percentage};
 use taskmanager_theme::Theme;
 
-mod quota;
-
-use quota::{ContainerQuotaBreach, container_quota_view, quota_readout};
+use taskmanager_shell::presentation::container_quota::{
+    ContainerQuotaBreach, container_quota_view, quota_readout,
+};
 
 /// Which branch the page body takes for one rollup projection. Pure seam the
 /// headless tests pin: a typed non-healthy source and a genuinely
@@ -441,7 +443,7 @@ pub(crate) fn container_row_vm(summary: &ContainerSummary) -> ContainerRowVm {
     // vanished cgroup memory) — never a fabricated `0.0%` / `0 MB`.
     let cpu = match summary.cpu_percentage.availability() {
         ScalarAvailability::Available | ScalarAvailability::Partial(_) => {
-            scalar_text(summary.cpu_percentage, |value| format!("{value:.1}%"))
+            observed_precise_percentage(summary.cpu_percentage.current_value().copied())
         }
         _ => missing_value(),
     };
@@ -454,7 +456,7 @@ pub(crate) fn container_row_vm(summary: &ContainerSummary) -> ContainerRowVm {
             .as_ref()
             .map_or_else(missing_value, |kind| runtime_label(Some(kind)).to_owned()),
         cpu,
-        memory: scalar_text(summary.memory_bytes, bytes),
+        memory: observed_scalar_text(summary.memory_bytes, bytes),
         processes: if summary.member_pids.is_empty() {
             missing_value()
         } else {
@@ -547,7 +549,10 @@ fn container_table<'a>(
     .width(Length::Fill);
 
     let warning = crate::theme_binding::color(theme_snapshot.palette().warning);
-    let (shown, hidden) = container_row_window(rollup.containers.len());
+    // The shared row-page owner splits the inventory; this frontend owns only
+    // the cap, so a truncated list always comes with its stated omission.
+    let budget = row_budget(rollup.containers.len(), MAX_CONTAINER_ROWS);
+    let (shown, hidden) = (budget.shown(), budget.hidden());
     let mut rows: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = rollup.containers
         [..shown]
         .iter()
@@ -606,7 +611,7 @@ fn container_table<'a>(
         .collect();
     if hidden > 0 {
         rows.push(
-            container(text(more_rows_label(hidden)).size(f32::from(tokens::FONT_12)))
+            container(text(i18n::more_rows_label(hidden)).size(f32::from(tokens::FONT_12)))
                 .padding(4)
                 .width(Length::Fill)
                 .into(),
@@ -624,15 +629,14 @@ fn container_table<'a>(
     .into()
 }
 
-fn more_rows_label(hidden: usize) -> String {
-    t("common.more_rows").replace("{count}", &hidden.to_string())
-}
-
 /// Render a typed scalar observation: the value when available, `—`
 /// otherwise (a first sample or an unreadable file must never look like a
 /// zero). The production cell seam — `container_row_vm` renders through it
 /// and the headless tests pin the same function.
-fn scalar_text<T: Copy>(observation: ScalarObservation<T>, format: impl Fn(T) -> String) -> String {
+fn observed_scalar_text<T: Copy>(
+    observation: ScalarObservation<T>,
+    format: impl Fn(T) -> String,
+) -> String {
     observation
         .current_value()
         .copied()
@@ -668,3 +672,7 @@ mod inset_tests;
 #[cfg(test)]
 #[path = "../../tests/gui/ui/empty_state_illustration_tests.rs"]
 mod illustration_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/containers_quota_tests.rs"]
+mod quota_tests;

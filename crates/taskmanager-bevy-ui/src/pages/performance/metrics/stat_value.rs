@@ -1,6 +1,7 @@
 //! The Performance stat rail's typed row keys and their pure folds.
 
 use crate::pages::performance::metrics::memory_metrics;
+use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{bytes, missing_value};
@@ -41,7 +42,7 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
             memory.used_percentage_observed(),
         ) {
             (Some(used), Some(percentage)) => {
-                format!("{} ({percentage:.0}%)", bytes(used))
+                format!("{} ({})", bytes(used), percent_text(percentage))
             }
             (Some(used), None) => bytes(used),
             _ => missing_value(),

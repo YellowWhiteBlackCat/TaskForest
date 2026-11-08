@@ -1,69 +1,15 @@
 //! test-intent: behavior
 //!
-//! Pure-core tests for the table projection: virtual window math (edge and
-//! clamping contracts the M1 scroller depends on), viewport capacity, the
+//! Pure-core tests for the table projection: measured viewport capacity, the
 //! hidden-column projection's identity invariant, and the ui-contract wiring.
+//! Row-window edge and clamping contracts belong to `zhuge-ui-core::row_page`
+//! and are proven there; this crate proves the wiring that consumes them.
 //!
-//! The oracle is the contract table itself (`taskmanager_ui_contract`) plus
-//! hand-computed window arithmetic — no bevy types, no world.
+//! The oracle is the contract table itself (`taskmanager_ui_contract`) — no
+//! bevy types, no world.
 
-use super::{
-    RowWindow, SortProjection, header_label, row_window, rows_in_viewport, sorted_direction,
-    visible_columns,
-};
+use super::{SortProjection, header_label, rows_in_viewport, sorted_direction, visible_columns};
 use taskmanager_ui_contract::PROCESS_COLUMNS;
-
-#[test]
-fn empty_table_or_viewport_renders_an_empty_window() {
-    assert_eq!(row_window(0, 10, 0), RowWindow::default());
-    assert_eq!(row_window(5, 0, 3), RowWindow::default());
-    let empty = row_window(0, 10, 0);
-    assert_eq!(empty.first, empty.last);
-}
-
-#[test]
-fn window_covers_the_viewport_from_the_requested_offset() {
-    let window = row_window(100, 10, 0);
-    assert_eq!(window.last - window.first, 10);
-    assert_eq!(window.first, 0);
-    assert_eq!(
-        row_window(100, 10, 42),
-        RowWindow {
-            first: 42,
-            last: 52
-        }
-    );
-}
-
-#[test]
-fn scroll_clamps_to_the_last_full_page_never_an_empty_tail() {
-    // Asking past the end pins the window so the last rows stay visible.
-    assert_eq!(
-        row_window(100, 10, 999),
-        RowWindow {
-            first: 90,
-            last: 100
-        }
-    );
-    assert_eq!(
-        row_window(100, 10, 90),
-        RowWindow {
-            first: 90,
-            last: 100
-        }
-    );
-    assert_eq!(
-        row_window(7, 3, 6),
-        RowWindow { first: 4, last: 7 },
-        "a short table pins to its own tail"
-    );
-}
-
-#[test]
-fn viewport_larger_than_total_shows_everything_and_ignores_scroll() {
-    assert_eq!(row_window(7, 50, 0), RowWindow { first: 0, last: 7 });
-    assert_eq!(row_window(7, 50, 30), RowWindow { first: 0, last: 7 });
-}
 
 #[test]
 fn viewport_capacity_floors_and_guards_degenerate_heights() {

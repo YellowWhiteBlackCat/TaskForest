@@ -12,6 +12,7 @@ use taskmanager_shell::presentation::{bytes, control_error_detail};
 
 use crate::TuiTheme;
 use crate::ui::{kv, panel};
+use taskforest_core::core::percent::{percent_text, precise_percent_text};
 
 /// One-line CPU readout for a group header. Partial and stale rows keep the
 /// value's availability visible with `P` / `S` plus member coverage; the
@@ -108,8 +109,8 @@ fn compact_localized_label(label: &str, width: usize) -> String {
 
 fn compact_cpu_value(value: &f32, width: usize) -> String {
     let candidates = [
-        format!("{value:.1}%"),
-        format!("{value:.0}%"),
+        precise_percent_text(*value),
+        percent_text(*value),
         format!("{value:.1}"),
         format!("{value:.0}"),
         format!("{value:.1e}"),
@@ -232,7 +233,7 @@ pub(super) fn render_group_details(
         )),
         kv(
             t("common.cpu"),
-            metric_detail(cpu, |value| format!("{value:.1}%")),
+            metric_detail(cpu, |value| precise_percent_text(*value)),
             theme,
         ),
         kv(

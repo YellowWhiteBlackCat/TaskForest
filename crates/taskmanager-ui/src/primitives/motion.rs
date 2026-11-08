@@ -19,6 +19,7 @@ use gpui::{Animation, AnimationExt, AnyElement, ElementId, IntoElement, Styled, 
 use taskmanager_theme::Color;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::tokens::{DURATION_FAST, DURATION_HOVER, DURATION_MEDIUM, MotionPolicy};
+use zhuge_ui_core::easing::lerp;
 
 /// The hover/state-transition animation: 120ms ease-in-out (Fluent hover
 /// class, [`DURATION_HOVER`]).
@@ -59,7 +60,7 @@ fn safe_progress(value: f32) -> f32 {
 fn interpolate_opacity(from: f32, to: f32, progress: f32) -> f32 {
     let from = safe_opacity(from);
     let to = safe_opacity(to);
-    (from + (to - from) * safe_progress(progress)).clamp(0.0, 1.0)
+    lerp(from, to, safe_progress(progress)).clamp(0.0, 1.0)
 }
 
 fn interpolate_color(from: Color, to: Color, progress: f32) -> Color {

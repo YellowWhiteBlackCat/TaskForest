@@ -360,7 +360,7 @@ fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
     );
     assert_eq!(
         value("proc.anon_huge_pages"),
-        Some("64.0 MiB (25.0% RSS)"),
+        Some("64.0 MiB (25% RSS)"),
         "the overview row must carry the observed huge-page charge"
     );
 }
@@ -896,7 +896,7 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
     assert_eq!(
         lines[1],
         format!(
-            "{} #0 45.5% · {} 1.0 GiB",
+            "{} #0 46% · {} 1.0 GiB",
             t("common.gpu"),
             t("gpu.vram_in_use")
         )
@@ -905,7 +905,7 @@ fn gpu_summary_formats_devices_engines_and_cold_start_gap() {
         lines[2],
         format!("{} #1 — · {} —", t("common.gpu"), t("gpu.vram_in_use"))
     );
-    assert_eq!(lines[3], "render  78.2%  2.5s");
+    assert_eq!(lines[3], "render  78%  2.5s");
     assert_eq!(lines[4], "copy  —  1.5M cycles");
     assert_eq!(lines.len(), 5);
 }

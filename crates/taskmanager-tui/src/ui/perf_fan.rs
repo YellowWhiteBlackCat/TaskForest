@@ -28,9 +28,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use taskforest_core::core::sensors::{
-    SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
-};
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
@@ -38,6 +36,7 @@ use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 use super::containers::{StatePanel, StatePanelKind};
 use crate::TuiApp;
 use crate::TuiTheme;
+use taskforest_core::core::percent::percent_text;
 
 /// Render the per-fan detail section into `area`. A zero-height area (the
 /// small-terminal case where no panel was allocated) renders nothing. A `None`
@@ -178,8 +177,9 @@ fn fan_lines(
         let rpm = fan
             .current_number()
             .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
-        let pwm = fan_pwm_percent(sensors, fan)
-            .map_or_else(missing_value, |percent| format!("{percent:.0}%"));
+        let pwm = sensors
+            .fan_pwm_percent(fan)
+            .map_or_else(missing_value, percent_text);
         lines.push(ratatui::text::Line::from(format!(
             "  {} {} · {} {}",
             t("fan.rpm"),
@@ -291,21 +291,6 @@ fn thermal_zone_lines(
 /// The PWM duty-cycle percent for the physical device owning `fan`, resolved
 /// through the typed magnitude observation. `None` when no duty-cycle channel
 /// is currently readable — never a fabricated 0%.
-fn fan_pwm_percent(sensors: &SensorCenterSnapshot, fan: &SensorReading) -> Option<f32> {
-    sensors
-        .readings
-        .iter()
-        .filter(|reading| reading.device_id() == fan.device_id())
-        .find_map(
-            |reading| match reading.measurement_observation().current_value()? {
-                SensorMagnitude::DutyCycle { value, maximum } if *maximum > 0 => {
-                    Some(*value as f32 * 100.0 / *maximum as f32)
-                }
-                _ => None,
-            },
-        )
-}
-
 #[cfg(test)]
 #[path = "../../tests/gui/ui/perf_fan_tests.rs"]
 mod tests;

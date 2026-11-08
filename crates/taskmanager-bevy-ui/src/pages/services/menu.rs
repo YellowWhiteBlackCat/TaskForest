@@ -19,6 +19,7 @@ use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::system::{Commands, ResMut};
 use taskforest_core::core::services::{ServiceAction, ServiceItem};
+use taskmanager_application::i18n::service_action_label;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, PlatformEffect};
 
@@ -51,7 +52,7 @@ impl ActionMenuContext for ServiceMenuCtx {
             items: MENU_ACTIONS
                 .iter()
                 .map(|action| MenuItem {
-                    label: crate::confirmation::service_action_label(*action).to_owned(),
+                    label: service_action_label(*action).to_owned(),
                     enabled: true,
                 })
                 .collect(),

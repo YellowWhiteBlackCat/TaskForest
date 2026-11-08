@@ -28,12 +28,14 @@ use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 mod aggregate;
 mod insights;
 pub(crate) use insights::{insights_lines, modal_insights_lines, network_requires_escalation};
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::process_details_vm::{
     ProcessDetailsRowVm, process_details_rows_with_local_time,
 };
 use taskmanager_shell::ProcessTreeRow;
 use taskmanager_shell::presentation::command_identity_summary;
+use zhuge_ui_core::row_page::{clamped_first, max_first};
 
 /// Clamp a stored vertical-scroll intent to the valid viewport range so the
 /// rendered content never scrolls past the last line. `content_lines` is the
@@ -42,17 +44,18 @@ use taskmanager_shell::presentation::command_identity_summary;
 /// for text, excluding any block borders). The stored `offset` is the user's
 /// intent and may exceed the max when content shrinks; the renderer always uses
 /// the clamped value. Returns `(effective_offset, max_offset)` so callers can
-/// render a position indicator / overflow hint.
+/// render a position indicator / overflow hint. Both come from the shared
+/// row-page owner, so the painted slice and the indicator state one fact.
 pub(crate) fn clamped_scroll(
     content_lines: usize,
     visible_height: u16,
     offset: usize,
 ) -> (usize, usize) {
-    if visible_height == 0 {
-        return (0, 0);
-    }
-    let max = content_lines.saturating_sub(visible_height as usize);
-    (offset.min(max), max)
+    let visible_rows = usize::from(visible_height);
+    (
+        clamped_first(content_lines, visible_rows, offset),
+        max_first(content_lines, visible_rows),
+    )
 }
 
 /// Compute the wrapped content height (text rows, excluding block borders) for
@@ -216,7 +219,7 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
         let cpu = data.cpu;
         let cell = Cell::from(cpu.map_or_else(
             || MISSING_VALUE.to_owned(),
-            |value| format!("{value:>5.1}%"),
+            |value| format!("{:>5}", precise_percent_text(value)),
         ));
         if gray_zero && cpu == Some(0.0) {
             cell.style(Style::new().fg(theme.dim))

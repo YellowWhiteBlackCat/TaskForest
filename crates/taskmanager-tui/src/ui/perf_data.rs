@@ -10,6 +10,7 @@ use taskforest_core::core::metrics::{
     NetworkMetrics,
 };
 use taskforest_core::core::power::BatteryInfo;
+use taskforest_core::core::units::BYTES_PER_MIB;
 use taskforest_core::core::units::format_quantity_with;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::memory::{self, MemSegment, SwapBreakdown};
@@ -21,11 +22,8 @@ use super::units::{
     memory_text_pref, observed_frequency, observed_percentage, observed_temperature,
     quantity_text_optional,
 };
+use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::duration;
-
-/// Bytes in one mebibyte — the signed memory usage rate is published in
-/// MiB/s and rendered through the shared byte ladder.
-const MIB_BYTES: u64 = 1024 * 1024;
 
 /// Below this absolute rate (MiB/s) the usage-rate row reports the shared
 /// dash instead of a sub-tick value, mirroring the gpui row gate
@@ -41,7 +39,7 @@ pub(super) fn core_cell_readout(cpu: Option<&CpuMetrics>, core_index: usize) -> 
     [
         cpu.and_then(|cpu| cpu.current_core_usage_pct(core_index))
             .filter(|value| value.is_finite())
-            .map_or_else(missing_value, |value| format!("{value:.0}%")),
+            .map_or_else(missing_value, percent_text),
         cpu.and_then(|cpu| cpu.current_core_frequency_mhz(core_index))
             .map_or_else(missing_value, |mhz| {
                 format!("{:.2} GHz", mhz as f64 / 1000.0)
@@ -137,7 +135,7 @@ pub(super) fn memory_stats_rows(
 /// ladder formatted as a per-second quantity.
 fn signed_memory_rate_readout(rate_mib_per_sec: f32, use_bytes: bool, use_base2: bool) -> String {
     let sign = if rate_mib_per_sec < 0.0 { '-' } else { '+' };
-    let magnitude_bytes = (f64::from(rate_mib_per_sec.abs()) * MIB_BYTES as f64).round() as u64;
+    let magnitude_bytes = (f64::from(rate_mib_per_sec.abs()) * BYTES_PER_MIB as f64).round() as u64;
     format!(
         "{sign}{}",
         format_quantity_with(magnitude_bytes, use_bytes, use_base2, true)
@@ -162,7 +160,7 @@ pub(super) struct BatteryData {
 pub(super) fn battery_data(battery: &BatteryInfo) -> BatteryData {
     let capacity = battery
         .current_capacity_pct()
-        .map_or_else(missing_value, |value| format!("{value}%"));
+        .map_or_else(missing_value, percent_text);
     let status = if battery.status.is_empty() {
         missing_value()
     } else {
@@ -179,9 +177,7 @@ pub(super) fn battery_data(battery: &BatteryInfo) -> BatteryData {
     // Health comes from the core full/design rule; each estimate renders
     // only when the native source reported one under its status gate.
     // Unavailable facts stay absent — never a believable "0%" / "0m".
-    let health = battery
-        .current_health_pct()
-        .map(|value| format!("{value:.1}%"));
+    let health = battery.current_health_pct().map(percent_text);
     let time_estimate = battery
         .current_time_to_full_secs()
         .map(|secs| (t("battery.time_to_full"), secs))
@@ -368,7 +364,7 @@ pub(super) fn gpu_data(gpu: &GpuMetrics) -> GpuData {
         fan_pwm: gpu
             .current_fan_speed_pct()
             .filter(|value| value.is_finite())
-            .map(|pct| format!("{pct:.0}%")),
+            .map(percent_text),
         memory_bus_width: gpu
             .memory_bus_width_bits
             .filter(|width| *width > 0)
@@ -456,7 +452,7 @@ pub(super) fn network_data(
                 .current_signal_dbm()
                 .map_or_else(missing_value, |dbm| {
                     let quality = wifi_signal_quality_percent(dbm);
-                    format!("{dbm} dBm ({quality:.0}%)")
+                    format!("{dbm} dBm ({})", percent_text(quality))
                 }),
             bssid: network.current_bssid().map(str::to_owned),
             details,

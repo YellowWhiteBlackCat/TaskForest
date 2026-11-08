@@ -579,7 +579,7 @@ fn the_core_cell_carries_the_frequency_and_temperature_subtitle() {
     );
     assert_eq!(
         dyn_text(world, &DynField::Cpu(CpuField::CoreUsage(0))),
-        Some("12.0%".to_owned())
+        Some("12%".to_owned())
     );
 }
 

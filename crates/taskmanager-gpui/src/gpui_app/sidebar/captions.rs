@@ -1,14 +1,15 @@
 //! Sidebar caption projections kept separate from the device-row renderer.
 
 use crate::gpui_app::formatting;
-use crate::gpui_app::perf_views::gpu_percentage_readout;
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::units::bytes_percent;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskforest_core::core::{BatteryInfo, SensorReading};
 use taskmanager_application::i18n;
 use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_shell::presentation::observed_percentage;
 
 pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {
     units.format_quantity(bytes_per_sec, QuantityFamily::Network, true)
@@ -21,11 +22,7 @@ pub(super) fn clean_disk_name(name: &str) -> String {
 }
 
 pub(super) fn disk_activity_caption(disk: &DiskMetrics, units: UnitPreferences) -> String {
-    let active = disk
-        .current_active_time_pct()
-        .map_or_else(formatting::missing_value, |value| {
-            format!("{:.0}%", value.round())
-        });
+    let active = observed_percentage(disk.current_active_time_pct());
     let rate = match (
         disk.current_read_bytes_per_sec(),
         disk.current_write_bytes_per_sec(),
@@ -55,9 +52,7 @@ pub(super) fn network_rate_caption(network: &NetworkMetrics, units: UnitPreferen
 }
 
 pub(super) fn battery_capacity_caption(battery: &BatteryInfo) -> String {
-    battery
-        .current_capacity_pct()
-        .map_or_else(formatting::missing_value, |value| format!("{value}%"))
+    observed_percentage(battery.current_capacity_pct().map(f32::from))
 }
 
 pub(super) fn fan_speed_caption(reading: &SensorReading) -> String {
@@ -74,11 +69,7 @@ pub(super) fn cpu_caption(snap: &SystemSnapshot) -> (String, String) {
         .map(str::trim)
         .filter(|brand| !brand.is_empty())
         .map_or_else(formatting::missing_value, str::to_string);
-    let usage = cpu
-        .current_global_usage_pct()
-        .map_or_else(formatting::missing_value, |value| {
-            format!("{:.0}%", value.round())
-        });
+    let usage = observed_percentage(cpu.current_global_usage_pct());
 
     let freq_str = cpu.current_frequency_mhz().map(|mhz| {
         if mhz >= 1000 {
@@ -140,8 +131,7 @@ pub(super) fn mem_caption(snap: &SystemSnapshot, units: UnitPreferences) -> (Str
         });
     (
         format!("{used} / {total}"),
-        m.used_percentage_observed()
-            .map_or_else(formatting::missing_value, |value| format!("{value:.0}%")),
+        observed_percentage(m.used_percentage_observed()),
     )
 }
 
@@ -216,7 +206,7 @@ pub(super) fn gpu_caption_line1(g: &GpuMetrics, units: UnitPreferences) -> Strin
 pub(super) fn gpu_caption_line2(g: &GpuMetrics) -> String {
     let mut parts = Vec::new();
     if let Some(util) = g.current_utilization_pct() {
-        parts.push(format!("{util:.0}%"));
+        parts.push(percent_text(util));
     }
     let (vram_used, vram_total) = if let (Some(used), Some(total)) = (
         g.current_dedicated_vram_used_bytes(),
@@ -243,7 +233,7 @@ pub(super) fn gpu_caption_line2(g: &GpuMetrics) -> String {
     if let (Some(used), Some(total)) = (vram_used, vram_total)
         && let Some(pct) = bytes_percent(used, total)
     {
-        parts.push(format!("VRAM {:.0}%", pct.min(100.0).round()));
+        parts.push(format!("VRAM {}", percent_text(pct.min(100.0))));
     }
     if let Some(temp) = g.current_temperature_c() {
         parts.push(format!("{:.0} °C", temp.round()));
@@ -254,7 +244,7 @@ pub(super) fn gpu_caption_line2(g: &GpuMetrics) -> String {
         parts.push(format!("{:.0} W", p));
     }
     if parts.is_empty() {
-        gpu_percentage_readout(g.current_utilization_pct())
+        observed_percentage(g.current_utilization_pct())
     } else {
         parts.join("  ·  ")
     }

@@ -28,6 +28,7 @@ use gpui::{
 use taskforest_core::core::config::{
     WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
 };
+use taskmanager_application::i18n;
 use taskmanager_theme::WindowControls;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Skin, Theme};
@@ -124,6 +125,16 @@ impl DecorationOutcomeNotice {
             Self::CustomRefused => "notice.deco_custom_refused",
         }
     }
+}
+
+/// The localized notice text for one decoration outcome.
+///
+/// The key map and its resolution live together with the vocabulary they
+/// belong to, so no other GPUI module composes a localized string from the
+/// key itself.
+#[must_use]
+pub fn decoration_outcome_label(notice: DecorationOutcomeNotice) -> &'static str {
+    i18n::t(notice.i18n_key())
 }
 
 /// Compare a window-frame preference against the decoration fact the window

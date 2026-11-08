@@ -1,8 +1,6 @@
 //! Performance split and pinned/stacked statistics surfaces.
 
-use super::{
-    PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_STACK_HEIGHT, PERFORMANCE_STATS_TRAILING_INSET,
-};
+use super::{PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_TRAILING_INSET};
 use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px, rems};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme};
@@ -11,6 +9,7 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
+use taskmanager_ui_contract::presentation::vocabulary::PERFORMANCE_STATS_STACK_HEIGHT;
 
 /// Canonical Performance page split: a shrinkable main column and a pinned,
 /// non-scrolling statistics column.
@@ -45,8 +44,8 @@ pub(super) fn performance_stack(theme: &Theme, left: Div, stats: Div, stats_widt
     let stats = performance_stats_surface(theme, stats, px(stats_width), false)
         .flex_none()
         .w_full()
-        .h(PERFORMANCE_STATS_STACK_HEIGHT)
-        .max_h(PERFORMANCE_STATS_STACK_HEIGHT)
+        .h(px(PERFORMANCE_STATS_STACK_HEIGHT))
+        .max_h(px(PERFORMANCE_STATS_STACK_HEIGHT))
         .pt(definite_length(tokens::SPACE_10))
         .debug_selector(|| "tm-perf-stats-surface".to_string());
     div()

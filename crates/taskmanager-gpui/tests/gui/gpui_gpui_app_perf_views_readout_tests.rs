@@ -1,14 +1,15 @@
+use super::finite_graph_summary;
 use super::memory_stats::optional_memory;
 use super::network_stats::network_link_speed_graph_max_mbps;
-use super::{finite_graph_summary, gpu_percentage_readout};
 use taskforest_core::core::units::UnitPreferences;
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_theme::Theme;
 
 #[test]
 fn gpu_optional_percentages_distinguish_unknown_from_measured_zero() {
-    assert_eq!(gpu_percentage_readout(None), "—");
-    assert_eq!(gpu_percentage_readout(Some(0.0)), "0%");
-    assert_eq!(gpu_percentage_readout(Some(41.6)), "42%");
+    assert_eq!(observed_percentage(None::<f32>), "—");
+    assert_eq!(observed_percentage(Some(0.0)), "0%");
+    assert_eq!(observed_percentage(Some(41.6)), "42%");
 }
 
 #[test]

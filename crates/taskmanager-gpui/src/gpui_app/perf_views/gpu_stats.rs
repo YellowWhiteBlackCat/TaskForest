@@ -9,9 +9,11 @@ use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_application::i18n;
 
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_shell::presentation::observed_percentage;
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::device_status_i18n_key;
+use taskforest_core::core::percent::percent_text;
 
 pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> {
     let mut stats: Vec<StatRow> = vec![
@@ -21,8 +23,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
         ),
         StatRow::text(
             i18n::t("common.utilization"),
-            g.current_utilization_pct()
-                .map(|percentage| format!("{:.0}%", percentage.round())),
+            g.current_utilization_pct().map(percent_text),
         ),
     ];
     if let Some(name) = g
@@ -112,7 +113,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
     if let Some(percentage) = g.current_idle_residency_pct() {
         stats.push(StatRow::text(
             i18n::t("gpu.idle_residency"),
-            Some(format!("{:.0}%", percentage.round())),
+            Some(observed_percentage(Some(percentage))),
         ));
     }
     // ── Power draw (amdgpu hwmon / NVML; None on Intel sysfs — no xe hwmon). ──
@@ -138,10 +139,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
         ));
     }
     if let Some(pct) = g.current_fan_speed_pct().filter(|value| value.is_finite()) {
-        stats.push(StatRow::text(
-            i18n::t("fan.pwm"),
-            Some(format!("{pct:.0}%")),
-        ));
+        stats.push(StatRow::text(i18n::t("fan.pwm"), Some(percent_text(pct))));
     }
     // ── Driver (basename of device/driver symlink — xe / i915 / amdgpu). ──
     if let Some(d) = &g.driver {
@@ -212,7 +210,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
     for e in &g.engines {
         stats.push(StatRow::text(
             e.name.clone(),
-            Some(format!("{:.0}%", e.usage_pct.round())),
+            Some(observed_percentage(Some(e.usage_pct))),
         ));
     }
     // ── GPU throttling reason (amdgpu hwmon) ──

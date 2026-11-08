@@ -8,6 +8,7 @@ use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::pixels;
+use taskmanager_ui_contract::InputModality;
 use taskmanager_ui_contract::navigation::NavOrientation;
 /// Debug-selector identity of the telemetry-ready viewport wrapper.
 ///
@@ -21,8 +22,8 @@ use std::time::Duration;
 
 use super::capture::schedule_controlled_presentation;
 use super::{
-    Hover, InputModality, RootView, SelectedDevice, TopPage, WindowCorner, alert_ui, device_label,
-    i18n, init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
+    Hover, RootView, SelectedDevice, TopPage, WindowCorner, alert_ui, device_label, i18n,
+    init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
 use crate::gpui_app::dashboard;
 
@@ -169,6 +170,7 @@ fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Co
 
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::frame_timing::observe_frame(std::time::Instant::now());
         if self.capture_evidence.feedback_overlay_active() {
             self.page = TopPage::Performance;
             self.selected = SelectedDevice::Cpu;
@@ -390,7 +392,13 @@ impl Render for RootView {
             self.decoration_outcome_reported = true;
             // The "⚠ " prefix routes the toast to the Danger kind (see
             // `RootView::show_local_feedback`).
-            self.show_local_feedback(format!("\u{26a0} {}", i18n::t(notice.i18n_key())), cx);
+            self.show_local_feedback(
+                format!(
+                    "\u{26a0} {}",
+                    crate::gpui_app::chrome::decoration_outcome_label(notice)
+                ),
+                cx,
+            );
         }
         let t = t.with_focus_visible(self.input_modality.shows_focus_ring());
 

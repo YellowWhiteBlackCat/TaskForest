@@ -1,6 +1,7 @@
 //! Availability-preserving display text for process-group aggregate cells.
 
 use taskforest_core::core::metrics::ScalarAvailability;
+use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
@@ -28,7 +29,7 @@ pub(crate) fn memory_aggregate_summary(
 /// Short status token for the bounded aggregate cell; the full explanation
 /// remains in the tooltip and accessibility summary.
 pub(crate) fn cpu_aggregate_compact(metric: &AggregateMetric<f32>) -> String {
-    aggregate_metric_compact(metric, |value| format!("{value:.0}%"))
+    aggregate_metric_compact(metric, |value| percent_text(*value))
 }
 
 /// Short status token for the bounded aggregate memory cell.

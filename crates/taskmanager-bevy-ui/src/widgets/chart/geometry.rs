@@ -6,6 +6,13 @@
 //! the curve never joins across a gap, and a single observation draws
 //! nothing.
 
+use taskmanager_shell::presentation::ChartSlots;
+use zhuge_ui_core::value::interval_fraction;
+
+/// The flat answer for a range that cannot travel: the curve parks on the
+/// mid frame instead of collapsing onto an edge.
+const FLAT_AT_MID_FRAME: f32 = 0.5;
+
 /// One projected point of the curve, in chart-local pixels (y grows down).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ChartVertex {
@@ -42,97 +49,14 @@ pub(crate) enum ChartScale {
     Ceiling(f32),
 }
 
-/// The slot grid one curve's samples occupy inside the measured frame.
-///
-/// The product contract is a **right-anchored capacity window**: the newest
-/// sample pins to the right edge and every sample owns one fixed slot of the
-/// window's width. A window that holds fewer samples than the capacity
-/// therefore grows a short, evenly-paced curve from the right edge leftward
-/// instead of stretching a handful of samples across the whole frame — the
-/// curve never claims a history the product does not have. GPUI's
-/// `sample_x` and Iced's `WindowSlots` own the same rule; this is the Bevy
-/// reading of it.
+/// The slot grid is the shared owner's
+/// ([`taskmanager_shell::presentation::ChartSlots`]): the product contract is a
+/// **right-anchored capacity window**, and GPUI's `sample_x`, Iced's chart
+/// grid and this surface all resolve their slots through it, so the three
+/// frontends cannot drift apart.
 ///
 /// The drawing x and the hover resolution derive from the same denominator,
 /// so a hover readout can never disagree with a drawn sample.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ChartSlots {
-    sample_count: usize,
-    capacity: usize,
-    width: f32,
-}
-
-impl ChartSlots {
-    /// Build the slot grid for a window of `sample_count` samples inside a
-    /// `capacity`-wide frame. A capacity below the sample count is safe: the
-    /// denominator is their maximum, so an over-full window degrades to the
-    /// full-span spread rather than dividing by zero.
-    #[must_use]
-    pub(crate) fn new(sample_count: usize, capacity: usize, width: f32) -> Self {
-        Self {
-            sample_count,
-            capacity,
-            width,
-        }
-    }
-
-    /// The shared denominator: the sample span, or the capacity span, or one.
-    fn denominator(&self) -> f32 {
-        self.sample_count
-            .saturating_sub(1)
-            .max(self.capacity.saturating_sub(1))
-            .max(1) as f32
-    }
-
-    /// The x-coordinate of the sample at `index` (oldest→newest, the newest
-    /// pinned at the right edge). A window with fewer than two samples has no
-    /// span, so it carries no x at all.
-    ///
-    /// The slot is measured from the right and subtracted from the denominator
-    /// BEFORE the divide, so a full window (capacity == sample count) resolves
-    /// to `width * index / (count - 1)` bit-for-bit: the settled curve is the
-    /// same numbers the full-span projection always painted, never a value
-    /// that merely rounds to it.
-    #[must_use]
-    pub(crate) fn x(&self, index: usize) -> f32 {
-        if self.sample_count < 2 {
-            return 0.0;
-        }
-        let width = if self.width.is_finite() {
-            self.width.max(0.0)
-        } else {
-            0.0
-        };
-        let denominator = self.denominator();
-        let from_right = (self.sample_count - 1 - index.min(self.sample_count - 1)) as f32;
-        width * (denominator - from_right) / denominator
-    }
-
-    /// The inverse of [`ChartSlots::x`]: map a frame-relative cursor x onto
-    /// the nearest sample slot. `None` before the frame, for a non-positive or
-    /// non-finite width, or when the window holds fewer than two samples.
-    ///
-    /// The newest sample owns the right edge, so a cursor AT the edge is the
-    /// newest slot rather than nothing: the relative position clamps into the
-    /// frame exactly like the reference surface's resolution.
-    #[must_use]
-    pub(crate) fn index_at(&self, cursor_x: f32) -> Option<usize> {
-        if self.sample_count < 2
-            || !cursor_x.is_finite()
-            || !self.width.is_finite()
-            || self.width <= 0.0
-            || cursor_x < 0.0
-        {
-            return None;
-        }
-        let relative = (cursor_x / self.width).clamp(0.0, 1.0);
-        let index = (self.sample_count as f32 - 1.0 - (1.0 - relative) * self.denominator())
-            .round()
-            .clamp(0.0, (self.sample_count - 1) as f32);
-        Some(index as usize)
-    }
-}
-
 /// The finite extent of a sample window, or `None` when nothing was measured.
 fn finite_extrema(window: &[f32]) -> Option<(f32, f32)> {
     window
@@ -204,7 +128,6 @@ pub(crate) fn chart_runs_in(
             (0.0, ceiling)
         }
     };
-    let span = ceiling - floor;
     let count = window.len();
     let slots = ChartSlots::new(count, capacity, width);
 
@@ -221,12 +144,11 @@ pub(crate) fn chart_runs_in(
             }
             continue;
         }
-        let x = if count <= 1 { width } else { slots.x(index) };
-        let y = if span <= 0.0 {
-            height / 2.0
-        } else {
-            height * (1.0 - ((value - floor) / span).clamp(0.0, 1.0))
-        };
+        let x = slots.x(index);
+        // The vertical axis reads the shared interval projection: a range that
+        // cannot travel parks the curve on the mid frame, which is the
+        // Bevy surface's declared flat answer.
+        let y = height * (1.0 - interval_fraction(value, floor, ceiling, FLAT_AT_MID_FRAME));
         current.push(ChartVertex { x, y });
     }
     if current.len() >= 2 {

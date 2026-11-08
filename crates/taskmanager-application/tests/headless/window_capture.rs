@@ -9,6 +9,110 @@ fn target(name: &str) -> WindowCaptureTarget {
     WindowCaptureTarget::path(PathBuf::from("/tmp").join(name))
 }
 
+struct ScriptedPort {
+    completions: Vec<WindowCaptureCompletion>,
+    failed: bool,
+}
+
+impl WindowCapturePort for ScriptedPort {
+    fn try_submit(&mut self, request: WindowCaptureRequest) -> Result<(), WindowCaptureError> {
+        if self.failed {
+            return Err(WindowCaptureError::new(
+                WindowCaptureErrorKind::Backpressure,
+                "queue full",
+            ));
+        }
+        // Complete immediately so the drain owner has a real state to decide.
+        self.completions.push(WindowCaptureCompletion {
+            request: request.id(),
+            outcome: WindowCaptureOutcome::Ready {
+                destination: Arc::from("/tmp/one.png"),
+                width: 1920,
+                height: 1080,
+                backend: WindowCaptureBackend::SpectacleActiveWindow,
+            },
+        });
+        Ok(())
+    }
+
+    fn drain(&mut self) -> Vec<WindowCaptureCompletion> {
+        std::mem::take(&mut self.completions)
+    }
+}
+
+#[test]
+fn the_intent_owner_decides_submit_and_drain_notices_for_every_frontend() {
+    let mut session = WindowCaptureSession::new(ScriptedPort {
+        completions: Vec::new(),
+        failed: false,
+    });
+
+    // No installed client is an honest absence, not a failed request.
+    let absent = request_current_window_capture::<ScriptedPort>(None, None);
+    assert!(!absent.submitted);
+    assert_eq!(absent.notice, WindowCaptureNotice::Unavailable);
+
+    let queued = request_current_window_capture(Some(&mut session), None);
+    assert!(queued.submitted);
+    assert_eq!(queued.notice, WindowCaptureNotice::Queued);
+    assert_eq!(queued.notice.severity(), WindowCaptureNoticeSeverity::Info);
+    assert_eq!(
+        queued.notice.lifecycle(),
+        WindowCaptureNoticeLifecycle::Short
+    );
+
+    // The busy decision stays the owner's: a second request before the first
+    // completion is drained must not be reimplemented differently per frontend.
+    let busy = request_current_window_capture(Some(&mut session), None);
+    assert!(!busy.submitted);
+    assert_eq!(busy.notice, WindowCaptureNotice::Busy);
+    assert_eq!(busy.notice.severity(), WindowCaptureNoticeSeverity::Warning);
+
+    let (changed, notice) = drain_window_capture_completions(Some(&mut session));
+    assert!(changed);
+    assert_eq!(
+        notice,
+        Some(WindowCaptureNotice::Ready {
+            destination: Arc::from("/tmp/one.png"),
+            width: 1920,
+            height: 1080,
+        })
+    );
+    // Ready has its own success copy, decided by the shell feedback owner.
+    assert_eq!(
+        notice.as_ref().map(|item| item.severity()),
+        Some(WindowCaptureNoticeSeverity::Success)
+    );
+
+    // A second drain has nothing left: no fabricated frame change either.
+    assert_eq!(
+        drain_window_capture_completions(Some(&mut session)),
+        (false, None)
+    );
+}
+
+#[test]
+fn a_rejected_submit_becomes_a_failed_notice_with_the_port_detail() {
+    let mut session = WindowCaptureSession::new(ScriptedPort {
+        completions: Vec::new(),
+        failed: true,
+    });
+    let outcome = request_current_window_capture(Some(&mut session), None);
+    assert!(!outcome.submitted);
+    assert_eq!(
+        outcome.notice,
+        WindowCaptureNotice::Failed("queue full".to_owned())
+    );
+    assert_eq!(
+        outcome.notice.severity(),
+        WindowCaptureNoticeSeverity::Error
+    );
+    assert_eq!(
+        outcome.notice.lifecycle(),
+        WindowCaptureNoticeLifecycle::Long
+    );
+}
+
 #[test]
 fn queued_running_ready_lifecycle_is_correlated() {
     let mut controller = WindowCaptureController::new();

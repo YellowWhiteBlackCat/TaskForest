@@ -13,6 +13,7 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, actions, div, px,
 };
 use taskmanager_theme::Palette;
+use taskmanager_ui_contract::columns;
 // The resize policy is the contract's (see `taskmanager_ui_contract::columns`):
 // every frontend reads the same minimum, maximum and keyboard step, so the
 // same drag behaves the same everywhere.
@@ -83,8 +84,10 @@ pub fn width_from_drag(
     anchor_x: &mut Option<Pixels>,
     cursor_x: Pixels,
 ) -> Pixels {
-    let anchor = *anchor_x.get_or_insert(cursor_x);
-    start_width + (cursor_x - anchor)
+    let mut inner = anchor_x.map(Pixels::as_f32);
+    let width = columns::width_from_drag(start_width.as_f32(), &mut inner, cursor_x.as_f32());
+    *anchor_x = inner.map(px);
+    px(width)
 }
 
 /// Build the reference GPUI resize gutter.

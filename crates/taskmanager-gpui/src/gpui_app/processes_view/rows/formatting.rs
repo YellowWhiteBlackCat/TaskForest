@@ -1,5 +1,6 @@
 //! Process-table numeric and local start-time formatting.
 
+use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::cpu_time_compact;
@@ -16,7 +17,7 @@ pub(super) fn format_memory(units: UnitPreferences, bytes: u64) -> String {
 }
 
 pub(super) fn format_cpu_percent(value: f32) -> String {
-    format!("{value:.1}%")
+    precise_percent_text(value)
 }
 
 /// `None` (typed unavailable/unknown) renders as "—" instead of a believable

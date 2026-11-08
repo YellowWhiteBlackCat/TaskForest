@@ -15,9 +15,7 @@ use std::rc::Rc;
 
 use iced::Element;
 use iced::widget::container;
-use taskforest_core::core::sensors::{
-    SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
-};
+use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity, SensorReading};
 use taskmanager_application::i18n::t;
 
 use taskmanager_shell::viewmodel::StatRow;
@@ -28,7 +26,8 @@ use super::perf_devices::DeviceBlockContext;
 use super::tables;
 use crate::app::Message;
 use crate::theme;
-use crate::trend_strip::finite_peak;
+use taskforest_core::core::percent::percent_text;
+use taskmanager_shell::presentation::finite_peak;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
     DeviceNavigationPresentation, PerformanceChartInventory,
@@ -188,8 +187,8 @@ pub(super) fn fan_summary_lines(
         t("fan.rpm"),
         fan.current_number().map(|value| format!("{value:.0} RPM")),
     )];
-    if let Some(pwm) = fan_pwm_percent(sensors, fan) {
-        rows.push(StatRow::text(t("fan.pwm"), Some(format!("{pwm:.0}%"))));
+    if let Some(pwm) = sensors.fan_pwm_percent(fan) {
+        rows.push(StatRow::text(t("fan.pwm"), Some(percent_text(pwm))));
     }
     for temperature in sensors.readings.iter().filter(|reading| {
         reading.device_id() == fan.device_id() && reading.quantity() == &SensorQuantity::Temperature
@@ -202,24 +201,6 @@ pub(super) fn fan_summary_lines(
         }
     }
     rows
-}
-
-/// The PWM duty-cycle percent for the physical device owning `fan`, resolved
-/// through the typed magnitude observation. `None` when no duty-cycle channel
-/// is currently readable — never a fabricated 0%.
-fn fan_pwm_percent(sensors: &SensorCenterSnapshot, fan: &SensorReading) -> Option<f32> {
-    sensors
-        .readings
-        .iter()
-        .filter(|reading| reading.device_id() == fan.device_id())
-        .find_map(
-            |reading| match reading.measurement_observation().current_value()? {
-                SensorMagnitude::DutyCycle { value, maximum } if *maximum > 0 => {
-                    Some(*value as f32 * 100.0 / *maximum as f32)
-                }
-                _ => None,
-            },
-        )
 }
 
 /// The fan's RPM gauge: the per-fan RPM window plotted in the device

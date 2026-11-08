@@ -54,6 +54,7 @@ taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime", versi
 # never drift on offsets or sentinel semantics. Pure safe-Rust leaf.
 taskmanager-smbios-tables = { path = "../taskmanager-smbios-tables", version = "0.5.1" }
 tracing = "0.1"
+zhuge-ui-core.workspace = true
 
 # ADR-024: the second audited `unsafe` boundary crate — the AF_PACKET socket
 # seam for per-process network byte accounting. Only its safe `FiveTuple` parser

@@ -1,7 +1,9 @@
 //! Synchronous handshake helpers: submit one request and block until the
 //! correlated outcome (snapshot, failure, or timeout) is drained.
 
+use std::time::SystemTime;
 use std::time::{Duration, Instant};
+use taskforest_core::core::time::unix_millis;
 
 use taskforest_contract::{CompositeSourceSnapshot, OperationFailure};
 use taskforest_core::core::appearance::DesktopAppearance;
@@ -32,9 +34,10 @@ impl PlatformClient {
         wait: Duration,
         poll: Duration,
     ) -> DesktopAppearanceHandshake {
-        let Ok(request_id) =
-            self.submit_desktop_appearance(DesktopAppearanceRequest::Observe, submitted_at_ms())
-        else {
+        let Ok(request_id) = self.submit_desktop_appearance(
+            DesktopAppearanceRequest::Observe,
+            unix_millis(SystemTime::now()),
+        ) else {
             return DesktopAppearanceHandshake::default();
         };
         let deadline = Instant::now() + wait;
@@ -71,14 +74,6 @@ impl PlatformClient {
             std::thread::sleep(poll);
         }
     }
-}
-
-fn submitted_at_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
-        .unwrap_or(u64::MAX)
 }
 
 #[cfg(test)]

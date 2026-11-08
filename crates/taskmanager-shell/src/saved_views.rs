@@ -306,6 +306,26 @@ pub fn sort_from_token(token: &str) -> Option<SortCol> {
     }
 }
 
+/// Decode one persisted sort-column token, including the historical
+/// spellings early frontends wrote.
+///
+/// [`sort_from_token`] is the canonical inverse and stays strict, so the
+/// saved-view import path keeps failing closed on an unknown token. The
+/// *config* decode boundary is a different question: a config file written by
+/// an older build still carries `"PSS"` (for the PSS column) and `"State"`
+/// (for the state column), both of which predate the canonical
+/// `"MemoryPss"` / `"Status"` tokens. Those two spellings are accepted here,
+/// in one place, so every frontend that reads a persisted config agrees on
+/// which historical spellings mean what.
+#[must_use]
+pub fn sort_from_legacy_token(token: &str) -> Option<SortCol> {
+    match token {
+        "PSS" => Some(SortCol::Pss),
+        "State" => Some(SortCol::State),
+        _ => sort_from_token(token),
+    }
+}
+
 pub fn hidden_tokens(hidden: &HashSet<SortCol>) -> Vec<String> {
     let mut tokens: Vec<_> = hidden
         .iter()

@@ -21,12 +21,17 @@ fn explicit_setup_actions_submit_once_and_switching_surfaces_destroys_the_old_tr
         .non_send_mut::<crate::app::FrontendTrack>()
         .initial_refresh_submitted = true;
     app.update();
-    assert!(app.world().resource::<WindowSurfaceState>().0.is_none());
+    assert!(
+        app.world()
+            .resource::<WindowSurfaceState>()
+            .active()
+            .is_none()
+    );
     app.world_mut().trigger(FirstRunCommand::Open);
     app.update();
     app.update();
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::FirstRun)
     ));
     let control = app
@@ -51,7 +56,7 @@ fn explicit_setup_actions_submit_once_and_switching_surfaces_destroys_the_old_tr
     app.update();
     app.update();
     assert!(matches!(
-        app.world().resource::<WindowSurfaceState>().0,
+        app.world().resource::<WindowSurfaceState>().active(),
         Some(WindowSurface::About)
     ));
     assert_eq!(
@@ -71,7 +76,7 @@ fn explicit_setup_actions_submit_once_and_switching_surfaces_destroys_the_old_tr
     app.update();
     assert!(
         matches!(
-            app.world().resource::<WindowSurfaceState>().0,
+            app.world().resource::<WindowSurfaceState>().active(),
             Some(WindowSurface::About)
         ),
         "a stale close cannot dismiss the replacement surface"

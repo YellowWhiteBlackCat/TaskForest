@@ -28,6 +28,7 @@ use taskmanager_theme::{GlassTier, Theme};
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
 use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
+use taskmanager_shell::presentation::priority_tier_label;
 use taskmanager_shell::{ProcessControlAvailability, ProcessControlScope, SortCol};
 
 /// Inputs for the process action strip. The caller supplies the already
@@ -73,7 +74,7 @@ impl ProcessToolbarAction {
             Self::ForceKill => i18n::t("proc.kill"),
             Self::Suspend => i18n::t("proc.suspend"),
             Self::Resume => i18n::t("proc.resume"),
-            Self::SetPriority(tier) => i18n::t(tier.i18n_key()),
+            Self::SetPriority(tier) => priority_tier_label(tier),
             Self::EfficiencyMode => i18n::t("proc.efficiency_mode"),
             Self::Affinity => i18n::t("proc.affinity"),
             Self::ExportBatchHistory => i18n::t("proc.batch_history_export"),

@@ -65,6 +65,32 @@ pub enum ApplicationHistoryStatus {
     Ready,
 }
 
+impl ApplicationHistoryStatus {
+    /// Return the localized (heading, detail) copy for this status.
+    #[must_use]
+    pub fn copy_text(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Disabled => (
+                crate::i18n::t("history.application.disabled"),
+                crate::i18n::t("history.application.disabled_detail"),
+            ),
+            Self::Unavailable => (
+                crate::i18n::t("history.application.unavailable"),
+                crate::i18n::t("history.application.unavailable_detail"),
+            ),
+            Self::Connecting => (
+                crate::i18n::t("history.application.connecting"),
+                crate::i18n::t("history.application.connecting_detail"),
+            ),
+            Self::Collecting => (
+                crate::i18n::t("history.application.collecting"),
+                crate::i18n::t("history.application.collecting_detail"),
+            ),
+            Self::Ready => (crate::i18n::t("history.application.title"), ""),
+        }
+    }
+}
+
 /// One persisted metric series and its fact-only window summary.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApplicationHistoryMetricSeries {

@@ -152,8 +152,8 @@ pub(crate) fn mini_graph_cell(
     .child(
         div()
             .absolute()
-            .top(px(4.0))
-            .left(px(6.0))
+            .top(definite_length(tokens::SPACE_4))
+            .left(definite_length(tokens::SPACE_6))
             .text_size(font_size(tokens::FONT_10))
             .font_weight(font_weight(tokens::FONT_WEIGHT_BOLD))
             .text_color(hsla(theme.fg_dim))

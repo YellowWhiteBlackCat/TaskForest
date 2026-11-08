@@ -130,24 +130,53 @@ fn frontend_production_sources_own_no_history_storage_primitive() {
     }
 }
 
+/// Frontend modules that are *evidence channels* rather than product code.
+///
+/// A capture or frame-timing sink writes one typed line for the external
+/// evidence runner; it reads no platform fact and is disabled unless the
+/// product opts in through an environment variable. The native-IO invariant
+/// is about a frontend *reading* OS sources or *spawning* commands — neither
+/// happens here — so these modules are exempt.
+///
+/// The list is spelled out rather than matched by a filename prefix: a
+/// prefix rule silently widened the exemption every time a new sink was
+/// added, and it missed the same sink living under a different directory
+/// (`runtime/frame_timing.rs` vs `app/frame_timing.rs`). Every entry names
+/// the exact module path, so a new sink is an explicit, reviewable decision.
+const EVIDENCE_CHANNEL_MODULES: &[(&str, &str)] = &[
+    ("crates/taskmanager-gpui/src", "frame_timing.rs"),
+    ("crates/taskmanager-gpui/src", "capture.rs"),
+    ("crates/taskmanager-iced/src", "app/frame_timing.rs"),
+    ("crates/taskmanager-iced/src", "capture.rs"),
+    ("crates/taskmanager-tui/src", "runtime/frame_timing.rs"),
+    ("crates/taskmanager-tui/src", "capture.rs"),
+    ("crates/taskmanager-bevy-ui/src", "frame_timing.rs"),
+    ("crates/taskmanager-bevy-ui/src", "window/frame_capture.rs"),
+    ("crates/taskmanager-bevy-ui/src", "capture.rs"),
+];
+
 /// Concatenate a frontend's production Rust sources, skipping capture-only
 /// modules. Capture plumbing (marker/manifest writes) is enabled exclusively
 /// by the capture runner and is not a runtime path, so the native-IO invariant
 /// applies to the shell the product actually runs.
-fn frontend_shell_sources(root: &std::path::Path) -> String {
-    fn visit(path: &std::path::Path, output: &mut String) {
+fn frontend_shell_sources(repository: &std::path::Path, root: &std::path::Path) -> String {
+    fn visit(repository: &std::path::Path, path: &std::path::Path, output: &mut String) {
         let entries = fs::read_dir(path)
             .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
         for entry in entries {
             let path = entry.expect("directory entry should be readable").path();
             if path.is_dir() {
-                visit(&path, output);
+                visit(repository, &path, output);
             } else if path.extension().is_some_and(|extension| extension == "rs") {
-                let is_capture_module = path
-                    .file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .is_some_and(|stem| stem.starts_with("capture"));
-                if is_capture_module {
+                let relative = path
+                    .strip_prefix(repository)
+                    .expect("a frontend source must live under the repository")
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                let is_evidence_channel = EVIDENCE_CHANNEL_MODULES
+                    .iter()
+                    .any(|(prefix, module)| relative == format!("{prefix}/{module}"));
+                if is_evidence_channel {
                     continue;
                 }
                 output.push_str(&fs::read_to_string(&path).unwrap_or_else(|error| {
@@ -158,7 +187,7 @@ fn frontend_shell_sources(root: &std::path::Path) -> String {
         }
     }
     let mut output = String::new();
-    visit(root, &mut output);
+    visit(repository, root, &mut output);
     output
 }
 
@@ -182,7 +211,8 @@ fn frontends_execute_no_native_commands_and_read_no_native_paths() {
         ("TUI", "crates/taskmanager-tui/src"),
         ("Bevy", "crates/taskmanager-bevy-ui/src"),
     ] {
-        let code = without_line_comments(&frontend_shell_sources(&repository.join(root)));
+        let code =
+            without_line_comments(&frontend_shell_sources(&repository, &repository.join(root)));
         for forbidden in FORBIDDEN_NATIVE_IO_AND_COMMANDS {
             assert!(
                 !code.contains(forbidden),
@@ -195,6 +225,7 @@ fn frontends_execute_no_native_commands_and_read_no_native_paths() {
         );
     }
     let gpui = without_line_comments(&frontend_shell_sources(
+        &repository,
         &repository.join("crates/taskmanager-gpui/src/gpui_app"),
     ));
     assert!(

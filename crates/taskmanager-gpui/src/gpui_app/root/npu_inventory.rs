@@ -9,6 +9,8 @@
 //! hardware snapshot arrives on the same slow static-facts cadence, so the
 //! accelerator enumeration rides it without a new timer.
 
+use std::time::SystemTime;
+use taskforest_core::core::time::unix_millis;
 use taskmanager_application::NpuInventoryRequest;
 
 use crate::gpui_app::root::RootView;
@@ -21,7 +23,7 @@ impl RootView {
         let Some(platform) = self.platform.as_mut() else {
             return;
         };
-        let _ = platform
-            .submit_npu_inventory(NpuInventoryRequest {}, super::platform_submission_time_ms());
+        let _ =
+            platform.submit_npu_inventory(NpuInventoryRequest {}, unix_millis(SystemTime::now()));
     }
 }

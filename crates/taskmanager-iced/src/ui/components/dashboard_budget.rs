@@ -1,5 +1,7 @@
 //! Complete dashboard groups inside an allocated Iced body slot.
 
+use zhuge_ui_core::row_page::page_count;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DashboardBudget {
     pub(crate) compact_summary: bool,
@@ -23,7 +25,8 @@ impl DashboardBudget {
         }
         let rows = (available / 132.0).floor().clamp(1.0, 4.0) as usize;
         let count = (rows * columns).min(4);
-        let rows = count.div_ceil(columns);
+        // How many fixed-column rows a count needs is the shared page axis.
+        let rows = page_count(count, columns);
         let each = (available - (rows.saturating_sub(1) as f32 * 8.0)) / rows as f32;
         Self {
             compact_summary,

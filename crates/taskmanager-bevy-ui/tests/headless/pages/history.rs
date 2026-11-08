@@ -12,7 +12,8 @@ use super::*;
 use taskforest_core::core::history::{HistoryMetric, HistorySeriesKey};
 use taskmanager_application::{
     ApplicationHistoryRow, HistoryReplayCompletion, HistoryReplayCompletionDisposition,
-    HistoryReplayCompletionOutcome, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
+    HistoryReplayCompletionOutcome, HistoryReplayController, HistoryReplayError,
+    HistoryReplayErrorKind, HistoryReplayRow,
 };
 
 fn identity(value: &str, verified: bool) -> ApplicationHistoryIdentity {
@@ -288,7 +289,8 @@ fn runtime_is_inert_without_a_connector_and_only_exposes_typed_read_states() {
             .projection()
             .unavailable_reason
             .map(|reason| reason.stable_code()),
-        Some("connector_stopped")
+        Some("connector_start"),
+        "history was requested with no connector installed, so the session could not start"
     );
     assert!(runtime.projection().rows.is_empty());
     runtime.request(false);

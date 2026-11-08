@@ -7,6 +7,7 @@
 use iced::Task;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::PlatformEffect;
+use taskmanager_application::session_slot::SessionSlot;
 use taskmanager_application::{
     DiagnosticBundleSession, DiagnosticBundleTarget, prepare_service_log_bundle,
 };
@@ -16,26 +17,13 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 use super::{IcedApp, Message};
 use taskmanager_application::i18n::t;
 
-#[derive(Debug, Default)]
-pub(super) enum IcedServiceLogExportRuntime {
-    #[default]
-    Unavailable,
-    Active(DiagnosticBundleSession<DiagnosticBundleClient>),
-}
-
-impl IcedServiceLogExportRuntime {
-    fn active_mut(&mut self) -> Option<&mut DiagnosticBundleSession<DiagnosticBundleClient>> {
-        match self {
-            Self::Unavailable => None,
-            Self::Active(session) => Some(session),
-        }
-    }
-}
+pub(super) type IcedServiceLogExportRuntime =
+    SessionSlot<DiagnosticBundleSession<DiagnosticBundleClient>>;
 
 impl IcedApp {
     pub(crate) fn install_service_log_export_client(&mut self, client: DiagnosticBundleClient) {
-        self.service_log_export =
-            IcedServiceLogExportRuntime::Active(DiagnosticBundleSession::new(client));
+        self.service_log_export
+            .install_with(|| DiagnosticBundleSession::new(client));
     }
 
     pub(super) fn open_service_log_effect(&mut self) -> Option<PlatformEffect> {

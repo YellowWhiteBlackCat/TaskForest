@@ -80,3 +80,22 @@ fn legacy_rows_without_authority_metadata_fail_closed() {
     assert_eq!(decoded.control_policy, StartupControlPolicy::Unsupported);
     assert!(decoded.id.is_empty());
 }
+
+#[test]
+fn startup_scope_and_control_policy_i18n_keys_are_non_empty() {
+    for scope in [
+        StartupScope::User,
+        StartupScope::System,
+        StartupScope::Session,
+        StartupScope::Unknown,
+    ] {
+        assert!(!scope.i18n_key().is_empty());
+    }
+    for policy in [
+        StartupControlPolicy::Direct,
+        StartupControlPolicy::UserOverride,
+        StartupControlPolicy::Unsupported,
+    ] {
+        assert!(!policy.i18n_key().is_empty());
+    }
+}

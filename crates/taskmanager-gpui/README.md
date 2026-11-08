@@ -31,6 +31,18 @@ backdrop primitive, so the production binding reports
 fallback. Optical glass is not claimed on this frontend until a released
 upstream API passes the P0 gate without vendor, fork or local patches.
 
+`src/detached_chart_window.rs` owns the typed contract for splitting one
+Performance chart into its own window: a frozen `DetachedChartKey`, one
+`ChartWindowDetachMode` (embedded, separate window, or layer-shell surface),
+and a pure `DetachedChartWindowState` command lifecycle. The pinned GPUI
+snapshot has no public adapter that opens and closes a second, compositor-owned
+chart window, so `ChartWindowCapability::current()` honestly reports
+`Unavailable`; every detach command fails closed without mutating state and no
+layer-shell negotiation is inferred. The separate normal-window and
+layer-shell modes are request vocabulary only, not implemented OS
+capabilities. A future adapter must add a verified `Available` capability and
+pass the window lifecycle gates before any UI action can grant a detach.
+
 `taskforest-g --demo` uses shared deterministic fixtures and bounded in-memory
 history. It does not load user configuration, persist history, spawn a tray or
 execute host actions. First Run opens through Settings or a user setup action;
@@ -49,6 +61,7 @@ Component implementations belong to `taskmanager-ui`.
 
 ```text
 src/assets.rs  capture.rs  run.rs      assets, evidence capture, binary entry
+src/detached_chart_window.rs           detached chart window state and capability
 src/window_presentation.rs             layer-shell / standalone host adapter
 src/gpui_app.rs                        RootView composition root
 ├── root/                              root view layout and lifecycle
