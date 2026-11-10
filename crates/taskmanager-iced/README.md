@@ -10,8 +10,7 @@ widgets.
 Fixed-extent window geometry and original-byte text runs are owned by
 `zhuge-ui-core`; generic virtual bodies, rich text, badges and surface styles
 are owned by `zhuge-ui-kit-iced`. Product adapters keep column specifications,
-search predicates, native theme bindings and business messages. Root workspace dependencies pin the shared Git revision; local development uses
-the shared repository’s Cargo patch helper. Each product retains its own lockfile.
+search predicates, native theme bindings and business messages. Root workspace dependencies declare exact crates.io releases, and `Cargo.lock` pins their registry checksums.
 
 It consumes `taskmanager-shell` and toolkit-neutral contracts. It does not access OS sources, choose providers, import
 GPUI entities or share large-table widget state with another frontend. Properties resolve the frozen live key against

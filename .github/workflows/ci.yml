@@ -18,8 +18,8 @@
 #                       (scripts/quality/semver-api-gate.sh): every publishable
 #                       crate is compared against the base revision, and a
 #                       breaking change blocks the merge. The publishable
-#                       crates are not on crates.io yet, so the baseline is a
-#                       git revision, not a published version.
+#                       crates are not on crates.io yet, so their baseline is a
+#                       git revision; the four shared zhuge-ui-* crates are consumed as published releases.
 #
 # Removed from the PR path to save quota:
 #   - coverage job      -> local extended (same llvm-cov invocation)
@@ -284,8 +284,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # The baseline is a git revision, not a crates.io release: the
-          # publishable crates are not published yet, so the tool builds the
+          # The taskforest-* public API baseline is a git revision because those
+          # crates are not published yet, so the tool builds the
           # baseline rustdoc from the local history. A shallow clone cannot
           # resolve that revision.
           fetch-depth: 0

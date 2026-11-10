@@ -25,6 +25,14 @@ FRONTEND_PACKAGES = {
     "iced": "taskmanager-iced",
     "bevy": "taskmanager-bevy-ui",
 }
+SHARED_REGISTRY_PACKAGES = frozenset(
+    {
+        "zhuge-ui-core",
+        "zhuge-ui-tokens",
+        "zhuge-ui-kit-iced",
+        "zhuge-ui-kit-bevy",
+    }
+)
 FRONTEND_SCRIPTS = {
     "gpui": (
         "scripts/capture-windows.sh",
@@ -145,14 +153,24 @@ def workspace_packages(root: Path) -> dict[str, dict]:
         timeout=60,
     )
     metadata = json.loads(output.stdout)
-    packages = {}
+    packages: dict[str, dict] = {}
+    registry_ids: dict[str, str] = {}
     for package in metadata["packages"]:
-        source = package.get("source")
-        if source is not None and not source.startswith("git+"):
+        if package["name"] not in SHARED_REGISTRY_PACKAGES:
+            if package.get("source") is not None:
+                continue
+            packages[package["name"]] = package
             continue
+        source = package.get("source") or ""
+        if not source.startswith("registry+"):
+            raise ValueError(f"shared package {package['name']} is not resolved from crates.io: {source!r}")
+        previous_id = registry_ids.get(package["name"])
+        if previous_id and previous_id != package["id"]:
+            raise ValueError(f"ambiguous shared registry release: {package['name']}")
+        registry_ids[package["name"]] = package["id"]
         previous = packages.get(package["name"])
         if previous and previous["manifest_path"] != package["manifest_path"]:
-            raise ValueError(f"ambiguous package owner: {package['name']}; align shared Git revisions")
+            raise ValueError(f"ambiguous package owner: {package['name']}")
         packages[package["name"]] = package
     pending = list(packages.values())
     seen_manifests = {Path(package["manifest_path"]).resolve() for package in pending}
@@ -180,6 +198,30 @@ def workspace_packages(root: Path) -> dict[str, dict]:
                     packages[local["name"]] = local
                     pending.append(local)
     return packages
+
+
+def registry_release_paths(root: Path, packages: dict[str, dict]) -> list[Path]:
+    """Bind a shared registry dependency by its exact Cargo.lock release entry."""
+
+    lock_path = root / "Cargo.lock"
+    lock_text = lock_path.read_text(encoding="utf-8")
+    paths: set[Path] = set()
+    for name in SHARED_REGISTRY_PACKAGES:
+        package = packages.get(name)
+        if package is None:
+            continue
+        source = package["source"]
+        if not source.startswith("registry+"):
+            raise ValueError(f"shared package {name} is not resolved from crates.io")
+        needle = (
+            f'name = "{name}"\n'
+            f'version = "{package["version"]}"\n'
+            f'source = "{source}"\n'
+        )
+        if needle not in lock_text:
+            raise ValueError(f"Cargo.lock does not pin the resolved {name} registry release")
+        paths.add(lock_path)
+    return sorted(paths)
 
 
 def package_scope(root: Path, packages: dict[str, dict], frontend: str) -> set[str]:
@@ -215,11 +257,14 @@ def package_scope(root: Path, packages: dict[str, dict], frontend: str) -> set[s
 def source_paths(root: Path, frontend: str) -> list[Path]:
     packages = workspace_packages(root)
     paths: set[Path] = set()
+    paths.update(registry_release_paths(root, packages))
     for relative in ROOT_FILES:
         path = root / relative
         if path.is_file():
             paths.add(path)
     for package_name in package_scope(root, packages, frontend):
+        if package_name in SHARED_REGISTRY_PACKAGES:
+            continue
         manifest = Path(packages[package_name]["manifest_path"]).resolve()
         paths.add(manifest)
         package_root = manifest.parent
@@ -289,6 +334,44 @@ def self_test() -> int:
             sibling.write_text("pub fn changed() {}\n", encoding="utf-8")
             assert write_manifest(product, "iced", output) == 0
             assert original != output.read_text(encoding="utf-8")
+        registry_root = root / "registry"
+        registry_root.mkdir()
+        lock = registry_root / "Cargo.lock"
+        metadata = {"packages": [
+            {
+                "name": name,
+                "version": "1.0.0",
+                "source": "registry+https://github.com/rust-lang/crates.io-index",
+                "manifest_path": str(registry_root / name / "Cargo.toml"),
+                "id": f"registry+https://github.com/rust-lang/crates.io-index#{name}@1.0.0",
+                "dependencies": [],
+            }
+            for name in SHARED_REGISTRY_PACKAGES
+        ]}
+        lock.write_text(
+            "".join(
+                f'[[package]]\nname = "{name}"\nversion = "1.0.0"\n'
+                f'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                f'checksum = "{index * 64:064x}"\n'
+                for index, name in enumerate(SHARED_REGISTRY_PACKAGES, 1)
+            ),
+            encoding="utf-8",
+        )
+        with patch(
+            "subprocess.run",
+            return_value=subprocess.CompletedProcess([], 0, json.dumps(metadata), ""),
+        ):
+            packages = workspace_packages(registry_root)
+            assert set(SHARED_REGISTRY_PACKAGES) <= set(packages)
+            assert registry_release_paths(registry_root, packages) == [lock]
+            assert source_paths(registry_root, "bevy") == [lock]
+        lock.write_text(lock.read_text(encoding="utf-8").replace('version = "1.0.0"', 'version = "1.0.1"', 1), encoding="utf-8")
+        try:
+            registry_release_paths(registry_root, packages)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a stale Cargo.lock release must fail closed")
     assert FRONTEND_PACKAGES["gpui"] == "taskmanager-gpui"
     assert FRONTEND_PACKAGES["tui"] != FRONTEND_PACKAGES["iced"]
     assert FRONTEND_PACKAGES["bevy"] == "taskmanager-bevy-ui"

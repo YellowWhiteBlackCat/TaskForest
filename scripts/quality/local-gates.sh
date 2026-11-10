@@ -176,7 +176,7 @@ run_py() {
     timeout --kill-after=10s "${PY_TIMEOUT:-300}" python3 "$@"
 }
 
-private_census_ready() {
+private_owned_census_ready() {
     local needed="$1"
     local tools="$repo/.private/tools"
     local siblings
@@ -185,16 +185,19 @@ private_census_ready() {
     for required in \
         "$tools/rust_scan.py" \
         "$tools/duplicate_funnel_core.py" \
-        "$siblings/music-frog/crates" \
         "$siblings/libs/zhuge-ui-kit/crates" \
         $needed; do
         if [[ ! -e "$required" ]]; then
-            private_census_skip_reason="private census input absent ($required)"
+            private_census_skip_reason="private owned census input absent ($required)"
             return 1
         fi
     done
     private_census_skip_reason=""
     return 0
+}
+
+private_census_ready() {
+    private_owned_census_ready "$@"
 }
 
 run_private_census_stage() {
@@ -936,23 +939,17 @@ if maybe blueprint-scope; then
     run_stage blueprint-scope quick run_py scripts/quality/blueprint_scope_guard.py
 fi
 if maybe funnel-adjudication-self; then
-    # R58's live near/exact/kit-covered ruler: a code change that creates a
-    # new normalized duplicate shape must fail here rather than hiding in a
-    # historical evidence snapshot. The tool and the two sibling product trees
-    # are private host material; a clean CI clone has none of them, so the
-    # stage must be explicitly SKIPped there instead of reporting a false
-    # FAIL (or, worse, the probe passing on empty roots).
-    run_private_census_stage funnel-adjudication-self \
-        "$repo/.private/tools/r58_funnel_adjudication.py $repo/.private/tools/cross_product_near_duplicate_funnel.py" \
-        "$repo/.private/tools/r58_funnel_adjudication.py" --self-test
+    # The two-product exact/near funnel measured a repository boundary that is
+    # no longer owned here. Its decision table is preserved as private history;
+    # a report derived from an out-of-scope product tree cannot gate this repo.
+    record funnel-adjudication-self quick SKIP 0
+    echo "SKIP funnel-adjudication-self (retired cross-product probe; out-of-scope repository)"
 fi
 if maybe numeric-fact-census; then
-    # The cross-product float-fact census owns the "shared spelling, no
-    # declaration" gate: every TF/MF/KIT candidate needs a written class,
-    # reason, and adjudication receipt. Run live, not against a snapshot.
-    run_private_census_stage numeric-fact-census \
-        "$repo/.private/tools/cross_product_numeric_fact_census.py" \
-        "$repo/.private/tools/cross_product_numeric_fact_census.py"
+    # The three-repository float-fact census is retired with the out-of-scope
+    # product. The kit's own TF+kit census remains a blocking CI gate.
+    record numeric-fact-census quick SKIP 0
+    echo "SKIP numeric-fact-census (retired cross-product probe; kit CI runs the owned census)"
 fi
 if maybe frontend-duplicate-adjudication; then
     # The four-frontend duplicate ruler must read the live funnel, not R89d's
@@ -964,18 +961,16 @@ if maybe frontend-duplicate-adjudication; then
 fi
 if maybe owner-import-shape; then
     # A qualified shared-kit path in executable code is a second owner
-    # address. The public inline-path guard now owns the same rule; this
-    # private cross-product ruler proves both products stay clean.
-    run_private_census_stage owner-import-shape \
-        "$repo/.private/tools/owner_import_shape_guard.py" \
-        "$repo/.private/tools/owner_import_shape_guard.py"
+    # address. The public inline-path guard owns this rule for the only
+    # in-scope product tree.
+    record owner-import-shape quick SKIP 0
+    echo "SKIP owner-import-shape (public inline-path owns the single in-scope tree)"
 fi
 if maybe owner-family-call-sites; then
-    # R71's reviewed baseline: adding, moving or deleting an easing/curve/
-    # pixel/status owner call site reopens the KEEP/PUSH decision.
-    run_private_census_stage owner-family-call-sites \
-        "$repo/.private/tools/owner_family_call_site_guard.py $repo/.private/evidence/owner-family-call-sites.json" \
-        "$repo/.private/tools/owner_family_call_site_guard.py"
+    # R71's baseline included an out-of-scope product. New in-scope owner call
+    # sites are covered by the public owner gates and the kit's census.
+    record owner-family-call-sites quick SKIP 0
+    echo "SKIP owner-family-call-sites (retired cross-product baseline; public owner gates apply)"
 fi
 if maybe background-compositor-guard; then
     # A private GUI launcher must never hand a bare Wayland socket to a
