@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""The two product trees must resolve one immutable shared-kit Git revision.
+"""The product resolves each shared-kit crate from one published release.
 
-The private kit workspace is consumed by Git rev, not by a crates.io release
-that can lag the features the products already use. All four declarations in
-each product must name the same full commit, and both lockfiles must resolve
-those packages from that exact Git source. A local ``[patch.crates-io]`` may
-rewrite a host's lockfile into path or registry entries; committed locks must
-never carry that host-only state. The negative fixture proves a version or
-source split makes the comparison fail.
+The shared kit is consumed from crates.io: the manifest version, the lock
+version, the lock source and the sha256 recorded by Cargo must all describe
+the same published registry artifact. A local ``[patch.crates-io]`` or a Git
+rev lock is a host-only state and must never be committed as release evidence.
 """
 
 from __future__ import annotations
@@ -19,132 +16,87 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-RUSTDEV = ROOT.parent
-KIT = RUSTDEV / "libs" / "zhuge-ui-kit"
-PRODUCTS = (ROOT, RUSTDEV / "music-frog")
-KIT_URL = "https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git"
-REQUIREMENT = re.compile(
-    r'^([A-Za-z0-9_-]+)\s*=\s*\{[^}]*\bgit\s*=\s*"([^"]+)"[^}]*\brev\s*=\s*"([0-9a-f]{40})"[^}]*\}',
-    re.MULTILINE,
+KIT_PACKAGES = (
+    "zhuge-ui-core",
+    "zhuge-ui-tokens",
+    "zhuge-ui-kit-iced",
+    "zhuge-ui-kit-bevy",
 )
+REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 PACKAGE = re.compile(r"(?ms)^\[\[package\]\]\n(.*?)(?=^\[\[package\]\]\n|\Z)")
 FIELD = re.compile(r'^([a-zA-Z_][a-zA-Z0-9_]*) = "([^"]+)"$', re.MULTILINE)
 
 
-def kit_versions() -> dict[str, str]:
-    versions = {}
-    crates = KIT / "crates"
-    if crates.is_dir():
-        for manifest in sorted(crates.glob("*/Cargo.toml")):
-            document = tomllib.loads(manifest.read_text(encoding="utf-8"))
-            package = document["package"]
-            if package.get("publish") is not False:
-                versions[package["name"]] = package["version"]
-    if versions:
-        return versions
-    # A clean CI clone has no sibling kit checkout. The committed lock still
-    # names the four packages and their versions, so the single-product check
-    # can verify the public repository state without pretending to know the
-    # private workspace's current manifests.
-    for name, fields in lock_entries(ROOT / "Cargo.lock").items():
-        if name.startswith("zhuge-ui-") and fields.get("source", "").startswith("git+"):
-            versions[name] = fields["version"]
+def declared_versions(root: Path) -> dict[str, str]:
+    document = tomllib.loads((root / "Cargo.toml").read_text(encoding="utf-8"))
+    dependencies = document["workspace"]["dependencies"]
+    versions: dict[str, str] = {}
+    for name in KIT_PACKAGES:
+        value = dependencies[name]
+        assert isinstance(value, str), f"{name}: expected a crates.io version requirement"
+        assert re.fullmatch(r"\d+\.\d+\.\d+", value), f"{name}: pin an exact release version"
+        versions[name] = value
     return versions
 
 
-def declared_pins(manifest: Path) -> dict[str, tuple[str, str]]:
-    return {
-        match.group(1): (match.group(2), match.group(3))
-        for match in REQUIREMENT.finditer(manifest.read_text(encoding="utf-8"))
-    }
-
-
-def lock_entries(lock: Path) -> dict[str, dict[str, str]]:
-    text = lock.read_text(encoding="utf-8")
+def lock_entries(root: Path) -> dict[str, dict[str, str]]:
     entries: dict[str, dict[str, str]] = {}
-    for block in PACKAGE.findall(text):
-        header = block.split("\ndependencies = [", 1)[0]
-        fields = dict(FIELD.findall(header))
+    for block in PACKAGE.findall((root / "Cargo.lock").read_text(encoding="utf-8")):
+        fields = dict(FIELD.findall(block.split("\ndependencies = [", 1)[0]))
         if "name" in fields:
             entries[fields["name"]] = fields
     return entries
 
 
-def audit(products: tuple[Path, ...] = PRODUCTS) -> list[str]:
-    versions = kit_versions()
+def audit(root: Path = ROOT) -> list[str]:
+    declared = declared_versions(root)
+    locked = lock_entries(root)
     findings: list[str] = []
-    revisions: set[str] = set()
-    if not versions:
-        return ["the shared kit manifests expose no publishable crate versions"]
-    for product in products:
-        declared = declared_pins(product / "Cargo.toml")
-        locked = lock_entries(product / "Cargo.lock")
-        for name, version in versions.items():
-            pin = declared.get(name)
-            if pin is None:
-                findings.append(f"{product.name}: {name} has no Git rev declaration")
-                continue
-            source, revision = pin
-            if source != KIT_URL:
-                findings.append(f"{product.name}: {name} uses Git source {source!r}")
-            revisions.add(revision)
-            entry = locked.get(name, {})
-            if entry.get("version") != version:
-                findings.append(
-                    f"{product.name}: {name} lock version {entry.get('version')!r} != {version!r}"
-                )
-            expected = f"git+{KIT_URL}?rev={revision}#{revision}"
-            if entry.get("source") != expected:
-                findings.append(
-                    f"{product.name}: {name} lock source {entry.get('source')!r} != {expected!r}"
-                )
-    if len(revisions) != 1:
-        findings.append(f"the two products must share one kit rev, found {sorted(revisions)}")
+    for name, version in declared.items():
+        entry = locked.get(name, {})
+        if entry.get("version") != version:
+            findings.append(f"{name}: lock version {entry.get('version')!r} != {version!r}")
+        if entry.get("source") != REGISTRY_SOURCE:
+            findings.append(f"{name}: lock source {entry.get('source')!r} is not crates.io")
+        checksum = entry.get("checksum", "")
+        if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+            findings.append(f"{name}: lock has no registry checksum")
     return findings
 
 
 class ReleasePinParityTests(unittest.TestCase):
-    def test_both_products_pin_the_same_immutable_revision(self):
+    def test_the_committed_tree_pins_one_registry_release_per_crate(self):
         self.assertEqual(audit(), [])
 
-    def test_a_version_or_source_split_fails(self):
-        versions = kit_versions()
-        name = next(iter(versions))
+    def test_a_git_or_patch_lock_is_rejected(self):
         original = (ROOT / "Cargo.lock").read_text(encoding="utf-8")
-        revision = declared_pins(ROOT / "Cargo.toml")[name][1]
-        expected = f"git+{KIT_URL}?rev={revision}#{revision}"
-        version_split = original.replace(
-            f'name = "{name}"\nversion = "{versions[name]}"',
-            f'name = "{name}"\nversion = "0.0.0"',
+        name = KIT_PACKAGES[0]
+        version = declared_versions(ROOT)[name]
+        mutated = original.replace(
+            f'name = "{name}"\nversion = "{version}"\nsource = "{REGISTRY_SOURCE}"',
+            f'name = "{name}"\nversion = "{version}"',
             1,
         )
-        source_split = original.replace(f'source = "{expected}"', "", 1)
-        self.assertNotEqual(original, version_split)
-        self.assertNotEqual(original, source_split)
-        for split in (version_split, source_split):
-            entry = next(
-                fields
-                for block in PACKAGE.findall(split)
-                if (fields := dict(FIELD.findall(block.split("\ndependencies = [", 1)[0]))).get("name") == name
-            )
-            self.assertTrue(
-                entry.get("version") != versions[name] or entry.get("source") != expected
-            )
+        self.assertNotEqual(original, mutated)
+        entry = next(
+            fields
+            for block in PACKAGE.findall(mutated)
+            if (fields := dict(FIELD.findall(block.split("\ndependencies = [", 1)[0]))).get("name") == name
+        )
+        self.assertNotEqual(entry.get("source"), REGISTRY_SOURCE)
 
 
 def main() -> int:
-    arguments = sys.argv[1:]
-    if "--self-test" in arguments:
+    if "--self-test" in sys.argv[1:]:
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(ReleasePinParityTests)
         result = unittest.TextTestRunner(verbosity=2).run(suite)
         return 0 if result.wasSuccessful() else 1
-    products = PRODUCTS if KIT.is_dir() and (RUSTDEV / "music-frog").is_dir() else PRODUCTS[:1]
-    findings = audit(products=products)
+    findings = audit()
     for finding in findings:
         print(f"VIOLATION: {finding}")
     if findings:
         return 1
-    print("shared-kit Git pin parity: PASS")
+    print("shared-kit registry pin parity: PASS")
     return 0
 
 

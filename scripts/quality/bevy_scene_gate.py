@@ -55,7 +55,7 @@ MANUAL_CHILD_API = re.compile(
     r"|insert_children|replace_children)\s*\("
 )
 DIRECT_SPAWN = re.compile(r"\.\s*spawn(?:_batch|_empty|_empty_at)?\s*\(")
-ALLOWED_SPAWN_ARGUMENTS = ("Camera2d", "Observer::new")
+ALLOWED_SPAWN_ARGUMENTS = ("Camera2d", "Observer::new", "Screenshot::primary_window")
 TEMPLATE_VALUE = re.compile(r"\btemplate_value\b|\bTemplateValue\b")
 PX_VARIANT = re.compile(r"\bVal::Px\s*\(\s*(?P<sign>-?)(?P<num>\d+(?:\.\d+)?)\s*\)")
 PX_HELPER = re.compile(r"(?<!\w)px\s*\(\s*(?P<sign>-?)(?P<num>\d+(?:\.\d+)?)\s*\)")
@@ -523,6 +523,11 @@ def self_test() -> int:
         (
             "camera and observer infrastructure stay allowed",
             "fn setup(mut commands: Commands) { commands.spawn(Camera2d); }",
+            [],
+        ),
+        (
+            "a screenshot request is a render command, not UI hierarchy",
+            "fn capture(mut commands: Commands) { commands.spawn(Screenshot::primary_window()); }",
             [],
         ),
         (
