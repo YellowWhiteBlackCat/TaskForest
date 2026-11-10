@@ -56,10 +56,11 @@ fn the_slide_ramp_answers_finished_for_a_missing_clock() {
     assert_eq!(chart_slide_ramp(9.0), 1.0);
 }
 
-/// One spelling this fold replaced was Iced's hand-written ramp, whose second
-/// half squared through `f32::powi(2)`. The fold squares with `*`; over every
-/// progress the shared duration can produce the two answers are the same bits,
-/// which is what makes the fold behavior-neutral rather than a redraw.
+/// The slope this fold replaced was Iced's hand-written ease-in-out. Its two
+/// halves now have one owner; the fixture spells the same arithmetic so a
+/// future curve change fails the test. `powi(2)` is not used in the fixture:
+/// some targets lower it to a different 1-ULP answer than `x * x`, which
+/// would make a platform float-library difference look like a curve change.
 #[test]
 fn the_slide_ramp_keeps_the_replaced_spelling_bit_for_bit() {
     let replaced = |raw: f32| {
@@ -71,7 +72,8 @@ fn the_slide_ramp_keeps_the_replaced_spelling_bit_for_bit() {
         if t < 0.5 {
             2.0 * t * t
         } else {
-            1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+            let x = -2.0 * t + 2.0;
+            1.0 - x * x / 2.0
         }
     };
     let duration = CHART_SLIDE_DURATION.as_micros();
