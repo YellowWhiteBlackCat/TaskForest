@@ -31,6 +31,23 @@ pub enum QuantityFamily {
     Network,
 }
 
+impl QuantityFamily {
+    /// The complete family set, in the product's Performance order.
+    ///
+    /// A frontend that offers one preference pair per family spends this
+    /// set; it never restates the three families in its own vocabulary.
+    pub const ALL: [Self; 3] = [Self::Memory, Self::Drive, Self::Network];
+}
+
+/// Which half of one family's `(use_bytes, use_base2)` pair a setting writes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum QuantitySetting {
+    /// Render bytes (`true`) or the 8× bits value (`false`).
+    UseBytes,
+    /// Use the 1024 ladder (`true`) or the 1000 ladder (`false`).
+    UseBase2,
+}
+
 /// Pure unit-preference data extracted from the core `Config` unit fields.
 /// Carries no toolkit or provider types so every frontend (and the
 /// application layer) can share one formatting semantic.
@@ -87,6 +104,42 @@ impl UnitPreferences {
             QuantityFamily::Memory => (self.memory_use_bytes, self.memory_use_base2),
             QuantityFamily::Drive => (self.drive_use_bytes, self.drive_use_base2),
             QuantityFamily::Network => (self.network_use_bytes, self.network_use_base2),
+        }
+    }
+
+    /// The mutable slot behind one family's setting.
+    ///
+    /// Every surface that edits unit preferences needs the SAME six-way
+    /// dispatch. Keeping it here means a frontend binds the fact instead of
+    /// spelling a second `Memory/Drive/Network × bytes/base2` ladder.
+    pub const fn setting_mut(
+        &mut self,
+        family: QuantityFamily,
+        setting: QuantitySetting,
+    ) -> &mut bool {
+        match (family, setting) {
+            (QuantityFamily::Memory, QuantitySetting::UseBytes) => &mut self.memory_use_bytes,
+            (QuantityFamily::Memory, QuantitySetting::UseBase2) => &mut self.memory_use_base2,
+            (QuantityFamily::Drive, QuantitySetting::UseBytes) => &mut self.drive_use_bytes,
+            (QuantityFamily::Drive, QuantitySetting::UseBase2) => &mut self.drive_use_base2,
+            (QuantityFamily::Network, QuantitySetting::UseBytes) => &mut self.network_use_bytes,
+            (QuantityFamily::Network, QuantitySetting::UseBase2) => &mut self.network_use_base2,
+        }
+    }
+
+    /// Write one family setting. Returns whether the value changed.
+    pub const fn set_setting(
+        &mut self,
+        family: QuantityFamily,
+        setting: QuantitySetting,
+        value: bool,
+    ) -> bool {
+        let target = self.setting_mut(family, setting);
+        if *target == value {
+            false
+        } else {
+            *target = value;
+            true
         }
     }
 

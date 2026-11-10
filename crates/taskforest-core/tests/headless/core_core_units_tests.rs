@@ -5,6 +5,33 @@ const MIB: u64 = KIB * 1024;
 const GIB: u64 = MIB * 1024;
 const TIB: u64 = GIB * 1024;
 
+/// Every family/setting pair writes exactly its own slot, and a no-op write
+/// reports no change — the fold a frontend's unit-preference editor spends
+/// instead of spelling six mutable bools itself.
+#[test]
+fn quantity_setting_dispatch_is_exhaustive_and_noop_aware() {
+    let mut prefs = UnitPreferences::default();
+    for family in QuantityFamily::ALL {
+        for setting in [QuantitySetting::UseBytes, QuantitySetting::UseBase2] {
+            let before = *prefs.setting_mut(family, setting);
+            let changed = prefs.set_setting(family, setting, !before);
+            assert!(changed, "{family:?}/{setting:?} must report a real change");
+            assert_eq!(*prefs.setting_mut(family, setting), !before);
+            assert!(
+                !prefs.set_setting(family, setting, !before),
+                "{family:?}/{setting:?} no-op must be inert"
+            );
+        }
+    }
+    // The six slots are distinct: writing one never touches its neighbours.
+    let mut other = UnitPreferences::default();
+    other.set_setting(QuantityFamily::Network, QuantitySetting::UseBytes, true);
+    assert!(other.settings(QuantityFamily::Memory).0);
+    assert!(other.settings(QuantityFamily::Drive).0);
+    assert!(other.settings(QuantityFamily::Network).0);
+    assert!(!other.settings(QuantityFamily::Network).1);
+}
+
 /// The full bytes/bits × base-2/base-10 matrix on representative byte
 /// counts, including the tier boundaries — the string contract every
 /// frontend's parity test repeats verbatim.

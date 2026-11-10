@@ -172,7 +172,7 @@ pub(crate) use presentation_preferences::{
     QuantityNotation,
 };
 pub use presentation_preferences::{
-    DevicePreference, PresentationFingerprint, PresentationSnapshot, UnitFamily,
+    DevicePreference, PresentationFingerprint, PresentationSnapshot,
 };
 pub use responsive::*;
 pub(crate) use startup::init_demo;

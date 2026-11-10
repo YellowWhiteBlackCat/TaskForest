@@ -1,4 +1,5 @@
 use super::*;
+use taskforest_core::core::units::QuantityFamily;
 use taskmanager_theme::tokens::UiSize;
 
 fn changed_axes(before: PresentationFingerprint, after: PresentationFingerprint) -> [bool; 6] {
@@ -24,7 +25,7 @@ fn named_mutations_invalidate_only_their_owned_projection_axis() {
     );
 
     let before = preferences.fingerprint();
-    preferences.set_quantity_notation(UnitFamily::Network, QuantityNotation::Bytes);
+    preferences.set_quantity_notation(QuantityFamily::Network, QuantityNotation::Bytes);
     assert_eq!(
         changed_axes(before, preferences.fingerprint()),
         [false, false, true, false, false, false]

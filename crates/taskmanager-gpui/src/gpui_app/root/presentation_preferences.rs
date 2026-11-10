@@ -16,7 +16,7 @@ use taskforest_core::core::config::{
     COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_PLATFORM_DEFAULT, WINDOW_DECORATIONS_SYSTEM,
 };
-use taskforest_core::core::units::UnitPreferences;
+use taskforest_core::core::units::{QuantityFamily, QuantitySetting, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
@@ -34,13 +34,6 @@ pub enum DevicePreference {
     NetworkVirtual,
     NetworkOther,
     Gpus,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum UnitFamily {
-    Memory,
-    Drive,
-    Network,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -305,12 +298,8 @@ impl PresentationSnapshot {
     }
 
     #[must_use]
-    pub const fn unit_choices(&self, family: UnitFamily) -> (bool, bool) {
-        match family {
-            UnitFamily::Memory => (self.units.memory_use_bytes, self.units.memory_use_base2),
-            UnitFamily::Drive => (self.units.drive_use_bytes, self.units.drive_use_base2),
-            UnitFamily::Network => (self.units.network_use_bytes, self.units.network_use_base2),
-        }
+    pub const fn unit_choices(&self, family: QuantityFamily) -> (bool, bool) {
+        self.units.settings(family)
     }
 
     #[must_use]
@@ -429,28 +418,26 @@ impl PresentationPreferences {
         self.snapshot.fingerprint.devices = bump(self.snapshot.fingerprint.devices);
     }
 
-    pub(super) fn set_quantity_notation(&mut self, family: UnitFamily, notation: QuantityNotation) {
-        let use_bytes = notation == QuantityNotation::Bytes;
-        let target = match family {
-            UnitFamily::Memory => &mut self.snapshot.units.memory_use_bytes,
-            UnitFamily::Drive => &mut self.snapshot.units.drive_use_bytes,
-            UnitFamily::Network => &mut self.snapshot.units.network_use_bytes,
-        };
-        if *target != use_bytes {
-            *target = use_bytes;
+    pub(super) fn set_quantity_notation(
+        &mut self,
+        family: QuantityFamily,
+        notation: QuantityNotation,
+    ) {
+        if self.snapshot.units.set_setting(
+            family,
+            QuantitySetting::UseBytes,
+            notation == QuantityNotation::Bytes,
+        ) {
             self.snapshot.fingerprint.units = bump(self.snapshot.fingerprint.units);
         }
     }
 
-    pub(super) fn set_magnitude_base(&mut self, family: UnitFamily, base: MagnitudeBase) {
-        let use_base2 = base == MagnitudeBase::Binary;
-        let target = match family {
-            UnitFamily::Memory => &mut self.snapshot.units.memory_use_base2,
-            UnitFamily::Drive => &mut self.snapshot.units.drive_use_base2,
-            UnitFamily::Network => &mut self.snapshot.units.network_use_base2,
-        };
-        if *target != use_base2 {
-            *target = use_base2;
+    pub(super) fn set_magnitude_base(&mut self, family: QuantityFamily, base: MagnitudeBase) {
+        if self.snapshot.units.set_setting(
+            family,
+            QuantitySetting::UseBase2,
+            base == MagnitudeBase::Binary,
+        ) {
             self.snapshot.fingerprint.units = bump(self.snapshot.fingerprint.units);
         }
     }

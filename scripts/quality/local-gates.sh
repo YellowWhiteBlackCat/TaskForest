@@ -599,6 +599,9 @@ fi
 if maybe process-priority-owner; then
     run_stage process-priority-owner quick run_py scripts/quality/test_process_priority_owner.py
 fi
+if maybe quantity-family-owner; then
+    run_stage quantity-family-owner quick run_py scripts/quality/test_quantity_family_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

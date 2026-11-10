@@ -2,8 +2,8 @@
 
 use gpui::Context;
 
-use super::{MagnitudeBase, QuantityNotation, RootView, UnitFamily};
-use taskforest_core::core::units::UnitPreferences;
+use super::{MagnitudeBase, QuantityNotation, RootView};
+use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 
 impl RootView {
     /// Snapshot the six current unit choices at render entry. Providers only
@@ -14,7 +14,7 @@ impl RootView {
 
     pub(crate) fn set_memory_use_bytes(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_quantity_notation(
-            UnitFamily::Memory,
+            QuantityFamily::Memory,
             if enabled {
                 QuantityNotation::Bytes
             } else {
@@ -26,7 +26,7 @@ impl RootView {
 
     pub(crate) fn set_memory_use_base2(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_magnitude_base(
-            UnitFamily::Memory,
+            QuantityFamily::Memory,
             if enabled {
                 MagnitudeBase::Binary
             } else {
@@ -38,7 +38,7 @@ impl RootView {
 
     pub(crate) fn set_drive_use_bytes(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_quantity_notation(
-            UnitFamily::Drive,
+            QuantityFamily::Drive,
             if enabled {
                 QuantityNotation::Bytes
             } else {
@@ -50,7 +50,7 @@ impl RootView {
 
     pub(crate) fn set_drive_use_base2(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_magnitude_base(
-            UnitFamily::Drive,
+            QuantityFamily::Drive,
             if enabled {
                 MagnitudeBase::Binary
             } else {
@@ -62,7 +62,7 @@ impl RootView {
 
     pub(crate) fn set_network_use_bytes(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_quantity_notation(
-            UnitFamily::Network,
+            QuantityFamily::Network,
             if enabled {
                 QuantityNotation::Bytes
             } else {
@@ -74,7 +74,7 @@ impl RootView {
 
     pub(crate) fn set_network_use_base2(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.presentation.set_magnitude_base(
-            UnitFamily::Network,
+            QuantityFamily::Network,
             if enabled {
                 MagnitudeBase::Binary
             } else {
