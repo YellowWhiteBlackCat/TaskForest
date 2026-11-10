@@ -55,7 +55,7 @@ use zhuge_ui_kit_bevy::frame_capture::install_sync_frame_capture;
 use zhuge_ui_kit_bevy::frame_timing::install_bevy_frame_timing;
 
 mod backdrop_capture;
-pub(crate) use backdrop_capture::BackdropCaptureTarget;
+pub(crate) use backdrop_capture::{BackdropCaptureTarget, BackdropRevision};
 mod capture_marker;
 mod capture_marker_cores;
 mod capture_marker_health;
@@ -87,7 +87,7 @@ use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
 use crate::widgets::chart::ChartPointer;
-use crate::widgets::controls::{ControlVisual, control_background};
+use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::widgets::layout_budget::{
     PerformanceFrameBudget, sync_performance_frame_budget, sync_performance_frame_resolution,
 };
@@ -655,6 +655,13 @@ type ChangedControlVisuals<'w, 's> = Query<
 /// `Interaction`/`Pressed` state; this system supplies the shared BSN skin.
 fn sync_control_visuals(palette: Res<WindowPalette>, mut controls: ChangedControlVisuals<'_, '_>) {
     for (visual, interaction, pressed, mut fill) in &mut controls {
+        // An atomic card owns its own surface: the optical material paints
+        // it when the renderer can sample a backdrop, and its state tint
+        // rides an overlay above the glass. Writing the fill here would
+        // fight the card's own painter for the same component.
+        if visual.0 == ControlTone::Card {
+            continue;
+        }
         fill.0 = control_background(
             visual,
             interaction.copied().unwrap_or_default(),

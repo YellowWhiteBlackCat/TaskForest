@@ -6,15 +6,13 @@
 
 use std::{cell::RefCell, rc::Rc};
 use taskforest_core::core::DeviceStatus;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
-use taskmanager_ui::theme_binding::glass_shadow;
 use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui::theme_binding::rem_length;
 
-use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px, rems};
+use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_telemetry_store::TelemetryStore;
 
 use super::dynamic_stats::{battery_stats, fan_stats};
@@ -247,21 +245,18 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
 }
 
 fn dynamic_device_empty(theme: &Theme, title: &str, message: &str, status: DeviceStatus) -> Div {
-    let layer = theme.glass_card();
     div()
         .size_full()
         .flex()
         .items_center()
         .justify_center()
         .child(
-            div()
+            CardSurface::new(theme.palette())
+                .glass(GlassTier::Card)
+                .radius(tokens::card_radius(theme))
+                .padding(tokens::SPACE_16)
+                .render()
                 .max_w(px(460.0))
-                .p(definite_length(tokens::SPACE_16))
-                .rounded(rem_length(tokens::card_radius(theme)))
-                .border(rems(GlassTier::Card.edge_width_rem()))
-                .border_color(hsla(layer.edge))
-                .bg(glass_fill(theme, GlassTier::Card))
-                .shadow(glass_shadow(theme, GlassTier::Card))
                 .flex()
                 .flex_col()
                 .gap(definite_length(tokens::SPACE_8))

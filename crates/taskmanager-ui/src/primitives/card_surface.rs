@@ -1,10 +1,32 @@
 //! Shared card/panel surface primitive (GLASS-01 frosted glass).
+//!
+//! One primitive owns the whole glass material: the theme's translucent
+//! gradient fill, the hairline edge, and the tier's soft elevation shadow.
+//! A frontend that needs a floating panel, a nested control track, or a
+//! chrome strip asks this primitive for the right elevation instead of
+//! assembling fill + edge + shadow by hand — that hand assembly is how two
+//! ladders for the same material appeared in the first place.
 
 use gpui::{
     AbsoluteLength, AnyElement, App, DefiniteLength, IntoElement, ParentElement, RenderOnce,
     Styled, Window, div, rems,
 };
 use taskmanager_theme::{Color, GlassTier, Length, Palette, tokens};
+
+/// How a glass surface carries elevation.
+///
+/// A surface that floats above its backdrop casts the tier's two-layer soft
+/// shadow. A surface that lives INSIDE another elevated surface paints the
+/// same glass material and the same hairline edge, but no shadow: a second
+/// elevation there would read as a double rim and darken the parent's edge.
+/// Both forms come from this one primitive so no frontend paints its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SurfaceElevation {
+    /// The surface floats above its backdrop and casts the tier's shadow.
+    Floating,
+    /// The surface is inset in another surface and casts no shadow.
+    Inset,
+}
 
 /// A palette-owned card surface with configurable padding and fill.
 #[derive(IntoElement)]
@@ -15,6 +37,9 @@ pub struct CardSurface {
     padding: Length,
     radius: Length,
     bordered: bool,
+    /// How this surface carries elevation. A glass surface is floating by
+    /// default; a nested control track opts into the inset form.
+    elevation: SurfaceElevation,
     /// When set, the surface paints the frosted-glass contract for this tier:
     /// translucent theme gradient, a hairline edge, and the two-layer soft
     /// shadow. The palette's tokens remain the fallback for non-glass surfaces.
@@ -30,8 +55,23 @@ impl CardSurface {
             padding: tokens::SPACE_12,
             radius: palette.panel_radius,
             bordered: true,
+            elevation: SurfaceElevation::Floating,
             palette,
             glass: Some(GlassTier::Card),
+        }
+    }
+
+    /// Build a surface with no inner padding: the caller owns the content
+    /// inset.
+    ///
+    /// A plot frame, a chrome strip or a control track places its own
+    /// content inside the material, so the surface must not add a second
+    /// inset on top of it.
+    #[must_use]
+    pub fn unpadded(palette: Palette) -> Self {
+        Self {
+            padding: Length(0.0),
+            ..Self::new(palette)
         }
     }
 
@@ -80,6 +120,18 @@ impl CardSurface {
     #[must_use]
     pub fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
+        self
+    }
+
+    /// Paint this surface as a nested (inset) one: the shared glass material
+    /// and hairline edge, without a second elevation shadow.
+    ///
+    /// Use this for a control track, a chip, or a plot frame that already
+    /// lives inside an elevated card. Stacking the tier's shadow there would
+    /// draw a second rim inside the parent and darken its edge.
+    #[must_use]
+    pub fn inset(mut self) -> Self {
+        self.elevation = SurfaceElevation::Inset;
         self
     }
 
@@ -134,7 +186,9 @@ impl CardSurface {
                 glass.map_or(self.palette.border, |layer| layer.edge),
             ));
         }
-        if let Some(tier) = self.glass {
+        if let Some(tier) = self.glass
+            && self.elevation == SurfaceElevation::Floating
+        {
             surface = surface.shadow(crate::theme_binding::glass_shadow(
                 &self.palette.theme,
                 tier,
@@ -149,3 +203,7 @@ impl RenderOnce for CardSurface {
         self.render()
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/headless/card_surface.rs"]
+mod tests;

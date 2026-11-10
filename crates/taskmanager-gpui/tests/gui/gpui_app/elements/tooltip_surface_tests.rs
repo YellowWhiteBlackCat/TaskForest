@@ -1,3 +1,5 @@
+//! Tooltip glass-surface contract: elevation and the flat inset variant.
+
 use crate::gpui_app::elements::overlays::{flat_tooltip, tooltip};
 use gpui::Styled;
 use taskmanager_theme::{GlassTier, HighContrast, LightDark, ResolvedFonts, Skin, Theme, tokens};
@@ -53,10 +55,11 @@ fn graph_tooltip_keeps_its_flat_elevation() {
         .as_ref()
         .expect("elevated tooltip paints the shared shadow");
     assert_eq!(elevated_shadow, &glass_shadow(&theme, GlassTier::Card));
-    let shadows = flat
-        .style()
-        .box_shadow
-        .as_ref()
-        .expect("flat tooltip must explicitly clear shadows");
-    assert!(shadows.is_empty());
+    assert!(
+        flat.style()
+            .box_shadow
+            .as_ref()
+            .is_none_or(|shadows| shadows.is_empty()),
+        "a flat tooltip must not stack a second card shadow"
+    );
 }

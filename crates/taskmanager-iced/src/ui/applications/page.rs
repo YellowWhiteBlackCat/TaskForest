@@ -3,8 +3,8 @@
 use super::*;
 use crate::IcedApp;
 use crate::saved_views::{PresetsRibbonState, presets_ribbon};
+use iced::widget::column;
 use iced::widget::scrollable::Direction;
-use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Padding, Renderer, Theme};
 use taskforest_core::core::process::ProcessBatchAction;
 use zhuge_ui_core::virtual_list::VirtualWindow;
@@ -16,6 +16,7 @@ use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visib
 use taskmanager_shell::{ProcessControlScope, SortDir};
 use taskmanager_theme::tokens::FONT_13;
 use taskmanager_theme::tokens::FONT_CAPTION;
+use taskmanager_ui_contract::IconId;
 
 use crate::ui::virtual_list::resolve_table_window;
 
@@ -66,15 +67,22 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
 
     let search: Element<'_, Message, Theme, Renderer> = if shell.search_active() {
         row![
-            text_input(t("search.processes"), shell.query.as_str())
-                .on_input(Message::SearchChanged)
-                .on_submit(Message::CloseSearch),
-            focus::button(
+            crate::ui::components::plain_text_input(
+                theme_snapshot,
+                Some(FocusTarget::SearchTrigger),
+                t("search.processes"),
+                shell.query.as_str(),
+                Message::SearchChanged,
+                Some(Message::CloseSearch),
+                false,
+            ),
+            crate::ui::components::icon_button(
                 theme_snapshot,
                 FocusTarget::SearchClose,
+                IconId::Close,
                 t("common.close"),
                 Message::CloseSearch,
-                false,
+                true,
             ),
         ]
         .spacing(4)

@@ -236,7 +236,7 @@ fn telemetry_warmup_body<'a>(
             // The revolving accent arc (GPUI-spinner counterpart): the
             // per-frame pump advances the phase while the shell collects its
             // first frame; a static arc renders when motion is disabled.
-            spinner::canvas_view(theme_snapshot, spin),
+            components::spinner(theme_snapshot, spin),
             text(t("common.loading")).size(f32::from(tokens::FONT_16)),
             text(t("common.telemetry_warming_up"))
                 .size(f32::from(tokens::FONT_12))

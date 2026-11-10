@@ -258,9 +258,7 @@ pub fn prop_row(t: &Theme, label: &str, value: String) -> Div {
 /// Localized `"{label}: {value}"` join (full-width colon in zh) — the single
 /// spelling for legend-style pairs instead of hardcoded ASCII colons.
 fn kv_label_value(label_key: &'static str, value: &str) -> String {
-    i18n::t("common.kv")
-        .replace("{label}", i18n::t(label_key))
-        .replace("{value}", value)
+    i18n::key_value_label(i18n::t(label_key), value)
 }
 
 fn details_section_tabs(

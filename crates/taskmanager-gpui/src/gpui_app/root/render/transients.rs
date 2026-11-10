@@ -15,17 +15,15 @@ use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::overlays::toast::Toast;
 use taskmanager_ui::primitives::badge::Badge;
 use taskmanager_ui::primitives::badge::BadgeTone;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::primitives::spinner::Spinner;
 use taskmanager_ui::theme_binding::appear;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
-use taskmanager_ui::theme_binding::glass_shadow;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rem_value;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
@@ -161,7 +159,6 @@ fn compose_shell_feedback(
         FeedbackSeverity::Error => theme.danger,
     };
     let weak = cx.entity().downgrade();
-    let layer = theme.glass_card();
     let message = div()
         .flex_1()
         .min_w(px(0.0))
@@ -182,15 +179,13 @@ fn compose_shell_feedback(
             });
         })
         .child("\u{2715}");
-    let card = div()
+    let card = CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .padding(tokens::SPACE_6)
+        .render()
         .max_w(px(640.0))
         .px(definite_length(tokens::SPACE_10))
-        .py(definite_length(tokens::SPACE_6))
-        .rounded(rem_length(tokens::card_radius(theme)))
-        .bg(glass_fill(theme, GlassTier::Card))
-        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(layer.edge))
-        .shadow(glass_shadow(theme, GlassTier::Card))
         .text_size(font_size(tokens::FONT_12))
         .text_color(hsla(theme.fg))
         .flex()

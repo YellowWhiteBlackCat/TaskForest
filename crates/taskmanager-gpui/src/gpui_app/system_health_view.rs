@@ -3,9 +3,7 @@
 //! This module consumes typed snapshots and emits typed confirmation requests.
 //! It performs no collection, filesystem access, or SMART command execution.
 
-use gpui::{
-    App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative, rems,
-};
+use gpui::{App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative};
 use std::rc::Rc;
 use taskmanager_application::SourceStateKind;
 use taskmanager_shell::presentation::filesystem_backing_label;
@@ -14,10 +12,8 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::rem_length;
 
 use taskforest_core::core::metrics::DiskMetrics;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
@@ -222,12 +218,12 @@ fn filesystem_row(
         .inode_usage_percent
         .filter(|value| value.is_finite())
         .map_or_else(unavailable, percent_text);
-    div()
-        .p(definite_length(tokens::SPACE_9))
-        .rounded(rem_length(tokens::control_radius(theme)))
-        .border(rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-        .bg(glass_fill(theme, GlassTier::Card))
+    CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::control_radius(theme))
+        .padding(tokens::SPACE_9)
+        .inset()
+        .render()
         .child(
             div()
                 .flex()
@@ -348,12 +344,12 @@ fn sensor_group(
     } else {
         for row in folded {
             rows = rows.child(
-                div()
-                    .p(definite_length(tokens::SPACE_8))
-                    .rounded(rem_length(tokens::control_radius(theme)))
-                    .border(rems(GlassTier::Card.edge_width_rem()))
-                    .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-                    .bg(glass_fill(theme, GlassTier::Card))
+                CardSurface::new(theme.palette())
+                    .glass(GlassTier::Card)
+                    .radius(tokens::control_radius(theme))
+                    .padding(tokens::SPACE_8)
+                    .inset()
+                    .render()
                     .flex()
                     .flex_row()
                     .flex_wrap()

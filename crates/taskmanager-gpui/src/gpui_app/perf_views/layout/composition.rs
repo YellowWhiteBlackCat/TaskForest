@@ -1,14 +1,12 @@
 //! Performance split and pinned/stacked statistics surfaces.
 
 use super::{PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_TRAILING_INSET};
-use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px, rems};
+use gpui::{Div, InteractiveElement, ParentElement, Pixels, Styled, div, px};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
-use taskmanager_ui::theme_binding::glass_fill;
-use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::presentation::vocabulary::PERFORMANCE_STATS_STACK_HEIGHT;
 
 /// Canonical Performance page split: a shrinkable main column and a pinned,
@@ -76,7 +74,11 @@ pub(super) fn performance_stats_surface(
     // Keep a definite readable width here. The statistics rail is deliberately
     // not a scroll owner: unavailable rows are omitted before painting and the
     // shared page budget controls the fixed-height surface.
-    let mut surface = div()
+    let mut surface = CardSurface::unpadded(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .inset()
+        .render()
         .flex()
         .flex_col()
         // `min_w` is the ELEMENT-level floor of the stats rail: the budget's
@@ -91,11 +93,7 @@ pub(super) fn performance_stats_surface(
         .h_full()
         .min_h(px(0.0))
         .overflow_hidden()
-        .pr(PERFORMANCE_STATS_TRAILING_INSET)
-        .rounded(rem_length(tokens::card_radius(theme)))
-        .border(rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(theme.glass_card().edge))
-        .bg(glass_fill(theme, GlassTier::Card));
+        .pr(PERFORMANCE_STATS_TRAILING_INSET);
     if pinned {
         surface = surface.pl(definite_length(tokens::SPACE_16));
     }

@@ -2,18 +2,17 @@
 
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
-use gpui::{Div, ParentElement, Styled, div, px, relative, rems};
+use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_shell::memory::MemSegmentKind;
 use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
@@ -287,17 +286,17 @@ pub(super) fn composition_block(
         .iter()
         .map(|(color, share, _, _)| (*color, *share))
         .collect();
-    let mut column = div()
+    let mut column = CardSurface::unpadded(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .inset()
+        .render()
         .flex()
         .flex_col()
         .flex_none()
         .gap(definite_length(tokens::SPACE_8))
         .px(definite_length(tokens::SPACE_12))
-        .py(definite_length(tokens::SPACE_10))
-        .rounded(rem_length(tokens::card_radius(theme)))
-        .border(rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(theme.glass_card().edge))
-        .bg(glass_fill(theme, GlassTier::Card));
+        .py(definite_length(tokens::SPACE_10));
     if mode == MemoryDetailMode::Full {
         column = column.child(summary_metrics(theme, memory, units));
     }

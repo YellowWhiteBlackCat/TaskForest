@@ -1,6 +1,6 @@
 //! "Run New Task" modal overlay for launching an unprivileged command.
 
-use iced::widget::{column, container, row, text, text_input};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
@@ -22,16 +22,17 @@ pub fn run_task_overlay<'a>(
     state: &'a RunTaskState,
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let input = text_input(t("search.run_command"), &state.command)
-        .id(iced::widget::Id::from(crate::focus::focus_id(
-            FocusTarget::RunTaskCommandInput,
-        )))
-        .on_input(Message::UpdateRunTaskCommand)
-        .on_submit(Message::SubmitRunTask)
-        .padding(8)
-        .size(f32::from(tokens::FONT_13));
+    let input = crate::ui::components::plain_text_input(
+        theme_snapshot,
+        Some(FocusTarget::RunTaskCommandInput),
+        t("search.run_command"),
+        &state.command,
+        Message::UpdateRunTaskCommand,
+        Some(Message::SubmitRunTask),
+        false,
+    );
 
-    let mut body_items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = vec![input.into()];
+    let mut body_items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = vec![input];
 
     if let Some(err) = &state.error_msg {
         let danger_color = crate::theme_binding::color(theme_snapshot.palette().danger);
@@ -75,7 +76,7 @@ pub fn run_task_overlay<'a>(
     modal_overlay(
         theme_snapshot,
         t("proc.run_new_task"),
-        "Enter executable path or command",
+        t("search.run_command"),
         content.into(),
         appear,
     )

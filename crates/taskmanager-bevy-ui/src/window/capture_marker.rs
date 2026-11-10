@@ -245,21 +245,19 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             {
                 return;
             }
-            let Some((flow, flow_transform)) = access.card_flow.iter().next() else {
-                return;
-            };
-            let flow_bottom = flow_transform.translation.y + flow.size().y / 2.0;
-            let flow_right = flow_transform.translation.x + flow.size().x / 2.0;
-            let mut groups_inside = true;
-            for (_, node, transform) in &access.card_groups {
-                let half = node.size() / 2.0;
-                groups_inside &= transform.translation.x - half.x
-                    >= flow_transform.translation.x - flow.size().x / 2.0 - 0.5
-                    && transform.translation.x + half.x <= flow_right + 0.5
-                    && transform.translation.y + half.y <= flow_bottom + 0.5;
-            }
-            if !groups_inside {
-                return;
+            if let Some((flow, flow_transform)) = access.card_flow.iter().next() {
+                let flow_bottom = flow_transform.translation.y + flow.size().y / 2.0;
+                let flow_right = flow_transform.translation.x + flow.size().x / 2.0;
+                let groups_inside = access.card_groups.iter().all(|(_, node, transform)| {
+                    let half = node.size() / 2.0;
+                    transform.translation.x - half.x
+                        >= flow_transform.translation.x - flow.size().x / 2.0 - 0.5
+                        && transform.translation.x + half.x <= flow_right + 0.5
+                        && transform.translation.y + half.y <= flow_bottom + 0.5
+                });
+                if !groups_inside {
+                    return;
+                }
             }
             if !access.state.data_presented {
                 access.state.data_presented = true;

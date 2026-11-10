@@ -5,7 +5,7 @@ use crate::gpui_app::sidebar::{NetworkVisibility, SelectedDevice};
 use crate::gpui_app::theme::mono_font_with_fallback;
 use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Pixels, Size,
-    StatefulInteractiveElement, Styled, div, px, rems, size,
+    StatefulInteractiveElement, Styled, div, px, size,
 };
 use taskforest_core::core::config::SidebarDeviceOverrideConfig;
 use taskforest_core::core::metrics::SystemSnapshot;
@@ -14,13 +14,11 @@ use taskmanager_application::i18n;
 use taskmanager_theme::{GlassTier, Theme, tokens};
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::presentation_binding::control_measurement;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
-use taskmanager_ui::theme_binding::glass_shadow;
 use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rem_value;
 use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::IconId;
@@ -398,15 +396,12 @@ pub fn initial_window_size() -> Size<Pixels> {
 }
 
 pub fn disconnected_device(theme: &Theme, stable_id: Option<&str>) -> impl IntoElement {
-    let layer = theme.glass_card();
-    let mut card = div()
+    let mut card = CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .padding(tokens::SPACE_18)
+        .render()
         .max_w(px(460.0))
-        .p(px(f32::from(tokens::SPACE_18)))
-        .rounded(rem_length(tokens::card_radius(theme)))
-        .border(rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(layer.edge))
-        .bg(glass_fill(theme, GlassTier::Card))
-        .shadow(glass_shadow(theme, GlassTier::Card))
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_8))

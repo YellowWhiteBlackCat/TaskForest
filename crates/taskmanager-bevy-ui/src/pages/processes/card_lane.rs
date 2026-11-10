@@ -1,5 +1,5 @@
-//! Applications card lane: a current-focus dashboard, state chips, and one
-//! bounded atomic-card flow over the existing shell row projection.
+//! Applications card lane: a current-focus dashboard and one bounded
+//! atomic-card flow over the existing shell row projection.
 //!
 //! FlClash v0.9.1's public redesign is a layout reference only: dashboard
 //! around current focus, proxy groups as cards, group tabs as chips, optional
@@ -8,6 +8,11 @@
 //! filtering, sorting, selection, identity, and virtual scrolling remain
 //! shell-owned. The static hero may use the real optical tier, while the
 //! scrolled cards use painted glass; nested optical glass is not claimed.
+//!
+//! The lane renders NO filter chips of its own: the page chrome's canonical
+//! status-filter pills already classify by the very same provider state the
+//! buckets use, so a second chip row would be the same fact painted twice.
+//! The group headers carry the bucket identity and its size instead.
 
 use bevy::ecs::component::Component;
 use bevy::ecs::event::Event;
@@ -76,9 +81,22 @@ pub(crate) struct ProcessCardGroup(pub(crate) ProcessStatusFilter);
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessAtomicCard(pub(crate) usize);
 
-/// One status chip that routes to the shell's canonical filter.
+/// The group header's overflow action: reveal every row of this bucket.
+///
+/// The bucket's admitted row is bounded by the measured column count, so a
+/// bucket with more members than columns states the remainder. This action
+/// is how the remainder becomes reachable: it reduces through the shell's
+/// canonical status filter and hands the page to its dense table.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ProcessGroupChip(pub(crate) ProcessStatusFilter);
+pub(crate) struct ProcessGroupOverflow(pub(crate) ProcessStatusFilter);
+
+/// The card's state tint overlay.
+///
+/// An optical card has no painted fill to tint, so the hover, pressed and
+/// selected ink rides a dedicated overlay above the glass instead of
+/// replacing the surface the material owns.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessCardStateOverlay;
 
 /// Official Button marker for the two presentation modes.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -146,6 +164,8 @@ pub(crate) struct CardFlowMetrics {
     pub(crate) control_height_px: f32,
     /// The measured atomic-card height, in logical pixels.
     pub(crate) card_height_px: f32,
+    /// The narrowest an atomic card may be, in logical pixels.
+    pub(crate) card_min_width_px: f32,
     /// The group header height, in logical pixels.
     pub(crate) header_height_px: f32,
     /// The gap between two group blocks, in logical pixels.
@@ -167,21 +187,22 @@ impl CardFlowMetrics {
         // height and leftover space stays OUTSIDE the card instead of
         // inflating it into an empty panel.
         let card_height_px = control_height_px * 2.0 + space_4() + space_16();
+        // The card's WIDTH floor is set by its fact line: PID, CPU and
+        // memory each carry a label and a value, and below this width the
+        // memory value clips instead of truncating. Eight control heights
+        // is the smallest multiple that holds that line in the standard
+        // type size, so a wide slot paints a card GRID instead of a row of
+        // wide banners.
+        let card_min_width_px = control_height_px * 8.0;
         Self {
             control_height_px,
             card_height_px,
+            card_min_width_px,
             header_height_px: control_height_px,
             group_gap_px: space_8(),
             card_floor_px: card_height_px,
             card_ceiling_px: card_height_px,
         }
-    }
-
-    /// The fixed card-lane chrome (mode row, focus dashboard, chips, gaps)
-    /// that the page slot must charge before the card flow spends its height.
-    #[must_use]
-    pub(crate) fn lane_chrome_height_px(self) -> f32 {
-        self.control_height_px * 9.0 + self.group_gap_px * 4.0
     }
 
     /// The shared contract's spec for one group block: the header plus the
@@ -237,12 +258,6 @@ impl CardFlowBudget {
         }
     }
 
-    /// The number of atomic cards the admitted group blocks hold.
-    #[must_use]
-    pub(crate) fn cards(self) -> usize {
-        self.groups.saturating_mul(self.columns)
-    }
-
     /// The height one atomic card may take inside an admitted group block.
     #[must_use]
     pub(crate) fn card_height_px(self, metrics: CardFlowMetrics) -> f32 {
@@ -250,13 +265,14 @@ impl CardFlowBudget {
     }
 }
 
-/// Derive Bevy's card metrics from a measured slot and spend the shared
-/// contract's verdict.
+/// Derive Bevy's card metrics from the measured card-flow viewport and
+/// spend the shared contract's verdict.
 ///
-/// The measured slot is logical pixels. Bevy contributes its own card height,
-/// group header height, group gap, and the column count derived from the
-/// available width; the shared contract answers with the whole-group count,
-/// the clamped group height, and the zero-group verdict.
+/// The measured slot is the flow viewport's own logical size. Bevy
+/// contributes its card height, group header height, group gap, and the
+/// column count derived from the viewport width; the shared contract answers
+/// with the whole-group count, the clamped group height, and the zero-group
+/// verdict.
 #[must_use]
 pub(crate) fn card_flow_budget(
     slot_width_px: f32,
@@ -265,8 +281,10 @@ pub(crate) fn card_flow_budget(
 ) -> CardFlowBudget {
     let metrics = CardFlowMetrics::from_palette(palette);
     let columns = card_columns(slot_width_px, &metrics);
-    let available =
-        (slot_height_px - metrics.lane_chrome_height_px() - metrics.group_gap_px).max(0.0);
+    // The measured slot IS the bounded card-flow viewport: the mode row,
+    // dashboard, page title and toolbar already spent their height before
+    // this node was laid out. Only the flow's own group gap remains.
+    let available = (slot_height_px - metrics.group_gap_px).max(0.0);
     let verdict = admit_card_groups(available, columns, metrics.spec());
     CardFlowBudget {
         measured: true,
@@ -279,13 +297,15 @@ pub(crate) fn card_flow_budget(
 /// The number of card columns this frontend paints in a measured width.
 ///
 /// A column is admitted only when a whole card keeps its readable floor, so
-/// a narrow slot never paints a squeezed card.
+/// a narrow slot never paints a squeezed card. The floor is the card's own
+/// minimum WIDTH — the width its fact line needs — so a wide slot fills with
+/// a card grid instead of a handful of banner-width cards.
 #[must_use]
 pub(crate) fn card_columns(slot_width_px: f32, metrics: &CardFlowMetrics) -> usize {
-    if slot_width_px <= 0.0 || metrics.card_floor_px <= 0.0 {
+    if slot_width_px <= 0.0 || metrics.card_min_width_px <= 0.0 {
         return 1;
     }
-    let column_floor_px = metrics.card_floor_px * 4.0;
+    let column_floor_px = metrics.card_min_width_px;
     let columns =
         ((slot_width_px + metrics.group_gap_px) / (column_floor_px + metrics.group_gap_px)).floor();
     (columns.max(1.0) as usize).clamp(1, 4)
@@ -353,6 +373,30 @@ pub(crate) struct CardGroupPlan {
     pub(crate) total: usize,
 }
 
+/// The card lane's group window.
+///
+/// The bucket list is folded over the WHOLE visible set, so a bucket is a
+/// page-wide fact and never changes identity while the lane scrolls. The
+/// window only says which bucket the lane starts at, so every bucket stays
+/// reachable and the group headers keep their whole counts.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct CardFlowWindow {
+    /// The index of the first admitted bucket.
+    pub(crate) top: usize,
+}
+
+impl CardFlowWindow {
+    /// The window clamped to the buckets that actually exist and to the
+    /// number of whole groups the measured slot admits.
+    #[must_use]
+    pub(crate) fn clamped(self, buckets: usize, groups: usize) -> Self {
+        let last = buckets.saturating_sub(groups.min(buckets));
+        Self {
+            top: self.top.min(last),
+        }
+    }
+}
+
 /// Fold ALREADY PROJECTED shell rows into state groups and admit whole
 /// groups.
 ///
@@ -362,7 +406,11 @@ pub(crate) struct CardGroupPlan {
 /// is on screen. The shell's visible set is the one authority for which
 /// processes exist; the dense window is only that presentation's paging.
 #[must_use]
-pub(crate) fn card_flow_plan(shell: &ShellApp, budget: CardFlowBudget) -> CardFlowPlan {
+pub(crate) fn card_flow_plan(
+    shell: &ShellApp,
+    budget: CardFlowBudget,
+    window: CardFlowWindow,
+) -> CardFlowPlan {
     let visible = shell.visible_processes();
     if visible.is_empty() {
         return CardFlowPlan {
@@ -381,18 +429,16 @@ pub(crate) fn card_flow_plan(shell: &ShellApp, budget: CardFlowBudget) -> CardFl
             None => folded.push((group, vec![index])),
         }
     }
+    let start = window.clamped(folded.len(), budget.groups).top;
     let mut groups: Vec<CardGroupPlan> = Vec::new();
-    let mut used_cards = 0usize;
-    let capacity = budget.cards();
-    for (group, members) in folded {
+    for (group, members) in folded.into_iter().skip(start) {
         if groups.len() >= budget.groups {
             break;
         }
         let admitted = members.len().min(budget.columns);
-        if admitted == 0 || used_cards + admitted > capacity {
+        if admitted == 0 {
             break;
         }
-        used_cards += admitted;
         groups.push(CardGroupPlan {
             group,
             members: members[..admitted].to_vec(),
@@ -403,6 +449,27 @@ pub(crate) fn card_flow_plan(shell: &ShellApp, budget: CardFlowBudget) -> CardFl
         groups,
         empty: false,
     }
+}
+
+/// The bucket index the shell's current selection sits in.
+///
+/// The lane follows the shell cursor: a selected row that lives in a bucket
+/// below the window must still be visible, so the window moves to that
+/// bucket instead of leaving the selection behind.
+#[must_use]
+pub(crate) fn card_bucket_of_selection(shell: &ShellApp) -> Option<usize> {
+    let selected = shell.selected;
+    let mut folded: Vec<(CardGroup, Vec<usize>)> = Vec::new();
+    for (index, process) in shell.visible_processes().iter().enumerate() {
+        let group = card_group(&process.status);
+        match folded.iter_mut().find(|(bucket, _)| *bucket == group) {
+            Some((_, members)) => members.push(index),
+            None => folded.push((group, vec![index])),
+        }
+    }
+    folded
+        .iter()
+        .position(|(_, members)| members.contains(&selected))
 }
 
 mod scenes;

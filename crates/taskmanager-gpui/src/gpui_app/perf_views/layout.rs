@@ -11,13 +11,12 @@
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::power_w;
 use taskmanager_shell::presentation::temperature_c;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rgba;
 /// Debug-selector identity of the ONE Performance composition root.
 ///
@@ -27,7 +26,7 @@ pub const PERF_MAIN_VIEWPORT_SELECTOR: &str = "tm-perf-main-viewport";
 
 use gpui::{
     AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Styled,
-    div, px, rems,
+    div, px,
 };
 
 use crate::gpui_app::elements;
@@ -520,12 +519,14 @@ fn summary_overlay(theme: &Theme, row: Div) -> Div {
         .max_w(px(320.0))
         .min_w(px(0.0))
         .child(
-            row.rounded(rem_length(tokens::control_radius(theme)))
-                .border(rems(GlassTier::Card.edge_width_rem()))
-                .border_color(hsla(theme.glass_card().edge))
-                .bg(glass_fill(theme, GlassTier::Card))
+            CardSurface::unpadded(theme.palette())
+                .glass(GlassTier::Card)
+                .radius(tokens::control_radius(theme))
+                .inset()
+                .render()
                 .px(definite_length(tokens::SPACE_8))
-                .py(definite_length(tokens::SPACE_2)),
+                .py(definite_length(tokens::SPACE_2))
+                .child(row),
         )
 }
 

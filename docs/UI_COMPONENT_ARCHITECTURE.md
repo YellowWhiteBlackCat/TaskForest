@@ -119,18 +119,16 @@ Bevy/Iced 基础组件与纯文本、窗口算法和中立 surface 值统一归�
   设备选择、详情映射和有界 rail 位于 `ui/performance.rs`，页面模块只保留自身的数据投影和交互编排。
 - Services、Startup、Users 共用 Iced 的表格/状态组件；GPUI 的 Process Insights、Dashboard、
   Process Details 与 Iced 的对应页面保持 toolkit-local，不共享 widget 状态。
-- 页面特化组件可以拥有自己的字段、图表或危险操作，但必须组合已有 surface、state、row、
-  key/value、toolbar 和 scroll primitives；重复第二次的几何/状态语义必须下沉到对应
-  toolkit 的组件层：GPUI 进入 `taskmanager-ui`，Iced 进入
-  `taskmanager-iced/src/ui/components.rs`，Bevy 进入 `taskmanager-bevy-ui/src/widgets.rs`
-  （100% `bsn!` 场景适配器，见 [BEVY_UI_FRONTEND.md](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)）。
-- 特化不是豁免：新增 wrapper 先说明数据或交互边界，并补窄窗口、焦点和失败态回归；不得用
-  import alias、改名 re-export 或跨 crate forwarding facade 绕过组件边界；跨层类型必须从
-  其 owner crate 的显式模块路径导入。
-
-Iced 的 renderer-local 组件入口是 `taskmanager-iced/src/ui/components.rs`；`focus.rs` 负责
-可访问激活壳，`theme.rs` 负责 token 到 Iced style 的映射，`virtual_list.rs` 负责有界表格窗口。
-它们与 `taskmanager-ui` 平行而非上下游关系。
+- 页面特化组件必须组合已有 surface、state、row、key/value、toolbar 和 scroll primitives；
+  重复第二次的几何/状态语义必须下沉到对应 toolkit 组件层：GPUI `taskmanager-ui`、Iced
+  `components.rs`、Bevy `widgets.rs`（[Bevy 章程](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)）。
+  特化要说明数据/交互边界并补窄窗口、焦点和失败态回归；不得用 alias、改名 re-export 或
+  forwarding facade 绕过组件边界，跨层类型从 owner crate 显式模块导入。
+- Iced 组件入口是 `components.rs`，控件族拆在 `controls.rs` 与 `controls/`；`focus.rs` 负责
+  可访问激活壳，`theme.rs`/`theme/control_measurement.rs` 负责共享玻璃与
+  `ControlRole`/`resolve_size` 映射。checkbox 与 text_input 有真实生产挂载，原生多行 TextEditor
+  与参考端一致地无多行文本语义、仅由行为测试覆盖；焦点环遵守共享输入模态策略。它们与
+  `taskmanager-ui` 平行而非上下游关系。
 
 ## 四端对齐与“求同存异”质量基线
 

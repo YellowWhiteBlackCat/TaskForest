@@ -593,6 +593,9 @@ fi
 if maybe percent-readout-owner; then
     run_stage percent-readout-owner quick run_py scripts/quality/test_percent_readout_owner.py
 fi
+if maybe dashboard-metric-owner; then
+    run_stage dashboard-metric-owner quick run_py scripts/quality/test_dashboard_metric_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

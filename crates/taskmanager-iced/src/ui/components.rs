@@ -22,6 +22,7 @@ use zhuge_ui_kit_iced::surface;
 use crate::app::{FocusTarget, Message};
 use crate::theme;
 
+pub(crate) mod controls;
 pub(crate) mod dashboard_budget;
 pub(crate) mod highlight;
 pub(crate) mod inputs;
@@ -30,6 +31,7 @@ pub(crate) mod primitives;
 pub(crate) mod selectable_text;
 mod tooltip;
 
+pub(crate) use controls::*;
 pub(crate) use inputs::*;
 pub(crate) use popover::Popover;
 pub(crate) use primitives::*;

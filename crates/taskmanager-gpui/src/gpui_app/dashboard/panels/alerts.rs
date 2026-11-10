@@ -37,7 +37,12 @@ fn glass_surface(theme: &Theme, radius: Length, padding: Length) -> Div {
 /// A dense control surface inside an already-elevated rule card: the same
 /// shared glass material, without stacking a second shadow on the card.
 fn inset_glass_surface(theme: &Theme, radius: Length, padding: Length) -> Div {
-    glass_surface(theme, radius, padding).shadow_none()
+    CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(radius)
+        .padding(padding)
+        .inset()
+        .render()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

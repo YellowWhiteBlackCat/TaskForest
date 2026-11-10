@@ -6,9 +6,10 @@
 //! functions and their unit tests; holds no UI state of its own — the typed
 //! [`StartupBootEvidenceSnapshot`] arrives as a render param.
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative, rems};
+use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
@@ -56,7 +57,11 @@ pub(super) fn boot_evidence_strip(
         theme.danger
     };
     let pill = |id: &'static str, label: &str, value: &str, value_color: Color| {
-        div()
+        CardSurface::unpadded(theme.palette())
+            .glass(GlassTier::Card)
+            .radius(tokens::card_radius(theme))
+            .inset()
+            .render()
             .id(id)
             .debug_selector(move || id.to_string())
             .flex()
@@ -65,10 +70,6 @@ pub(super) fn boot_evidence_strip(
             .gap(rem_length(tokens::SPACE_3))
             .px(rem_length(tokens::SPACE_3))
             .py(rem_length(tokens::SPACE_2))
-            .rounded(rem_length(tokens::card_radius(theme)))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-            .bg(glass_fill(theme, GlassTier::Card))
             .child(
                 div()
                     .text_size(font_size(tokens::FONT_11))
@@ -263,17 +264,17 @@ pub(super) fn boot_timeline_block(
         );
     }
     Some(
-        div()
+        CardSurface::unpadded(theme.palette())
+            .glass(GlassTier::Card)
+            .radius(tokens::card_radius(theme))
+            .inset()
+            .render()
             .debug_selector(|| "boot-timeline".to_string())
             .flex()
             .flex_col()
             .gap(rem_length(tokens::SPACE_4))
             .px(rem_length(tokens::SPACE_4))
             .py(rem_length(tokens::SPACE_3))
-            .rounded(rem_length(tokens::card_radius(theme)))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-            .bg(glass_fill(theme, GlassTier::Card))
             .child(
                 div()
                     .flex()

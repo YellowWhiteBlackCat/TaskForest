@@ -13,7 +13,7 @@ use std::ops::RangeInclusive;
 use std::sync::OnceLock;
 
 use iced::Length;
-use iced::widget::{column, container, row, text};
+use iced::widget::{container, row, text};
 use taskmanager_theme::tokens::MotionPolicy;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
@@ -22,7 +22,6 @@ use taskmanager_theme::{
 };
 
 use super::*;
-use crate::ui::components::divider;
 use taskmanager_application::i18n::{Language, t, with_language};
 
 /// Label column width of one settings row (px contract): a stable left rail
@@ -37,30 +36,6 @@ const ROW_LABEL_WIDTH: f32 = 180.0;
 pub(super) const SEGMENT_NONE: usize = usize::MAX;
 
 // ── layout primitives ────────────────────────────────────────────────────────
-
-/// One semantic group header (GPUI parity): strong title over the shared
-/// hairline divider, separating the Zed-style General / Appearance / Fonts /
-/// System / Notifications / Units blocks.
-pub(super) fn group_header<'a>(theme_snapshot: &'a Theme, title: &'static str) -> IcedElement<'a> {
-    column(vec![
-        text(title).size(f32::from(tokens::FONT_HEADER)).into(),
-        divider(theme_snapshot),
-    ])
-    .spacing(f32::from(tokens::SPACE_4))
-    .into()
-}
-
-/// A dim caption inside one group (the shared titled-section grammar every
-/// Settings row hangs under).
-pub(super) fn section_caption<'a>(
-    theme_snapshot: &'a Theme,
-    label: &'static str,
-) -> IcedElement<'a> {
-    text(label)
-        .size(f32::from(tokens::FONT_CAPTION))
-        .color(crate::theme::muted_text_color(theme_snapshot))
-        .into()
-}
 
 /// One settings row: fixed-width label rail on the left, the control (or
 /// static value) on the right.

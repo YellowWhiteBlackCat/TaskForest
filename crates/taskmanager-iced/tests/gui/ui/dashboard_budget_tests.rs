@@ -38,12 +38,12 @@ fn dashboard_budget_spends_the_shared_card_flow_verdict() {
             available(height, expected_summary),
             expected_columns,
             spec(),
-            MAX_CARDS.div_ceil(expected_columns),
+            max_metric_groups(expected_columns),
         );
         assert_eq!(budget.compact_summary, expected_summary);
         assert_eq!(budget.columns, admitted.columns);
-        assert_eq!(budget.count, admitted.cards().min(MAX_CARDS));
-        assert!(budget.count <= MAX_CARDS);
+        assert_eq!(budget.count, admitted.cards().min(DASHBOARD_METRIC_COUNT));
+        assert!(budget.count <= DASHBOARD_METRIC_COUNT);
         if admitted.groups == 0 {
             assert_eq!(budget.chart_height, 0.0);
         } else {
@@ -72,7 +72,7 @@ fn short_slot_degrades_to_zero_complete_groups() {
 fn tall_slot_caps_at_four_cards_and_keeps_a_bounded_chart() {
     let budget = DashboardBudget::resolve(1280.0, 2000.0);
     assert_eq!(budget.columns, 2);
-    assert_eq!(budget.count, MAX_CARDS);
+    assert_eq!(budget.count, DASHBOARD_METRIC_COUNT);
     assert!(budget.chart_height >= CHART_HEIGHT_FLOOR);
     assert!(budget.chart_height <= CHART_HEIGHT_CEILING);
 }

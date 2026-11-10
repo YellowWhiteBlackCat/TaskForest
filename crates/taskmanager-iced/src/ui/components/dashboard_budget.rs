@@ -1,6 +1,7 @@
 //! Complete dashboard groups inside an allocated Iced body slot.
 
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowSpec, admit_card_groups_capped};
+use taskmanager_ui_contract::presentation::dashboard::{DASHBOARD_METRIC_COUNT, max_metric_groups};
 
 /// Compact-summary geometry (px contract). This is Iced's own presentation
 /// decision: below either axis the four-value summary card degrades to one
@@ -30,8 +31,6 @@ const GROUP_GAP: f32 = 8.0;
 const CARD_CHROME_HEIGHT: f32 = 100.0;
 const CHART_HEIGHT_FLOOR: f32 = 32.0;
 const CHART_HEIGHT_CEILING: f32 = 100.0;
-/// Product content cap: four timeline metrics, never a layout fact.
-const MAX_CARDS: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct DashboardBudget {
@@ -52,8 +51,8 @@ impl DashboardBudget {
         let available = height - fixed - GROUP_GAP;
         let spec = CardFlowSpec::new(CARD_HEIGHT_FLOOR, CARD_HEIGHT_CEILING).with_gap(GROUP_GAP);
         let admitted =
-            admit_card_groups_capped(available, columns, spec, MAX_CARDS.div_ceil(columns));
-        let count = admitted.cards().min(MAX_CARDS);
+            admit_card_groups_capped(available, columns, spec, max_metric_groups(columns));
+        let count = admitted.cards().min(DASHBOARD_METRIC_COUNT);
         Self {
             compact_summary,
             columns: admitted.columns,

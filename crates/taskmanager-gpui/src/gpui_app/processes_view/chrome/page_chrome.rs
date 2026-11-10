@@ -4,13 +4,13 @@ use std::collections::HashSet;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
-use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
+use taskmanager_ui::theme_binding::rem_length;
 
-use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px, rems};
+use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_ui::inputs::text_input::TextInputState;
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::primitives::toolbar::Toolbar;
 
 use super::action_bar::{ProcessActionBarProps, action_bar};
@@ -163,19 +163,17 @@ pub(super) fn process_control_chrome(
     };
 
     match presentation.controls() {
-        ProcessControlPresentation::Unified => div()
+        ProcessControlPresentation::Unified => CardSurface::new(theme.palette())
+            .glass(GlassTier::Card)
+            .radius(tokens::card_radius(theme))
+            .padding(tokens::SPACE_2)
+            .render()
             .flex()
             .items_center()
             .w_full()
             .min_w(px(0.0))
             .gap(rem_length(presentation.control_gap()))
             .px(rem_length(tokens::SPACE_4))
-            .py(rem_length(tokens::SPACE_2))
-            .rounded(rem_length(tokens::card_radius(theme)))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-            .bg(glass_fill(theme, GlassTier::Card))
-            .shadow(glass_shadow(theme, GlassTier::Card))
             .debug_selector(|| "tm-proc-unified-controls".to_string())
             .child(actions)
             .child(secondary_controls()),

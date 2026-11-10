@@ -65,6 +65,7 @@ crates/*/docs/*.md       crate 专题章程：单个 crate 的深层细节，由
 | Wire 与领域事实边界 | [WIRE_DOMAIN_BOUNDARIES.md](WIRE_DOMAIN_BOUNDARIES.md) |
 | 跨产品共享 UI 包扩展与升级 | [SHARED_UI_PACKAGES.md](SHARED_UI_PACKAGES.md) |
 | UI 组件 | [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md) |
+| Iced 能力登记表入口 | [PARITY_REGISTRY.md](PARITY_REGISTRY.md) |
 | 弹性布局流程 | [ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md) |
 | 前端章程与专有指南 | [bevy-ui 章程](../crates/taskmanager-bevy-ui/docs/BEVY_UI_FRONTEND.md)、[bevy-ui 指南](../crates/taskmanager-bevy-ui/docs/UI_GUIDE_BEVY_UI.md)、[GPUI 指南](../crates/taskmanager-gpui/docs/UI_GUIDE_GPUI.md)、[Iced 指南](../crates/taskmanager-iced/docs/UI_GUIDE_ICED.md)、[TUI 指南](../crates/taskmanager-tui/docs/UI_GUIDE_TUI.md)（crate 专属文档下沉在各前端 crate 的 `docs/`，由其 README 引用） |
 | 术语表 | [GLOSSARY.md](GLOSSARY.md) |

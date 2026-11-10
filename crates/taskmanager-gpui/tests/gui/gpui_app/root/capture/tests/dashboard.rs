@@ -73,7 +73,9 @@ async fn dashboard_cards_stay_inside_the_bounded_review_viewport(cx: &mut TestAp
                 .unwrap();
             let first = win
                 .read_with(cx, |view, _| {
-                    layout.first_metric(view.dashboard.history_first_metric)
+                    layout
+                        .metric_window(view.dashboard.history_first_metric)
+                        .first
                 })
                 .unwrap();
             let mut visual = VisualTestContext::from_window(win.into(), cx);

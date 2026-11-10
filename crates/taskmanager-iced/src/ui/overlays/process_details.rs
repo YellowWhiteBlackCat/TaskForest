@@ -1,6 +1,6 @@
 //! Process properties and details modal projection for Iced.
 
-use iced::widget::{column, container, row, text, text_input};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskforest_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
@@ -317,7 +317,7 @@ pub(crate) fn working_directory_value(shell: &ShellApp, target: &FrozenProcessId
 fn environment_section<'a>(
     theme_snapshot: &'a Theme,
     state: Option<&ProcessInsightFacetState<ProcessEnvironment>>,
-    filter: &str,
+    filter: &'a str,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = crate::theme::muted_text_color(theme_snapshot);
     let (subheading, body): (
@@ -413,10 +413,17 @@ fn environment_section<'a>(
                 )
             });
             let filter_input: Element<'a, Message, iced::Theme, iced::Renderer> =
-                text_input(t("prop.environment_filter"), filter)
-                    .on_input(Message::EnvironmentFilterChanged)
-                    .width(Length::Fixed(220.0))
-                    .into();
+                container(crate::ui::components::plain_text_input(
+                    theme_snapshot,
+                    None,
+                    t("prop.environment_filter"),
+                    filter,
+                    Message::EnvironmentFilterChanged,
+                    None,
+                    false,
+                ))
+                .width(Length::Fixed(220.0))
+                .into();
             let mut block =
                 column![row![filter_input].spacing(8), column(rows).spacing(1),].spacing(4);
             if let Some(copy_all) = copy_all {

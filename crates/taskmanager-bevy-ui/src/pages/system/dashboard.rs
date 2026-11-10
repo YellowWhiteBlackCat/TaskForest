@@ -47,6 +47,22 @@ use taskmanager_application::{
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::dashboard::{
+    DASHBOARD_METRIC_COUNT, DashboardMetricWindow, MetricPaging,
+};
+
+/// The metric count the measured dashboard slot admits.
+///
+/// The state keeps the measured body size, so the paging handler resolves
+/// the same window the painter draws: the shared contract owns the count and
+/// the window arithmetic, the measured slot owns only how many cards fit.
+fn measured_metric_count(state: &SystemDashboardState) -> usize {
+    state
+        .layout
+        .map_or(DASHBOARD_METRIC_COUNT, |(width, height)| {
+            SystemDashboardBudget::resolve(width, height).count
+        })
+}
 
 /// The dashboard card's flex basis, in rem: the width one timeline card asks
 /// for before the row wraps the next one beside it.
@@ -123,8 +139,16 @@ fn activate(
             state.window = window;
             state.first_metric = 0;
         }
-        DashboardControl::Previous => state.first_metric = state.first_metric.saturating_sub(1),
-        DashboardControl::Next => state.first_metric = state.first_metric.saturating_add(1).min(3),
+        DashboardControl::Previous | DashboardControl::Next => {
+            let step = if matches!(control.0, DashboardControl::Previous) {
+                MetricPaging::Previous
+            } else {
+                MetricPaging::Next
+            };
+            let window =
+                DashboardMetricWindow::resolve(state.first_metric, measured_metric_count(&state));
+            state.first_metric = window.paged(step).first;
+        }
     }
     state.layout = None;
     for mut scroll in &mut bodies {
@@ -194,7 +218,9 @@ pub(crate) fn body(
     budget: SystemDashboardBudget,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let cards = TimelineMetric::ALL.into_iter().skip(state.first_metric).take(budget.count).map(|metric| {
+    let cards = DashboardMetricWindow::resolve(state.first_metric, budget.count)
+        .metrics()
+        .map(|metric| {
         let GlassPanelMaterial {
             fill,
             edge,
@@ -220,7 +246,8 @@ pub(crate) fn body(
             BoxShadow({ shadows })
             Children [ @{grain} -- {parts}]
         }) as Box<dyn Scene>
-    }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
     let notice: Vec<Box<dyn Scene>> = if budget.count == 0 {
         vec![Box::new(
             bsn! { Text({t("dashboard.resize").to_owned()}) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::WordBoundary } Node { width: percent(100), min_width: px(0.0) } },

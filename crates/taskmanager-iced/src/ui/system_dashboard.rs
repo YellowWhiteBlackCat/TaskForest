@@ -20,6 +20,7 @@ use taskmanager_application::system_timeline::{
 };
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
+use taskmanager_ui_contract::presentation::dashboard::{DashboardMetricWindow, MetricPaging};
 
 use crate::app::{FocusTarget, Message};
 use crate::focus;
@@ -43,8 +44,12 @@ pub enum SystemDashboardMessage {
     SelectWindow(SystemHistoryWindow),
     SelectSection(SystemPageSection),
     SelectHealthSection(HealthReviewSection),
-    Previous,
-    Next,
+    /// Page the metric window to an explicit start offset.
+    ///
+    /// The shared dashboard contract owns the paging arithmetic, and only the
+    /// renderer knows the measured slot: the target offset is resolved where
+    /// the layout is known and published as the result.
+    SetMetricOffset(usize),
 }
 
 /// The label for one history window (1m, 5m, 15m, 60m), matching GPUI copy.
@@ -64,6 +69,8 @@ pub(crate) fn render_system_dashboard(
     responsive(move |size| {
         let theme_snapshot = app.theme();
         let budget = DashboardBudget::resolve(size.width, size.height);
+        let window =
+            DashboardMetricWindow::resolve(app.system_dashboard_first_metric, budget.count);
         let model = summary_model(app.shell.projection(), &series);
         let summary = if budget.compact_summary {
             text(format!(
@@ -84,14 +91,18 @@ pub(crate) fn render_system_dashboard(
             theme_snapshot,
             FocusTarget::SystemDashboardPrevious,
             t("dashboard.previous_metrics").to_owned(),
-            Message::SystemDashboard(SystemDashboardMessage::Previous),
+            Message::SystemDashboard(SystemDashboardMessage::SetMetricOffset(
+                window.paged(MetricPaging::Previous).first,
+            )),
             false,
         );
         let next = focus::dynamic_button(
             theme_snapshot,
             FocusTarget::SystemDashboardNext,
             t("dashboard.next_metrics").to_owned(),
-            Message::SystemDashboard(SystemDashboardMessage::Next),
+            Message::SystemDashboard(SystemDashboardMessage::SetMetricOffset(
+                window.paged(MetricPaging::Next).first,
+            )),
             false,
         );
         let mut body = column![summary, row![previous, next].spacing(8)]
@@ -100,11 +111,7 @@ pub(crate) fn render_system_dashboard(
         if budget.count == 0 {
             return body.push(text(t("dashboard.resize"))).into();
         }
-        let metrics = TimelineMetric::ALL
-            .into_iter()
-            .skip(app.system_dashboard_first_metric)
-            .take(budget.count)
-            .collect::<Vec<_>>();
+        let metrics = window.metrics().collect::<Vec<_>>();
         for pair in metrics.chunks(budget.columns) {
             body = body.push(
                 row(pair

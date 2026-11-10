@@ -1,42 +1,46 @@
 //! Scene construction for the Applications card lane. Every surface here is
-//! another presentation of shell-owned row facts: status chips reduce through
-//! the canonical filter, cards address the same visible rows and input seams
-//! as the dense table, and the focus dashboard only displays typed facts.
+//! another presentation of shell-owned row facts: the cards address the same
+//! visible rows and input seams as the dense table, and the focus dashboard
+//! only displays typed facts.
 //!
-//! The static hero asks for the real optical tier; the scrolled cards stay
-//! painted. Nested optical glass is not claimed.
+//! The focus dashboard and the atomic cards ask for the REAL optical tier.
+//! Their painted appearance still stands in when the renderer cannot sample
+//! a backdrop, and every surface also joins the offscreen lower composite
+//! so the optical shader refracts the product's real surfaces. Nested
+//! optical glass is not claimed: the mirrored layer stays painted.
 
 use bevy::a11y::AccessibilityNode;
+use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
 use bevy::math::Vec2;
 use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on};
 use bevy::text::{InlineBox, InlineBoxKind, LineBreak, TextLayout};
-use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, FlexWrap, JustifyContent,
-    Node, Overflow, UiRect, Val, percent, px, rem,
+    AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, FlexDirection,
+    JustifyContent, Node, Overflow, PositionType, UiRect, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
-use taskmanager_application::i18n::{more_rows_label, t};
+use taskmanager_application::i18n::{key_value_label, more_rows_label, t};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::PageContext;
-use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
+use crate::glass::{BackdropMirror, GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::icons::{IconInk, InlineIcon};
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole};
 
-use super::runtime::{on_group_chip_activated, on_view_mode_activated};
+use super::runtime::{on_group_overflow_activated, on_view_mode_activated};
 use super::{
     CardGroupPlan, FocusProjection, ProcessAtomicCard, ProcessCardFlow, ProcessCardGroup,
-    ProcessFocusContent, ProcessFocusDashboard, ProcessFocusField, ProcessFocusSortDir,
-    ProcessFocusValue, ProcessGroupChip, ProcessViewMode, ProcessViewModeButton, focus_projection,
+    ProcessCardStateOverlay, ProcessFocusContent, ProcessFocusDashboard, ProcessFocusField,
+    ProcessFocusSortDir, ProcessFocusValue, ProcessGroupOverflow, ProcessViewMode,
+    ProcessViewModeButton, focus_projection,
 };
 use crate::pages::processes::projection::{self, ProcessRowView};
 use crate::pages::processes::{ProcessRowLink, ProcessTableArtifact, input};
@@ -71,11 +75,17 @@ pub(crate) fn focus_projection_dashboard_scene(
         BorderColor::all(edge)
         BoxShadow({ shadows })
         OpticalGlassCard { tier: GlassTier::Card, enabled: true }
+        BackdropMirror { tier: GlassTier::Card }
         ProcessFocusDashboard
         Children [ @{ grain } -- @{ content } ]
     })
 }
 
+/// The dashboard's three fact rows.
+///
+/// Every fact carries its label: an unlabelled value reads as a stray number
+/// rather than as a measurement, and the hero is the only place the card
+/// presentation states the count, the sort and the query.
 fn focus_content_scene(palette: &UiPalette, focus: &FocusProjection) -> Box<dyn Scene> {
     let sort_icon = match focus.sort_descending {
         true => IconId::NavigateDown,
@@ -152,27 +162,22 @@ fn focus_content_scene(palette: &UiPalette, focus: &FocusProjection) -> Box<dyn 
                 overflow: Overflow::clip_x(),
             }
             Children [
-                Node { flex_shrink: 0.0, overflow: Overflow::clip_x() }
-                Children [
-                    Text({ count }) ProcessFocusValue(ProcessFocusField::Count)
-                    TextRole(Role::Body) Pickable::IGNORE
-                ] --
-                Node { flex_shrink: 0.0, overflow: Overflow::clip_x() }
-                Children [
-                    Text({ sort }) ProcessFocusValue(ProcessFocusField::Sort)
-                    TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }
-                    Pickable::IGNORE
-                ] --
-                @{ sort_direction } --
+                @{ labeled_value(&label("proc.focus_visible"), count, ProcessFocusField::Count) } --
                 Node {
-                    flex_grow: 1.0, flex_basis: px(0.0), min_width: px(0.0),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(space_4()),
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [
-                    Text({ query }) ProcessFocusValue(ProcessFocusField::Query)
-                    TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
-                    Pickable::IGNORE
-                ]
+                    Text({ label("proc.focus_sort") }) TextRole(Role::Caption) Pickable::IGNORE --
+                    Text({ sort }) ProcessFocusValue(ProcessFocusField::Sort) TextRole(Role::Body)
+                    TextLayout { linebreak: LineBreak::NoWrap } Pickable::IGNORE
+                ] --
+                @{ sort_direction } --
+                @{ labeled_value(&label("proc.focus_query"), query, ProcessFocusField::Query) }
             ]
         ]
     })
@@ -219,45 +224,18 @@ fn mode_button_scene(mode: ProcessViewMode, palette: &UiPalette) -> Box<dyn Scen
     })
 }
 
-fn chip_scene(
-    filter: ProcessStatusFilter,
-    palette: &UiPalette,
-    focus: &FocusProjection,
-) -> Box<dyn Scene> {
-    let selected = filter == focus.active_group;
-    Box::new(bsn! {
-        Node {
-            height: rem(palette.control_height_rem),
-            padding: UiRect::horizontal(px(space_8())),
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            flex_shrink: 0.0,
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-        }
-        BackgroundColor({ if selected { palette.nav_active_bg } else { palette.content_bg } })
-        ControlVisual(ControlTone::Surface, { selected })
-        Button
-        ProcessGroupChip({ filter })
-        on(on_group_chip_activated)
-        Children [
-            Text({ filter.label().to_owned() }) TextRole(Role::Caption) Pickable::IGNORE
-        ]
-    })
-}
-
-/// The whole bounded lane: mode buttons, optical focus dashboard, status
-/// chips, and one clipped card-flow viewport. Its fixed chrome follows the
-/// shared card-flow budget's ladder.
+/// The whole bounded lane: the mode row, the optical focus dashboard and one
+/// clipped card-flow viewport.
+///
+/// The lane renders NO filter chips: the page chrome's canonical status
+/// filter already classifies by the very same provider state the buckets
+/// use, so a second chip row would paint the same fact twice.
 pub(crate) fn card_lane_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let focus = focus_projection(context.shell);
     let dashboard = focus_projection_dashboard_scene(palette, &focus);
     let cards_button = mode_button_scene(ProcessViewMode::Cards, palette);
     let dense_button = mode_button_scene(ProcessViewMode::Dense, palette);
-    let chips: Vec<Box<dyn Scene>> = ProcessStatusFilter::ALL
-        .into_iter()
-        .map(|filter| chip_scene(filter, palette, &focus))
-        .collect();
     bsn! {
         Node {
             width: percent(100),
@@ -280,17 +258,6 @@ pub(crate) fn card_lane_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             @{ dashboard } --
             Node {
                 width: percent(100),
-                height: rem(palette.control_height_rem),
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: Val::Px(space_8()),
-                row_gap: Val::Px(space_8()),
-                flex_shrink: 0.0,
-                overflow: Overflow::clip(),
-            }
-            Children [ { chips } ] --
-            Node {
-                width: percent(100),
                 flex_grow: 1.0,
                 flex_basis: px(0.0),
                 min_height: px(0.0),
@@ -303,9 +270,10 @@ pub(crate) fn card_lane_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     }
 }
 
-/// One complete state group: a header plus one row of atomic cards. The card
-/// scenes interpolate directly into the row — a wrapper would keep their
-/// markers from mounting.
+/// One complete state group: a header that states the bucket, one row of
+/// atomic cards, and the action that reveals the rows the row could not
+/// hold. The card scenes interpolate directly into the row — a wrapper would
+/// keep their markers from mounting.
 pub(crate) fn group_scene(
     group: &CardGroupPlan,
     rows: &[ProcessRowView],
@@ -315,13 +283,10 @@ pub(crate) fn group_scene(
     card_height_rem: f32,
 ) -> Box<dyn Scene> {
     // A truncated row must SAY so: the header states the bucket's whole
-    // size, and the shared overflow wording names what the row leaves out.
+    // size, and the overflow action names what the row leaves out.
     let hidden = group.total.saturating_sub(group.members.len());
-    let header = if hidden == 0 {
-        group.group.label().to_owned()
-    } else {
-        format!("{} · {}", group.group.label(), more_rows_label(hidden))
-    };
+    let header = key_value_label(group.group.label(), &group.total.to_string());
+    let overflow = overflow_action_scene(group.group, hidden, palette);
     let cards: Vec<Box<dyn Scene>> = group
         .members
         .iter()
@@ -346,11 +311,13 @@ pub(crate) fn group_scene(
                 width: percent(100),
                 height: rem(palette.control_height_rem),
                 align_items: AlignItems::Center,
+                column_gap: Val::Px(space_8()),
                 flex_shrink: 0.0,
                 overflow: Overflow::clip_x(),
             }
             Children [
-                Text({ header }) TextRole(Role::Caption) Pickable::IGNORE
+                Text({ header }) TextRole(Role::Caption) Pickable::IGNORE --
+                @{ overflow }
             ] --
             Node {
                 width: percent(100),
@@ -360,6 +327,46 @@ pub(crate) fn group_scene(
                 flex_shrink: 0.0,
             }
             Children [ { cards } ]
+        ]
+    })
+}
+
+/// The overflow action for a bucket the admitted row could not hold.
+///
+/// The action reduces through the shell's canonical status filter and hands
+/// the page to its dense table, so every row of the bucket stays reachable
+/// instead of being summarized away.
+fn overflow_action_scene(
+    filter: ProcessStatusFilter,
+    hidden: usize,
+    palette: &UiPalette,
+) -> Box<dyn Scene> {
+    if hidden == 0 {
+        return Box::new(bsn! {
+            Node { width: px(0.0), height: px(0.0) }
+            Pickable::IGNORE
+        });
+    }
+    let mut node = accesskit::Node::new(accesskit::Role::Button);
+    node.set_label(t("proc.group_show_all").replace("{status}", filter.label()));
+    node.set_description(more_rows_label(hidden));
+    Box::new(bsn! {
+        Node {
+            height: rem(palette.control_height_rem),
+            padding: UiRect::horizontal(px(space_8())),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            flex_shrink: 0.0,
+            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+        }
+        BackgroundColor({ palette.content_bg })
+        ControlVisual(ControlTone::Surface, { false })
+        Button
+        ProcessGroupOverflow({ filter })
+        on(on_group_overflow_activated)
+        AccessibilityNode({ node })
+        Children [
+            Text({ more_rows_label(hidden) }) TextRole(Role::Caption) Pickable::IGNORE
         ]
     })
 }
@@ -386,7 +393,27 @@ pub(crate) fn empty_card_scene(message: String, palette: &UiPalette) -> Box<dyn 
     })
 }
 
-/// One atomic process card on the painted card tier. It carries the same row
+/// The card's state tint overlay.
+///
+/// An optical card has no painted fill to tint, so the hover, pressed and
+/// selected ink rides this overlay above the glass instead of replacing the
+/// surface the material owns.
+fn state_overlay_scene() -> Box<dyn Scene> {
+    Box::new(bsn! {
+        Node {
+            width: percent(100),
+            height: percent(100),
+            position_type: PositionType::Absolute,
+            left: percent(0),
+            top: percent(0),
+        }
+        BackgroundColor(Color::NONE)
+        ProcessCardStateOverlay
+        Pickable::IGNORE
+    })
+}
+
+/// One atomic process card on the real optical tier. It carries the same row
 /// link, semantic address, accessibility node and activation seams as a dense
 /// row, so selection, secondary press and keyboard focus never fork.
 pub(crate) fn atomic_card_scene(
@@ -410,6 +437,7 @@ pub(crate) fn atomic_card_scene(
     let shadows = palette.glass_shadow(GlassTier::Card);
     let label = t_label;
     let _ = query;
+    let overlay = state_overlay_scene();
     Box::new(bsn! {
         Node {
             flex_grow: 1.0,
@@ -424,6 +452,8 @@ pub(crate) fn atomic_card_scene(
         }
         BackgroundColor({ fill })
         BoxShadow({ shadows })
+        OpticalGlassCard { tier: GlassTier::Card, enabled: true }
+        BackdropMirror { tier: GlassTier::Card }
         ControlVisual(ControlTone::Card, { selected })
         Button
         ProcessRowLink({ index })
@@ -434,6 +464,7 @@ pub(crate) fn atomic_card_scene(
         SemanticAddress({ semantic.0.clone() })
         AccessibilityNode({ accessibility_node })
         Children [
+            @{ overlay } --
             Node {
                 width: percent(100),
                 flex_direction: FlexDirection::Row,
@@ -496,8 +527,8 @@ impl ProcessViewMode {
     /// The mode button's shared copy. No frontend-local dictionary.
     fn label(self) -> &'static str {
         match self {
-            Self::Cards => t("common.processes"),
-            Self::Dense => t("settings.density_compact"),
+            Self::Cards => t("proc.view_cards"),
+            Self::Dense => t("proc.view_table"),
         }
     }
 }

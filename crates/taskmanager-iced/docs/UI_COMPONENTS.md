@@ -11,6 +11,13 @@ native selection and renderer caches; all shared types use their defining module
   projections and charts.
 - `src/ui/components.rs` owns shared Iced surfaces, the root page scaffold,
   key/value rows and the state-panel grammar;
+  `src/ui/components/controls.rs` plus `controls/` own the GPUI-parity
+  activation/layout family: button, icon button, pill, checkbox, section
+  header, toolbar, label, single-line input and the component-layer spinner
+  entry; the native multi-line editor is implemented there too, but the
+  product has no multi-line text surface today (the GPUI reference input is
+  single-line as well), so it is proven by the behavior suite rather than
+  mounted in production;
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero);
@@ -20,12 +27,20 @@ native selection and renderer caches; all shared types use their defining module
   Card glass gradient, its specular edge, and the single-quad projection of
   the theme's two-layer glass shadow (the same projection the floating
   panels consume). The switch, slider, select, search field and the
-  segmented track all read it, so no control owns a second palette, radius
-  ladder or shadow ladder; the hover/pressed/focus/disabled states reweight
-  those same tokens and never change geometry (the shared
-  `ControlState::changes_measurement` contract). The focus ring reads the
-  shared ring token, so a pointer-driven focus paints no ring on the switch
-  or the segmented track either.
+  segmented track, plus the new activation/text family, all read it, so no
+  control owns a second palette, radius ladder or shadow ladder.
+  `theme/control_measurement.rs` selects the live `UiSize`/`RowDensity` axis
+  and delegates to `presentation_binding::control_measurement`; every control
+  spends `ControlRole::{Button, IconButton, Input, Toggle}` through
+  `resolve_size`, never a second size table. Hover/pressed/focus/disabled
+  only reweight paint (the shared `ControlState::changes_measurement`
+  contract). The focus ring reads the shared ring token, so a pointer-driven
+  focus paints no ring on the switch, segmented track, buttons or checkbox.
+  All visible copy is an i18n key resolved by `taskmanager-application`;
+  `icon_button` uses `IconId` and exposes its localized label as a shared
+  tooltip because Iced 0.14 has no accessible-name operation.
+  `src/ui/spinner.rs` remains the sole spinner canvas/arc owner; the component
+  wrapper only re-surfaces it to the warm-up body.
 - `src/ui/components/dashboard_budget.rs` spends the shared card-flow
   admission verdict (`taskmanager_ui_contract::presentation::card_flow`):
   the whole-group admission and the card floor..ceiling clamp are the shared

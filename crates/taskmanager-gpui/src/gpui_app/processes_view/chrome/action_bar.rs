@@ -7,15 +7,14 @@ use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
-use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
 
 use gpui::{
     AnyElement, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div, rems,
+    StatefulInteractiveElement, Styled, div,
 };
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::root::{Hover, RootView};
@@ -23,7 +22,7 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens::{self, UiSize};
-use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_theme::{GlassTier, Length, Theme};
 
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
@@ -431,33 +430,40 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
         .gap(definite_length(tokens::SPACE_8))
         .children(content)
         .debug_selector(|| "tm-proc-action-bar".to_string());
-    let mut action_bar = div()
+    match (surface, actions) {
+        (ProcessActionSurface::Standalone, ProcessActionPresentation::Essential) => {
+            glass_action_bar(theme, tokens::SPACE_2, content)
+        }
+        (ProcessActionSurface::Standalone, ProcessActionPresentation::Primary) => {
+            glass_action_bar(theme, tokens::SPACE_4, content)
+        }
+        (ProcessActionSurface::Embedded, _) => div()
+            .flex()
+            .flex_col()
+            .flex_shrink_0()
+            .px(definite_length(tokens::SPACE_4))
+            .py(definite_length(tokens::SPACE_2))
+            .debug_selector(|| "tm-proc-action-surface".to_string())
+            .child(content),
+    }
+}
+
+/// The standalone action strip is one shared glass card: its material, its
+/// hairline edge and its two-layer shadow come from the shared surface
+/// primitive, so the strip cannot drift into a second glass recipe.
+fn glass_action_bar(theme: &Theme, vertical_padding: Length, content: impl IntoElement) -> Div {
+    CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .padding(vertical_padding)
+        .render()
         .flex()
         .flex_col()
         .flex_shrink_0()
+        .w_full()
         .px(definite_length(tokens::SPACE_4))
         .debug_selector(|| "tm-proc-action-surface".to_string())
-        .child(content);
-    action_bar = match (surface, actions) {
-        (ProcessActionSurface::Standalone, ProcessActionPresentation::Essential) => action_bar
-            .w_full()
-            .py(rem_length(tokens::SPACE_2))
-            .rounded(rem_length(tokens::card_radius(theme)))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-            .bg(glass_fill(theme, GlassTier::Card))
-            .shadow(glass_shadow(theme, GlassTier::Card)),
-        (ProcessActionSurface::Standalone, ProcessActionPresentation::Primary) => action_bar
-            .w_full()
-            .py(rem_length(tokens::SPACE_4))
-            .rounded(rem_length(tokens::card_radius(theme)))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-            .bg(glass_fill(theme, GlassTier::Card))
-            .shadow(glass_shadow(theme, GlassTier::Card)),
-        (ProcessActionSurface::Embedded, _) => action_bar.py(definite_length(tokens::SPACE_2)),
-    };
-    action_bar
+        .child(content)
 }
 
 #[cfg(test)]

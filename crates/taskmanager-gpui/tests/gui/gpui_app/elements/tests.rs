@@ -168,15 +168,21 @@ mod card_shadow_tests {
             GraphSettings::default(),
             new_graph_cache(),
         );
-        assert!(matches!(
-            &cell.style().box_shadow,
-            Some(shadows) if shadows.is_empty()
-        ));
+        assert!(
+            cell.style()
+                .box_shadow
+                .as_ref()
+                .is_none_or(|shadows| shadows.is_empty()),
+            "an inline graph cell must not stack a second shadow"
+        );
         let mut main = graph_card(&theme, div());
-        assert!(matches!(
-            &main.style().box_shadow,
-            Some(shadows) if shadows.is_empty()
-        ));
+        assert!(
+            main.style()
+                .box_shadow
+                .as_ref()
+                .is_none_or(|shadows| shadows.is_empty()),
+            "the enclosing graph card must not stack a second shadow"
+        );
     }
 
     /// The shadow ink adapts to light/dark: dark skins cast pure translucent

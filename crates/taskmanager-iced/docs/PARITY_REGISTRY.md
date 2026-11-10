@@ -17,16 +17,24 @@ explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
 Scrollbar is declared `Native` via iced's scrollable; every other capability is
 `Ported`. A silent omission or unexplained difference fails the crate gate.
 
-The control family (switch, slider, select, search field, segmented track)
-paints the SAME material the GPUI component layer wears: the shared Card
-glass gradient, its specular edge, and the theme's own two-layer glass shadow
-folded into the single quad Iced can paint (`theme::control_glass`). The
-hover/pressed/focus/disabled states reweight those tokens and never change
-geometry, and the focus ring reads the shared ring token — so a pointer-driven
-focus paints no ring on the switch or the segmented track either, the same
-strict keyboard-only policy every other control already follows. These are
-PRESENTATION executions of the shared tokens, not new semantics: the three
-registered divergences above keep their reasons unchanged.
+The control family (button, icon button, pill, checkbox, label, section
+header, toolbar, spinner, single-line input, multi-line editor, switch,
+slider, select, search field, segmented track) paints the SAME material the
+GPUI component layer wears: the shared Card glass gradient, its specular edge,
+and the theme's own two-layer glass shadow folded into the single quad Iced can
+paint (`theme::control_glass`). `theme/control_measurement.rs` binds the live
+theme snapshot to `ControlRole`/`resolve_size`; hover/pressed/focus/disabled
+states reweight paint and never change geometry. The focus ring reads the
+shared ring token, so pointer-driven focus paints no ring, and all copy is
+resolved through `taskmanager-application::i18n`. `Checkbox` is now a real
+`components::check_box` production path in the Applications column menu;
+`TextInput` is mounted through `plain_text_input` on the Applications search
+field, the Services filter, the process-properties environment filter and
+the Run Task command field. The native multi-line editor shares that material
+and geometry but has no production mount, because every editable text
+surface of this product is single-line (like the GPUI reference input). These
+are PRESENTATION executions of the shared tokens, not new semantics: the
+three registered divergences above keep their reasons unchanged.
 
 <!-- iced-capability-divergences: tooltip, toast, text-selection -->
 

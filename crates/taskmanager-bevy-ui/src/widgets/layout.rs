@@ -5,6 +5,7 @@
 //! `bsn!`; no layout system is allowed to fork a second set of breakpoints.
 
 use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, number};
 use taskmanager_ui_contract::presentation::vocabulary::{
     PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_SIDEBAR_MAX_WIDTH, PERFORMANCE_SLOT_GAP,
@@ -117,8 +118,10 @@ impl SystemDashboardBudget {
                 card_height: 0.0,
             };
         }
-        let rows = (available / 132.0).floor().clamp(1.0, 4.0) as usize;
-        let count = (rows * columns).min(4);
+        // The product owns how many metric cards the dashboard shows; the
+        // measured slot only decides how many of them FIT.
+        let rows = ((available / 132.0).floor() as usize).clamp(1, DASHBOARD_METRIC_COUNT);
+        let count = (rows * columns).min(DASHBOARD_METRIC_COUNT);
         // How many fixed-column rows a count needs is the shared page axis.
         let rows = page_count(count, columns);
         let card_height =

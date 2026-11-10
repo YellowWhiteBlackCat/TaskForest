@@ -52,8 +52,15 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                          not floating toasts",
             },
         ),
-        // iced's native text_input widget; keyboard paths ride the focus
-        // shell so activation/traversal match the reference.
+        // `components::plain_text_input` owns the single-line native
+        // TextInput binding; its style reads `control_glass` and its
+        // geometry resolves through ControlRole::Input. The Applications
+        // search field, the Services filter, the process-properties
+        // environment filter and the Run Task command field all mount it.
+        // The native multi-line editor exists as a toolkit-complete control
+        // (same glass and geometry) but has no production mount: every
+        // editable text surface of this product is single-line, like the
+        // GPUI reference input.
         (TextInput, Ported),
         (SearchInput, Ported),
         (
@@ -73,6 +80,9 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         ),
         (Switch, Ported),
         (Slider, Ported),
+        // `components::check_box` mounts Iced's native checkbox with a
+        // shared Toggle-role glass and the focus shell's keyboard activation;
+        // the Applications column menu consumes it for every column choice.
         (Checkbox, Ported),
         (Select, Ported),
         (SegmentedControl, Ported),

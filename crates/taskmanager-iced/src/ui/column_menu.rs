@@ -30,28 +30,30 @@ pub(super) fn render<'a>(
             .into_iter()
             .map(|(column, _)| {
                 let checked = !hidden.contains(&column);
-                let label = format!("{} {}", if checked { "✓" } else { "·" }, column.label());
-                focus::dynamic_button(
+                crate::ui::components::check_box(
                     theme_snapshot,
                     FocusTarget::ProcessColumnToggle(column),
-                    label,
-                    Message::ToggleProcessColumn(column),
+                    checked,
+                    crate::ui::applications::localized_sort_column_label(column),
+                    move |_| Message::ToggleProcessColumn(column),
                     false,
                 )
             })
             .chain([
-                focus::dynamic_button(
+                crate::ui::components::glass_button(
                     theme_snapshot,
                     FocusTarget::ProcessColumnsReset,
-                    t("common.reset").to_owned(),
+                    t("common.reset"),
                     Message::ResetProcessColumns,
+                    crate::ui::components::ButtonTone::Secondary,
                     false,
                 ),
-                focus::dynamic_button(
+                crate::ui::components::glass_button(
                     theme_snapshot,
                     FocusTarget::ProcessColumnsClose,
-                    t("common.cancel").to_owned(),
+                    t("common.cancel"),
                     Message::CloseProcessColumnsMenu,
+                    crate::ui::components::ButtonTone::Secondary,
                     false,
                 ),
             ])

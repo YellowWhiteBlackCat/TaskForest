@@ -134,7 +134,7 @@ pub(crate) fn process_status_filter_selector(
     let tabs: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = ProcessStatusFilter::ALL
         .into_iter()
         .map(|filter| {
-            focus::choice_pill(
+            crate::ui::components::pill(
                 theme_snapshot,
                 FocusTarget::ProcessStatusFilterTab(filter),
                 filter.label().to_string(),

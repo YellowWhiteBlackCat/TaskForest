@@ -1,5 +1,6 @@
 use super::*;
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowBudget, admit_card_groups_capped};
+use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 use taskmanager_ui_contract::presentation::vocabulary::{
     LayoutProfile, NavigationPresentation, VerticalSpace,
 };
@@ -28,7 +29,7 @@ fn expected_flow(available_height: f32, columns: usize) -> CardFlowBudget {
         available_height,
         columns,
         card_flow_spec(),
-        MAX_METRIC_GROUPS / columns,
+        max_metric_groups(columns),
     )
 }
 
@@ -59,7 +60,7 @@ fn assert_cards_stay_inside_the_shared_footprint(budget: DashboardBudget) {
         "a card may never grow past its ceiling: {budget:?}"
     );
     assert_eq!(budget.metric_count % budget.columns, 0);
-    assert!(budget.metric_count <= MAX_METRIC_GROUPS * budget.columns);
+    assert!(budget.metric_count <= DASHBOARD_METRIC_COUNT);
 }
 
 #[test]
@@ -181,11 +182,61 @@ fn a_narrow_page_keeps_one_column_and_still_reaches_every_metric() {
         assert_spends_shared_flow(budget);
         assert_cards_stay_inside_the_shared_footprint(budget);
         // Paging must still reach every metric, whatever the page admitted.
-        let last = budget.first_metric(budget.metric_count.max(1));
-        assert!(last + budget.metric_count.max(1) <= MAX_METRIC_GROUPS);
+        let window = budget.metric_window(budget.metric_count.max(1));
+        assert!(window.first + budget.metric_count.max(1) <= DASHBOARD_METRIC_COUNT);
     }
 
     let tall = DashboardBudget::from_page_layout(constrained_layout(width, 1400.0));
     assert_eq!(tall.metric_count, 4);
-    assert_eq!(tall.first_metric(3), 0);
+    assert_eq!(tall.metric_window(3).first, 0);
+}
+
+/// A tall reference frame must spend the measured review slot; a card
+/// footprint ceiling that stops below the slot leaves a visible dead band
+/// under the last row. The shared admission arithmetic is NOT the cause: the
+/// shape's own card footprint is.
+#[test]
+fn a_tall_reference_frame_spends_its_measured_review_slot() {
+    let budget = DashboardBudget::from_page_layout(constrained_layout(1180.0, 780.0));
+    assert_eq!(budget.columns, 2);
+    assert_eq!(budget.metric_count, DASHBOARD_METRIC_COUNT);
+    assert_cards_stay_inside_the_shared_footprint(budget);
+    assert_spends_shared_flow(budget);
+    let groups = budget.metric_count / budget.columns;
+    let footprint = budget.card_height * groups as f32 + CARD_GAP * (groups - 1) as f32;
+    assert!(
+        footprint >= budget.review_height - 1.0,
+        "a tall frame must not leave a dead band under the last card row: {budget:?}"
+    );
+}
+
+/// The compact frame's fixed chrome is measured, not guessed: its window
+/// controls, coverage readout and paging are one wrapped row, so the budget
+/// must not charge three separate full-height rows for them.
+#[test]
+fn a_compact_frame_charges_the_wrapped_control_row_once() {
+    use crate::gpui_app::root::responsive::{FrameBudget, FrameChromeBudget};
+    use gpui::{px, size};
+    use taskmanager_ui_contract::navigation::NavOrientation;
+
+    let (width, height) = (720.0, 480.0);
+    let frame = FrameBudget::for_root(
+        size(px(width), px(height)),
+        NavOrientation::Vertical,
+        FrameChromeBudget::new(32.0, false, false),
+    );
+    let budget = DashboardBudget::from_frame(frame);
+    assert_eq!(budget.columns, 2);
+    assert!(
+        budget.metric_count > 0,
+        "a complete group still fits: {budget:?}"
+    );
+    assert_cards_stay_inside_the_shared_footprint(budget);
+    assert_spends_shared_flow(budget);
+    let groups = budget.metric_count / budget.columns;
+    let footprint = budget.card_height * groups as f32 + CARD_GAP * (groups - 1) as f32;
+    assert!(
+        footprint <= budget.review_height,
+        "the cards must fit the measured slot: {budget:?}"
+    );
 }

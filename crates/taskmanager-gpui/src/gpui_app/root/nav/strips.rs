@@ -9,9 +9,8 @@ use gpui::{
 };
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
-use taskmanager_ui::theme_binding::glass_fill;
-use taskmanager_ui::theme_binding::glass_shadow;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui::theme_binding::rem_length;
@@ -174,7 +173,10 @@ pub fn nav_strip_horizontal(
         .pt(definite_length(tokens::SPACE_6))
         .pb(definite_length(tokens::SPACE_4))
         .child(
-            div()
+            CardSurface::unpadded(t.palette())
+                .glass(GlassTier::Sidebar)
+                .radius(tokens::card_radius(t))
+                .render()
                 .debug_selector(|| "tm-navigation-strip".to_string())
                 .h(px(crate::gpui_app::chrome::titlebar_height(t) + 4.0))
                 .flex_1()
@@ -182,11 +184,6 @@ pub fn nav_strip_horizontal(
                 .flex()
                 .flex_row()
                 .items_center()
-                .bg(glass_fill(t, GlassTier::Sidebar))
-                .rounded(rem_length(tokens::card_radius(t)))
-                .border(gpui::rems(GlassTier::Sidebar.edge_width_rem()))
-                .border_color(hsla(t.glass_layer(GlassTier::Sidebar).edge))
-                .shadow(glass_shadow(t, GlassTier::Sidebar))
                 .px(rem_length(tokens::SPACE_6))
                 .child(tabs)
                 .child(div().w(length(tokens::SPACE_6)).flex_shrink_0())
@@ -350,7 +347,11 @@ pub fn nav_strip_vertical(
         .pl(definite_length(tokens::SPACE_8))
         .pr(definite_length(tokens::SPACE_4))
         .child(
-            div()
+            CardSurface::new(t.palette())
+                .glass(GlassTier::Sidebar)
+                .radius(tokens::card_radius(t))
+                .padding(tokens::SPACE_6)
+                .render()
                 .debug_selector(|| "tm-navigation-rail".to_string())
                 .h_full()
                 .min_w(px(0.0))
@@ -360,12 +361,6 @@ pub fn nav_strip_vertical(
                 .flex_shrink_0()
                 .flex()
                 .flex_col()
-                .bg(glass_fill(t, GlassTier::Sidebar))
-                .rounded(rem_length(tokens::card_radius(t)))
-                .border(gpui::rems(GlassTier::Sidebar.edge_width_rem()))
-                .border_color(hsla(t.glass_layer(GlassTier::Sidebar).edge))
-                .shadow(glass_shadow(t, GlassTier::Sidebar))
-                .p(rem_length(tokens::SPACE_6))
                 .child(tabs)
                 .child(
                     div()

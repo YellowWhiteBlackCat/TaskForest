@@ -16,6 +16,7 @@ use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::{definite_length, font_size, font_weight, hsla};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::dashboard::MetricPaging;
 
 fn dashboard_summaries(props: &DashboardViewProps<'_>, series: &GraphTimelineSeries) -> Div {
     let theme = props.theme;
@@ -102,8 +103,7 @@ fn dashboard_summaries(props: &DashboardViewProps<'_>, series: &GraphTimelineSer
 }
 
 fn dashboard_paging(props: &DashboardViewProps<'_>) -> Div {
-    let count = props.layout.metric_count.max(1);
-    let first = props.layout.first_metric(props.state.history_first_metric);
+    let window = props.layout.metric_window(props.state.history_first_metric);
     let mut row = div()
         .flex()
         .flex_row()
@@ -115,13 +115,13 @@ fn dashboard_paging(props: &DashboardViewProps<'_>) -> Div {
             true,
             "dashboard-previous-metrics",
             "dashboard.previous_metrics",
-            first > 0,
+            window.can_page_previous(),
         ),
         (
             false,
             "dashboard-next-metrics",
             "dashboard.next_metrics",
-            first + count < TimelineMetric::ALL.len(),
+            window.can_page_next(),
         ),
     ] {
         let entity = props.entity.clone();
@@ -131,11 +131,12 @@ fn dashboard_paging(props: &DashboardViewProps<'_>) -> Div {
                 i18n::t(key),
                 move |_, cx| {
                     entity.update(cx, |view, cx| {
-                        view.dashboard.history_first_metric = if previous {
-                            first.saturating_sub(count)
+                        let step = if previous {
+                            MetricPaging::Previous
                         } else {
-                            (first + count).min(TimelineMetric::ALL.len().saturating_sub(count))
+                            MetricPaging::Next
                         };
+                        view.dashboard.history_first_metric = window.paged(step).first;
                         cx.notify();
                     });
                 },

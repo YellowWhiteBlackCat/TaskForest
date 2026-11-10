@@ -23,6 +23,11 @@ use taskmanager_theme::{
 };
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
+mod control_measurement;
+pub use control_measurement::{
+    control_extent, control_measurement, control_padding_x, ui_size_from_root,
+};
+
 /// The control/surface visual state Iced paints from the shared presentation
 /// vocabulary. Geometry never changes with state: focus, hover, press and
 /// disabled alter paint only, so a ring or a disabled tint cannot consume a
@@ -127,6 +132,7 @@ pub fn control_glass(
 pub fn control_divider_color(theme: &Theme) -> iced::Color {
     color(theme.glass_card().edge)
 }
+
 /// The iced theme for one neutral theme snapshot: `Theme::custom` with the
 /// skin's backdrop/text/accent/status tokens. Widget default styles then
 /// inherit the skin's semantic colors; explicit styles read the same tokens

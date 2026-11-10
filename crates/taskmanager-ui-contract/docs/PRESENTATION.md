@@ -15,12 +15,27 @@ budget       measured slot → typed page and slot allocation
    ↓
 card_flow    whole-group admission + card height clamp (one arithmetic)
    ↓
+dashboard    the product metric count + the paged metric window
+   ↓
 parity       probe grid and the unexplained-difference rule
 sizes        control-role matrix and hit-target floor
 motion       motion-role/curve matrix and forbidden sites
 resolution   the frame's resolved facts and the re-deriving verifier
 load_tiers   the per-core load-tier band edges + the clamp-and-bucket fold
 ```
+
+## The dashboard metric window is one count
+
+The dashboard shows the product's timeline metrics. WHICH metrics exist is a
+semantic fact owned by the application layer (`TimelineMetric::ALL`); HOW MANY
+metric cards a shape may draw, and WHERE a paged window may start, is a
+presentation fact. `presentation::dashboard` derives the count from that set
+(`DASHBOARD_METRIC_COUNT`), derives the group cap from the count
+(`max_metric_groups`), and owns the window arithmetic
+(`DashboardMetricWindow`: resolve, page, and the metric order). The shapes
+spend the verdict instead of restating a number, so a shape that pages by one
+window and a shape that pages by one metric differ by a declared step, never
+by a second count.
 
 ## Card flow is one admission rule
 

@@ -253,7 +253,19 @@ pub fn tooltip(t: &Theme, text: &str) -> Div {
 /// The non-elevated tooltip leaf used by graph tooltips, which sit above an
 /// already-painted chart surface and must not stack a second card shadow.
 pub(crate) fn flat_tooltip(t: &Theme, text: &str) -> Div {
-    tooltip(t, text).shadow_none()
+    CardSurface::new(t.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::control_radius(t))
+        .padding(tokens::SPACE_4)
+        .inset()
+        .child(
+            div()
+                .px(definite_length(tokens::SPACE_4))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(t.fg))
+                .child(text.to_string()),
+        )
+        .render()
 }
 
 /// A tooltip overlay: the [`tooltip`] label, raised above all siblings via

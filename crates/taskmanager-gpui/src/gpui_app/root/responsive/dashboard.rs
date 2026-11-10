@@ -3,6 +3,7 @@
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowSpec, admit_card_groups_capped};
+use taskmanager_ui_contract::presentation::dashboard::{DashboardMetricWindow, max_metric_groups};
 use taskmanager_ui_contract::presentation::vocabulary::BOTTOM_SAFETY_BAND;
 
 use super::FrameBudget;
@@ -12,7 +13,13 @@ use super::FrameBudget;
 mod tests;
 
 pub(crate) const CARD_FLOOR: f32 = 112.0;
-pub(crate) const CARD_CEILING: f32 = 172.0;
+/// A history chart is elastic content, so its ceiling is the tallest slot
+/// the measured reference family can hand two whole groups. The old 172px
+/// ceiling stopped the cards less than halfway into a tall frame's review
+/// slot and left a visible dead band under the last row. The shared card-flow
+/// contract still owns the floor clamp, whole-group admission and gap
+/// arithmetic; this ceiling is the shape's own card footprint.
+pub(crate) const CARD_CEILING: f32 = 420.0;
 pub(crate) const CARD_GAP: f32 = tokens::SPACE_8.0;
 pub(crate) const SUMMARY_CARD_HEIGHT: f32 = 88.0;
 pub(crate) const SUMMARY_COUNT_HEIGHT: f32 = 24.0;
@@ -21,9 +28,6 @@ pub(crate) const SECTION_WRAPPED_HEIGHT: f32 = 72.0;
 pub(crate) const WINDOW_CONTROLS_HEIGHT: f32 = 32.0;
 pub(crate) const PAGING_HEIGHT: f32 = 32.0;
 pub(crate) const COVERAGE_HEIGHT: f32 = 24.0;
-/// The dashboard owns four metrics at most; a two-column layout spends the
-/// same four metrics in two groups.
-const MAX_METRIC_GROUPS: usize = 4;
 
 /// The dashboard metric card's own footprint, handed to the shared card-flow
 /// contract that owns the whole-group admission and the height clamp.
@@ -102,7 +106,7 @@ impl DashboardBudget {
             review_height,
             columns,
             card_flow_spec(),
-            MAX_METRIC_GROUPS / columns,
+            max_metric_groups(columns),
         );
         Self {
             columns,
@@ -113,7 +117,9 @@ impl DashboardBudget {
         }
     }
 
-    pub(crate) fn first_metric(self, requested: usize) -> usize {
-        requested.min(MAX_METRIC_GROUPS.saturating_sub(self.metric_count.max(1)))
+    /// The metric window this page shows, resolved against the metrics the
+    /// product owns (the shared dashboard contract owns that arithmetic).
+    pub(crate) fn metric_window(self, requested: usize) -> DashboardMetricWindow {
+        DashboardMetricWindow::resolve(requested, self.metric_count)
     }
 }

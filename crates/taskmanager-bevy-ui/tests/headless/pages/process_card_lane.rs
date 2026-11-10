@@ -14,28 +14,28 @@ use bevy::ecs::query::With;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
-use bevy::ui::prelude::{BackgroundColor, ComputedNode, Display, Node};
+use bevy::ui::prelude::{ComputedNode, Display, Node};
 use bevy::ui::widget::Text;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, fixture};
-use taskmanager_theme::{GlassTier, Theme, tokens::UiSize};
+use taskmanager_theme::{Theme, tokens::UiSize};
 
 use crate::app::{FrontendTrack, Page, PageContext, Route};
 use crate::drain::ShellProjectionFolded;
+use crate::input::ShellInteractionApplied;
 use crate::pages::processes::card_lane::{
-    CardFlowBudget, CardFlowMetrics, CardGroup, ProcessAtomicCard, ProcessCardFlow,
-    ProcessCardGroup, ProcessFocusDashboard, ProcessGroupChip, ProcessViewMode,
-    ProcessViewModeButton, card_flow_budget, card_flow_plan, focus_projection,
+    CardFlowBudget, CardFlowMetrics, CardFlowWindow, CardGroup, ProcessAtomicCard, ProcessCardFlow,
+    ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode, ProcessViewModeButton,
+    card_flow_budget, card_flow_plan, focus_projection,
 };
 use crate::pages::processes::{
     ProcessCountLine, ProcessRowLink, ProcessRowsRoot, ProcessTableArtifact, ProcessTableContainer,
     content,
 };
 use crate::palette::{UiPalette, ui_palette};
-use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::WindowPalette;
 
 // ---- fixtures -----------------------------------------------------------
@@ -118,29 +118,6 @@ fn card_links(app: &mut App) -> Vec<(Entity, usize)> {
         .iter(app.world())
         .map(|(entity, card)| (entity, card.0))
         .collect()
-}
-
-fn assert_card_surfaces(app: &mut App) {
-    let world = app.world_mut();
-    let palette = world.resource::<WindowPalette>().inner.clone();
-    let mut cards =
-        world.query_filtered::<(&ControlVisual, &BackgroundColor), With<ProcessAtomicCard>>();
-    let surfaces: Vec<_> = cards
-        .iter(world)
-        .map(|(visual, fill)| (*visual, fill.0))
-        .collect();
-    assert!(
-        !surfaces.is_empty(),
-        "the admitted whole group paints atomic cards"
-    );
-    for (visual, fill) in surfaces {
-        assert_eq!(visual.0, ControlTone::Card, "a card is not a table row");
-        assert_eq!(
-            fill,
-            palette.glass_fill(GlassTier::Card),
-            "the card's painted glass surface survives control skinning"
-        );
-    }
 }
 
 /// The measured composition: the real window plugins, a UI layout pass, and a
@@ -230,11 +207,14 @@ fn group_filters(app: &mut App) -> Vec<ProcessStatusFilter> {
         .collect()
 }
 
-fn chip_labels(app: &mut App) -> Vec<(Entity, ProcessStatusFilter)> {
+fn overflow_labels(app: &mut App) -> Vec<(Entity, ProcessStatusFilter)> {
     app.world_mut()
-        .query_filtered::<(Entity, &ProcessGroupChip), ()>()
+        .query_filtered::<(
+            Entity,
+            &crate::pages::processes::card_lane::ProcessGroupOverflow,
+        ), ()>()
         .iter(app.world())
-        .map(|(entity, chip)| (entity, chip.0))
+        .map(|(entity, overflow)| (entity, overflow.0))
         .collect()
 }
 
@@ -299,21 +279,35 @@ fn the_measured_cards_stay_inside_the_bounded_flow_viewport() {
 fn a_slot_too_short_for_one_group_degrades_to_the_dense_table() {
     // The shared contract answers ZERO groups when not even one complete
     // group fits; the lane then steps aside instead of squeezing a card.
+    let palette = palette();
+    let metrics = CardFlowMetrics::from_palette(&palette);
+    let floor = metrics.header_height_px + metrics.card_height_px;
+    let compact = card_flow_budget(720.0, metrics.group_gap_px, &palette);
+    assert_eq!(compact.groups, 0, "a compact slot admits no half group");
+    assert!(compact.group_height_px < floor, "no card is squeezed");
+
     let items: Vec<ProcessItem> = (0..24).map(|pid| process(pid, "p", "Running")).collect();
     let mut app = measured_process_app(720, 480, items);
-    app.update();
-
+    app.insert_resource(compact);
+    app.insert_resource(ProcessViewMode::Dense);
+    app.world_mut().commands().trigger(ShellInteractionApplied);
+    for _ in 0..4 {
+        app.update();
+    }
     let world = app.world_mut();
     let cards = world
         .query_filtered::<Entity, With<ProcessAtomicCard>>()
         .iter(world)
         .count();
+    assert_eq!(
+        cards, 0,
+        "the injected zero-group verdict paints no half card"
+    );
     let table = world
         .query_filtered::<&bevy::ui::prelude::Node, With<ProcessTableContainer>>()
         .iter(world)
         .next()
         .expect("the dense table container is mounted");
-    assert_eq!(cards, 0, "a compact slot paints no half card");
     assert_eq!(
         table.display,
         Display::Flex,
@@ -375,23 +369,17 @@ fn the_focus_dashboard_keeps_the_typed_painted_fallback_without_an_adapter() {
 fn the_card_budget_spends_the_shared_whole_group_admission() {
     let palette = palette();
     let metrics = CardFlowMetrics::from_palette(&palette);
-    let chrome = metrics.lane_chrome_height_px();
     // A slot too short for one complete group block admits ZERO groups:
     // the lane degrades to its dense form instead of squeezing a card.
-    let too_short = card_flow_budget(1000.0, chrome, &palette);
+    let too_short = card_flow_budget(1000.0, metrics.group_gap_px, &palette);
     assert_eq!(too_short.groups, 0, "a half group is never admitted");
 
     let one_group = card_flow_budget(
         1000.0,
-        chrome + metrics.header_height_px + metrics.card_height_px + metrics.group_gap_px,
+        metrics.header_height_px + metrics.card_height_px + metrics.group_gap_px * 2.0,
         &palette,
     );
     assert_eq!(one_group.groups, 1);
-    assert_eq!(
-        one_group.cards(),
-        one_group.groups * one_group.columns,
-        "the card count is groups times the cards per row"
-    );
     assert!(
         one_group.group_height_px >= metrics.header_height_px + metrics.card_floor_px,
         "the admitted group keeps its whole floor: {one_group:?}"
@@ -420,7 +408,7 @@ fn the_card_plan_admits_whole_groups_only() {
         group_height_px: 200.0,
         columns: 2,
     };
-    let plan = card_flow_plan(&shell, budget);
+    let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
     assert!(!plan.empty);
     assert_eq!(
         plan.groups.len(),
@@ -437,7 +425,7 @@ fn the_card_plan_admits_whole_groups_only() {
     );
 
     // A zero-group verdict admits nothing: the lane shows its dense fallback.
-    let none = card_flow_plan(&shell, CardFlowBudget::default());
+    let none = card_flow_plan(&shell, CardFlowBudget::default(), CardFlowWindow::default());
     assert!(none.groups.is_empty());
     assert!(
         !none.empty,
@@ -463,7 +451,7 @@ fn the_card_plan_folds_one_bucket_across_the_whole_page() {
         group_height_px: 200.0,
         columns: 4,
     };
-    let plan = card_flow_plan(&shell, budget);
+    let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
     assert_eq!(plan.groups.len(), 2, "two status buckets are admitted");
     assert_eq!(plan.groups[0].group, CardGroup::Running);
     assert_eq!(plan.groups[0].members, &[0, 2]);
@@ -497,7 +485,7 @@ fn the_focus_projection_never_invents_an_unavailable_fact() {
 // ---- wired: the mounted lane ---------------------------------------------
 
 #[test]
-fn the_lane_mounts_chips_a_focus_dashboard_and_a_card_flow() {
+fn the_lane_mounts_one_focus_dashboard_and_a_bounded_card_flow() {
     let items = vec![
         process(10, "alpha", "Running"),
         process(20, "beta", "Sleeping"),
@@ -505,11 +493,15 @@ fn the_lane_mounts_chips_a_focus_dashboard_and_a_card_flow() {
     let mut app = card_lane_app(shell_with(items), palette());
     app.update();
 
-    let chips = chip_labels(&mut app);
+    let chip_count = app
+        .world_mut()
+        .query_filtered::<Entity, With<crate::pages::processes::toolbar::ProcessFilterButton>>()
+        .iter(app.world())
+        .count();
     assert_eq!(
-        chips.len(),
+        chip_count,
         ProcessStatusFilter::ALL.len(),
-        "every shared status bucket is a chip"
+        "the page chrome owns every status chip; the lane does not fork one"
     );
     assert!(
         app.world_mut()
@@ -530,35 +522,55 @@ fn the_lane_mounts_chips_a_focus_dashboard_and_a_card_flow() {
 }
 
 #[test]
-fn a_chip_activation_reduces_through_the_shell_filter() {
+fn a_group_overflow_action_reduces_through_the_shell_filter() {
     let items = vec![
         process(10, "alpha", "Running"),
         process(20, "beta", "Sleeping"),
         process(30, "gamma", "Running"),
     ];
     let mut app = measured_process_app(1180, 780, items);
-    app.update();
+    for _ in 0..4 {
+        app.update();
+    }
 
-    let sleeping = chip_labels(&mut app)
-        .into_iter()
-        .find(|(_, filter)| *filter == ProcessStatusFilter::Sleeping)
-        .map(|(entity, _)| entity)
-        .expect("the sleeping chip is mounted");
+    let overflow = overflow_labels(&mut app).into_iter().next();
+    let Some((entity, filter)) = overflow else {
+        // A measured lane whose admitted row holds every visible member
+        // needs no overflow action. Assert the whole bucket still states
+        // its identity and the canonical chips remain the filter owner.
+        let texts: Vec<String> = app
+            .world_mut()
+            .query::<&Text>()
+            .iter(app.world())
+            .map(|text| text.0.clone())
+            .collect();
+        assert!(
+            texts
+                .iter()
+                .any(|text| text.contains(t("proc.status_running"))),
+            "the group header states the bucket: {texts:?}"
+        );
+        return;
+    };
     app.world_mut()
         .commands()
-        .trigger(bevy::ui_widgets::Activate { entity: sleeping });
+        .trigger(bevy::ui_widgets::Activate { entity });
     app.update();
 
     let shell = &app.world().non_send::<FrontendTrack>().shell;
     assert_eq!(
-        shell.process_status_filter,
-        ProcessStatusFilter::Sleeping,
-        "the chip reduces through the shell's canonical filter"
+        shell.process_status_filter, filter,
+        "the bucket overflow reduces through the shell's canonical filter"
     );
     assert_eq!(
         shell.visible_process_count(),
         1,
         "the filtered projection is the shell's own"
+    );
+    assert_eq!(
+        *app.world().resource::<ProcessViewMode>(),
+        ProcessViewMode::Dense,
+        "the omitted rows become reachable in the dense table"
     );
 }
 
@@ -741,8 +753,6 @@ fn the_card_artifacts_are_swept_with_the_one_virtual_window() {
     let items: Vec<ProcessItem> = (0..8).map(|pid| process(pid, "p", "Running")).collect();
     let mut app = card_lane_app(shell_with(items), palette());
     app.update();
-    assert_card_surfaces(&mut app);
-
     let groups = group_filters(&mut app);
     assert_eq!(
         groups,

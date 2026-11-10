@@ -10,6 +10,7 @@ use super::super::{IcedApp, Message, PerfDevice};
 use super::dispatch::UpdateDispatch;
 use taskforest_contract::CapabilityId;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
+use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 
 impl IcedApp {
     pub(super) fn reduce_performance_message(&mut self, message: Message) -> UpdateDispatch {
@@ -112,15 +113,10 @@ impl IcedApp {
             // Frontend-local dashboard window selection (no shell effect):
             // the pills only re-project the System-page dashboard segment.
             Message::SystemDashboard(
-                crate::ui::system_dashboard::SystemDashboardMessage::Previous,
+                crate::ui::system_dashboard::SystemDashboardMessage::SetMetricOffset(offset),
             ) => {
                 self.system_dashboard_first_metric =
-                    self.system_dashboard_first_metric.saturating_sub(1);
-                None
-            }
-            Message::SystemDashboard(crate::ui::system_dashboard::SystemDashboardMessage::Next) => {
-                self.system_dashboard_first_metric =
-                    self.system_dashboard_first_metric.saturating_add(1).min(3);
+                    offset.min(DASHBOARD_METRIC_COUNT.saturating_sub(1));
                 None
             }
             Message::SystemDashboard(

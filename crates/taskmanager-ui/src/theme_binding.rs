@@ -27,7 +27,8 @@ use taskmanager_theme::fonts::FontAvailability;
 use taskmanager_theme::optical_glass::OpticalGlassCapability;
 use taskmanager_theme::platform::{WeightCompensationAxis, effective_weight};
 use taskmanager_theme::theme::{
-    EdgeTiling, GlassTier, Material, STANDARD_ROOT_REM_SIZE, Theme, WindowChromeState,
+    EdgeTiling, GlassShadowProjection, GlassTier, Material, STANDARD_ROOT_REM_SIZE, Theme,
+    WindowChromeState,
 };
 use taskmanager_theme::tokens::{DURATION_FAST, DURATION_MEDIUM, MotionPolicy};
 
@@ -119,9 +120,15 @@ fn rem_pixels(theme: &Theme, value: f32) -> Pixels {
 
 /// Resolve the theme-owned two-layer glass shadow onto GPUI's pixel-only
 /// shadow type. All dimensions originate in [`GlassTier`] REM values.
+///
+/// GPUI paints every layer of a shadow, so this binding declares the
+/// [`GlassShadowProjection::Layered`] projection explicitly: the shared
+/// contract stays the single owner of the elevation ladder, and a renderer
+/// that can only paint one quad (Iced) declares its own projection instead
+/// of re-deriving the ink here.
 #[must_use]
 pub fn glass_shadow(theme: &Theme, tier: GlassTier) -> Vec<BoxShadow> {
-    let layers = tier.shadow(theme);
+    let layers = tier.projected_shadow(theme, GlassShadowProjection::Layered);
     vec![
         BoxShadow {
             color: hsla(layers.ambient.color),

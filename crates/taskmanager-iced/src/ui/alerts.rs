@@ -9,7 +9,7 @@
 //! `alert.*` catalog keys the TUI suggestions overlay and the GPUI rule
 //! manager already consume.
 
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, text};
 use iced::{Element, Length};
 use taskforest_core::core::alerts::AlertRuleConflictPolicy;
 use taskforest_core::core::alerts::AlertSeverity;
@@ -22,7 +22,7 @@ mod editor;
 use crate::app::{AlertsMessage, FocusTarget, Message};
 use crate::focus;
 use crate::theme;
-use crate::ui::components::styled_scrollable;
+use crate::ui::components::{ButtonTone, glass_button, section_header, styled_scrollable, toolbar};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -56,44 +56,46 @@ pub(crate) fn page_tab_pill(
 /// Render the Alerts page body.
 pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
-    let export_button = focus::button(
+    let export_button = glass_button(
         theme_snapshot,
         FocusTarget::AlertsExport,
         t("common.export"),
         Message::Alerts(AlertsMessage::ExportRules),
-        false,
+        ButtonTone::Secondary,
+        true,
     );
-    let import_button = focus::button(
+    let import_button = glass_button(
         theme_snapshot,
         FocusTarget::AlertsImport,
         "Import (merge)",
         Message::Alerts(AlertsMessage::ImportRulesFromClipboard {
             mode: AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
         }),
-        false,
+        ButtonTone::Secondary,
+        true,
     );
-    let replace_button = focus::button(
+    let replace_button = glass_button(
         theme_snapshot,
         FocusTarget::AlertsImportReplace,
         "Import (replace)",
         Message::Alerts(AlertsMessage::ImportRulesFromClipboard {
             mode: AlertRuleImportMode::Replace,
         }),
-        false,
+        ButtonTone::Danger,
+        true,
     );
 
-    let add = focus::button(
+    let add = glass_button(
         theme_snapshot,
         FocusTarget::AlertsAdd,
         t("alerts.add_rule"),
         Message::Alerts(AlertsMessage::AddDefaultRule),
-        false,
+        ButtonTone::Primary,
+        true,
     );
     let heading = column![
-        text(t("alerts.manage")).size(f32::from(tokens::FONT_14)),
-        row![add, export_button, import_button, replace_button]
-            .spacing(f32::from(tokens::SPACE_8))
-            .wrap()
+        section_header(theme_snapshot, t("alerts.manage")),
+        toolbar(vec![add, export_button, import_button, replace_button]),
     ];
 
     let active_section = active_section(app, theme_snapshot);
@@ -120,12 +122,8 @@ fn active_section<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     let lines = active_alert_lines(app);
-    let mut section = column![
-        text(t("dashboard.active_alerts"))
-            .size(f32::from(tokens::FONT_12))
-            .color(muted)
-    ]
-    .spacing(f32::from(tokens::SPACE_4));
+    let mut section = column![section_header(theme_snapshot, t("dashboard.active_alerts"))]
+        .spacing(f32::from(tokens::SPACE_4));
 
     if lines.is_empty() {
         section = section.push(

@@ -32,6 +32,8 @@ const OPTICAL_GLASS_SHADER_HANDLE: Handle<Shader> =
 
 mod capability;
 pub(crate) use capability::{OPTICAL_GLASS_MAX_BLUR_PX, optical_glass_capability};
+mod backdrop_mirror;
+pub(crate) use backdrop_mirror::BackdropMirror;
 mod scene;
 pub(crate) use scene::{OpticalBackdropSource, OpticalGlassCard};
 
@@ -236,6 +238,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_plugins(UiMaterialPlugin::<OpticalGlassMaterial>::default());
     app.add_observer(materialize_optical_glass);
     scene::register(app);
+    backdrop_mirror::register(app);
 }
 
 fn materialize_optical_glass(

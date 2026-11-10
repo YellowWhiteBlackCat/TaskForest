@@ -19,11 +19,11 @@ use iced::{Element, Length};
 use taskmanager_theme::{FontAvailability, FontChoice, FontRole, Theme, tokens};
 
 use crate::app::{DeviceKind, FocusTarget, Message, PresentationPreferences, SettingsChange};
-use crate::ui::components::styled_scrollable;
+use crate::ui::components::{ButtonTone, glass_button, styled_scrollable};
 use taskmanager_application::i18n::Language;
 
 use super::components::IcedElement;
-use super::components::{segmented, select, slider, switch};
+use super::components::{label, section_header, segmented, select, slider, switch};
 use super::overlays::modal_overlay;
 use taskmanager_application::i18n::t;
 
@@ -71,11 +71,12 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                     text(t("settings.additional_setup_detail"))
                         .size(f32::from(tokens::FONT_12))
                         .into(),
-                    crate::focus::dynamic_button(
+                    glass_button(
                         theme_snapshot,
                         FocusTarget::FirstRunOpen,
                         t("settings.additional_setup_open").to_owned(),
                         Message::FirstRun(crate::app::FirstRunMessage::Open),
+                        ButtonTone::Primary,
                         false,
                     ),
                 ],
@@ -102,7 +103,7 @@ fn group<'a>(
     rows: Vec<IcedElement<'a>>,
 ) -> IcedElement<'a> {
     column(vec![
-        group_header(theme_snapshot, t(key)),
+        section_header(theme_snapshot, t(key)),
         column(rows).spacing(f32::from(tokens::SPACE_2)).into(),
     ])
     .spacing(f32::from(tokens::SPACE_6))
@@ -153,7 +154,7 @@ fn general_group<'a>(
                     ),
                 ),
             ),
-            section_caption(theme_snapshot, t("settings.keyboard")),
+            label(theme_snapshot, t("settings.keyboard"), true),
             shortcut_section(theme_snapshot),
         ],
     )
@@ -299,11 +300,12 @@ fn fonts_group<'a>(
                 t("settings.text_rendering"),
                 static_value(theme_snapshot, t("settings.text_default")),
             ),
-            hint_line(
+            label(
                 theme_snapshot,
                 // Frontend-neutral wording: the GPUI-specific key belongs to the
                 // GPUI settings page; Iced has no text-raster variant at all.
                 t("settings.text_rendering_unavailable_generic"),
+                true,
             ),
         ],
     )
@@ -368,7 +370,7 @@ fn device_label_key(kind: DeviceKind) -> &'static str {
 /// zero-value graying, continuous history.
 fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) -> IcedElement<'a> {
     let mut rows: Vec<IcedElement<'a>> = Vec::new();
-    rows.push(section_caption(theme_snapshot, t("settings.devices")));
+    rows.push(label(theme_snapshot, t("settings.devices"), true));
     for kind in DeviceKind::ALL {
         rows.push(setting_row(
             t(device_label_key(kind)),
@@ -397,10 +399,7 @@ fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) 
             Some(refresh_label),
         ),
     ));
-    rows.push(section_caption(
-        theme_snapshot,
-        t("settings.graph_settings"),
-    ));
+    rows.push(label(theme_snapshot, t("settings.graph_settings"), true));
     rows.push(setting_row(
         t("settings.graph_data_points"),
         slider(
@@ -437,9 +436,10 @@ fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) 
             |on| Message::SettingsChanged(SettingsChange::GrayZeroValues(on)),
         ),
     ));
-    rows.push(hint_line(
+    rows.push(label(
         theme_snapshot,
         t("settings.gray_zero_values_hint"),
+        true,
     ));
     rows.push(setting_row(
         t("settings.history_persistence"),
@@ -451,9 +451,10 @@ fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) 
             |on| Message::SettingsChanged(SettingsChange::ContinuousHistory(on)),
         ),
     ));
-    rows.push(hint_line(
+    rows.push(label(
         theme_snapshot,
         t("settings.history_persistence_detail"),
+        true,
     ));
     group(theme_snapshot, "settings.group_system", rows)
 }
@@ -478,7 +479,11 @@ fn notifications_group<'a>(
                     |on| Message::SettingsChanged(SettingsChange::DesktopNotifications(on)),
                 ),
             ),
-            hint_line(theme_snapshot, t("settings.desktop_notifications_hint")),
+            label(
+                theme_snapshot,
+                t("settings.desktop_notifications_hint"),
+                true,
+            ),
             setting_row(
                 t("settings.quiet_hours_start"),
                 boxed(
@@ -575,7 +580,7 @@ fn units_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) -
         base2_change,
     ) in surfaces
     {
-        rows.push(section_caption(theme_snapshot, t(unit_key)));
+        rows.push(label(theme_snapshot, t(unit_key), true));
         rows.push(setting_row(
             t(unit_key),
             segmented(

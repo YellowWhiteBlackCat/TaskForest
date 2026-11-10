@@ -7,11 +7,10 @@ use taskforest_core::core::directory_usage::{
 use taskforest_core::core::identity::DeviceId;
 use taskforest_core::core::metrics::GpuMetrics;
 use taskforest_core::core::sensors::SensorQuantity;
-use taskmanager_application::system_timeline::{
-    SystemHistoryWindow, SystemPageSection, TimelineMetric,
-};
+use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_application::{AppPage, DirectoryUsageRequest, PlatformEffect, i18n::t};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 
 use crate::TuiApp;
 use taskmanager_shell::presentation::gpu_engine_rows::{
@@ -157,7 +156,7 @@ impl TuiApp {
         if self.system_section == SystemPageSection::Dashboard {
             self.system_scroll = self
                 .system_scroll
-                .min(TimelineMetric::ALL.len().saturating_sub(1));
+                .min(DASHBOARD_METRIC_COUNT.saturating_sub(1));
         }
     }
 

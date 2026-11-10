@@ -361,6 +361,20 @@ pub fn more_rows_label(hidden: usize) -> String {
     t("common.more_rows").replace("{count}", &hidden.to_string())
 }
 
+/// The localized `"{label}: {value}"` join — the single spelling for
+/// legend-style pairs.
+///
+/// The catalog owns the punctuation (a full-width colon in zh), so a
+/// frontend that spells its own separator invents a second spelling. Both
+/// the label and the value arrive already localized; this resolver only
+/// places them.
+#[must_use]
+pub fn key_value_label(label: &str, value: &str) -> String {
+    t("common.kv")
+        .replace("{label}", label)
+        .replace("{value}", value)
+}
+
 /// The localized choice label for a history replay window.
 ///
 /// The window's catalog key is core vocabulary

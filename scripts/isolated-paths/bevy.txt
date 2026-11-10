@@ -16,6 +16,7 @@ crates/taskmanager-theme/src/lib.rs
 crates/taskmanager-theme/src/theme.rs
 crates/taskmanager-ui-contract/src/presentation.rs
 crates/taskmanager-ui-contract/src/presentation/card_flow.rs
+crates/taskmanager-ui-contract/src/presentation/dashboard.rs
 # shell 只携带本行消费的 presentation 面(trend/gpu 图表接缝,ADR-027):
 # 整个 shell 的未提交 diff 还混着依赖新 core 的告警重构,不携带。
 crates/taskmanager-shell/Cargo.toml

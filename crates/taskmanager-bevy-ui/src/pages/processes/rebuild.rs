@@ -252,7 +252,8 @@ fn rebuild_window_scenes(
             // table's measured window collapses to zero rows while the
             // card lane owns the screen, so a window-derived plan would
             // admit nothing at all.
-            let plan = card_flow_plan(shell, card_budget);
+            let window = surface.card_window.as_deref().copied().unwrap_or_default();
+            let plan = card_flow_plan(shell, card_budget, window);
             if plan.empty || plan.groups.is_empty() {
                 vec![empty_card_scene(
                     if plan.empty {

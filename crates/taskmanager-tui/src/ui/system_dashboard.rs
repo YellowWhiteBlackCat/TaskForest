@@ -14,6 +14,7 @@ use taskmanager_application::{
     system_timeline::{SystemHistoryWindow, TimelineMetric, TimelineStatistic},
 };
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
+use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let series = app.shell.system_timeline_series(app.system_history_window);
@@ -63,7 +64,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     let slots = usize::from(inner.height.saturating_sub(2) / 4);
     let first = app
         .system_scroll
-        .min(TimelineMetric::ALL.len().saturating_sub(1));
+        .min(DASHBOARD_METRIC_COUNT.saturating_sub(1));
     for (slot, metric) in TimelineMetric::ALL
         .into_iter()
         .skip(first)

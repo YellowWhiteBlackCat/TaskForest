@@ -5,7 +5,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::privilege_center::{PrivilegeCenterInputs, PrivilegeRowState};
 use taskmanager_theme::tokens;
 
-use super::controls::{group_header, hint_line, setting_row};
+use super::controls::{hint_line, setting_row};
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme::muted_text_color;
@@ -43,7 +43,7 @@ pub(super) fn privileges_group(app: &crate::IcedApp) -> IcedElement<'_> {
         rows.push(setting_row(t(privilege.label_key), controls.into()));
     }
     column![
-        group_header(theme, t("settings.privileges")),
+        crate::ui::components::section_header(theme, t("settings.privileges")),
         column(rows).spacing(f32::from(tokens::SPACE_2))
     ]
     .spacing(f32::from(tokens::SPACE_6))

@@ -5,7 +5,7 @@ use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::DashboardBudget;
 use crate::gpui_app::timeline::GraphTimelineSeries;
-use gpui::{Div, Entity, ParentElement, Styled, div};
+use gpui::{Div, Entity, ParentElement, Styled, div, px};
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
@@ -42,16 +42,15 @@ pub(super) fn render_history_grid(
             graph_cache: graph_cache.clone(),
         })
     };
-    let mut grid = div()
+    let grid = div()
         .flex()
         .flex_row()
         .flex_wrap()
+        .h_full()
+        .min_h(px(0.0))
         .gap(definite_length(tokens::SPACE_8));
-    for metric in TimelineMetric::ALL
-        .into_iter()
-        .skip(layout.first_metric(state.history_first_metric))
-        .take(layout.metric_count)
-    {
+    let mut grid = grid;
+    for metric in layout.metric_window(state.history_first_metric).metrics() {
         let (label, color, max, unit) = match metric {
             TimelineMetric::Cpu => (i18n::t("common.cpu"), theme.cpu, 100.0, "%"),
             TimelineMetric::Memory => (i18n::t("common.memory"), theme.memory, 100.0, "%"),

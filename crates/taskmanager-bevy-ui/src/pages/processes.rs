@@ -271,6 +271,10 @@ pub(crate) struct TableSurface<'w, 's> {
     /// The card lane's bounded flow root: the visible home of the atomic
     /// cards when the card presentation is active.
     card_flows: Query<'w, 's, Entity, With<card_lane::ProcessCardFlow>>,
+    /// The card lane's group window: which bucket the lane starts at. The
+    /// bucket list is folded over the whole visible set, so the window only
+    /// decides where the lane looks, never what a bucket is.
+    card_window: Option<ResMut<'w, card_lane::CardFlowWindow>>,
 }
 
 // ---- observers -----------------------------------------------------------
@@ -362,6 +366,7 @@ fn on_select_step(
         RowPage::reveal_centered(total, surface.scroll.viewport_rows, shell.selected)
             .page()
             .first();
+    reveal_card_window(shell, &mut surface);
     let Ok(root) = surface.roots.single() else {
         return;
     };
@@ -389,6 +394,7 @@ fn on_select_row(
         RowPage::reveal_centered(total, surface.scroll.viewport_rows, shell.selected)
             .page()
             .first();
+    reveal_card_window(shell, &mut surface);
     let Ok(root) = surface.roots.single() else {
         return;
     };
@@ -437,11 +443,55 @@ fn on_scroll_intent(
     let Ok(root) = surface.roots.single() else {
         return;
     };
-    surface.scroll.top = surface
-        .scroll
-        .top
-        .saturating_add_signed(trigger.event().rows);
+    let rows = trigger.event().rows;
+    let mode = surface
+        .mode
+        .as_deref()
+        .copied()
+        .unwrap_or(ProcessViewMode::Dense);
+    let effective = surface
+        .card_budget
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .effective_mode(mode);
+    if effective == ProcessViewMode::Cards {
+        // The lane scrolls by WHOLE buckets: a bucket is the lane's atomic
+        // block, and a half bucket is the half group the shared admission
+        // contract forbids.
+        if let Some(window) = surface.card_window.as_deref_mut() {
+            window.top = window.top.saturating_add_signed(rows);
+        }
+    } else {
+        surface.scroll.top = surface.scroll.top.saturating_add_signed(rows);
+    }
     rebuild_table(&mut commands, root, track.shell(), &mut surface);
+}
+
+/// Move the card lane's window so the shell's current selection is inside it.
+///
+/// The card presentation and the dense table share one cursor. When the
+/// selected row lives in a bucket the lane does not show, the window moves
+/// to that bucket — the selection is never a fact the card lane hides.
+fn reveal_card_window(shell: &ShellApp, surface: &mut TableSurface) {
+    let Some(window) = surface.card_window.as_deref_mut() else {
+        return;
+    };
+    let Some(bucket) = card_lane::card_bucket_of_selection(shell) else {
+        return;
+    };
+    let groups = surface
+        .card_budget
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .groups
+        .max(1);
+    let top = window.top;
+    if bucket >= top && bucket < top + groups {
+        return;
+    }
+    window.top = bucket;
 }
 
 /// Search-commit seam: replace the query through the shell's public bulk

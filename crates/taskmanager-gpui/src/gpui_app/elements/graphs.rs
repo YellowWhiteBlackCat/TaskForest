@@ -9,10 +9,10 @@ use taskmanager_application::i18n;
 use taskmanager_theme::Color;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui::theme_binding::rgba;
@@ -25,14 +25,13 @@ use taskmanager_ui::theme_binding::rgba;
 /// Returns a `Div` (not `impl IntoElement`) so callers can keep chaining layout
 /// (e.g. an absolute overlay label on top of the graph, as cpu_view per-core does).
 pub fn graph_card(theme: &Theme, graph: impl IntoElement) -> Div {
-    div()
+    CardSurface::unpadded(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .inset()
+        .render()
         .flex_1()
         .min_h(px(0.0))
-        .rounded(rem_length(tokens::card_radius(theme)))
-        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-        .bg(glass_fill(theme, GlassTier::Card))
-        .shadow_none()
         .overflow_hidden()
         .child(
             div()
@@ -95,13 +94,13 @@ fn graph_card_with_explicit_state(
                 .items_center()
                 .justify_center()
                 .child(
-                    div()
+                    CardSurface::unpadded(theme.palette())
+                        .glass(GlassTier::Card)
+                        .radius(tokens::control_radius(theme))
+                        .inset()
+                        .render()
                         .px(definite_length(tokens::SPACE_12))
                         .py(definite_length(tokens::SPACE_6))
-                        .rounded(rem_length(tokens::control_radius(theme)))
-                        .border(gpui::rems(GlassTier::Card.edge_width_rem()))
-                        .border_color(hsla(theme.glass_layer(GlassTier::Card).edge))
-                        .bg(glass_fill(theme, GlassTier::Card))
                         .text_size(font_size(tokens::FONT_12))
                         .text_color(hsla(theme.fg_dim))
                         .child(label),
