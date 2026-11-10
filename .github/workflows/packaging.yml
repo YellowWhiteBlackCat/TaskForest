@@ -63,9 +63,6 @@ on:
         type: boolean
         default: false
     secrets:
-      SHARED_UI_KIT_READ_KEY:
-        description: Read-only credential for the private shared UI kit Git dependency
-        required: true
       WINDOWS_CERT_B64:
         description: Optional base64-encoded Authenticode PFX certificate
         required: false
@@ -137,10 +134,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           targets: ${{ matrix.musl_target }}
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
         with:
@@ -308,11 +301,6 @@ jobs:
       - name: Install Rust target
         shell: bash
         run: rustup target add "$RUST_TARGET"
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        shell: bash
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
         with:

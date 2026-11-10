@@ -113,21 +113,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
-      # This is the same cheap fail-fast entry point developers run locally.
-      # It completes before GUI packages, Cargo caches, or workspace builds.
-      # The release helper binaries do not exist in this policy job yet, so
-      # install-manager-smoke is repeated in the later release job after its
-      # helper build; it remains a blocking check there.
       - name: Fast local-equivalent gates
         env:
           SKIP_INSTALL_MANAGER_SMOKE: "1"
         run: timeout --kill-after=10s 300s bash scripts/quality/local-gates.sh quick
-      # Keep the audit on the runner so it can reuse the private Git dependency
-      # fetched above without passing credentials into a Docker action.
+      # Keep the audit on the runner so the dependency cache stays local.
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny@0.20.2
@@ -154,10 +144,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: clippy
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
         with:
@@ -217,10 +203,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.1
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
@@ -258,10 +240,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.1
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
         with:
@@ -326,14 +304,6 @@ jobs:
       # through SEMVER_RUSTDOC_TOOLCHAIN.
       - name: Install the nightly toolchain for rustdoc JSON
         run: rustup toolchain install nightly --profile minimal
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
-      # cargo-semver-checks 0.51.0 is the current stable release. It needs a
-      # rustc >= 1.93 (this repository pins 1.99.1) and ships prebuilt Linux
-      # binaries, so `fallback: none` keeps the install deterministic instead
-      # of silently compiling the tool from source.
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-semver-checks@0.51.0
@@ -387,10 +357,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends
           libfontconfig1-dev libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@1.99.1
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@sccache
       - uses: actions/github-script@v9
