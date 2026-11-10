@@ -217,6 +217,23 @@ pub fn priority_tier_label(tier: PriorityTier) -> &'static str {
     i18n::t(tier.i18n_key())
 }
 
+/// Locale catalog key for a scheduling-priority tier's ACTION tooltip —
+/// the single tier→tooltip fold shared by every frontend's action bars,
+/// menus and popovers.
+///
+/// The tier word itself is [`priority_tier_label`]'s business; this fold owns
+/// only the key that names the tooltip of "set this tier". A frontend that
+/// spells the three keys itself owns a second per-tier vocabulary that can
+/// drift from the catalog and from the other shapes.
+#[must_use]
+pub const fn priority_tier_tooltip_key(tier: PriorityTier) -> &'static str {
+    match tier {
+        PriorityTier::High => "tooltip.proc_high",
+        PriorityTier::Normal => "tooltip.proc_normal",
+        PriorityTier::Low => "tooltip.proc_low",
+    }
+}
+
 /// Localized label for one neutral process-batch action. This is the single
 /// action→display fold used by confirmations, menus, and completion feedback
 /// in every frontend. Platform words such as a raw nice value or signal name

@@ -596,6 +596,9 @@ fi
 if maybe dashboard-metric-owner; then
     run_stage dashboard-metric-owner quick run_py scripts/quality/test_dashboard_metric_owner.py
 fi
+if maybe process-priority-owner; then
+    run_stage process-priority-owner quick run_py scripts/quality/test_process_priority_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

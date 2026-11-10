@@ -27,7 +27,7 @@ use taskmanager_theme::{GlassTier, Length, Theme};
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
 use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
-use taskmanager_shell::presentation::priority_tier_label;
+use taskmanager_shell::presentation::{priority_tier_label, priority_tier_tooltip_key};
 use taskmanager_shell::{ProcessControlAvailability, ProcessControlScope, SortCol};
 
 /// Inputs for the process action strip. The caller supplies the already
@@ -87,9 +87,7 @@ impl ProcessToolbarAction {
             Self::ForceKill => "tooltip.proc_kill",
             Self::Suspend => "tooltip.proc_suspend",
             Self::Resume => "tooltip.proc_resume",
-            Self::SetPriority(PriorityTier::High) => "tooltip.proc_high",
-            Self::SetPriority(PriorityTier::Normal) => "tooltip.proc_normal",
-            Self::SetPriority(PriorityTier::Low) => "tooltip.proc_low",
+            Self::SetPriority(tier) => priority_tier_tooltip_key(tier),
             Self::EfficiencyMode => "tooltip.proc_efficiency_mode",
             Self::Affinity => "tooltip.proc_affinity",
             Self::ExportBatchHistory => "tooltip.proc_batch_export",
@@ -305,21 +303,17 @@ fn actions_dropdown(
                 overflow_entry(ProcessToolbarAction::Resume, availability, &entity),
                 MenuEntry::Separator,
                 MenuEntry::Label(i18n::t("proc.priority").into()),
+            ]);
+            // The offered tiers and their order come from the one core-owned
+            // set; a renderer never restates the high → normal → low ladder.
+            entries.extend(PriorityTier::ALL.map(|tier| {
                 overflow_entry(
-                    ProcessToolbarAction::SetPriority(PriorityTier::High),
+                    ProcessToolbarAction::SetPriority(tier),
                     availability,
                     &entity,
-                ),
-                overflow_entry(
-                    ProcessToolbarAction::SetPriority(PriorityTier::Normal),
-                    availability,
-                    &entity,
-                ),
-                overflow_entry(
-                    ProcessToolbarAction::SetPriority(PriorityTier::Low),
-                    availability,
-                    &entity,
-                ),
+                )
+            }));
+            entries.extend([
                 overflow_entry(ProcessToolbarAction::EfficiencyMode, availability, &entity),
                 MenuEntry::Separator,
                 overflow_entry(ProcessToolbarAction::Affinity, availability, &entity),

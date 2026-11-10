@@ -37,6 +37,15 @@
   once for all four renderers. Authorization is offered only when the catalog
   exposes a usable request seam; GPU actions retain the observed device
   identity.
+- `priority_tier_label` and `priority_tier_tooltip_key` are the ONLY wording
+  folds for a scheduling-priority tier. The tier itself is a core fact:
+  `taskforest_core::core::process::PriorityTier` owns the offered set and its
+  order (`PriorityTier::ALL`), the locale key that names a tier
+  (`PriorityTier::i18n_key`) and the action that applies it
+  (`ProcessBatchAction::SetPriority`). A renderer that offers priority
+  choices spends the core set and these two folds; it declares no tier of its
+  own and spells no tier key. The quick stage `process-priority-owner` fails
+  the shape that forks any of the three.
 
 ## GPU chart metric session
 

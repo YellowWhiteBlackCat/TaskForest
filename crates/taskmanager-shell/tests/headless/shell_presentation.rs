@@ -312,6 +312,33 @@ fn priority_tier_labels_resolve_non_empty_and_distinct_for_every_tier() {
 }
 
 #[test]
+fn priority_tier_tooltip_keys_resolve_to_catalog_entries_for_every_tier() {
+    // Pin English so the "not the raw key" check is deterministic on any
+    // runner (a missing catalog entry degrades to the key literal).
+    i18n::set_language(i18n::Language::En);
+    let mut seen: Vec<&'static str> = Vec::new();
+    for tier in PriorityTier::ALL {
+        let key = priority_tier_tooltip_key(tier);
+        assert!(
+            key.starts_with("tooltip."),
+            "{tier:?} uses a foreign key {key:?}"
+        );
+        let resolved = i18n::t(key);
+        assert_ne!(
+            resolved, key,
+            "{tier:?} tooltip must resolve to a catalog entry, not the raw key"
+        );
+        assert!(!resolved.is_empty(), "empty tooltip for {tier:?}");
+        assert!(
+            !seen.contains(&key),
+            "tooltip key {key:?} is shared by two tiers"
+        );
+        seen.push(key);
+    }
+    assert_eq!(seen.len(), PriorityTier::ALL.len());
+}
+
+#[test]
 fn process_batch_action_labels_are_complete_and_action_specific() {
     use taskforest_core::core::process::ProcessBatchAction;
 
