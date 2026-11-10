@@ -11,7 +11,6 @@
 //! (nav rail, tables, dialogs) consume `UiPalette` — never the official
 //! Feathers skin system, which this frontend does not adopt.
 
-use bevy::color::Alpha;
 use bevy::text::{FontSize, FontWeight, TextFont};
 use bevy::ui::prelude::{ShadowStyle, Val};
 use taskmanager_theme::Theme;
@@ -212,24 +211,21 @@ impl UiPalette {
 
     #[must_use]
     pub(crate) fn glass_shadow(&self, tier: GlassTier) -> Vec<ShadowStyle> {
-        let (ambient_y, ambient_blur) = tier.ambient_shadow_rem();
-        let (contact_y, contact_blur) = tier.contact_shadow_rem();
+        let layers = tier.shadow(&self.optical_theme);
         vec![
             ShadowStyle {
-                color: self
-                    .card_shadow
-                    .with_alpha(self.card_shadow.to_srgba().alpha * 0.6),
+                color: theme_color(layers.ambient.color),
                 x_offset: Val::Rem(0.0),
-                y_offset: Val::Rem(ambient_y),
+                y_offset: Val::Rem(layers.ambient.offset_y),
                 spread_radius: Val::Rem(0.0),
-                blur_radius: Val::Rem(ambient_blur),
+                blur_radius: Val::Rem(layers.ambient.blur_radius),
             },
             ShadowStyle {
-                color: self.card_shadow,
+                color: theme_color(layers.contact.color),
                 x_offset: Val::Rem(0.0),
-                y_offset: Val::Rem(contact_y),
+                y_offset: Val::Rem(layers.contact.offset_y),
                 spread_radius: Val::Rem(0.0),
-                blur_radius: Val::Rem(contact_blur),
+                blur_radius: Val::Rem(layers.contact.blur_radius),
             },
         ]
     }

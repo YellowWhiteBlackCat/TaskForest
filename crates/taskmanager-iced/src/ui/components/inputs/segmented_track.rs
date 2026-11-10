@@ -1,5 +1,7 @@
 //! Keyboard shell and widget implementation for the segmented choice control.
 
+use super::{segmented_active_index, segmented_neighbor_index};
+use crate::app::{FocusTarget, Message};
 use iced::advanced;
 use iced::advanced::layout::{Limits, Node};
 use iced::advanced::mouse::{self, Button, Cursor, Interaction};
@@ -13,10 +15,6 @@ use iced::keyboard::key::{Key, Named};
 use iced::{
     Background, Border, Color, Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector,
 };
-use taskmanager_theme::tokens;
-
-use super::{segmented_active_index, segmented_neighbor_index};
-use crate::app::{FocusTarget, Message};
 
 pub(super) struct SegmentedTrack<'a> {
     id: widget::Id,
@@ -233,7 +231,7 @@ impl Widget<Message, Theme, Renderer> for SegmentedTrack<'_> {
                     bounds: layout.bounds(),
                     border: Border {
                         color: self.focus_color,
-                        width: f32::from(tokens::SPACE_2),
+                        width: crate::theme::FOCUS_RING_WIDTH,
                         radius: self.focus_radius.into(),
                     },
                     ..Quad::default()

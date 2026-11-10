@@ -45,3 +45,7 @@ pub use visual::{
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/elements/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/elements/tooltip_surface_tests.rs"]
+mod tooltip_surface_tests;

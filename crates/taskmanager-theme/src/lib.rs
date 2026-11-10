@@ -60,6 +60,7 @@ pub use settings::{
 };
 pub use skins::SkinTokens;
 pub use theme::{
-    EdgeTiling, GlassLayer, GlassTier, HighContrast, LightDark, Material, RadiusScale, Skin, Theme,
+    EdgeTiling, GlassLayer, GlassShadow, GlassShadowElevation, GlassShadowLayer,
+    GlassShadowProjection, GlassTier, HighContrast, LightDark, Material, RadiusScale, Skin, Theme,
     WindowChromeState, WindowControls, WindowCorner, with_alpha,
 };

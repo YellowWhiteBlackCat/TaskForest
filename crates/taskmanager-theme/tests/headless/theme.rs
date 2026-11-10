@@ -61,6 +61,39 @@ fn glass_edges_and_shadows_are_authored_on_the_rem_axis() {
 }
 
 #[test]
+fn glass_shadow_layers_share_one_resolved_contract() {
+    for (skin, mode) in [
+        (Skin::Gnome, LightDark::Light),
+        (Skin::Gnome, LightDark::Dark),
+    ] {
+        let theme = Theme::build(
+            skin,
+            mode,
+            HighContrast::Off,
+            ResolvedFonts::system_for(skin),
+        );
+        for tier in GlassTier::ALL {
+            let shadow = tier.shadow(&theme);
+            let ink = theme.glass_layer(tier).shadow;
+            let (ambient_y, ambient_blur) = tier.ambient_shadow_rem();
+            let (contact_y, contact_blur) = tier.contact_shadow_rem();
+            assert_eq!(shadow.ambient.offset_y, ambient_y);
+            assert_eq!(shadow.ambient.blur_radius, ambient_blur);
+            assert_eq!(shadow.contact.offset_y, contact_y);
+            assert_eq!(shadow.contact.blur_radius, contact_blur);
+            assert_eq!(shadow.contact.color, ink);
+            assert_eq!(shadow.ambient.color, ink.with_alpha(ink.a * 0.6));
+            let single = tier.projected_shadow(&theme, GlassShadowProjection::SingleQuad);
+            let opacity = tier.single_quad_elevation().opacity();
+            assert!((single.contact.color.a - ink.a * opacity).abs() < 1e-6);
+            assert!((single.ambient.color.a - ink.a * opacity * 0.6).abs() < 1e-6);
+            assert_eq!(single.contact.color.with_alpha(1.0), ink.with_alpha(1.0));
+            assert_eq!(single.ambient.color.with_alpha(1.0), ink.with_alpha(1.0));
+        }
+    }
+}
+
+#[test]
 fn glass_layers_stay_translucent_with_specular_edges_and_shadow() {
     for skin in Skin::ALL {
         for mode in LightDark::ALL {

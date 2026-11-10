@@ -786,6 +786,10 @@ fn application_table_measures_complete_rows_and_keeps_the_footer_inside_every_wi
             ProjectionSeedFact::Processes(Some(items)),
         );
         app.world_mut().resource_mut::<Route>().page = Page::Processes;
+        // Legacy table-geometry proof explicitly selects the dense surface;
+        // the card lane's own geometry proof lives in process_card_lane.rs.
+        app.world_mut()
+            .insert_resource(crate::pages::processes::card_lane::ProcessViewMode::Dense);
         app.world_mut().trigger(crate::app::RouteChanged);
         for _ in 0..8 {
             app.update();

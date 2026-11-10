@@ -13,7 +13,9 @@ use iced::advanced::widget::{Id, Tree};
 use iced::{Element, Event, Rectangle, Size, mouse};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_theme::ResolvedFonts;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, Skin};
+use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 type TestElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -358,4 +360,237 @@ fn input_controls_build_across_skins_modes_and_degenerate_states() {
             let _ = segmented(&theme, target(), &[], 0, |_| Message::Tick);
         }
     }
+}
+
+/// Input, select and segmented styles resolve through the shared control
+/// glass: their fills are the theme's own glass gradient, their borders the
+/// shared specular edge, and hover/pressed/disabled/focused are distinct
+/// token-derived states rather than a second local palette.
+#[test]
+fn input_styles_consume_the_shared_control_glass() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark).with_focus_visible(true);
+    let active = crate::theme::control_glass(
+        &theme,
+        ControlRole::Input,
+        crate::theme::ControlVisualState::Active,
+    );
+    let select_active = select_style(&theme, iced::widget::pick_list::Status::Active);
+    let select_hovered = select_style(&theme, iced::widget::pick_list::Status::Hovered);
+    let select_open = select_style(
+        &theme,
+        iced::widget::pick_list::Status::Opened { is_hovered: false },
+    );
+    let search_active = search_style(&theme, iced::widget::text_input::Status::Active);
+    let search_focused = search_style(
+        &theme,
+        iced::widget::text_input::Status::Focused { is_hovered: false },
+    );
+    let search_disabled = search_style(&theme, iced::widget::text_input::Status::Disabled);
+
+    assert_eq!(
+        select_active.background,
+        active.background.expect("glass fill")
+    );
+    assert_eq!(select_active.border, active.border);
+    assert_ne!(select_hovered.background, select_active.background);
+    assert_eq!(
+        select_open.border.color,
+        crate::theme::focus_ring_color(&theme, false)
+    );
+    assert_ne!(select_open.border.width, select_active.border.width);
+    assert_eq!(
+        search_active.background,
+        active.background.expect("glass fill")
+    );
+    assert_eq!(
+        search_focused.border.color,
+        crate::theme::focus_ring_color(&theme, false)
+    );
+    assert_eq!(
+        search_disabled.value,
+        crate::theme_binding::color(theme.palette().fg_muted)
+    );
+    assert_eq!(
+        search_disabled.icon,
+        crate::theme_binding::color(theme.palette().fg_muted)
+    );
+    assert_eq!(
+        search_disabled.placeholder,
+        crate::theme_binding::color(theme.palette().fg_muted)
+    );
+}
+
+/// The segmented control paints connected glass segments with hairline
+/// dividers and rounds only the two OUTER track ends, matching the GPUI
+/// connected-track grammar: one glass track, transparent idle segments over
+/// it, and the accent fill on the active choice.
+#[test]
+fn segmented_styles_round_outer_ends_and_paint_token_dividers() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark);
+    let first = segment_style(&theme, 0, 3, false, button::Status::Active);
+    let middle = segment_style(&theme, 1, 3, false, button::Status::Active);
+    let last = segment_style(&theme, 2, 3, false, button::Status::Hovered);
+    let single = segment_style(&theme, 0, 1, false, button::Status::Active);
+    let radius = crate::theme::scaled_radius(&theme, theme.palette().control_radius);
+    assert_eq!(
+        (first.border.radius.top_left, first.border.radius.top_right),
+        (radius, 0.0)
+    );
+    assert_eq!(
+        (
+            middle.border.radius.top_left,
+            middle.border.radius.top_right
+        ),
+        (0.0, 0.0)
+    );
+    assert_eq!(
+        (
+            last.border.radius.bottom_left,
+            last.border.radius.bottom_right
+        ),
+        (0.0, radius)
+    );
+    assert_eq!(
+        (
+            single.border.radius.top_left,
+            single.border.radius.bottom_right
+        ),
+        (radius, radius)
+    );
+    assert_eq!(
+        crate::theme::control_divider_color(&theme),
+        crate::theme::card_glass_style(&theme).border.color
+    );
+    assert_ne!(last.background, middle.background);
+
+    // The active choice keeps the accent fill and the accent foreground; an
+    // idle segment stays transparent so the ONE connected track shows
+    // through it.
+    let active = segment_style(&theme, 1, 3, true, button::Status::Active);
+    assert_eq!(
+        active.background,
+        Some(Background::Color(crate::theme_binding::color(
+            theme.palette().accent
+        )))
+    );
+    assert_eq!(
+        active.text_color,
+        crate::theme_binding::color(theme.accent_text)
+    );
+    assert_eq!(
+        middle.background,
+        Some(Background::Color(Color::TRANSPARENT)),
+        "an idle segment must not paint its own tile over the track"
+    );
+
+    // The track itself is ONE shared glass surface.
+    let track = segmented_track_style(&theme);
+    assert_eq!(
+        track.background,
+        crate::theme::card_glass_style(&theme).background
+    );
+    assert_eq!(
+        track.border.color,
+        crate::theme::card_glass_style(&theme).border.color
+    );
+}
+
+/// In compact viewports every control still fits its measured bounds and
+/// keeps the shared hit-target floor: focus, hover and disabled change paint,
+/// never geometry. The disabled switch remains inert through both input
+/// paths (proved by the production interaction test).
+#[test]
+fn compact_control_bounds_and_states_stay_geometry_invariant() {
+    let renderer = renderer();
+    let compact = Size::new(360.0, 240.0);
+    let theme = theme_for(Skin::Gnome, LightDark::Dark);
+    let choices = vec![("Low".to_string(), 0), ("High".to_string(), 1)];
+    let mut controls: Vec<TestElement<'_>> = vec![
+        switch(theme, target(), true, false, |_| Message::Tick),
+        switch(theme, target(), true, true, |_| Message::Tick),
+        slider(
+            &theme,
+            target(),
+            0.0..=10.0,
+            1.0,
+            4.0,
+            |_| Message::Tick,
+            None::<fn(f32) -> String>,
+        ),
+        search_input(&theme, target(), "find", "disk", |_| Message::Tick),
+        segmented(&theme, target(), &choices, 0, |_| Message::Tick),
+    ];
+    for (index, element) in controls.iter_mut().enumerate() {
+        let mut tree = Tree::new(&*element);
+        let node = layout(element, &mut tree, &renderer, compact);
+        let bounds = node.bounds();
+        assert!(
+            bounds.x >= 0.0 && bounds.y >= 0.0,
+            "control {index} stays inside the left/top compact edge"
+        );
+        assert!(
+            bounds.x + bounds.width <= compact.width + 0.5
+                && bounds.y + bounds.height <= compact.height + 0.5,
+            "control {index} stays inside the right/bottom compact edge"
+        );
+        assert!(bounds.width > 0.0 && bounds.height > 0.0);
+    }
+    let measured = crate::presentation_binding::control_measurement(
+        ControlRole::Input,
+        ControlState::Normal,
+        UiSize::Small,
+        RowDensity::Compact,
+    );
+    assert_eq!(measured.extent, measured.realized_extent);
+    assert_eq!(measured.padding_x, 12.0);
+    assert!(!ControlState::Focused.changes_measurement());
+    assert!(!ControlState::Disabled.changes_measurement());
+    assert!(!ControlState::Active.changes_measurement());
+}
+
+/// The switch knob is a RAISED element inside the track: it wears the shared
+/// Card glass contact layer, not a locally numbered shadow, and disabling it
+/// keeps the same material with a dimmed fill. The knob's lift is the same
+/// token the two-layer shadow projection uses.
+#[test]
+fn switch_knob_wears_the_shared_contact_shadow() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark);
+    let enabled = switch_knob_style(&theme, false);
+    let disabled = switch_knob_style(&theme, true);
+    let contact = crate::theme::glass_contact_shadow(&theme, GlassTier::Card);
+    assert_eq!(enabled.shadow, contact);
+    assert_eq!(disabled.shadow, contact);
+    assert_ne!(enabled.background, disabled.background);
+    assert_eq!(enabled.border.radius, (SWITCH_KNOB_SIZE / 2.0).into());
+}
+
+/// A focused search field paints the shared focus ring; a disabled one mutes
+/// its icon/value/placeholder without inventing a second text palette. The
+/// clear affordance keeps the standard status states (hover/pressed/disabled)
+/// over the same control glass.
+#[test]
+fn search_clear_and_disabled_stay_on_the_shared_control_glass() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark).with_focus_visible(true);
+    let active = search_clear_style(&theme, button::Status::Active);
+    let hovered = search_clear_style(&theme, button::Status::Hovered);
+    let pressed = search_clear_style(&theme, button::Status::Pressed);
+    let disabled = search_clear_style(&theme, button::Status::Disabled);
+    let glass = crate::theme::control_glass(
+        &theme,
+        ControlRole::IconButton,
+        crate::theme::ControlVisualState::Active,
+    );
+    assert_eq!(active.background, glass.background);
+    assert_eq!(active.border, glass.border);
+    assert_eq!(active.shadow, glass.shadow);
+    assert_ne!(hovered.background, active.background);
+    assert!(
+        pressed.shadow.blur_radius == active.shadow.blur_radius,
+        "the shadow geometry stays the shared projection's; only the ink changes"
+    );
+    assert!(pressed.shadow.color.a < active.shadow.color.a);
+    assert_eq!(
+        disabled.text_color,
+        crate::theme_binding::color(theme.palette().fg_muted)
+    );
 }

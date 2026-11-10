@@ -2,7 +2,6 @@
 //! Native tree inspection renders the shared hierarchy in the owned bounded modal.
 //! Query, selection, batch gates and typed unavailable cells retain shell authority.
 
-use bevy::a11y::AccessibilityNode;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::{EntityEvent, Event};
@@ -12,12 +11,10 @@ use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
-use bevy::ui::prelude::{
-    BackgroundColor, ComputedNode, FlexDirection, Node, Val, percent, px, rem,
-};
+use bevy::scene::{Scene, bsn};
+use bevy::ui::prelude::{BackgroundColor, ComputedNode, FlexDirection, Node, Val, percent, px};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::Activate;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppAction, AppPage};
 
@@ -26,25 +23,27 @@ use zhuge_ui_core::row_page::RowPage;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::input_contract::SemanticAddress;
-use crate::palette::{UiPalette, space_8};
-use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::palette::space_8;
 use crate::widgets::table::resize::{ColumnResizeSession, ColumnWidthOverrides};
-use crate::widgets::table::{header_scene_with_widths, row_scene_with_widths, visible_columns};
+use crate::widgets::table::{header_scene_with_widths, visible_columns};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod affinity;
+pub(crate) mod card_lane;
 pub(crate) mod columns_modal;
 pub(crate) mod details;
 pub(crate) mod input;
 pub(crate) mod menu;
 pub(crate) mod projection;
 pub(crate) mod properties_modal;
+mod rebuild;
 pub(crate) mod toolbar;
 
 pub(crate) use projection::*;
+pub(crate) use rebuild::{live_widths, rebuild_table, rows_root_scene};
 
 pub(crate) mod layout;
+use card_lane::{CardFlowBudget, ProcessViewMode};
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct ProcessPageRoot;
 #[derive(Component, Clone, Copy, Default)]
@@ -108,33 +107,80 @@ pub(crate) struct ProcessTableContainer;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessDetailsContainer;
 
+/// The outer card-lane wrapper owns the mode's Display. Its inner lane scene
+/// owns the optical dashboard and cards, so the mode query and the table query
+/// can never touch the same entity.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessCardLaneRoot;
+
+type ResponsiveTables<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Node,
+    (
+        With<ProcessTableContainer>,
+        bevy::ecs::query::Without<ProcessDetailsContainer>,
+        bevy::ecs::query::Without<ProcessCardLaneRoot>,
+    ),
+>;
+type ResponsiveLanes<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Node,
+    (
+        With<ProcessCardLaneRoot>,
+        bevy::ecs::query::Without<ProcessTableContainer>,
+        bevy::ecs::query::Without<ProcessDetailsContainer>,
+    ),
+>;
+type ResponsiveDetails<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Node,
+    (
+        With<ProcessDetailsContainer>,
+        bevy::ecs::query::Without<ProcessTableContainer>,
+        bevy::ecs::query::Without<ProcessCardLaneRoot>,
+    ),
+>;
+
 pub(crate) fn sync_processes_responsive_layout(
     pages: Query<&ComputedNode, With<ProcessPageRoot>>,
-    mut tables: Query<
-        &mut Node,
-        (
-            With<ProcessTableContainer>,
-            bevy::ecs::query::Without<ProcessDetailsContainer>,
-        ),
-    >,
-    mut details: Query<
-        &mut Node,
-        (
-            With<ProcessDetailsContainer>,
-            bevy::ecs::query::Without<ProcessTableContainer>,
-        ),
-    >,
+    mode: Option<Res<ProcessViewMode>>,
+    card_budget: Option<Res<CardFlowBudget>>,
+    mut tables: ResponsiveTables,
+    mut lanes: ResponsiveLanes,
+    mut details: ResponsiveDetails,
 ) {
-    let Ok(page) = pages.single() else {
-        return;
+    let _page_width = pages
+        .single()
+        .map(|page| page.size().x * page.inverse_scale_factor())
+        .unwrap_or(0.0);
+    let fallback = ProcessViewMode::Dense;
+    let view_mode = mode.as_deref().copied().unwrap_or(fallback);
+    let effective_mode = card_budget
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .effective_mode(view_mode);
+    let (table_display, lane_visible) = match effective_mode {
+        ProcessViewMode::Cards => (bevy::ui::Display::None, true),
+        ProcessViewMode::Dense => (bevy::ui::Display::Flex, false),
     };
-    let width = page.size().x * page.inverse_scale_factor();
-    if width <= 0.0 {
-        return;
-    }
     for mut node in &mut tables {
-        if node.width != percent(100) {
+        if node.width != percent(100) || node.display != table_display {
             node.width = percent(100);
+            node.display = table_display;
+        }
+    }
+    for mut node in &mut lanes {
+        let next = if lane_visible {
+            bevy::ui::Display::Flex
+        } else {
+            bevy::ui::Display::None
+        };
+        if node.display != next {
+            node.display = next;
         }
     }
     for mut node in &mut details {
@@ -217,6 +263,14 @@ pub(crate) struct TableSurface<'w, 's> {
     hidden_cols: Option<Res<'w, ProcessHiddenColumns>>,
     widths: Option<Res<'w, ColumnWidthOverrides>>,
     resize: Option<Res<'w, ColumnResizeSession>>,
+    /// The presentation mode. Optional so a composition that never mounts the
+    /// card lane still assembles the dense table without a second resource.
+    mode: Option<Res<'w, ProcessViewMode>>,
+    /// The measured card-flow budget, owned by the card lane's own system.
+    card_budget: Option<Res<'w, CardFlowBudget>>,
+    /// The card lane's bounded flow root: the visible home of the atomic
+    /// cards when the card presentation is active.
+    card_flows: Query<'w, 's, Entity, With<card_lane::ProcessCardFlow>>,
 }
 
 // ---- observers -----------------------------------------------------------
@@ -417,213 +471,6 @@ fn on_query_commit(
     commands.trigger(ProcessSelectionChanged);
 }
 
-// ---- render --------------------------------------------------------------
-
-/// Selected-row fill: the palette's elevated card surface (the same token the
-/// active nav item uses — one "selected" surface per theme).
-/// The row's resting fill, in one with the shared [`ControlTone::Row`]
-/// contract: a selected row wears the theme's selection tint, every other
-/// odd row wears the zebra stripe, and an even row stays open so the page
-/// canvas reads through the table.
-fn row_fill(selected: bool, zebra: bool, palette: &UiPalette) -> bevy::color::Color {
-    if selected {
-        palette.selection_bg
-    } else if zebra {
-        palette.zebra_bg
-    } else {
-        bevy::color::Color::NONE
-    }
-}
-
-/// One row wrapper: the virtual window's row height and selection fill, with
-/// the shared widgets row scene inside (cell widths/alignment stay contract-
-/// owned). The wrapper is a Button — pointer picking activates the row seam —
-/// and carries the link index plus the AccessKit identity node so tests,
-/// pointer bridges, and assistive technology map a node to its row.
-fn row_wrapper_scene(
-    row: &ProcessRowView,
-    columns: &[&ProcessColumnSpec],
-    widths: &[f32],
-    query: &str,
-    palette: &UiPalette,
-) -> Box<dyn Scene> {
-    let zebra = row.index % 2 == 1;
-    let fill = row_fill(row.selected, zebra, palette);
-    let index = row.index;
-    let cells = row.cells.clone();
-    let app_icon = row.app_icon;
-    let accessibility_node = crate::semantic::process_row_node(&row.name, &row.semantic_id);
-    let semantic = crate::input_contract::SemanticAddress(
-        crate::input_contract::stable_semantic_address("process-row", &row.semantic_id),
-    );
-    let inner = row_scene_with_widths(&cells, columns, widths, query, app_icon, Some(palette));
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: rem(palette.control_height_rem),
-        }
-        BackgroundColor({ fill })
-        ProcessRowLink({ index })
-        ProcessTableArtifact
-        ControlVisual(ControlTone::Row { zebra: { zebra } }, { row.selected })
-        Button
-        on(input::on_row_activated)
-        on(input::on_row_secondary_pressed)
-        SemanticAddress({ semantic.0.clone() })
-        AccessibilityNode({ accessibility_node })
-        Children [
-             @{ inner }
-        ]
-    })
-}
-
-/// The empty window's honest message node.
-fn empty_state_scene(message: String) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-        }
-        ProcessTableArtifact
-        Children [
-             Text({ message }) TextRole(Role::Body)
-        ]
-    })
-}
-
-/// Materialize one window: the row wrappers, or the empty-state node when the
-/// filtered set is empty. One rule for the mount-time static rows and every
-/// observer rebuild.
-fn window_scenes(
-    projection: &ProcessRowsProjection,
-    columns: &[&ProcessColumnSpec],
-    widths: &[f32],
-    palette: &UiPalette,
-    query: &str,
-) -> Vec<Box<dyn Scene>> {
-    if projection.total == 0 {
-        return vec![empty_state_scene(empty_state_text(query))];
-    }
-    projection
-        .rows
-        .iter()
-        .map(|row| row_wrapper_scene(row, columns, widths, query, palette))
-        .collect()
-}
-
-/// Despawn the previous window's artifacts, spawn the new one under the rows
-/// root, rewrite the count line, and normalize the stored scroll intent to
-/// the clamped window start. Shared by every observer.
-///
-/// The header is NOT rebuilt while a column drag is live: the drag's gutter
-/// lives in the header, and rebuilding it under the pointer would cancel the
-/// drag mid-gesture. The dragged widths are written into the live cells
-/// instead, and the header picks them up when the drag ends.
-fn rebuild_table(
-    commands: &mut Commands,
-    root: Entity,
-    shell: &ShellApp,
-    surface: &mut TableSurface,
-) {
-    let hidden_ids: Vec<&str> = surface
-        .hidden_cols
-        .as_ref()
-        .map_or_else(Vec::new, |h| h.0.iter().map(String::as_str).collect());
-    let projection = rows_projection_with_hidden(
-        shell,
-        surface.scroll.viewport_rows,
-        surface.scroll.top,
-        &hidden_ids,
-    );
-    surface.scroll.top = projection.window.first();
-    let columns = visible_columns(&hidden_ids);
-    let widths = live_widths(&columns, surface.widths.as_deref());
-    for artifact in surface.artifacts.iter() {
-        commands.entity(artifact).despawn();
-    }
-    for scene in window_scenes(
-        &projection,
-        &columns,
-        &widths,
-        &surface.palette.inner,
-        &shell.query,
-    ) {
-        let child = commands.spawn_scene(scene).id();
-        attach_child(commands, root, child);
-    }
-    if let Ok(mut line) = surface.count.single_mut() {
-        line.0 = count_line_text_for_shell(shell, projection.total, &shell.query);
-    }
-
-    let dragging = surface
-        .resize
-        .as_ref()
-        .is_some_and(|session| session.column.is_some());
-    if dragging {
-        return;
-    }
-    for header in surface.headers.iter() {
-        commands.entity(header).despawn();
-    }
-    if let Ok(slot) = surface.header_slots.single() {
-        let sort_proj = Some(sort_projection(shell.process_sort));
-        let header = header_scene_with_widths(&columns, &widths, sort_proj, &surface.palette.inner);
-        let header_node = bsn! {
-            Node {
-                width: percent(100),
-            }
-            ProcessTableHeaderArtifact
-            Children [
-                 @{ header }
-            ]
-        };
-        let child = commands.spawn_scene(header_node).id();
-        attach_child(commands, slot, child);
-    }
-}
-
-/// The live widths of the visible columns: the user's drag overrides over the
-/// contract defaults.
-fn live_widths(
-    columns: &[&ProcessColumnSpec],
-    overrides: Option<&ColumnWidthOverrides>,
-) -> Vec<f32> {
-    match overrides {
-        Some(overrides) => crate::widgets::table::resize::live_column_widths(columns, overrides),
-        None => crate::widgets::table::distribute_column_widths(columns, None),
-    }
-}
-
-/// The rows root scene: measured virtual viewport, the five `on()` seam
-/// observers (bootstrap first, so it is registered before the marker's own
-/// `Add` trigger dispatches), and the mount-time static window inside.
-fn rows_root_scene(
-    projection: &ProcessRowsProjection,
-    columns: &[&ProcessColumnSpec],
-    widths: &[f32],
-    palette: &UiPalette,
-    query: &str,
-) -> impl Scene + use<> {
-    let rows = window_scenes(projection, columns, widths, palette, query);
-    bsn! {
-        Node {
-            width: percent(100),
-            min_height: px(0.0), flex_grow: 1.0, flex_basis: px(0.0),
-            flex_direction: FlexDirection::Column,
-        }
-        on(bootstrap_processes_page)
-        on(on_select_step)
-        on(on_select_row)
-        on(on_toggle_row_selection)
-        on(on_scroll_intent)
-        on(on_query_commit)
-        ProcessRowsRoot
-        Children [
-            { rows }
-        ]
-    }
-}
-
 /// Content-region scene for the Processes page.
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
@@ -663,6 +510,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         &context.shell.query,
     );
     let toolbar = toolbar::toolbar_scene(context);
+    let card_lane = card_lane::card_lane_scene(context);
     let table = bsn! {
         Node {
             width: percent(100),
@@ -672,6 +520,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             height: percent(100), min_height:px(0.0),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
+            display: bevy::ui::Display::None,
         }
         ProcessTableContainer
         Children [
@@ -680,6 +529,19 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         ]
     };
     let details = details::panel_scene(context);
+    let card_lane = bsn! {
+        Node {
+            width: percent(100),
+            min_width: px(0.0),
+            min_height: px(0.0),
+            flex_grow: 1.0,
+            flex_basis: px(0.0),
+            display: bevy::ui::Display::Flex,
+            overflow: bevy::ui::Overflow::clip(),
+        }
+        ProcessCardLaneRoot
+        Children [ @{ card_lane } ]
+    };
     bsn! {
         Node {
             width: percent(100),
@@ -705,6 +567,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                     column_gap: Val::Px(space_8()),
                 }
                 Children [
+                     @{ card_lane } --
                      @{ table } --
                      @{ details }
                 ]
@@ -724,6 +587,10 @@ mod process_fixture_support;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/processes_table_parity.rs"]
 mod table_parity_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/process_card_lane.rs"]
+mod card_lane_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/process_affinity.rs"]

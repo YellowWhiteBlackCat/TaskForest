@@ -1,5 +1,6 @@
 name	page	window_size	skin
 applications	applications	1180x780	gnome-light
+applications-card-lane	applications-card-lane	1180x780	gnome-light
 performance	performance	1180x780	gnome-light
 services	services	1180x780	gnome-light
 service-logs	service-logs	1180x780	gnome-light
@@ -39,6 +40,7 @@ perf-network-normal	perf-network	1280x720	gnome-light
 perf-gpu-normal	perf-gpu	1280x720	gnome-light
 perf-battery-normal	perf-battery	1280x720	gnome-light
 applications-dark	applications	1180x780	gnome-dark
+applications-card-lane-dark	applications-card-lane	1180x780	gnome-dark
 applications-compact-dark	applications	720x480	gnome-dark
 services-dark	services	1180x780	gnome-dark
 services-compact-dark	services	720x480	gnome-dark

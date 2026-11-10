@@ -34,6 +34,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "perf-gpu" => Some("perf-gpu"),
         "perf-battery" => Some("perf-battery"),
         "process-force-kill" => Some("process-force-kill"),
+        "applications-card-lane" => Some("applications-card-lane"),
         "process-selection" => Some("process-selection"),
         "process-context-menu" => Some("process-context-menu"),
         "feedback-overlay" => Some("feedback-overlay"),
@@ -158,6 +159,7 @@ pub(crate) fn capture_page() -> Option<Page> {
     match value.trim().to_ascii_lowercase().as_str() {
         "storage-health" | "sensor-center" => Some(Page::System),
         "applications"
+        | "applications-card-lane"
         | "process-selection"
         | "process-context-menu"
         | "feedback-overlay"

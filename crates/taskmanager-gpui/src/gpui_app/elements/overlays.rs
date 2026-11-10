@@ -3,7 +3,7 @@
 use gpui::{
     AnimationExt, AnyElement, App, AppContext, Div, Entity, InteractiveElement, IntoElement,
     MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Styled, Window, anchored, deferred,
-    div, px, rems,
+    div, px,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -12,12 +12,12 @@ use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassTier, Theme, WindowCorner};
 use taskmanager_ui::overlays::dialog::Dialog;
 use taskmanager_ui::overlays::layer_stack::{LayerBackfill, LayerStack};
+use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::{appear, fade_in};
-use taskmanager_ui::theme_binding::{glass_shadow, rem_length};
 
 /// A modal overlay built on the own `taskmanager_ui` dialog + layer stack
 /// (`overlays::dialog::Dialog` pushed into a [`LayerStack`] modal layer).
@@ -236,17 +236,24 @@ pub fn dialog_overlay_width(
 /// [`tooltip_overlay`] to place it, or compose it directly inside your own
 /// `anchored` / `deferred` wrapper if you need custom placement.
 pub fn tooltip(t: &Theme, text: &str) -> Div {
-    div()
-        .bg(glass_fill(t, GlassTier::Card))
-        .border(rems(GlassTier::Card.edge_width_rem()))
-        .border_color(hsla(t.glass_layer(GlassTier::Card).edge))
-        .rounded(rem_length(tokens::control_radius(t)))
-        .shadow(glass_shadow(t, GlassTier::Card))
-        .px(rem_length(tokens::SPACE_8))
-        .py(rem_length(tokens::SPACE_4))
-        .text_size(font_size(tokens::FONT_12))
-        .text_color(hsla(t.fg))
-        .child(text.to_string())
+    CardSurface::new(t.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::control_radius(t))
+        .padding(tokens::SPACE_4)
+        .child(
+            div()
+                .px(definite_length(tokens::SPACE_4))
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(t.fg))
+                .child(text.to_string()),
+        )
+        .render()
+}
+
+/// The non-elevated tooltip leaf used by graph tooltips, which sit above an
+/// already-painted chart surface and must not stack a second card shadow.
+pub(crate) fn flat_tooltip(t: &Theme, text: &str) -> Div {
+    tooltip(t, text).shadow_none()
 }
 
 /// A tooltip overlay: the [`tooltip`] label, raised above all siblings via
@@ -325,13 +332,13 @@ fn tooltip_overlay_with_elevation(
     // it; once the tooltip disappears the element state is dropped and the
     // next appearance fades again (gpui drops element state for unmounted
     // ids — see window.rs finish()).
-    let mut label = tooltip(t, text);
-    if !elevated {
-        label = label.shadow_none();
+    let label = if elevated {
+        tooltip(t, text)
+    } else {
+        flat_tooltip(t, text)
     }
-    let label = label
-        .debug_selector(|| "tm-tooltip-overlay".to_string())
-        .with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
+    .debug_selector(|| "tm-tooltip-overlay".to_string())
+    .with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
     deferred(anchored().position(anchor).snap_to_window().child(label))
 }
 

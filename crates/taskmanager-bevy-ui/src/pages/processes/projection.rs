@@ -41,6 +41,21 @@ pub(crate) fn row_cells(
         .collect()
 }
 
+/// Resolve one row cell by the contract's stable column identity.
+///
+/// Card surfaces use semantic IDs rather than positional indices because a
+/// saved view may hide columns; a positional lookup would silently paint a
+/// different business fact.
+#[must_use]
+pub(crate) fn cell_by_id(row: &ProcessRowView, columns: &[&ProcessColumnSpec], id: &str) -> String {
+    columns
+        .iter()
+        .position(|column| column.id == id)
+        .and_then(|index| row.cells.get(index))
+        .cloned()
+        .unwrap_or_else(|| MISSING_VALUE.to_owned())
+}
+
 /// One cell's final display text. Unavailable scalars render the shared
 /// `MISSING_VALUE` dash, exactly like the TUI cells — a provider failure is
 /// never shown as a zero. The Start column uses the unsupported local-time
@@ -170,6 +185,40 @@ pub(crate) fn rows_projection(
     scroll_top: usize,
 ) -> ProcessRowsProjection {
     rows_projection_with_hidden(shell, viewport_rows, scroll_top, &[])
+}
+
+/// Build the row views for an explicit set of visible-set indices.
+///
+/// The card lane admits whole status buckets out of the shell's visible
+/// projection, so it needs row views for the ADMITTED indices only: a
+/// viewport window would cut a bucket in half, and projecting every visible
+/// row would build cells nobody paints.
+pub(crate) fn row_views_for_indices(
+    shell: &ShellApp,
+    indices: &[usize],
+    hidden_cols: &[&str],
+) -> Vec<ProcessRowView> {
+    let visible = shell.visible_processes();
+    let selected = visible
+        .len()
+        .checked_sub(1)
+        .map(|last| shell.selected.min(last));
+    let columns = visible_columns(hidden_cols);
+    indices
+        .iter()
+        .filter_map(|index| {
+            let process = visible.get(*index)?;
+            let is_selected = Some(*index) == selected || shell.is_process_selected(process);
+            Some(ProcessRowView {
+                index: *index,
+                semantic_id: process_semantic_key(process),
+                name: process.name.clone(),
+                cells: row_cells(process, &columns, is_selected),
+                selected: is_selected,
+                app_icon: process.current_application_identity().is_some(),
+            })
+        })
+        .collect()
 }
 
 /// The status line under the search box: the shared running-count copy, plus

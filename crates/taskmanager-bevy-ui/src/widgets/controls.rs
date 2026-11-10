@@ -26,6 +26,7 @@ use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
 use crate::widgets::bounded_text::BoundedText;
 use crate::window::{Role, TextRole};
 use bevy::text::{LineBreak, TextLayout};
+use taskmanager_theme::GlassTier;
 
 /// The sortable-header indicator: a semantic direction plate (arrow-up /
 /// arrow-down) tinted with the dim ink, or empty when the sort rests
@@ -62,6 +63,9 @@ pub(crate) enum ControlTone {
     /// the content surface while idle.
     #[default]
     Surface,
+    /// An atomic card keeps its own glass fill; control state reweights the
+    /// shared card surface instead of replacing it with a transparent row.
+    Card,
     /// A table row. `zebra` carries the row's parity inside the visible
     /// window, which is the only place the stripe has meaning: the stripe
     /// alternates what the user can see, not what the model indexes.
@@ -92,12 +96,14 @@ pub(crate) fn control_background(
         match visual.0 {
             ControlTone::Nav => palette.accent,
             ControlTone::Surface => palette.nav_active_bg,
+            ControlTone::Card => palette.selection_bg,
             ControlTone::Row { .. } => palette.selection_bg,
         }
     } else {
         match visual.0 {
             ControlTone::Nav => palette.nav_active_bg,
             ControlTone::Surface => palette.content_bg,
+            ControlTone::Card => palette.glass_fill(GlassTier::Card),
             // A table row is not a control surface: the reference surface
             // leaves an unselected row open so the page canvas reads through
             // it, and marks every other row with the theme's zebra tint for

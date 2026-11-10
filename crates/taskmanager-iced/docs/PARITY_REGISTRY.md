@@ -17,6 +17,17 @@ explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
 Scrollbar is declared `Native` via iced's scrollable; every other capability is
 `Ported`. A silent omission or unexplained difference fails the crate gate.
 
+The control family (switch, slider, select, search field, segmented track)
+paints the SAME material the GPUI component layer wears: the shared Card
+glass gradient, its specular edge, and the theme's own two-layer glass shadow
+folded into the single quad Iced can paint (`theme::control_glass`). The
+hover/pressed/focus/disabled states reweight those tokens and never change
+geometry, and the focus ring reads the shared ring token — so a pointer-driven
+focus paints no ring on the switch or the segmented track either, the same
+strict keyboard-only policy every other control already follows. These are
+PRESENTATION executions of the shared tokens, not new semantics: the three
+registered divergences above keep their reasons unchanged.
+
 <!-- iced-capability-divergences: tooltip, toast, text-selection -->
 
 Below is the complementary PAGE-LEVEL registry: Performance-page skin

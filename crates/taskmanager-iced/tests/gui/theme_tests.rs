@@ -3,11 +3,24 @@ use crate::theme_binding::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use iced::Font;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{FONT_MISANS_VF, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin};
+use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 fn combined_shadow_alpha(ink_alpha: f32, opacity: f32) -> f32 {
     let ambient = ink_alpha * opacity * 0.6;
     let contact = ink_alpha * opacity;
     1.0 - (1.0 - ambient) * (1.0 - contact)
+}
+
+fn gradient_stops(background: Option<iced::Background>) -> Vec<(f32, iced::Color)> {
+    let Some(iced::Background::Gradient(iced::Gradient::Linear(gradient))) = background else {
+        panic!("control glass must paint a linear gradient");
+    };
+    gradient
+        .stops
+        .iter()
+        .flatten()
+        .map(|stop| (stop.offset, stop.color))
+        .collect()
 }
 
 /// Font helpers read the resolved family names off the neutral theme, the
@@ -533,4 +546,122 @@ fn scrollbar_style_implements_capsule_and_translucent_rail() {
     let compact = compact_scrollbar_style(&iced, active_status);
     assert_eq!(compact.vertical_rail.border.radius, 2.0.into());
     assert_eq!(compact.vertical_rail.scroller.border.radius, 2.0.into());
+}
+
+/// The control-glass seam spends the SAME card glass tokens as the floating
+/// panels: two theme gradient stops, the shared specular edge, and the
+/// single-quad projection of the two-layer shadow. No control owns a second
+/// palette, radius ladder, or shadow authority.
+#[test]
+fn control_glass_reads_the_shared_card_glass_and_shadow_projection() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let active = control_glass(&theme, ControlRole::Input, ControlVisualState::Active);
+            let panel = card_glass_style(&theme);
+            assert_eq!(active.background, panel.background);
+            assert_eq!(active.border, panel.border);
+            assert_eq!(active.shadow, panel.shadow);
+            assert_eq!(active.text_color, panel.text_color);
+            assert_eq!(
+                gradient_stops(active.background),
+                stops_from_theme(&theme, GlassTier::Card)
+            );
+            assert_eq!(control_divider_color(&theme), panel.border.color);
+        }
+    }
+}
+
+fn stops_from_theme(theme: &Theme, tier: GlassTier) -> Vec<(f32, iced::Color)> {
+    let [top, bottom] = theme.glass_gradient(tier);
+    vec![(0.0, color(top)), (1.0, color(bottom))]
+}
+
+/// Hover/focus/pressed/disabled change PAINT only: the shared
+/// `ControlState` contract says geometry is invariant, and every state still
+/// resolves its colors through theme tokens. A focused control paints the
+/// shared ring; a pressed one sinks; a disabled one dims and never keeps the
+/// focused ring.
+#[test]
+fn control_glass_states_are_token_derived_and_geometry_invariant() {
+    let theme = Theme::dark().with_focus_visible(true);
+    let active = control_glass(&theme, ControlRole::Input, ControlVisualState::Active);
+    let hovered = control_glass(&theme, ControlRole::Input, ControlVisualState::Hovered);
+    let pressed = control_glass(&theme, ControlRole::Input, ControlVisualState::Pressed);
+    let focused = control_glass(&theme, ControlRole::Input, ControlVisualState::Focused);
+    let disabled = control_glass(&theme, ControlRole::Input, ControlVisualState::Disabled);
+    let pointer_theme = theme.with_focus_visible(false);
+    let pointer_focused = control_glass(
+        &pointer_theme,
+        ControlRole::Input,
+        ControlVisualState::Focused,
+    );
+
+    assert_eq!(hovered.border, active.border);
+    assert_eq!(pressed.border, active.border);
+    assert_eq!(disabled.border.radius, active.border.radius);
+    assert_ne!(
+        gradient_stops(hovered.background),
+        gradient_stops(active.background)
+    );
+    assert_ne!(
+        gradient_stops(pressed.background),
+        gradient_stops(active.background)
+    );
+    assert!(
+        hovered.shadow.blur_radius == active.shadow.blur_radius
+            && hovered.shadow.offset.y == active.shadow.offset.y,
+        "the shadow geometry stays exactly the shared projection's"
+    );
+    assert!(
+        pressed.shadow.color.a < active.shadow.color.a,
+        "a pressed control sinks visually"
+    );
+
+    assert_eq!(focused.border.color, focus_ring_color(&theme, false));
+    assert_eq!(focused.border.width, FOCUS_RING_WIDTH);
+    // Pointer focus keeps the resting glass edge and the resting width: the
+    // ring token's alpha is zero, so no ring is painted at all.
+    assert_eq!(pointer_focused.border.color, active.border.color);
+    assert_eq!(pointer_focused.border.width, active.border.width);
+
+    assert_eq!(disabled.text_color, Some(color(theme.palette().fg_muted)));
+    assert!(
+        disabled.shadow.color.a < active.shadow.color.a,
+        "disabled controls lose elevation"
+    );
+    assert_ne!(disabled.border.color, focused.border.color);
+    assert_ne!(
+        gradient_stops(disabled.background),
+        gradient_stops(active.background)
+    );
+
+    assert_eq!(
+        ControlVisualState::from_contract(ControlState::Compact),
+        ControlVisualState::Active
+    );
+    assert_eq!(
+        ControlVisualState::from_contract(ControlState::Disabled),
+        ControlVisualState::Disabled
+    );
+    assert!(!ControlState::Focused.changes_measurement());
+    assert!(!ControlState::Disabled.changes_measurement());
+}
+
+/// Badges and tooltips are non-interactive presentation roles: they keep the
+/// glass material but cast no elevation shadow, so compact slots do not
+/// accumulate overlapping depth washes.
+#[test]
+fn non_interactive_control_glass_keeps_the_material_without_elevation() {
+    let theme = Theme::dark();
+    let badge = control_glass(&theme, ControlRole::Badge, ControlVisualState::Active);
+    let tooltip = control_glass(&theme, ControlRole::Tooltip, ControlVisualState::Active);
+    assert_eq!(badge.shadow, iced::Shadow::default());
+    assert!(tooltip.shadow.color.a > 0.0);
+    assert_eq!(badge.background, card_glass_style(&theme).background);
 }

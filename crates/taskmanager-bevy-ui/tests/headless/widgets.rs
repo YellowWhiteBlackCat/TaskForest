@@ -20,8 +20,8 @@ use bevy::text::{InlineBox, InlineBoxKind};
 use bevy::ui::widget::{InlineImage, Text};
 use bevy::ui::{Node, Val};
 use bevy::ui_widgets::Button;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui_contract::IconId;
 
 use super::menu::{MenuItem, MenuSpec, MenuState, menu_scene_at};
@@ -268,4 +268,28 @@ fn table_rows_read_through_the_canvas_and_alternate_the_theme_zebra() {
         &palette,
     );
     assert_eq!(hovered, palette.hover_bg, "hover wins over the stripe");
+}
+
+#[test]
+fn an_atomic_card_keeps_the_shared_glass_fill() {
+    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let idle = PickingInteraction::None;
+    let card = control_background(
+        &ControlVisual(ControlTone::Card, false),
+        idle,
+        false,
+        &palette,
+    );
+    assert_eq!(
+        card,
+        palette.glass_fill(GlassTier::Card),
+        "the control skin does not erase a card's painted glass surface"
+    );
+    let selected = control_background(
+        &ControlVisual(ControlTone::Card, true),
+        idle,
+        false,
+        &palette,
+    );
+    assert_eq!(selected, palette.selection_bg, "selection wins on a card");
 }

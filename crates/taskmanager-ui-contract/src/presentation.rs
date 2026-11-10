@@ -22,6 +22,8 @@
 //!    ↓
 //! budget       measured slot → typed page and slot allocation
 //!    ↓
+//! card_flow    whole-group admission + card height clamp (one arithmetic)
+//!    ↓
 //! parity       the probe grid and the unexplained-difference rule
 //! ```
 //!
@@ -34,6 +36,7 @@
 //! numeric tables so neither can drift.
 
 pub mod budget;
+pub mod card_flow;
 pub mod load_tiers;
 pub mod motion;
 pub mod parity;

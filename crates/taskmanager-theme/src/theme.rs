@@ -189,6 +189,61 @@ impl GlassLayer {
     }
 }
 
+/// One toolkit-neutral shadow layer with resolved color and REM geometry.
+///
+/// Lengths stay on the root-relative axis; each frontend binding projects
+/// them into its own shadow vocabulary without authoring a second ladder.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct GlassShadowLayer {
+    /// The resolved shadow ink for this layer.
+    pub color: Color,
+    /// Vertical offset in root-relative units.
+    pub offset_y: f32,
+    /// Blur radius in root-relative units.
+    pub blur_radius: f32,
+}
+
+/// The complete two-layer glass elevation shadow for one tier.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct GlassShadow {
+    /// Wide, soft ambient elevation.
+    pub ambient: GlassShadowLayer,
+    /// Tight contact shadow that keeps the edge attached to the backdrop.
+    pub contact: GlassShadowLayer,
+}
+
+/// The renderer's declared projection of the shared glass shadow contract.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlassShadowProjection {
+    /// Paint both shared layers with their resolved token ink.
+    Layered,
+    /// Fold both layers into one alpha-weighted quad with the tier's
+    /// elevation opacity, for a renderer that paints only one shadow.
+    SingleQuad,
+}
+
+/// The single-quad elevation role for one glass tier.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlassShadowElevation {
+    Sidebar,
+    Card,
+    Modal,
+    Scrim,
+}
+
+impl GlassShadowElevation {
+    /// The elevation opacity for this surface role.
+    #[must_use]
+    pub const fn opacity(self) -> f32 {
+        match self {
+            Self::Sidebar => 0.45,
+            Self::Card => 0.7,
+            Self::Modal => 1.0,
+            Self::Scrim => 0.0,
+        }
+    }
+}
+
 /// The four glass tiers the product paints, with their blur radii.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GlassTier {
@@ -242,6 +297,55 @@ impl GlassTier {
             Self::Card => (1.0 / STANDARD_ROOT_REM_SIZE, 4.0 / STANDARD_ROOT_REM_SIZE),
             Self::Modal => (2.0 / STANDARD_ROOT_REM_SIZE, 6.0 / STANDARD_ROOT_REM_SIZE),
             Self::Scrim => (0.0, 0.0),
+        }
+    }
+
+    /// Both shadow layers with the theme's resolved ink and alpha weights.
+    #[must_use]
+    pub fn shadow(self, theme: &Theme) -> GlassShadow {
+        let ink = theme.glass_layer(self).shadow;
+        let (ambient_y, ambient_blur) = self.ambient_shadow_rem();
+        let (contact_y, contact_blur) = self.contact_shadow_rem();
+        GlassShadow {
+            ambient: GlassShadowLayer {
+                color: ink.with_alpha(ink.a * 0.6),
+                offset_y: ambient_y,
+                blur_radius: ambient_blur,
+            },
+            contact: GlassShadowLayer {
+                color: ink,
+                offset_y: contact_y,
+                blur_radius: contact_blur,
+            },
+        }
+    }
+
+    /// The shared shadow layers after a renderer's declared projection.
+    #[must_use]
+    pub fn projected_shadow(self, theme: &Theme, projection: GlassShadowProjection) -> GlassShadow {
+        let mut shadow = self.shadow(theme);
+        if projection == GlassShadowProjection::SingleQuad {
+            let elevation = self.single_quad_elevation().opacity();
+            shadow.ambient.color = shadow
+                .ambient
+                .color
+                .with_alpha(shadow.ambient.color.a * elevation);
+            shadow.contact.color = shadow
+                .contact
+                .color
+                .with_alpha(shadow.contact.color.a * elevation);
+        }
+        shadow
+    }
+
+    /// The single-quad elevation role for this tier.
+    #[must_use]
+    pub const fn single_quad_elevation(self) -> GlassShadowElevation {
+        match self {
+            Self::Sidebar => GlassShadowElevation::Sidebar,
+            Self::Card => GlassShadowElevation::Card,
+            Self::Modal => GlassShadowElevation::Modal,
+            Self::Scrim => GlassShadowElevation::Scrim,
         }
     }
 

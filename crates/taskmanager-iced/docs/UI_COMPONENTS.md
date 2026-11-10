@@ -16,6 +16,21 @@ native selection and renderer caches; all shared types use their defining module
   snapshot, unavailable progress never renders as a measured zero);
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
   controls that route keyboard access through the focus shell.
+- `src/theme.rs::control_glass` is the ONE control-surface seam: the shared
+  Card glass gradient, its specular edge, and the single-quad projection of
+  the theme's two-layer glass shadow (the same projection the floating
+  panels consume). The switch, slider, select, search field and the
+  segmented track all read it, so no control owns a second palette, radius
+  ladder or shadow ladder; the hover/pressed/focus/disabled states reweight
+  those same tokens and never change geometry (the shared
+  `ControlState::changes_measurement` contract). The focus ring reads the
+  shared ring token, so a pointer-driven focus paints no ring on the switch
+  or the segmented track either.
+- `src/ui/components/dashboard_budget.rs` spends the shared card-flow
+  admission verdict (`taskmanager_ui_contract::presentation::card_flow`):
+  the whole-group admission and the card floor..ceiling clamp are the shared
+  arithmetic, while Iced keeps only its own compact-summary decision and the
+  chart/chrome split inside one admitted card.
 - `src/focus.rs` owns keyboard-reachable activation shells and draws the shared
   `palette().ring` focus ring gated by the shared input modality
   (`taskmanager_ui_contract::InputModality`: only keyboard focus paints the

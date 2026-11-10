@@ -87,6 +87,13 @@ fn table_app(shell: ShellApp) -> App {
             });
         }
     }
+    // Table-parity cases explicitly select the dense presentation; the
+    // card lane is the default Applications surface.
+    app.world_mut()
+        .insert_resource(crate::pages::processes::card_lane::ProcessViewMode::Dense);
+    app.world_mut()
+        .commands()
+        .trigger(crate::input::ShellInteractionApplied);
     app.update();
     app.update();
     app

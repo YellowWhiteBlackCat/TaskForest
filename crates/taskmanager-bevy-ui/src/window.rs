@@ -58,7 +58,9 @@ mod backdrop_capture;
 pub(crate) use backdrop_capture::BackdropCaptureTarget;
 mod capture_marker;
 mod capture_marker_cores;
+mod capture_marker_health;
 mod capture_marker_interactive;
+mod capture_marker_zero_gray;
 mod capture_state;
 mod frame_capture;
 use backdrop_capture::{drive_backdrop_capture, sync_backdrop_capture};
@@ -440,6 +442,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::pages::sessions::register(app);
         crate::pages::process_tree::register(app);
         crate::pages::processes::layout::register(app);
+        crate::pages::processes::card_lane::register(app);
         crate::pages::performance::register(app);
         app.add_systems(
             bevy::app::PostUpdate,

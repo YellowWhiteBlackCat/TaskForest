@@ -22,15 +22,16 @@
 use std::ops::RangeInclusive;
 
 use iced::widget::{Space, button, container, row, text};
-use iced::{Background, Border, Color, Length, Vector};
+use iced::{Background, Border, Color, Length};
 use taskmanager_theme::color::{self, mix};
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassTier, Theme, tokens};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use super::IcedElement;
 use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
-use crate::theme;
+use crate::theme::{self, ControlVisualState};
 
 /// Switch track width (GPUI parity: 36px pill).
 const SWITCH_TRACK_WIDTH: f32 = 36.0;
@@ -54,6 +55,7 @@ pub(crate) fn switch<'a>(
     disabled: bool,
     on_toggle: impl Fn(bool) -> Message + 'a,
 ) -> IcedElement<'a> {
+    let palette = theme_snapshot.palette();
     // Knob geometry: the knob occupies a token-width leading gap when on and
     // slides to the leading edge when off (row layout inside the padded
     // track) — the same 16px slide the GPUI switch renders.
@@ -89,14 +91,13 @@ pub(crate) fn switch<'a>(
         // leaves `Status::Disabled`; no focus wrapper means no Tab stop.
         return control.into();
     }
-    let palette = theme_snapshot.palette();
     FocusableButton::new(
         focus_id(focus_target),
         control.on_press(press.clone()).into(),
         press,
         focus_target,
-        crate::theme_binding::color(palette.accent),
-        SWITCH_TRACK_HEIGHT / 2.0,
+        theme::focus_ring_color(&theme_snapshot, false),
+        theme::scaled_radius(&theme_snapshot, palette.control_radius),
         false,
     )
     .into()
@@ -138,26 +139,31 @@ fn switch_track_style(theme_snapshot: &Theme, on: bool, status: button::Status) 
 }
 
 fn switch_knob_style(theme_snapshot: &Theme, disabled: bool) -> container::Style {
-    let palette = theme_snapshot.palette();
-    let fill = if disabled {
-        mix(palette.surface, palette.window_backdrop, 0.5)
-    } else {
-        palette.surface
-    };
-    container::Style {
-        background: Some(Background::Color(crate::theme_binding::color(fill))),
-        border: Border {
-            color: Color::TRANSPARENT,
-            width: 0.0,
-            radius: (SWITCH_KNOB_SIZE / 2.0).into(),
+    let mut style = theme::control_glass(
+        theme_snapshot,
+        ControlRole::Badge,
+        if disabled {
+            ControlVisualState::Disabled
+        } else {
+            ControlVisualState::Active
         },
-        shadow: iced::Shadow {
-            color: crate::theme_binding::color(palette.card_shadow),
-            offset: Vector::new(0.0, 1.0),
-            blur_radius: 3.0,
+    );
+    style.background = Some(Background::Color(crate::theme_binding::color(
+        if disabled {
+            mix(
+                theme_snapshot.palette().surface,
+                theme_snapshot.palette().window_backdrop,
+                0.5,
+            )
+        } else {
+            theme_snapshot.palette().surface
         },
-        ..container::Style::default()
-    }
+    )));
+    style.border.radius = (SWITCH_KNOB_SIZE / 2.0).into();
+    // The knob is a RAISED element inside the track: it wears the shared
+    // glass contact layer, the same small lift the GPUI switch knob reads.
+    style.shadow = theme::glass_contact_shadow(theme_snapshot, GlassTier::Card);
+    style
 }
 
 /// A ranged value slider: iced's native slider in token styling, wrapped in
@@ -228,17 +234,27 @@ fn slider_snapped_value(range: &RangeInclusive<f32>, step: f32, value: f32) -> f
 
 fn slider_style(
     theme_snapshot: &Theme,
-    _status: iced::widget::slider::Status,
+    status: iced::widget::slider::Status,
 ) -> iced::widget::slider::Style {
     let palette = theme_snapshot.palette();
+    let state = match status {
+        iced::widget::slider::Status::Active => ControlVisualState::Active,
+        iced::widget::slider::Status::Hovered => ControlVisualState::Hovered,
+        iced::widget::slider::Status::Dragged => ControlVisualState::Pressed,
+    };
+    let glass = theme::control_glass(theme_snapshot, ControlRole::Toggle, state);
+    let Some(iced::Background::Gradient(iced::Gradient::Linear(gradient))) = glass.background
+    else {
+        unreachable!("control glass always paints a gradient")
+    };
     iced::widget::slider::Style {
         rail: iced::widget::slider::Rail {
             backgrounds: (
                 Background::Color(crate::theme_binding::color(palette.accent)),
-                Background::Color(crate::theme_binding::color(palette.border)),
+                Background::Gradient(iced::Gradient::Linear(gradient)),
             ),
             width: f32::from(tokens::SPACE_4),
-            border: Border::default(),
+            border: glass.border,
         },
         handle: iced::widget::slider::Handle {
             shape: iced::widget::slider::HandleShape::Circle {
@@ -246,7 +262,7 @@ fn slider_style(
             },
             background: Background::Color(crate::theme_binding::color(palette.accent)),
             border_width: f32::from(tokens::SPACE_2),
-            border_color: crate::theme_binding::color(palette.surface),
+            border_color: glass.border.color,
         },
     }
 }
@@ -271,12 +287,19 @@ where
     T: ToString + PartialEq + Clone + 'a,
 {
     if options.is_empty() {
+        let glass = theme::control_glass(
+            theme_snapshot,
+            ControlRole::Input,
+            ControlVisualState::Disabled,
+        );
         return container(
-            text(placeholder)
-                .size(f32::from(tokens::FONT_12))
-                .color(crate::theme::muted_text_color(theme_snapshot)),
+            text(placeholder).size(f32::from(tokens::FONT_12)).color(
+                glass.text_color.unwrap_or_else(|| {
+                    crate::theme_binding::color(theme_snapshot.palette().fg_muted)
+                }),
+            ),
         )
-        .style(move |_theme| select_placeholder_style(theme_snapshot))
+        .style(move |_theme| glass)
         .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
         .width(Length::Fill)
         .into();
@@ -298,38 +321,21 @@ fn select_style(
     status: iced::widget::pick_list::Status,
 ) -> iced::widget::pick_list::Style {
     let palette = theme_snapshot.palette();
-    let border_color = match status {
-        iced::widget::pick_list::Status::Opened { .. } => {
-            crate::theme_binding::color(palette.accent)
-        }
-        _ => crate::theme_binding::color(palette.border),
+    let state = match status {
+        iced::widget::pick_list::Status::Active => ControlVisualState::Active,
+        iced::widget::pick_list::Status::Hovered => ControlVisualState::Hovered,
+        iced::widget::pick_list::Status::Opened { .. } => ControlVisualState::Focused,
+    };
+    let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
+    let Some(background @ iced::Background::Gradient(_)) = glass.background else {
+        unreachable!("control glass always paints a gradient")
     };
     iced::widget::pick_list::Style {
         text_color: crate::theme_binding::color(palette.fg),
         placeholder_color: crate::theme_binding::color(palette.fg_muted),
         handle_color: crate::theme_binding::color(palette.fg_muted),
-        background: Background::Color(crate::theme_binding::color(palette.surface)),
-        border: Border {
-            color: border_color,
-            width: 1.0,
-            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
-        },
-    }
-}
-
-fn select_placeholder_style(theme_snapshot: &Theme) -> container::Style {
-    let palette = theme_snapshot.palette();
-    container::Style {
-        background: Some(Background::Color(crate::theme_binding::color(
-            palette.surface,
-        ))),
-        text_color: Some(crate::theme_binding::color(palette.fg_muted)),
-        border: Border {
-            color: crate::theme_binding::color(palette.border),
-            width: 1.0,
-            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
-        },
-        ..container::Style::default()
+        background,
+        border: glass.border,
     }
 }
 
@@ -368,13 +374,22 @@ pub(crate) fn search_input<'a>(
         field = field.push(
             button(crate::icons::icon(theme_snapshot, IconId::Close, 12.0))
                 .padding(f32::from(tokens::SPACE_2))
-                .style(move |_theme, status| {
-                    crate::theme::ghost_button_style(theme_snapshot, status)
-                })
+                .style(move |_theme, status| search_clear_style(theme_snapshot, status))
                 .on_press(clear),
         );
     }
-    field.into()
+    // ONE glass surface around the whole field: the icon, the input and the
+    // clear affordance share a single material, never a nested panel.
+    container(field)
+        .width(Length::Fill)
+        .style(move |_theme| {
+            theme::control_glass(
+                theme_snapshot,
+                ControlRole::Input,
+                ControlVisualState::Active,
+            )
+        })
+        .into()
 }
 
 /// The clear affordance exists only for a query that can be cleared; an
@@ -388,23 +403,48 @@ fn search_style(
     status: iced::widget::text_input::Status,
 ) -> iced::widget::text_input::Style {
     let palette = theme_snapshot.palette();
-    let border_color = match status {
-        iced::widget::text_input::Status::Focused { .. } => {
-            crate::theme_binding::color(palette.accent)
-        }
-        _ => crate::theme_binding::color(palette.border),
+    let state = match status {
+        iced::widget::text_input::Status::Active => ControlVisualState::Active,
+        iced::widget::text_input::Status::Hovered => ControlVisualState::Hovered,
+        iced::widget::text_input::Status::Focused { .. } => ControlVisualState::Focused,
+        iced::widget::text_input::Status::Disabled => ControlVisualState::Disabled,
+    };
+    let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
+    let Some(background @ iced::Background::Gradient(_)) = glass.background else {
+        unreachable!("control glass always paints a gradient")
     };
     iced::widget::text_input::Style {
-        background: Background::Color(crate::theme_binding::color(palette.surface)),
-        border: Border {
-            color: border_color,
-            width: 1.0,
-            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
-        },
-        icon: crate::theme_binding::color(palette.fg_muted),
-        placeholder: crate::theme_binding::color(palette.fg_muted),
-        value: crate::theme_binding::color(palette.fg),
+        background,
+        border: glass.border,
+        icon: glass
+            .text_color
+            .unwrap_or_else(|| crate::theme_binding::color(palette.fg_muted)),
+        placeholder: glass
+            .text_color
+            .unwrap_or_else(|| crate::theme_binding::color(palette.fg_muted)),
+        value: glass
+            .text_color
+            .unwrap_or_else(|| crate::theme_binding::color(palette.fg)),
         selection: crate::theme_binding::color(palette.selection),
+    }
+}
+
+fn search_clear_style(theme_snapshot: &Theme, status: button::Status) -> button::Style {
+    let state = match status {
+        button::Status::Active => ControlVisualState::Active,
+        button::Status::Hovered => ControlVisualState::Hovered,
+        button::Status::Pressed => ControlVisualState::Pressed,
+        button::Status::Disabled => ControlVisualState::Disabled,
+    };
+    let glass = theme::control_glass(theme_snapshot, ControlRole::IconButton, state);
+    button::Style {
+        background: glass.background,
+        text_color: glass
+            .text_color
+            .unwrap_or_else(|| crate::theme_binding::color(theme_snapshot.palette().fg)),
+        border: glass.border,
+        shadow: glass.shadow,
+        ..button::Style::default()
     }
 }
 
@@ -433,18 +473,42 @@ pub(crate) fn segmented<'a>(
         return Space::new().into();
     }
     let on_change = Box::new(on_change);
-    let segments: Vec<IcedElement<'a>> = choices
+    let choice_count = choices.len();
+    let (dividers, segments): (Vec<_>, Vec<_>) = choices
         .iter()
-        .map(|(label, value)| {
+        .enumerate()
+        .map(|(index, (label, value))| {
             let selected = *value == active;
-            button(text(label.clone()))
+            let divider: Option<IcedElement<'a>> = (index > 0).then(|| {
+                container(Space::new())
+                    .width(Length::Fixed(f32::from(tokens::SPACE_1)))
+                    .height(Length::Fill)
+                    .style(move |_theme| container::Style {
+                        background: Some(Background::Color(theme::control_divider_color(
+                            theme_snapshot,
+                        ))),
+                        ..container::Style::default()
+                    })
+                    .into()
+            });
+            let segment: IcedElement<'a> = button(text(label.clone()))
                 .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-                .style(move |_theme, status| segment_style(theme_snapshot, selected, status))
+                .style(move |_theme, status| {
+                    segment_style(theme_snapshot, index, choice_count, selected, status)
+                })
                 .on_press(on_change(*value))
-                .into()
+                .into();
+            (divider, segment)
         })
-        .collect();
-    let track = container(row(segments))
+        .unzip();
+    let mut row_children: Vec<IcedElement<'a>> = Vec::with_capacity(choices.len() * 2);
+    for (divider, segment) in dividers.into_iter().zip(segments) {
+        if let Some(divider) = divider {
+            row_children.push(divider);
+        }
+        row_children.push(segment);
+    }
+    let track = container(row(row_children))
         .style(move |_theme| segmented_track_style(theme_snapshot))
         .width(Length::Shrink);
     let palette = theme_snapshot.palette();
@@ -455,7 +519,7 @@ pub(crate) fn segmented<'a>(
         choices: choices.to_vec(),
         active,
         focus_target,
-        focus_color: crate::theme_binding::color(palette.accent),
+        focus_color: theme::focus_ring_color(theme_snapshot, false),
         focus_radius: theme::scaled_radius(theme_snapshot, palette.control_radius),
     })
     .into()
@@ -487,28 +551,22 @@ fn segmented_neighbor_index(
     })
 }
 
-fn segmented_track_style(theme_snapshot: &Theme) -> container::Style {
-    let palette = theme_snapshot.palette();
-    container::Style {
-        background: Some(Background::Color(crate::theme_binding::color(
-            palette.surface,
-        ))),
-        text_color: Some(crate::theme_binding::color(palette.fg)),
-        border: Border {
-            color: crate::theme_binding::color(palette.border),
-            width: 1.0,
-            radius: theme::scaled_radius(theme_snapshot, palette.control_radius).into(),
-        },
-        ..container::Style::default()
-    }
-}
-
 /// One segment's surface. The active segment fills with the accent and wins
 /// over hover (a selected segment stays accent-filled); idle segments are
 /// transparent over the track surface with token hover/pressed tints.
-fn segment_style(theme_snapshot: &Theme, selected: bool, status: button::Status) -> button::Style {
+fn segment_style(
+    theme_snapshot: &Theme,
+    index: usize,
+    count: usize,
+    selected: bool,
+    status: button::Status,
+) -> button::Style {
     let palette = theme_snapshot.palette();
-    let radius = theme::scaled_radius(theme_snapshot, palette.control_radius).into();
+    let radius = theme::scaled_radius(theme_snapshot, palette.control_radius);
+    // The track is ONE connected surface: an idle segment stays transparent
+    // so the track's own glass shows through, exactly as the GPUI connected
+    // track renders. The active segment fills with the accent and wins over
+    // hover; the hover/pressed tints are the shared palette tokens.
     let (background, text_color) = if selected {
         (
             Background::Color(crate::theme_binding::color(palette.accent)),
@@ -528,6 +586,10 @@ fn segment_style(theme_snapshot: &Theme, selected: bool, status: button::Status)
                 ))),
                 crate::theme_binding::color(palette.fg),
             ),
+            button::Status::Disabled => (
+                Background::Color(Color::TRANSPARENT),
+                crate::theme_binding::color(palette.fg_muted),
+            ),
             _ => (
                 Background::Color(Color::TRANSPARENT),
                 crate::theme_binding::color(palette.fg),
@@ -540,10 +602,30 @@ fn segment_style(theme_snapshot: &Theme, selected: bool, status: button::Status)
         border: Border {
             color: Color::TRANSPARENT,
             width: 0.0,
-            radius,
+            radius: iced::border::Radius {
+                top_left: if index == 0 { radius } else { 0.0 },
+                bottom_left: if index == 0 { radius } else { 0.0 },
+                top_right: if index + 1 == count { radius } else { 0.0 },
+                bottom_right: if index + 1 == count { radius } else { 0.0 },
+            },
         },
         ..button::Style::default()
     }
+}
+
+/// The connected track's own surface: the shared Card glass (the material
+/// every Iced floating surface wears) with the specular edge and the
+/// single-quad shadow projection. One material for the whole track.
+#[must_use]
+fn segmented_track_style(theme_snapshot: &Theme) -> container::Style {
+    let mut glass = theme::control_glass(
+        theme_snapshot,
+        ControlRole::Button,
+        ControlVisualState::Active,
+    );
+    glass.border.radius =
+        theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius).into();
+    glass
 }
 
 mod segmented_track;

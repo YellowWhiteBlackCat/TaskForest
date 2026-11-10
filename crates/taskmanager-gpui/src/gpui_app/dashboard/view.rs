@@ -384,7 +384,11 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         graph_cache,
     } = props;
     let samples = series.samples(metric);
-    div()
+    CardSurface::new(theme.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::card_radius(theme))
+        .padding(tokens::SPACE_5)
+        .render()
         .debug_selector(move || format!("tm-dashboard-history-card:{}", metric.id()))
         .w(relative(if layout.columns == 1 { 1.0 } else { 0.49 }))
         .min_w(px(0.0))

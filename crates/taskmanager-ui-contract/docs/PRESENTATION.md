@@ -13,12 +13,34 @@ thresholds   each shape's registered bands + the reason-bearing debt census
    ↓
 budget       measured slot → typed page and slot allocation
    ↓
+card_flow    whole-group admission + card height clamp (one arithmetic)
+   ↓
 parity       probe grid and the unexplained-difference rule
 sizes        control-role matrix and hit-target floor
 motion       motion-role/curve matrix and forbidden sites
 resolution   the frame's resolved facts and the re-deriving verifier
 load_tiers   the per-core load-tier band edges + the clamp-and-bucket fold
 ```
+
+## Card flow is one admission rule
+
+`card_flow` owns the arithmetic every graphical shape needs when a page
+paints cards instead of rows: how many COMPLETE groups fit in a measured
+slot, and how tall one card may become inside it. A group is admitted only
+when the whole group fits; an admitted group's height is the leftover space
+shared out and clamped into the card's own floor and ceiling; when even one
+group does not fit, the answer is zero groups and the caller degrades to its
+dense form. The shape measures its own slot and its own card footprint (its
+control height, its padding, its gap) and spends the verdict — it never
+re-derives the ladder. A shape that caps the group count (a page that shows
+at most four metrics) says so with `admit_card_groups_capped`; the cap is
+product content, not a layout fact.
+
+The elevation ladder a card wears is a different fact and lives with the
+theme's glass tiers: `taskmanager-theme` owns the two-layer shadow ink and
+geometry, and each renderer binding projects it (a renderer that paints one
+shadow quad folds the two layers into one alpha-weighted quad). No frontend
+owns a second shadow ladder.
 
 Intent, metric and classification are shared ("求同"). Units, chrome deduction
 and realization belong to the shape ("存异"): GPUI window rem, Iced scaled

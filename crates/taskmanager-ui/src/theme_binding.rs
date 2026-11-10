@@ -121,24 +121,25 @@ fn rem_pixels(theme: &Theme, value: f32) -> Pixels {
 /// shadow type. All dimensions originate in [`GlassTier`] REM values.
 #[must_use]
 pub fn glass_shadow(theme: &Theme, tier: GlassTier) -> Vec<BoxShadow> {
-    let ink = hsla(theme.glass_layer(tier).shadow);
-    let (ambient_y, ambient_blur) = tier.ambient_shadow_rem();
-    let (contact_y, contact_blur) = tier.contact_shadow_rem();
+    let layers = tier.shadow(theme);
     vec![
         BoxShadow {
-            color: Hsla {
-                a: ink.a * 0.6,
-                ..ink
-            },
-            offset: Point::new(Pixels::default(), rem_pixels(theme, ambient_y)),
-            blur_radius: rem_pixels(theme, ambient_blur),
+            color: hsla(layers.ambient.color),
+            offset: Point::new(
+                Pixels::default(),
+                rem_pixels(theme, layers.ambient.offset_y),
+            ),
+            blur_radius: rem_pixels(theme, layers.ambient.blur_radius),
             spread_radius: Pixels::default(),
             inset: false,
         },
         BoxShadow {
-            color: ink,
-            offset: Point::new(Pixels::default(), rem_pixels(theme, contact_y)),
-            blur_radius: rem_pixels(theme, contact_blur),
+            color: hsla(layers.contact.color),
+            offset: Point::new(
+                Pixels::default(),
+                rem_pixels(theme, layers.contact.offset_y),
+            ),
+            blur_radius: rem_pixels(theme, layers.contact.blur_radius),
             spread_radius: Pixels::default(),
             inset: false,
         },

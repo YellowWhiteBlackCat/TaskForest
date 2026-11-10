@@ -18,7 +18,115 @@ use iced::widget::{button, container, progress_bar, scrollable};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{Color, GlassTier, Length, Theme, tokens};
+use taskmanager_theme::{
+    Color, GlassShadowLayer, GlassShadowProjection, GlassTier, Length, Theme, tokens,
+};
+use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
+
+/// The control/surface visual state Iced paints from the shared presentation
+/// vocabulary. Geometry never changes with state: focus, hover, press and
+/// disabled alter paint only, so a ring or a disabled tint cannot consume a
+/// slot budget in a compact viewport.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ControlVisualState {
+    Active,
+    Hovered,
+    Pressed,
+    Focused,
+    Disabled,
+}
+
+impl ControlVisualState {
+    #[must_use]
+    pub const fn from_contract(state: ControlState) -> Self {
+        match state {
+            ControlState::Normal | ControlState::Compact => Self::Active,
+            ControlState::Focused => Self::Focused,
+            ControlState::Active => Self::Hovered,
+            ControlState::Disabled => Self::Disabled,
+        }
+    }
+
+    /// The shadow's paint weight for this state. Geometry (offset, blur) is
+    /// NEVER reweighted: it stays exactly the shared projection's. Only the
+    /// ink alpha changes, so a pressed control sinks and a disabled one
+    /// loses elevation without a second shadow ladder.
+    const fn shadow_alpha(self) -> f32 {
+        match self {
+            Self::Active | Self::Hovered | Self::Focused => 1.0,
+            Self::Pressed => 0.55,
+            Self::Disabled => 0.35,
+        }
+    }
+
+    const fn sheen_progress(self) -> f32 {
+        match self {
+            Self::Active => 0.0,
+            Self::Hovered | Self::Focused => 0.45,
+            Self::Pressed => 0.18,
+            Self::Disabled => 0.0,
+        }
+    }
+}
+
+/// One token-derived control surface: the shared Card glass gradient, its
+/// specular edge, and the same single-quad projection of the two-layer glass
+/// shadow the floating panels consume. Status only reweights those tokens;
+/// no control owns a second shadow ladder or a hand-picked hue.
+#[must_use]
+pub fn control_glass(
+    theme: &Theme,
+    role: ControlRole,
+    state: ControlVisualState,
+) -> container::Style {
+    let mut style = card_glass_style(theme);
+    if role == ControlRole::Badge {
+        style.shadow = iced::Shadow::default();
+    }
+    let sheen = theme.glass_sheen(GlassTier::Card);
+    let progress = state.sheen_progress();
+    if progress > 0.0 && sheen.a > 0.0 {
+        let [top, bottom] = theme.glass_gradient(GlassTier::Card);
+        style.background = Some(iced::Background::Gradient(iced::Gradient::Linear(
+            iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
+                .add_stop(0.0, color(mix(top, sheen, progress)))
+                .add_stop(1.0, color(mix(bottom, sheen, progress * 0.5))),
+        )));
+    }
+    style.shadow.color = style.shadow.color.scale_alpha(state.shadow_alpha());
+    if state == ControlVisualState::Disabled {
+        style.border.color = color(mix(
+            theme.glass_card().edge,
+            theme.palette().window_backdrop,
+            0.5,
+        ));
+        let base = color(theme.glass_card().fill);
+        style.background = Some(iced::Background::Gradient(iced::Gradient::Linear(
+            iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
+                .add_stop(0.0, base)
+                .add_stop(1.0, base),
+        )));
+        style.text_color = Some(color(theme.palette().fg_muted));
+    }
+    if state == ControlVisualState::Focused {
+        // The shared ring token carries the focus-visible decision in its
+        // alpha: pointer-driven focus keeps the plain edge and the resting
+        // width, keyboard focus paints the ring.
+        let ring = focus_ring_color(theme, false);
+        if ring.a > 0.0 {
+            style.border.color = ring;
+            style.border.width = FOCUS_RING_WIDTH;
+        }
+    }
+    style
+}
+
+/// The hairline divider between connected control segments: the same glass
+/// edge token as the floating surfaces, never a second border color.
+#[must_use]
+pub fn control_divider_color(theme: &Theme) -> iced::Color {
+    color(theme.glass_card().edge)
+}
 /// The iced theme for one neutral theme snapshot: `Theme::custom` with the
 /// skin's backdrop/text/accent/status tokens. Widget default styles then
 /// inherit the skin's semantic colors; explicit styles read the same tokens
@@ -71,36 +179,33 @@ fn glass_border(theme: &Theme, tier: GlassTier) -> iced::Border {
     }
 }
 
-fn glass_shadow_opacity(tier: GlassTier) -> f32 {
-    match tier {
-        GlassTier::Sidebar => 0.45,
-        GlassTier::Card => 0.7,
-        GlassTier::Modal => 1.0,
-        GlassTier::Scrim => 0.0,
+fn glass_shadow_with(theme: &Theme, layer: GlassShadowLayer) -> iced::Shadow {
+    iced::Shadow {
+        color: color(layer.color),
+        offset: iced::Vector::new(0.0, rem(theme, layer.offset_y)),
+        blur_radius: rem(theme, layer.blur_radius),
     }
 }
 
-fn glass_shadow_with(
-    theme: &Theme,
-    tier: GlassTier,
-    (offset, blur_radius): (f32, f32),
-    opacity_scale: f32,
-) -> iced::Shadow {
-    let shadow = theme.glass_layer(tier).shadow;
-    let opacity = glass_shadow_opacity(tier) * opacity_scale;
-    iced::Shadow {
-        color: color(shadow.with_alpha(shadow.a * opacity)),
-        offset: iced::Vector::new(0.0, rem(theme, offset)),
-        blur_radius: rem(theme, blur_radius),
-    }
+/// The tight contact layer of one glass tier: the small lift a raised
+/// element wears (the switch knob). It is the shared shadow contract's own
+/// contact layer, not a second shadow ladder.
+#[must_use]
+pub fn glass_contact_shadow(theme: &Theme, tier: GlassTier) -> iced::Shadow {
+    glass_shadow_with(
+        theme,
+        tier.projected_shadow(theme, GlassShadowProjection::SingleQuad)
+            .contact,
+    )
 }
 
 /// Collapse the theme's ambient and contact shadow layers into the one shadow
 /// quad Iced can paint. Alpha-weighted geometry preserves both token
 /// dimensions without claiming a second layer the toolkit cannot draw.
 fn glass_shadow(theme: &Theme, tier: GlassTier) -> iced::Shadow {
-    let ambient = glass_shadow_with(theme, tier, tier.ambient_shadow_rem(), 0.6);
-    let contact = glass_shadow_with(theme, tier, tier.contact_shadow_rem(), 1.0);
+    let layers = tier.projected_shadow(theme, GlassShadowProjection::SingleQuad);
+    let ambient = glass_shadow_with(theme, layers.ambient);
+    let contact = glass_shadow_with(theme, layers.contact);
     let ambient_alpha = ambient.color.a;
     let contact_alpha = contact.color.a;
     let total_alpha = ambient_alpha + contact_alpha;

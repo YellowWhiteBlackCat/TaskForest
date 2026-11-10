@@ -24,8 +24,8 @@ use bevy::ui_widgets::Activate;
 
 use super::{
     ProcessCountLine, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent, ProcessSearchInput,
-    ProcessSelectRow, ProcessSelectionChanged, ProcessTableArtifact, TableSurface, rebuild_table,
-    selected_identity,
+    ProcessSelectRow, ProcessSelectionChanged, ProcessTableArtifact, TableSurface, card_lane,
+    rebuild_table, selected_identity,
 };
 use crate::app::{FrontendTrack, Page, Route, ShellTrack};
 use crate::input::ShellInteractionApplied;
@@ -83,7 +83,11 @@ type HoveredTableSurfaces<'w, 's> = Query<
     'w,
     's,
     &'static PickingInteraction,
-    Or<(With<ProcessTableArtifact>, With<ProcessRowsRoot>)>,
+    Or<(
+        With<ProcessTableArtifact>,
+        With<ProcessRowsRoot>,
+        With<card_lane::ProcessCardFlow>,
+    )>,
 >;
 
 /// Wheel scroll into the rows root while the pointer hovers the table. A

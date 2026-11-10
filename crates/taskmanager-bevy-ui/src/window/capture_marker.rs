@@ -17,9 +17,12 @@ use crate::pages::performance::{
     DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
 };
 use crate::pages::process_tree::ProcessTreeRowMarker;
+use crate::pages::processes::card_lane::{
+    ProcessCardFlow, ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode,
+};
 use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
 use crate::pages::processes::properties_modal::PropertiesCapture;
-use crate::pages::processes::{ProcessRowsRoot, ProcessScrollIntent, ProcessScrollState};
+use crate::pages::processes::{ProcessRowsRoot, ProcessScrollState};
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
@@ -37,21 +40,18 @@ use bevy::text::TextColor;
 use bevy::ui::widget::Text;
 use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
 use taskforest_core::core::metrics::ScalarAvailability;
-use taskmanager_application::i18n::t;
-use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
 type TreeViewportFilter = (With<ModalBody>, Without<SystemBody>);
 
 #[derive(SystemParam)]
 pub(super) struct CaptureAccess<'w, 's> {
-    track: NonSend<'w, FrontendTrack>,
+    pub(super) track: NonSend<'w, FrontendTrack>,
     window_surface: Res<'w, WindowSurfaceState>,
     saved_views: Res<'w, crate::saved_views::SavedViewsState>,
     navigation: Res<'w, NavigationState>,
     nav_strip: Query<'w, 's, &'static ComputedNode, With<NavigationStrip>>,
-    system_state: Res<'w, SystemDashboardState>,
+    pub(super) system_state: Res<'w, SystemDashboardState>,
     device_focus: Res<'w, PerformanceDeviceFocus>,
     device_categories: Query<'w, 's, (&'static DeviceViewCategory, &'static ComputedNode)>,
     device_blocks: Query<'w, 's, (&'static DynBlock, &'static ComputedNode)>,
@@ -64,10 +64,10 @@ pub(super) struct CaptureAccess<'w, 's> {
             &'static CurveMeasurement,
         ),
     >,
-    route: Res<'w, Route>,
-    state: ResMut<'w, CaptureMarkerState>,
+    pub(super) route: Res<'w, Route>,
+    pub(super) state: ResMut<'w, CaptureMarkerState>,
     pages: Query<'w, 's, &'static PageContent>,
-    text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
+    pub(super) text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
     feedback_lines: Query<'w, 's, (&'static Text, &'static ComputedNode), With<FeedbackLine>>,
     focus: FocusCapture<'w, 's>,
     confirmation: ConfirmationCapture<'w, 's>,
@@ -78,7 +78,7 @@ pub(super) struct CaptureAccess<'w, 's> {
         (&'static ComputedNode, &'static UiGlobalTransform),
         With<MemoryInventoryAnchor>,
     >,
-    zero_cells: Query<
+    pub(super) zero_cells: Query<
         'w,
         's,
         (
@@ -88,9 +88,28 @@ pub(super) struct CaptureAccess<'w, 's> {
             &'static TextColor,
         ),
     >,
-    process_roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
-    process_scroll: Option<Res<'w, ProcessScrollState>>,
-    palette: Res<'w, WindowPalette>,
+    pub(super) process_roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
+    pub(super) process_scroll: Option<Res<'w, ProcessScrollState>>,
+    card_mode: Option<Res<'w, ProcessViewMode>>,
+    card_flow:
+        Query<'w, 's, (&'static ComputedNode, &'static UiGlobalTransform), With<ProcessCardFlow>>,
+    card_groups: Query<
+        'w,
+        's,
+        (
+            &'static ProcessCardGroup,
+            &'static ComputedNode,
+            &'static UiGlobalTransform,
+        ),
+        With<ProcessCardGroup>,
+    >,
+    dashboards: Query<
+        'w,
+        's,
+        (&'static ComputedNode, &'static UiGlobalTransform),
+        With<ProcessFocusDashboard>,
+    >,
+    pub(super) palette: Res<'w, WindowPalette>,
     tree_rows: Query<
         'w,
         's,
@@ -146,52 +165,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     application_history: Res<'w, HistoryProjectionResource>,
     interactive: InteractiveCaptureAccess<'w, 's>,
     process_menu: Option<ResMut<'w, ProcessMenuModal>>,
-    commands: Commands<'w, 's>,
-}
-
-/// The apps-zero-gray scenario waits for the scrolled zero row to be painted
-/// in the calibrated muted ink before it admits the frame's data.
-fn apps_zero_gray_ready(access: &mut CaptureAccess) -> bool {
-    let Some(scroll) = access
-        .process_scroll
-        .as_ref()
-        .filter(|scroll| scroll.viewport_rows > 0)
-    else {
-        return false;
-    };
-    let desired = access
-        .track
-        .shell
-        .visible_processes()
-        .len()
-        .saturating_sub(scroll.viewport_rows);
-    if scroll.top != desired {
-        if let Ok(root) = access.process_roots.single() {
-            access.commands.trigger(ProcessScrollIntent {
-                entity: root,
-                rows: isize::MAX,
-            });
-        }
-        return false;
-    }
-    let muted = crate::widgets::table::contrast::calibrate_muted_ink(
-        access.palette.inner.dim_color,
-        access.palette.inner.body_color,
-        &[
-            access.palette.inner.content_bg,
-            access.palette.inner.nav_active_bg,
-        ],
-    );
-    if !access.zero_cells.iter().any(|(zero, text, node, color)| {
-        zero.0 && text.0 == "0.0%" && node.size().x > 0.0 && node.size().y > 0.0 && color.0 == muted
-    }) {
-        return false;
-    }
-    if !access.state.data_presented {
-        access.state.data_presented = true;
-        return false;
-    }
-    true
+    pub(super) commands: Commands<'w, 's>,
 }
 
 pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
@@ -255,7 +229,48 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
     }
     match capture_scenario_target() {
-        Some("apps-zero-gray") if !apps_zero_gray_ready(&mut access) => return,
+        Some("applications-card-lane") => {
+            if route != Page::Processes
+                || access
+                    .card_mode
+                    .is_none_or(|mode| *mode != ProcessViewMode::Cards)
+                || !access
+                    .dashboards
+                    .iter()
+                    .any(|(node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+                || !access
+                    .card_groups
+                    .iter()
+                    .any(|(_, node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+            {
+                return;
+            }
+            let Some((flow, flow_transform)) = access.card_flow.iter().next() else {
+                return;
+            };
+            let flow_bottom = flow_transform.translation.y + flow.size().y / 2.0;
+            let flow_right = flow_transform.translation.x + flow.size().x / 2.0;
+            let mut groups_inside = true;
+            for (_, node, transform) in &access.card_groups {
+                let half = node.size() / 2.0;
+                groups_inside &= transform.translation.x - half.x
+                    >= flow_transform.translation.x - flow.size().x / 2.0 - 0.5
+                    && transform.translation.x + half.x <= flow_right + 0.5
+                    && transform.translation.y + half.y <= flow_bottom + 0.5;
+            }
+            if !groups_inside {
+                return;
+            }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("apps-zero-gray")
+            if !super::capture_marker_zero_gray::apps_zero_gray_ready(&mut access) =>
+        {
+            return;
+        }
         Some("apps-zero-gray") => {}
 
         Some("apps-group-expanded") => {
@@ -504,38 +519,7 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         }
 
         Some(scenario @ ("storage-health" | "sensor-center")) => {
-            let expected = if scenario == "sensor-center" {
-                HealthReviewSection::Sensors
-            } else {
-                HealthReviewSection::Storage
-            };
-            if route != Page::System
-                || access.system_state.section != SystemPageSection::Health
-                || access.system_state.health_section != expected
-            {
-                return;
-            }
-            let projection = access.track.shell.projection();
-            if !projection
-                .storage_health_projection()
-                .is_some_and(|(snapshot, _)| snapshot.filesystems.len() == 3)
-                || !projection
-                    .sensors
-                    .as_ref()
-                    .is_some_and(|snapshot| snapshot.readings.len() == 4)
-            {
-                return;
-            }
-            let labels: &[&str] = if scenario == "sensor-center" {
-                &["CPU package", "Chassis fan", "Package power"]
-            } else {
-                &[t("health.read_only"), t("health.errors_reported")]
-            };
-            if !labels.iter().all(|label| {
-                access.text.iter().any(|(text, node)| {
-                    node.size().x > 0.0 && node.size().y > 0.0 && text.0.contains(label)
-                })
-            }) {
+            if !super::capture_marker_health::health_review_ready(&access, route, scenario) {
                 return;
             }
         }

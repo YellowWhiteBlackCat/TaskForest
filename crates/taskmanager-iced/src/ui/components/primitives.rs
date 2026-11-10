@@ -188,13 +188,18 @@ pub(crate) fn tooltip<'a>(
     content: IcedElement<'a>,
     tip: &'a str,
 ) -> IcedElement<'a> {
-    let tip_fg = crate::theme_binding::color(theme.palette().fg);
-    let surface = theme;
-    let hint: IcedElement<'a> = container(text(tip).size(f32::from(tokens::FONT_11)).color(tip_fg))
-        .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
-        .style(move |_| theme::panel_style(surface))
-        .into();
+    let hint: IcedElement<'a> = tooltip_surface(theme, text(tip));
     Tooltip::new(content, hint, TooltipTrigger::Hover).into()
+}
+
+/// The tooltip's own surface: the shared Card glass panel (the tier the GPUI
+/// tooltip and the popup menus wear) with the muted hint text.
+fn tooltip_surface<'a>(theme: &'a Theme, body: iced::widget::Text<'a>) -> IcedElement<'a> {
+    let tip_fg = crate::theme_binding::color(theme.palette().fg);
+    container(body.size(f32::from(tokens::FONT_11)).color(tip_fg))
+        .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
+        .style(move |_| theme::panel_style(theme))
+        .into()
 }
 
 /// Owned variant for row projections whose detail string is created during
