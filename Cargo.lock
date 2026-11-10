@@ -13897,6 +13897,7 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-core"
 version = "0.1.18"
+source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
 dependencies = [
  "serde",
  "serde_json",
@@ -13906,6 +13907,7 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-kit-bevy"
 version = "0.4.1"
+source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
 dependencies = [
  "bevy",
  "parley",
@@ -13915,6 +13917,7 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-kit-iced"
 version = "0.2.0"
+source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
 dependencies = [
  "iced_core",
  "iced_widget",
@@ -13925,6 +13928,7 @@ dependencies = [
 [[package]]
 name = "zhuge-ui-tokens"
 version = "0.1.1"
+source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
 
 [[package]]
 name = "zlib-rs"
@@ -14018,3 +14022,19 @@ dependencies = [
  "syn 3.0.9",
  "winnow 1.0.4",
 ]
+
+[[patch.unused]]
+name = "zhuge-ui-core"
+version = "0.1.18"
+
+[[patch.unused]]
+name = "zhuge-ui-kit-bevy"
+version = "0.4.1"
+
+[[patch.unused]]
+name = "zhuge-ui-kit-iced"
+version = "0.2.0"
+
+[[patch.unused]]
+name = "zhuge-ui-tokens"
+version = "0.1.1"

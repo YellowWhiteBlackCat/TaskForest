@@ -581,6 +581,16 @@ fi
 if maybe release-pin-parity; then
     run_stage release-pin-parity quick run_py scripts/quality/test_release_pin_parity.py
 fi
+if maybe shared-kit-git-pin-self; then
+    run_stage shared-kit-git-pin-self quick run_py scripts/quality/test_shared_kit_git_pin.py --self-test
+fi
+if maybe shared-kit-git-pin; then
+    # The Git rev itself needs a single-product executor: parity proves both
+    # products agree, this gate proves the manifest and committed lock are
+    # self-consistent even when the sibling product is absent (a clean CI
+    # clone, for example).
+    run_stage shared-kit-git-pin quick run_py scripts/quality/test_shared_kit_git_pin.py
+fi
 if maybe semantic-tree-owner; then
     run_stage semantic-tree-owner quick run_py scripts/quality/test_semantic_tree_owner.py
 fi
@@ -984,6 +994,26 @@ if maybe background-compositor-guard; then
     run_private_census_stage background-compositor-guard \
         "$repo/.private/tools/background_compositor.py $repo/.private/tools/background_compositor_guard.py $repo/.private/tools/sync_frame_capture_runner.py $repo/.private/tools/enterprise_soak_runner.py" \
         "$repo/.private/tools/background_compositor_guard.py" --self-test
+fi
+if maybe release-followup-plan-self; then
+    # The completion verdict is a gate, not a receipt: it must re-derive from
+    # git every run, and its self-test must bite. A round that claims "done"
+    # because some file once said so is the same false green R145/R147
+    # recorded for the census tools -- and the ledger is what keeps a
+    # concurrent session's half-finished edits from being charged to this
+    # round.
+    run_private_census_stage release-followup-plan-self \
+        "$repo/.private/tools/release_followup_plan.py $(ls "$repo"/.private/plans/*-round-commits.json 2>/dev/null | tail -1)" \
+        "$repo/.private/tools/release_followup_plan.py" --self-test
+fi
+if maybe execution-audit-self; then
+    # The execution audit reads the follow-up plan, the soak runner and the
+    # roadmap together. Its self-test proves that a "ready" with no commit
+    # integration evidence is rejected, so a fabricated completion claim
+    # cannot survive a single quick gate.
+    run_private_census_stage execution-audit-self \
+        "$repo/.private/tools/enterprise_evidence_execution_audit.py $repo/.private/tools/release_followup_plan.py $repo/.private/tools/enterprise_soak_runner.py $(ls "$repo"/.private/plans/*-round-commits.json 2>/dev/null | tail -1)" \
+        "$repo/.private/tools/enterprise_evidence_execution_audit.py" --self-test
 fi
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
