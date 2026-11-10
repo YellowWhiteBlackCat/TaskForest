@@ -14,10 +14,10 @@ native selection and renderer caches; all shared types use their defining module
   `src/ui/components/controls.rs` plus `controls/` own the GPUI-parity
   activation/layout family: button, icon button, pill, checkbox, section
   header, toolbar, label, single-line input and the component-layer spinner
-  entry; the native multi-line editor is implemented there too, but the
-  product has no multi-line text surface today (the GPUI reference input is
-  single-line as well), so it is proven by the behavior suite rather than
-  mounted in production;
+  entry; the product has no multi-line text surface today (the GPUI
+  reference input is single-line as well), so the multi-line editor shape
+  lives in the behavior suite — built from the same glass and geometry
+  seams — instead of the production tree;
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero);
@@ -41,6 +41,15 @@ native selection and renderer caches; all shared types use their defining module
   tooltip because Iced 0.14 has no accessible-name operation.
   `src/ui/spinner.rs` remains the sole spinner canvas/arc owner; the component
   wrapper only re-surfaces it to the warm-up body.
+- The last raw toolkit controls are converged: the Users session actions run
+  through the shared glass button in both availability states (the
+  unavailable state keeps the shared `ControlRole::Button` extent, drops the
+  focus stop and publishes no request), the Network signal-quality bar
+  spends the shared `components::progress` primitive (clamped ratio, unknown
+  grammar for unavailable data), and the Applications priority preset uses
+  the shared `components::select` — the same `ControlRole::Input` glass,
+  geometry and focus stop the Settings selects use, instead of a bare
+  `pick_list`.
 - `src/ui/components/dashboard_budget.rs` spends the shared card-flow
   admission verdict (`taskmanager_ui_contract::presentation::card_flow`):
   the whole-group admission and the card floor..ceiling clamp are the shared

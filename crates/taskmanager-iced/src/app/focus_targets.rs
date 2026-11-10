@@ -57,6 +57,8 @@ pub enum FocusTarget {
     ProcessColumnsReset,
     /// Dismiss the Applications column-visibility menu.
     ProcessColumnsClose,
+    /// The Applications action-bar priority preset select.
+    ProcessPrioritySelect,
     /// The Services-page filter input.
     ServicesSearch,
     /// A page-scoped retry action for a degraded inventory source.
@@ -326,7 +328,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 202] = [
+    pub const ALL: [Self; 203] = [
         Self::ModalClose,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
@@ -339,6 +341,7 @@ impl FocusTarget {
         Self::SearchTrigger,
         Self::SearchClose,
         Self::ProcessColumnsTrigger,
+        Self::ProcessPrioritySelect,
         Self::ProcessSortHeader(SortCol::Cpu),
         Self::InfoSortHeader {
             table: InfoTable::Services,

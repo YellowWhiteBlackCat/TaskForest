@@ -13,7 +13,7 @@ use iced::{Element, Event, Point, Rectangle, Size, mouse};
 use taskmanager_application::i18n::{Language, with_language};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::ProcessStatusFilter;
-use taskmanager_theme::tokens::RowDensity;
+use taskmanager_theme::tokens::{RowDensity, SPACE_6};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
@@ -440,4 +440,118 @@ fn control_family_builds_within_a_compact_measured_viewport() {
     assert!(bounds.width <= size.width + 0.001);
     assert!(bounds.x >= -0.001 && bounds.y >= -0.001);
     assert!(bounds.x + bounds.width <= size.width + 0.001);
+}
+
+/// A disabled shared button drops the focus stop and the activation, while
+/// the measured extent stays on the shared role matrix: the availability
+/// state changes paint, never geometry.
+#[test]
+fn a_disabled_shared_button_publishes_nothing_and_keeps_the_shared_extent() {
+    let theme = theme();
+    let renderer = renderer();
+    let size = Size::new(320.0, 96.0);
+    let viewport = Rectangle::with_size(size);
+    let target = FocusTarget::EndTask;
+
+    let mut enabled: TestElement<'_> = glass_button(
+        &theme,
+        target,
+        "Run",
+        Message::CloseSearch,
+        ButtonTone::Primary,
+        true,
+    );
+    let mut enabled_tree = Tree::new(&enabled);
+    let enabled_node = layout(&mut enabled, &mut enabled_tree, &renderer, size);
+
+    let mut disabled: TestElement<'_> = glass_button(
+        &theme,
+        target,
+        "Run",
+        Message::CloseSearch,
+        ButtonTone::Primary,
+        false,
+    );
+    let mut disabled_tree = Tree::new(&disabled);
+    let disabled_node = layout(&mut disabled, &mut disabled_tree, &renderer, size);
+
+    assert_eq!(enabled_node.bounds().height, disabled_node.bounds().height);
+    assert_eq!(
+        disabled_node.bounds().height,
+        crate::theme::control_extent(&theme, ControlRole::Button)
+    );
+
+    assert!(focus(
+        &mut enabled,
+        &mut enabled_tree,
+        &enabled_node,
+        &renderer,
+        Id::from(focus_id(target)),
+    ));
+    let published = dispatch(
+        &mut enabled,
+        &mut enabled_tree,
+        &enabled_node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Enter, Code::Enter),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        published
+            .iter()
+            .any(|message| matches!(message, Message::CloseSearch))
+    );
+
+    assert!(!focus(
+        &mut disabled,
+        &mut disabled_tree,
+        &disabled_node,
+        &renderer,
+        Id::from(focus_id(target)),
+    ));
+    let silent = dispatch(
+        &mut disabled,
+        &mut disabled_tree,
+        &disabled_node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Enter, Code::Enter),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        !silent
+            .iter()
+            .any(|message| matches!(message, Message::CloseSearch)),
+        "a disabled control must publish no activation"
+    );
+}
+
+/// The shared progress bar keeps the shared bar height and clamps its ratio;
+/// unavailable data stays the unknown grammar instead of a fabricated zero.
+#[test]
+fn the_shared_progress_bar_keeps_the_shared_geometry_and_the_clamped_ratio() {
+    let theme = theme();
+    let renderer = renderer();
+    let size = Size::new(200.0, 60.0);
+    let mut element: TestElement<'_> = crate::ui::components::progress(
+        &theme,
+        Some(1.6),
+        crate::ui::components::BadgeTone::Accent,
+    );
+    let mut tree = Tree::new(&element);
+    let node = layout(&mut element, &mut tree, &renderer, size);
+    assert_eq!(node.bounds().height, f32::from(SPACE_6));
+    assert_eq!(
+        crate::ui::components::progress_fill(Some(1.6)),
+        crate::ui::components::ProgressFill::Determinate(1.0)
+    );
+    assert_eq!(
+        crate::ui::components::progress_fill(Some(f32::NAN)),
+        crate::ui::components::ProgressFill::Unknown
+    );
+    assert_eq!(
+        crate::ui::components::progress_fill(None),
+        crate::ui::components::ProgressFill::Unknown
+    );
 }

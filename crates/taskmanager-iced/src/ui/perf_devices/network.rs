@@ -431,8 +431,12 @@ fn network_block<'a>(
                         percent_text(quality)
                     ))
                     .size(f32::from(tokens::FONT_12)),
-                    container(iced::widget::progress_bar(0.0..=100.0, quality))
-                        .width(iced::Length::Fixed(120.0)),
+                    container(crate::ui::components::progress(
+                        theme_snapshot,
+                        Some(quality / 100.0),
+                        crate::ui::components::BadgeTone::Accent,
+                    ))
+                    .width(iced::Length::Fixed(120.0)),
                 ]
                 .spacing(8)
                 .align_y(iced::Alignment::Center)

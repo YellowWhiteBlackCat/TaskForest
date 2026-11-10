@@ -4,7 +4,7 @@
 //! Users vocabulary while routing session control through the shared shell
 //! effect boundary.
 
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use std::rc::Rc;
 use zhuge_ui_core::virtual_list::VirtualWindow;
@@ -502,17 +502,17 @@ fn session_action_button<'a>(
     target: FocusTarget,
     enabled: bool,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    if enabled {
-        focus::button(
-            theme_snapshot,
-            target,
-            label,
-            Message::RequestSessionControl(action),
-            false,
-        )
-    } else {
-        button(text(label)).into()
-    }
+    // Both availability states go through the ONE shared glass control: the
+    // disabled state drops the accent ink and the focus stop, never the
+    // measured extent (the shared `ControlRole::Button` matrix owns it).
+    crate::ui::components::glass_button(
+        theme_snapshot,
+        target,
+        label,
+        Message::RequestSessionControl(action),
+        crate::ui::components::ButtonTone::Primary,
+        enabled,
+    )
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

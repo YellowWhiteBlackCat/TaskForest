@@ -140,6 +140,69 @@ fn apply(app: &mut crate::IcedApp, messages: Vec<Message>) {
     }
 }
 
+/// The shared select publishes the typed option message when the focused
+/// trigger confirms the current selection, while the degenerate empty option
+/// list stays inert: a placeholder surface, never a fabricated value.
+#[test]
+fn select_confirms_the_typed_option_message_and_keeps_the_empty_list_inert() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark);
+    let renderer = renderer();
+    let size = Size::new(240.0, 80.0);
+    let viewport = Rectangle::with_size(size);
+    let options = vec!["High".to_string(), "Low".to_string()];
+
+    let mut element: TestElement<'_> = select(
+        &theme,
+        target(),
+        &options,
+        Some(&options[0]),
+        "pick one",
+        |option: &String| Message::ServicesSearchChanged(option.clone()),
+    );
+    let mut tree = Tree::new(&element);
+    let node = layout(&mut element, &mut tree, &renderer, size);
+    assert!(focus(&mut element, &mut tree, &node, &renderer, target()));
+    let confirmed = dispatch(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        key_pressed(
+            iced::keyboard::key::Named::Enter,
+            iced::keyboard::key::Code::Enter,
+        ),
+    );
+    assert!(confirmed.iter().any(|message| matches!(
+        message,
+        Message::ServicesSearchChanged(value) if value == "High"
+    )));
+
+    let empty: Vec<String> = Vec::new();
+    let mut inert: TestElement<'_> = select(&theme, target(), &empty, None, "pick one", |_| {
+        Message::Tick
+    });
+    let mut inert_tree = Tree::new(&inert);
+    let inert_node = layout(&mut inert, &mut inert_tree, &renderer, size);
+    let inert_messages = dispatch(
+        &mut inert,
+        &mut inert_tree,
+        &inert_node,
+        &renderer,
+        &viewport,
+        key_pressed(
+            iced::keyboard::key::Named::Enter,
+            iced::keyboard::key::Code::Enter,
+        ),
+    );
+    assert!(
+        !inert_messages
+            .iter()
+            .any(|message| matches!(message, Message::Tick)),
+        "an empty option list must stay inert instead of inventing a value"
+    );
+}
+
 /// Arrow navigation wraps past both ends, never treats an unknown active
 /// value as a position, and refuses to move in a choice-less or
 /// single-choice group.

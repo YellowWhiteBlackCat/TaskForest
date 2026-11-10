@@ -57,10 +57,9 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         // geometry resolves through ControlRole::Input. The Applications
         // search field, the Services filter, the process-properties
         // environment filter and the Run Task command field all mount it.
-        // The native multi-line editor exists as a toolkit-complete control
-        // (same glass and geometry) but has no production mount: every
-        // editable text surface of this product is single-line, like the
-        // GPUI reference input.
+        // Every editable text surface of this product is single-line, like
+        // the GPUI reference input; the multi-line editor shape is proven
+        // by the behavior suite only, over the same glass and geometry.
         (TextInput, Ported),
         (SearchInput, Ported),
         (

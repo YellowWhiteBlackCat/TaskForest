@@ -243,15 +243,12 @@ fn slider_style(
         iced::widget::slider::Status::Dragged => ControlVisualState::Pressed,
     };
     let glass = theme::control_glass(theme_snapshot, ControlRole::Toggle, state);
-    let Some(iced::Background::Gradient(iced::Gradient::Linear(gradient))) = glass.background
-    else {
-        unreachable!("control glass always paints a gradient")
-    };
+    let gradient = theme::control_glass_gradient(theme_snapshot, &glass);
     iced::widget::slider::Style {
         rail: iced::widget::slider::Rail {
             backgrounds: (
                 Background::Color(crate::theme_binding::color(palette.accent)),
-                Background::Gradient(iced::Gradient::Linear(gradient)),
+                Background::Gradient(gradient),
             ),
             width: f32::from(tokens::SPACE_4),
             border: glass.border,
@@ -327,9 +324,8 @@ fn select_style(
         iced::widget::pick_list::Status::Opened { .. } => ControlVisualState::Focused,
     };
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
-    let Some(background @ iced::Background::Gradient(_)) = glass.background else {
-        unreachable!("control glass always paints a gradient")
-    };
+    let background =
+        iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
     iced::widget::pick_list::Style {
         text_color: crate::theme_binding::color(palette.fg),
         placeholder_color: crate::theme_binding::color(palette.fg_muted),
@@ -410,9 +406,8 @@ fn search_style(
         iced::widget::text_input::Status::Disabled => ControlVisualState::Disabled,
     };
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
-    let Some(background @ iced::Background::Gradient(_)) = glass.background else {
-        unreachable!("control glass always paints a gradient")
-    };
+    let background =
+        iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
     iced::widget::text_input::Style {
         background,
         border: glass.border,

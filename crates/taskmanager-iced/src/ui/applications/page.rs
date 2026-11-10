@@ -338,13 +338,18 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                 Message::OpenRunTask,
             ));
             let priority_picker: Element<'_, Message, Theme, Renderer> = if control.is_ready() {
-                iced::widget::pick_list(
+                // The shared select owns the trigger paint (the ONE glass
+                // material), the `ControlRole::Input` geometry and the
+                // keyboard stop; this adapter only supplies the typed
+                // options and the typed batch message.
+                crate::ui::components::select(
+                    theme_snapshot,
+                    FocusTarget::ProcessPrioritySelect,
                     &PriorityChoice::ALL[..],
-                    None::<PriorityChoice>,
-                    |choice: PriorityChoice| Message::RequestProcessBatch(choice.action()),
+                    None::<&PriorityChoice>,
+                    t("proc.choose_priority"),
+                    |choice: &PriorityChoice| Message::RequestProcessBatch(choice.action()),
                 )
-                .placeholder(t("proc.choose_priority"))
-                .into()
             } else {
                 text(t("proc.choose_priority")).into()
             };

@@ -51,6 +51,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::SearchTrigger => "iced-search-trigger".to_owned(),
         FocusTarget::SearchClose => "iced-search-close".to_owned(),
         FocusTarget::ProcessColumnsTrigger => "iced-process-columns-trigger".to_owned(),
+        FocusTarget::ProcessPrioritySelect => "iced-process-priority-select".to_owned(),
         FocusTarget::ProcessColumnToggle(column) => {
             format!("iced-process-column-toggle-{}", column.label())
         }

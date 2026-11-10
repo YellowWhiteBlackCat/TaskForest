@@ -23,7 +23,9 @@ use taskmanager_theme::{
 };
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
+mod control_material;
 mod control_measurement;
+pub use control_material::control_glass_gradient;
 pub use control_measurement::{
     control_extent, control_measurement, control_padding_x, ui_size_from_root,
 };
