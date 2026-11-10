@@ -28,9 +28,14 @@ projection:
   surfaces, their edges and their shared layered shadows instead of a flat
   canvas. The shared capability decision still owns headless, high-contrast,
   software-adapter, and no-adapter fallbacks.
-- The mirror is a painted lower composite, not a recursive optical chain: the
-  production renderer still reports `OPTICAL_GLASS_MAX_NESTED_LAYERS = 1`.
-  Nested optical glass is deliberately **not** claimed.
+- The mirror alone is a painted lower composite; the RECURSIVE optical chain
+  lives beside it in
+  [`NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): the chain target holds
+  the first layer's optical pixels, not a painted proxy.
+- The production renderer reports `OPTICAL_GLASS_MAX_NESTED_LAYERS = 2` and the
+  hardware receipt records `nesting_layers_proven=true`: an overlay measured
+  at depth `1` samples the layer beneath it optically. A deeper composition
+  still fails closed to the typed Frosted fallback.
 
 ## Layout contract
 
@@ -77,6 +82,10 @@ projection:
   whole-group admission, focus facts, dense-mode seams, zero-group
   degradation, measured bounds, overflow activation, and the typed painted
   fallback without an adapter.
+- `tests/headless/pages/card_lane_width_admission.rs` asserts the right-edge
+  verdict before the renderer spends it: whole group width admission, a
+  narrow slot's one-column degradation, the overflow action's reserved slot,
+  and the typed zero-column degradation for a slot that holds no whole card.
 - `tests/headless/optical_backdrop_mirror.rs` proves that a marked surface is
   mirrored at its measured rectangle, that a move or palette change bumps the
   composite revision, that an unchanged surface does not, and that stale
@@ -94,6 +103,10 @@ projection:
   value was observed. The full durable matrix was not published (the run
   stayed targeted).
 - Optical GPU readiness remains covered by the existing capability/GPU gates.
-  The mirrored lower composite is proved headlessly; a hardware-adapter
-  screenshot of the deepened refraction is NOT yet published, and nested
-  optical glass remains an unproven boundary.
+  The mirrored lower composite is proved headlessly and the nested optical
+  chain is GPU-measured; a hardware-adapter screenshot of the deepened
+  refraction, and of two simultaneously optical layers, is NOT yet published.
+- The GPU receipt records `max_nested_layers=2` and
+  `nesting_layers_proven=true` on this host's Intel Arc B390 (Vulkan)
+  adapter. No two-layer optical screenshot is published yet — the receipt is
+  the evidence, not an image.

@@ -34,6 +34,9 @@ mod capability;
 pub(crate) use capability::{OPTICAL_GLASS_MAX_BLUR_PX, optical_glass_capability};
 mod backdrop_mirror;
 pub(crate) use backdrop_mirror::BackdropMirror;
+mod chain;
+mod nesting;
+pub(crate) use nesting::OpticalNestingDepths;
 mod scene;
 pub(crate) use scene::{OpticalBackdropSource, OpticalGlassCard};
 
@@ -237,8 +240,10 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     );
     app.add_plugins(UiMaterialPlugin::<OpticalGlassMaterial>::default());
     app.add_observer(materialize_optical_glass);
+    nesting::register(app);
     scene::register(app);
     backdrop_mirror::register(app);
+    chain::register(app);
 }
 
 fn materialize_optical_glass(

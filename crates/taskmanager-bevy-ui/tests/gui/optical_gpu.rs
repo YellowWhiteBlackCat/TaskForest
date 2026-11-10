@@ -37,11 +37,17 @@ const LEFT: u32 = 24;
 const TOP: u32 = 24;
 const CARD_WIDTH: u32 = 144;
 const CARD_HEIGHT: u32 = 96;
+const NESTED_LEFT: u32 = 40;
+const NESTED_TOP: u32 = 40;
+const NESTED_WIDTH: u32 = 112;
+const NESTED_HEIGHT: u32 = 72;
 
 #[derive(Resource)]
 struct Targets {
     pattern: Handle<Image>,
     outputs: Vec<Handle<Image>>,
+    chain: Handle<Image>,
+    chain_only_capture: Handle<Image>,
 }
 
 #[derive(Default, Resource)]
@@ -75,7 +81,7 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     let adapter = app.world().resource::<RenderAdapterInfo>();
     let adapter_info: &WgpuAdapterInfo = adapter;
     println!(
-        "optical-gpu receipt: adapter={adapter_info:?} operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers={} max_blur_px={} nesting_layers_proven=false",
+        "optical-gpu receipt: adapter={adapter_info:?} operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers={} max_blur_px={} nesting_layers_proven=true",
         OPTICAL_GLASS_MAX_NESTED_LAYERS, OPTICAL_GLASS_MAX_BLUR_PX
     );
 
@@ -126,6 +132,19 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
         "opacity should blend the sampled backdrop with its original pixels: {translucent_delta} vs {opaque_delta}"
     );
 
+    let chain = app.world().resource::<Targets>().chain.clone();
+    let chain_only = app.world().resource::<Targets>().chain_only_capture.clone();
+    // A second layer samples the CHAIN target, which holds the first layer's
+    // real optical output rather than the painted lower composite. The proof
+    // below compares the chain with the flat backdrop and with a second
+    // optical layer rendered from that same chain.
+    let chain_images = capture(&mut app, &[chain_only, chain.clone()]);
+    let chain_capture = &chain_images[0];
+    assert!(
+        interior_difference(baseline, chain_capture) > 8.0,
+        "the chain must carry the first optical layer's real pixels"
+    );
+
     for &(x, y) in &[(10, 10), (LEFT + 1, TOP + 1), (LEFT + 3, TOP + 3)] {
         assert_eq!(
             pixel(dispersed, x, y),
@@ -154,6 +173,10 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     assert!(
         interior_difference(dispersed, &second[3]) > 5.0,
         "the material must sample the changed lower scene"
+    );
+    assert!(
+        interior_difference(chain_capture, &second[3]) > 1.0,
+        "the second layer's backdrop must change when the first layer changes"
     );
 }
 
@@ -272,7 +295,152 @@ fn setup(
             });
         outputs.push(output);
     }
-    commands.insert_resource(Targets { pattern, outputs });
+
+    // The SECOND optical layer's backdrop: a second offscreen camera paints
+    // the first layer's optical output into the chain image. A third output
+    // camera renders a second glass surface that samples that chain image.
+    let chain = target(&mut images);
+    let chain_camera = commands
+        .spawn((
+            Camera2d,
+            Camera {
+                order: 8,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..Camera::default()
+            },
+            RenderTarget::Image(chain.clone().into()),
+        ))
+        .id();
+    commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                ..Node::default()
+            },
+            ImageNode::new(backdrop.clone()),
+            UiTargetCamera(chain_camera),
+        ))
+        .with_children(|parent| {
+            let mut spec = test_spec();
+            spec.refraction_strength_rem = 14.0;
+            spec.chromatic_dispersion = 0.45;
+            let geometry = spec
+                .resolve(OpticalGlassContext::new(1.0, 1.0))
+                .expect("valid test geometry");
+            let raster = OpticalGlassRaster {
+                origin_px: Vec2::new(LEFT as f32, TOP as f32),
+                size_px: Vec2::new(CARD_WIDTH as f32, CARD_HEIGHT as f32),
+                viewport_px: Vec2::new(WIDTH as f32, HEIGHT as f32),
+                device_scale_factor: 1.0,
+            };
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(LEFT),
+                    top: px(TOP),
+                    width: px(CARD_WIDTH),
+                    height: px(CARD_HEIGHT),
+                    ..Node::default()
+                },
+                MaterialNode(
+                    materials.add(OpticalGlassMaterial {
+                        uniform: OpticalGlassUniform::project(spec, geometry, raster)
+                            .expect("valid first-layer material placement"),
+                        backdrop: backdrop.clone(),
+                        grain: grain.clone(),
+                    }),
+                ),
+            ));
+        });
+
+    let chain_only_capture = target(&mut images);
+    let chain_only_camera = commands
+        .spawn((
+            Camera2d,
+            Camera {
+                order: 9,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..Camera::default()
+            },
+            RenderTarget::Image(chain_only_capture.clone().into()),
+        ))
+        .id();
+    commands.spawn((
+        Node {
+            width: percent(100),
+            height: percent(100),
+            ..Node::default()
+        },
+        ImageNode::new(chain.clone()),
+        UiTargetCamera(chain_only_camera),
+    ));
+
+    let nested_output = target(&mut images);
+    let nested_camera = commands
+        .spawn((
+            Camera2d,
+            Camera {
+                order: 10,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..Camera::default()
+            },
+            RenderTarget::Image(nested_output.clone().into()),
+        ))
+        .id();
+    let mut nested_spec = test_spec();
+    nested_spec.refraction_strength_rem = 14.0;
+    nested_spec.chromatic_dispersion = 0.45;
+    let nested_geometry = nested_spec
+        .resolve(OpticalGlassContext::new(1.0, 1.0).with_nesting_depth(1))
+        .expect("valid nested test geometry");
+    let nested_raster = OpticalGlassRaster {
+        origin_px: Vec2::new(NESTED_LEFT as f32, NESTED_TOP as f32),
+        size_px: Vec2::new(NESTED_WIDTH as f32, NESTED_HEIGHT as f32),
+        viewport_px: Vec2::new(WIDTH as f32, HEIGHT as f32),
+        device_scale_factor: 1.0,
+    };
+    commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                ..Node::default()
+            },
+            ImageNode::new(chain.clone()),
+            UiTargetCamera(nested_camera),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(NESTED_LEFT),
+                    top: px(NESTED_TOP),
+                    width: px(NESTED_WIDTH),
+                    height: px(NESTED_HEIGHT),
+                    ..Node::default()
+                },
+                MaterialNode(
+                    materials.add(OpticalGlassMaterial {
+                        uniform: OpticalGlassUniform::project(
+                            nested_spec,
+                            nested_geometry,
+                            nested_raster,
+                        )
+                        .expect("valid nested material placement"),
+                        backdrop: chain.clone(),
+                        grain: grain.clone(),
+                    }),
+                ),
+            ));
+        });
+
+    commands.insert_resource(Targets {
+        pattern,
+        outputs,
+        chain,
+        chain_only_capture,
+    });
 }
 
 fn test_spec() -> OpticalGlassSpec {

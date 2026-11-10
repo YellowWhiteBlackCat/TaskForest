@@ -346,6 +346,26 @@ def self_test() -> int:
         print(f"self-test FAIL: forced mode must reject software adapter: {result}")
         return 1
 
+    # A PROVEN nested-layer claim is parsed into the receipt's own fields:
+    # the ceiling and the proven flag must survive the receipt line, so the
+    # capability guard can compare them with the declared ceiling.
+    nested = (
+        'optical-gpu receipt: adapter=AdapterInfo { name: "GPU", '
+        "device_type: DiscreteGpu, backend: Vulkan } "
+        "operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain "
+        "max_nested_layers=2 max_blur_px=64 nesting_layers_proven=true"
+    )
+    result = classify(mode="auto", exit_code=0, discovered=True, log=nested)
+    if (
+        result["verdict"] != "PROVEN"
+        or result["runtime_capability"] != "OPTICAL (proven)"
+        or result.get("max_nested_layers") != 2
+        or result.get("nesting_layers_proven") is not True
+        or bool(result["blocking"])
+    ):
+        print(f"self-test FAIL: proven nested-layer classification: {result}")
+        return 1
+
     print("bevy-optical-gpu receipt self-test: PASS")
     return 0
 

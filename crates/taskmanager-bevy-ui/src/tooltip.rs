@@ -61,6 +61,7 @@ use bevy::ui::prelude::{
     px,
 };
 use bevy::ui::widget::Text;
+use taskmanager_application::i18n::t;
 use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::{OverlayDismissCause, tooltip_dismisses};
 
@@ -195,6 +196,27 @@ pub(crate) fn resolve_placement(
         origin: Vec2::new(x, y),
         flipped,
     }
+}
+
+/// Choose one measured capture anchor by its shared copy label.
+///
+/// The named Applications trigger wins when it has been measured; otherwise
+/// the first measured trigger remains usable. This is a pure viewport-layout
+/// admission, so the headless test can prove the capture anchor without a
+/// process-wide environment variable or a fixture-only tooltip widget.
+#[must_use]
+pub(crate) fn capture_target_from_measured(
+    targets: &[(Entity, String, Vec2)],
+    named_label: &str,
+) -> Option<(Entity, String)> {
+    let measured = targets
+        .iter()
+        .filter(|(_, _, size)| size.x > 0.0 && size.y > 0.0);
+    measured
+        .clone()
+        .find(|(_, label, _)| label == named_label)
+        .or_else(|| measured.into_iter().next())
+        .map(|(entity, label, _)| (*entity, label.clone()))
 }
 
 /// Scene for the hovering explanation card.
@@ -400,24 +422,30 @@ fn arm_tooltip_overlay(
     let Some(mut state) = state else {
         return;
     };
-    // Only a laid-out, visible trigger can anchor the card. The nav strip is
-    // respawned on route remounts, so a session frozen on a stale entity would
-    // leave the card unplaced (or pinned to the window's bottom-left corner).
-    let Some((target, text, _, _)) = targets
+    // The scenario names the "Choose columns" button so the card sits over
+    // the Applications optical hero. A generic first trigger would anchor to
+    // the nav toggle or an unrelated measured tooltip source instead. Only a
+    // laid-out target can anchor the card; route remounts respawn the nav, so
+    // a stale entity would leave the card at the viewport's bottom-left.
+    let measured: Vec<(Entity, String, Vec2)> = targets
         .iter()
-        .find(|(_, _, node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+        .map(|(entity, text, node, _)| (entity, text.0.clone(), node.size()))
+        .collect();
+    let Some((target, text)) = capture_target_from_measured(&measured, t("proc.choose_columns"))
     else {
         return;
     };
     // Re-publish whenever the live target moved: the nav strip is respawned on
     // route remounts, and a session frozen on the old entity would leave the
     // card unplaced. Matching the CURRENT entity keeps the anchor live.
-    if state.session.as_ref().is_some_and(|session| {
-        session.target == target && session.text == text.0 && state.is_ready()
-    }) {
+    if state
+        .session
+        .as_ref()
+        .is_some_and(|session| session.target == target && session.text == text && state.is_ready())
+    {
         return;
     }
-    state.show(target, text.0.clone());
+    state.show(target, text);
     state.ready = true;
     commands.trigger(TooltipStateChanged);
 }
@@ -557,3 +585,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
 #[cfg(test)]
 #[path = "../tests/headless/tooltip.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/tooltip_capture_arm.rs"]
+mod capture_arm_tests;

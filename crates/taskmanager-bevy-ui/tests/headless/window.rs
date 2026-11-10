@@ -50,8 +50,8 @@ use taskmanager_theme::{AppearanceOverride, GlassTier, LightDark, Skin, Theme};
 
 use super::appearance::resolve_demo_theme;
 use super::backdrop_capture::{
-    BackdropCaptureCamera, BackdropCaptureRoot, BackdropCaptureTarget, BackdropRevision,
-    PresentationCamera, drive_backdrop_capture,
+    BackdropCaptureCamera, BackdropCaptureRoot, BackdropCaptureTarget, BackdropChainCamera,
+    BackdropRevision, PresentationCamera, drive_backdrop_capture,
 };
 use super::{
     AppShellRoot, FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, WindowPalette,
@@ -201,6 +201,10 @@ fn offscreen_capture_camera_never_owns_the_interactive_shell() {
         .query_filtered::<Entity, With<BackdropCaptureCamera>>()
         .iter(world)
         .collect::<Vec<_>>();
+    let chain_cameras = world
+        .query_filtered::<Entity, With<BackdropChainCamera>>()
+        .iter(world)
+        .collect::<Vec<_>>();
     assert_eq!(
         presentation_cameras.len(),
         1,
@@ -211,8 +215,14 @@ fn offscreen_capture_camera_never_owns_the_interactive_shell() {
         1,
         "the frontend must spawn exactly one offscreen capture camera"
     );
+    assert_eq!(
+        chain_cameras.len(),
+        1,
+        "the frontend must spawn exactly one second-layer chain camera"
+    );
     let presentation = presentation_cameras[0];
     let capture = capture_cameras[0];
+    let chain = chain_cameras[0];
 
     assert_eq!(
         world
@@ -226,7 +236,15 @@ fn offscreen_capture_camera_never_owns_the_interactive_shell() {
             .get::<Camera>(capture)
             .expect("capture camera component")
             .order,
-        -2
+        -3
+    );
+    assert_eq!(
+        world
+            .get::<Camera>(chain)
+            .expect("chain camera component")
+            .order,
+        -2,
+        "the chain renders after the capture it samples and before the window"
     );
     assert!(matches!(
         world.get::<RenderTarget>(presentation),
@@ -234,6 +252,10 @@ fn offscreen_capture_camera_never_owns_the_interactive_shell() {
     ));
     assert!(matches!(
         world.get::<RenderTarget>(capture),
+        Some(RenderTarget::Image(_))
+    ));
+    assert!(matches!(
+        world.get::<RenderTarget>(chain),
         Some(RenderTarget::Image(_))
     ));
 

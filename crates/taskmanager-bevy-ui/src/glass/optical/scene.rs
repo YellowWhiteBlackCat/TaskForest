@@ -14,7 +14,7 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::query::{Changed, Has, With, Without};
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
 use bevy::picking::Pickable;
 use bevy::render::renderer::{RenderAdapterInfo, RenderDevice};
 use bevy::scene::{CommandsSceneExt, bsn};
@@ -29,6 +29,7 @@ use taskmanager_theme::optical_glass::{
     OpticalGlassContext, OpticalGlassDecision, OpticalGlassUnavailableReason,
 };
 
+use super::nesting::{OpticalNestingDepths, sync_optical_nesting_depths};
 use super::{
     OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassSurface,
     OpticalGlassUniform, optical_glass_capability,
@@ -37,7 +38,7 @@ use crate::glass::GlassNoiseLayer;
 use crate::widgets::chart::canvas::CanvasGrid;
 use crate::widgets::chart::painter::paint_chart_canvases;
 use crate::widgets::chart::{ChartCanvas, ChartPaintState, ChartStyle};
-use crate::window::{AppShellRoot, BackdropCaptureTarget, WindowPalette};
+use crate::window::{AppShellRoot, BackdropCaptureTarget, BackdropChainTarget, WindowPalette};
 
 /// One page card eligible for the production optical path.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,6 +95,25 @@ type OpticalGlassCardQuery<'w, 's> = Query<
     ),
 >;
 
+/// The optical layout resolver's inputs. One named bundle keeps the system
+/// under Clippy's argument ceiling without hiding a whole `World`.
+///
+/// The adapter input is `render_adapter: Option<Res<RenderAdapterInfo>>`: a
+/// live renderer publishes the adapter, and no adapter means the shared theme
+/// must fail closed. The lifetime-annotated field below is the same fact.
+#[derive(SystemParam)]
+struct OpticalLayoutAccess<'w, 's> {
+    palette: Option<Res<'w, WindowPalette>>,
+    target: Option<Res<'w, BackdropCaptureTarget>>,
+    chain: Option<Res<'w, BackdropChainTarget>>,
+    depths: Res<'w, OpticalNestingDepths>,
+    render_device: Option<Res<'w, RenderDevice>>,
+    render_adapter: Option<Res<'w, RenderAdapterInfo>>,
+    roots: Query<'w, 's, (&'static ComputedNode, &'static UiGlobalTransform), With<AppShellRoot>>,
+    cards: OpticalGlassCardQuery<'w, 's>,
+    commands: Commands<'w, 's>,
+}
+
 pub(crate) fn register(app: &mut App) {
     app.add_systems(
         PostUpdate,
@@ -104,12 +124,14 @@ pub(crate) fn register(app: &mut App) {
     .add_systems(
         PostUpdate,
         (
+            sync_optical_nesting_depths,
             sync_optical_glass_layout,
             sync_optical_glass_materials,
             sync_optical_backdrop_paint,
         )
             .chain()
             .after(UiSystems::PostLayout)
+            .after(UiSystems::Stack)
             .before(paint_chart_canvases),
     );
 }
@@ -260,15 +282,18 @@ fn sync_optical_backdrop_chart(
 /// Resolve the marked card from computed physical geometry and bind the
 /// backdrop material. Re-solving on layout changes updates the GPU uniform
 /// without rebuilding the page tree.
-fn sync_optical_glass_layout(
-    palette: Option<Res<WindowPalette>>,
-    target: Option<Res<BackdropCaptureTarget>>,
-    render_device: Option<Res<RenderDevice>>,
-    render_adapter: Option<Res<RenderAdapterInfo>>,
-    roots: Query<(&ComputedNode, &UiGlobalTransform), With<AppShellRoot>>,
-    mut cards: OpticalGlassCardQuery,
-    mut commands: Commands,
-) {
+fn sync_optical_glass_layout(access: OpticalLayoutAccess<'_, '_>) {
+    let OpticalLayoutAccess {
+        palette,
+        target,
+        chain,
+        depths,
+        render_device,
+        render_adapter,
+        roots,
+        mut cards,
+        mut commands,
+    } = access;
     let Some(palette) = palette else {
         return;
     };
@@ -291,7 +316,12 @@ fn sync_optical_glass_layout(
             .map(|raster| raster.device_scale_factor)
             .or_else(|| target.as_ref().map(|target| target.scale_factor))
             .unwrap_or(1.0);
-        let context = OpticalGlassContext::new(palette.inner.rem_px, scale_factor);
+        // The nesting depth is the theme's fail-closed input: it is the
+        // number of optical surfaces painted under this one, measured from
+        // the UI stack and the rectangles they share.
+        let depth = depths.depth_of(entity);
+        let context =
+            OpticalGlassContext::new(palette.inner.rem_px, scale_factor).with_nesting_depth(depth);
         let capability = optical_glass_capability(render_adapter.as_deref());
         let context = if render_device.is_none() || target.is_none() {
             context.headless()
@@ -302,11 +332,19 @@ fn sync_optical_glass_layout(
             .inner
             .optical_theme
             .optical_glass_decision(card.tier, capability, context);
-        let (spec, geometry, raster, target) = match (decision, raster, target.as_deref()) {
-            (OpticalGlassDecision::Optical { spec, geometry }, Some(raster), Some(target))
+        // A nested surface samples the CHAIN target: its backdrop then holds
+        // the lower surface's real optical output. A top-level surface
+        // samples the painted lower composite, which is all the product
+        // shows below it.
+        let backdrop = match depth {
+            0 => target.as_ref().map(|target| target.image.clone()),
+            _ => chain.as_ref().map(|chain| chain.image.clone()),
+        };
+        let (spec, geometry, raster, backdrop) = match (decision, raster, backdrop) {
+            (OpticalGlassDecision::Optical { spec, geometry }, Some(raster), Some(backdrop))
                 if raster.is_valid() =>
             {
-                (spec, geometry, raster, target)
+                (spec, geometry, raster, backdrop)
             }
             (decision, _, _) => {
                 let reason = match decision {
@@ -332,13 +370,13 @@ fn sync_optical_glass_layout(
                 if surface.spec != spec
                     || surface.geometry != geometry
                     || surface.raster != raster
-                    || surface.backdrop != target.image
+                    || surface.backdrop != backdrop
                 {
                     *surface = OpticalGlassSurface {
                         spec,
                         geometry,
                         raster,
-                        backdrop: target.image.clone(),
+                        backdrop: backdrop.clone(),
                     };
                 }
             }
@@ -347,7 +385,7 @@ fn sync_optical_glass_layout(
                     spec,
                     geometry,
                     raster,
-                    backdrop: target.image.clone(),
+                    backdrop,
                 });
             }
         }

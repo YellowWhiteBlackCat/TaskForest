@@ -8,6 +8,7 @@ use crate::demo_fixture::{
     demo_shell, seed_capture_confirmation_fixture, seed_service_log_fixture,
 };
 use crate::pages::performance::{PerformanceDeviceFocus, PerformanceFocus};
+use crate::pages::processes::card_lane::ProcessViewMode;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::window_surface::WindowSurfaceCommand;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
@@ -30,6 +31,7 @@ pub(super) fn initialize_capture_state(
     mut preferences: ResMut<ThemePreferences>,
     mut device_focus: ResMut<PerformanceDeviceFocus>,
     mut curve_focus: ResMut<PerformanceFocus>,
+    mut process_view_mode: ResMut<ProcessViewMode>,
     mut commands: Commands,
 ) {
     if demo.is_none() {
@@ -69,6 +71,15 @@ pub(super) fn initialize_capture_state(
     if capture_scenario_target() == Some("apps-group-expanded") {
         let _ = seed_shell_process_tree_with_partial_aggregate(&mut shell);
         shell.query = "capture-".into();
+    }
+    // Scenarios that anchor a real table row or its context menu need the
+    // DENSE presentation: the default Cards mode owns a different row root,
+    // so a capture that waits for `ProcessRowsRoot` would never paint.
+    if matches!(
+        capture_scenario_target(),
+        Some("process-context-menu" | "process-selection" | "process-force-kill")
+    ) {
+        *process_view_mode = ProcessViewMode::Dense;
     }
     track.shell = shell;
     track.initial_refresh_submitted = true;

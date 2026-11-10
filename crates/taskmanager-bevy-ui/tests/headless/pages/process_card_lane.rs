@@ -84,6 +84,7 @@ fn card_lane_app(shell: ShellApp, palette: UiPalette) -> App {
         groups: 1,
         columns: 2,
         group_height_px: 200.0,
+        ..Default::default()
     });
     // The page seams read the route resource; the window composition owns it
     // in production, so the headless fixture installs the same fact.
@@ -407,6 +408,7 @@ fn the_card_plan_admits_whole_groups_only() {
         groups: 1,
         group_height_px: 200.0,
         columns: 2,
+        ..Default::default()
     };
     let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
     assert!(!plan.empty);
@@ -450,6 +452,7 @@ fn the_card_plan_folds_one_bucket_across_the_whole_page() {
         groups: 2,
         group_height_px: 200.0,
         columns: 4,
+        ..Default::default()
     };
     let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
     assert_eq!(plan.groups.len(), 2, "two status buckets are admitted");

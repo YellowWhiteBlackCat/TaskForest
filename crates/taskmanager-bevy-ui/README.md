@@ -31,8 +31,10 @@ is derived from the live `RenderAdapterInfo`, so headless, no-adapter,
 software-adapter and high-contrast compositions keep the theme's typed
 painted/opaque fallback. `bevy-optical-gpu-gate.sh` discovers and runs the
 ignored production-shader proof, recording hardware proof or an explicit
-`PAINTED` degradation in a source-bound receipt. Performance marks one
-top-level candidate card; nested optical layers are unproven and fail closed.
+`PAINTED` degradation in a source-bound receipt. Performance marks the
+top-level candidate cards, and a second optical layer is admitted through the
+proved offscreen chain (`OPTICAL_GLASS_MAX_NESTED_LAYERS = 2`); a deeper
+composition still fails closed.
 An attached main-world material alone would not establish GPU readiness.
 The primary-window `PresentationCamera` retains the interactive shell and
 input target.
@@ -112,6 +114,9 @@ headless suite and capture flow live in
 - [`docs/BSN_AUTHORING.md`](docs/BSN_AUTHORING.md) — the 100% `bsn!` law, scene polymorphism
   and the dependency whitelist.
 - [`docs/VERIFICATION.md`](docs/VERIFICATION.md) — commands, guards, headless suite and capture.
+- [`docs/APPLICATIONS_CARD_LANE.md`](docs/APPLICATIONS_CARD_LANE.md) — the Applications focus/card lane and its elastic right-edge admission.
+- [`docs/NESTED_OPTICAL_CHAIN.md`](docs/NESTED_OPTICAL_CHAIN.md) — the second offscreen optical chain and its fail-closed capability boundary.
+- [`docs/GPUI_PARITY_BOUNDARIES.md`](docs/GPUI_PARITY_BOUNDARIES.md) — implemented GPUI page capability seams and explicit Bevy boundaries.
 - [`UI_COMPONENT_ARCHITECTURE`](../../docs/UI_COMPONENT_ARCHITECTURE.md) and
   [ADR-046](../../adr/046-bevy-fourth-shared-contract-shape.md) — shared contract shape.
 

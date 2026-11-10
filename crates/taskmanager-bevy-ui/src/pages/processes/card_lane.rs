@@ -231,6 +231,10 @@ pub(crate) struct CardFlowBudget {
     pub(crate) group_height_px: f32,
     /// The number of cards one group row holds.
     pub(crate) columns: usize,
+    /// The measured width the group rows were admitted against, in logical pixels.
+    pub(crate) width_px: f32,
+    /// The palette-derived card metrics behind that width admission.
+    pub(crate) metrics: Option<CardFlowMetrics>,
 }
 
 impl Default for CardFlowBudget {
@@ -240,6 +244,8 @@ impl Default for CardFlowBudget {
             groups: 0,
             group_height_px: 0.0,
             columns: 1,
+            width_px: 0.0,
+            metrics: None,
         }
     }
 }
@@ -263,6 +269,25 @@ impl CardFlowBudget {
     pub(crate) fn card_height_px(self, metrics: CardFlowMetrics) -> f32 {
         (self.group_height_px - metrics.header_height_px).max(metrics.card_floor_px)
     }
+
+    /// Re-admit one bucket's lower content as WHOLE columns against the slot
+    /// that was measured when this budget was resolved.
+    ///
+    /// The height contract admits whole group BLOCKS. The overflow action
+    /// belongs to the group's own header lane above the cards, so a truncated
+    /// bucket keeps every admitted card column instead of reserving a whole
+    /// card width for a header control that never joins the card row.
+    #[must_use]
+    pub(crate) fn width_columns(self, member_count: usize) -> usize {
+        let Some(metrics) = self.metrics else {
+            return self.columns.min(member_count);
+        };
+        if !self.width_px.is_finite() || self.width_px <= 0.0 {
+            return self.columns.min(member_count);
+        }
+        let admissible = admit_group_width(self.width_px, self.columns, &metrics, false).columns();
+        admissible.min(member_count)
+    }
 }
 
 /// Derive Bevy's card metrics from the measured card-flow viewport and
@@ -280,7 +305,10 @@ pub(crate) fn card_flow_budget(
     palette: &UiPalette,
 ) -> CardFlowBudget {
     let metrics = CardFlowMetrics::from_palette(palette);
-    let columns = card_columns(slot_width_px, &metrics);
+    let requested_columns = card_columns(slot_width_px, &metrics);
+    let columns = admit_group_width(slot_width_px, requested_columns, &metrics, false)
+        .columns()
+        .max(1);
     // The measured slot IS the bounded card-flow viewport: the mode row,
     // dashboard, page title and toolbar already spent their height before
     // this node was laid out. Only the flow's own group gap remains.
@@ -291,15 +319,17 @@ pub(crate) fn card_flow_budget(
         groups: verdict.groups,
         group_height_px: verdict.card_height,
         columns: verdict.columns,
+        width_px: slot_width_px,
+        metrics: Some(metrics),
     }
 }
 
-/// The number of card columns this frontend paints in a measured width.
+/// The number of card columns a measured width can hold.
 ///
-/// A column is admitted only when a whole card keeps its readable floor, so
-/// a narrow slot never paints a squeezed card. The floor is the card's own
-/// minimum WIDTH — the width its fact line needs — so a wide slot fills with
-/// a card grid instead of a handful of banner-width cards.
+/// The floor is the card's own minimum WIDTH — the width its PID/CPU/memory
+/// fact line needs — so a wide slot fills with a card grid instead of a
+/// handful of banner-width cards. The whole-group width predicate below
+/// decides how many of these requested columns a group may actually paint.
 #[must_use]
 pub(crate) fn card_columns(slot_width_px: f32, metrics: &CardFlowMetrics) -> usize {
     if slot_width_px <= 0.0 || metrics.card_min_width_px <= 0.0 {
@@ -309,6 +339,79 @@ pub(crate) fn card_columns(slot_width_px: f32, metrics: &CardFlowMetrics) -> usi
     let columns =
         ((slot_width_px + metrics.group_gap_px) / (column_floor_px + metrics.group_gap_px)).floor();
     (columns.max(1.0) as usize).clamp(1, 4)
+}
+
+/// The right-edge budget for ONE admitted group row.
+///
+/// The shared height admission answers only how many COMPLETE group BLOCKS
+/// fit; the width predicate is the frontend's own elastic-layout duty. A
+/// group's lower content is admitted as a WHOLE: the header's bucket label
+/// (and its overflow action when a bucket is truncated) and every card's
+/// single-line facts all have to keep their readable floor. This verdict is
+/// pure and is asserted headlessly before a renderer may spend it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GroupWidthAdmission {
+    /// The full `columns`-wide card row fits; paint every column.
+    Full { columns: usize },
+    /// Only ONE card keeps its whole lower content in this slot.
+    SingleColumn,
+    /// Even one card cannot keep its floor: degrade the whole lane.
+    Degrade,
+}
+
+impl GroupWidthAdmission {
+    /// The number of cards the admitted row paints, or zero when degraded.
+    #[must_use]
+    pub(crate) fn columns(self) -> usize {
+        match self {
+            Self::Full { columns } => columns,
+            Self::SingleColumn => 1,
+            Self::Degrade => 0,
+        }
+    }
+}
+
+/// Admit a group's lower content as whole columns against the measured slot.
+///
+/// A card keeps `[card_min_width_px, ...]`; the group header keeps the shared
+/// `more_rows_label` copy beside its own bucket label. The header is a
+/// separate whole group from the card row below it: its own clip protects
+/// both facts, while the card row admits its own whole card columns. The
+/// caller degrades the card row rather than clipping the last column.
+#[must_use]
+pub(crate) fn admit_group_width(
+    slot_width_px: f32,
+    columns: usize,
+    metrics: &CardFlowMetrics,
+    has_overflow: bool,
+) -> GroupWidthAdmission {
+    if !slot_width_px.is_finite()
+        || slot_width_px <= 0.0
+        || metrics.card_min_width_px <= 0.0
+        || metrics.group_gap_px <= 0.0
+    {
+        return GroupWidthAdmission::Degrade;
+    }
+    // One card keeps its fact line whole before anything else is admitted.
+    if slot_width_px < metrics.card_min_width_px {
+        return GroupWidthAdmission::Degrade;
+    }
+    let full = columns.clamp(1, 4);
+    if full <= 1 {
+        return GroupWidthAdmission::SingleColumn;
+    }
+    let row_width = |count: usize| {
+        metrics.card_min_width_px * count as f32
+            + metrics.group_gap_px * count.saturating_sub(1) as f32
+    };
+    let _ = has_overflow;
+    if row_width(full) <= slot_width_px {
+        return GroupWidthAdmission::Full { columns: full };
+    }
+    if row_width(1) <= slot_width_px {
+        return GroupWidthAdmission::SingleColumn;
+    }
+    GroupWidthAdmission::Degrade
 }
 
 /// The current focus resolves from the exact visible row the table cursor
@@ -435,7 +538,7 @@ pub(crate) fn card_flow_plan(
         if groups.len() >= budget.groups {
             break;
         }
-        let admitted = members.len().min(budget.columns);
+        let admitted = members.len().min(budget.width_columns(members.len()));
         if admitted == 0 {
             break;
         }

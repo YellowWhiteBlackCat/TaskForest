@@ -98,8 +98,15 @@ operation set and proven limits. The gate writes
 is derived from the live `RenderAdapterInfo` in
 `src/glass/optical/capability.rs`, not from a palette constant. High-contrast,
 headless, software-adapter and no-adapter compositions fail closed to typed
-fallbacks. The current proof covers one top-level glass layer; nested ordering
-is deliberately unproven and remains a typed fallback.
+fallbacks. The proof now covers TWO simultaneous optical layers: the offscreen chain
+camera republishes the first layer's own optical output and the GPU test
+asserts that chain target differs from the flat painted backdrop, so
+`OPTICAL_GLASS_MAX_NESTED_LAYERS = 2` and the receipt records
+`nesting_layers_proven=true` on a hardware adapter. A surface deeper than
+that still fails closed to a typed fallback. See
+[`docs/NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): the depth
+resolver is headlessly proved and the chain is GPU-measured, but no
+published screenshot shows the nested appearance in the shipped window.
 
 Check the shared workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.20
 version across this crate and `taskmanager-platform-runtime`

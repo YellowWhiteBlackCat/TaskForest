@@ -643,5 +643,9 @@ mod table_parity_tests;
 mod card_lane_tests;
 
 #[cfg(test)]
+#[path = "../../tests/headless/pages/card_lane_width_admission.rs"]
+mod card_lane_width_admission_tests;
+
+#[cfg(test)]
 #[path = "../../tests/headless/pages/process_affinity.rs"]
 mod process_affinity_tests;

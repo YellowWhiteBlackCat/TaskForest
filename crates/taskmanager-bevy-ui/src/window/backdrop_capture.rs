@@ -19,7 +19,7 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
 use bevy::ecs::template::template;
 use bevy::image::Image;
 use bevy::math::UVec2;
@@ -32,9 +32,48 @@ use bevy::window::{PrimaryWindow, Window, WindowRef};
 
 use crate::app::Route;
 use crate::drain::ShellProjectionFolded;
-use crate::glass::optical::OpticalGlassSurface;
+use crate::glass::optical::{OpticalGlassSurface, OpticalNestingDepths};
 use crate::palette::UiPalette;
 use crate::window::WindowPalette;
+
+/// The painted lower composite's camera order.
+///
+/// Cameras render in ascending order, so the capture has to paint BEFORE the
+/// chain that samples it, and both before the presentation that draws the
+/// window.
+const CAPTURE_CAMERA_ORDER: isize = -3;
+
+/// The second optical layer's camera order.
+///
+/// The chain samples the painted lower composite, so it renders after the
+/// capture that produced it.
+const CHAIN_CAMERA_ORDER: isize = -2;
+
+/// The interactive shell's camera order.
+const PRESENTATION_CAMERA_ORDER: isize = -1;
+
+/// The painted lower composite's camera.
+type CaptureCameraQuery<'w, 's> =
+    Query<'w, 's, (&'static mut RenderTarget, &'static mut Camera), With<BackdropCaptureCamera>>;
+
+/// The second optical layer's camera.
+type ChainCameraQuery<'w, 's> = Query<
+    'w,
+    's,
+    (&'static mut RenderTarget, &'static mut Camera),
+    (With<BackdropChainCamera>, Without<BackdropCaptureCamera>),
+>;
+
+/// The interactive shell's camera.
+type PresentationCameraQuery<'w, 's> = Query<
+    'w,
+    's,
+    &'static mut Camera,
+    (
+        With<PresentationCamera>,
+        (Without<BackdropCaptureCamera>, Without<BackdropChainCamera>),
+    ),
+>;
 
 /// The only camera that presents interactive UI to the primary window.
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -43,6 +82,17 @@ pub(crate) struct PresentationCamera;
 /// Camera that renders the non-interactive backdrop into an offscreen image.
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub(crate) struct BackdropCaptureCamera;
+
+/// Camera that renders the SECOND optical layer's backdrop into its own
+/// offscreen image.
+///
+/// The second layer's backdrop is not the painted lower composite: it is
+/// the FIRST optical layer's rendered pixels, which live in their own
+/// offscreen image. This camera is the one that samples that image and
+/// republishes it as the composite an overlay (a tooltip, a popover, a
+/// modal) actually sees.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct BackdropChainCamera;
 
 /// Root of the offscreen backdrop tree. This tree must never contain
 /// interactive UI; keeping it separate prevents the backdrop camera from
@@ -57,6 +107,23 @@ pub(crate) struct BackdropCaptureRoot;
 pub(crate) struct BackdropCaptureTarget {
     pub(crate) image: bevy::asset::Handle<Image>,
     pub(crate) camera: Entity,
+    pub(crate) physical_size: UVec2,
+    pub(crate) scale_factor: f32,
+}
+
+/// The live SECOND optical layer's backdrop target.
+///
+/// This target is the composite an overlay samples: it carries the page
+/// canvas, the painted lower surfaces, AND the first optical layer's own
+/// rendered pixels. A glass overlay that samples this image therefore
+/// refracts the real first-layer glass underneath it instead of a painted
+/// stand-in for it.
+#[derive(Resource, Clone, Debug)]
+pub(crate) struct BackdropChainTarget {
+    pub(crate) image: bevy::asset::Handle<Image>,
+    pub(crate) camera: Entity,
+    /// The image this chain samples: the first optical layer's own output.
+    pub(crate) source: bevy::asset::Handle<Image>,
     pub(crate) physical_size: UVec2,
     pub(crate) scale_factor: f32,
 }
@@ -94,7 +161,7 @@ pub(super) fn spawn(
         .spawn_scene(bsn! {
             Camera2d
             Camera {
-                order: -1,
+                order: PRESENTATION_CAMERA_ORDER,
                 computed: {
                     ComputedCameraValues {
                     target_info: Some(RenderTargetInfo {
@@ -126,7 +193,7 @@ pub(super) fn spawn(
         .spawn_scene(bsn! {
             Camera2d
             Camera {
-                order: -2,
+                order: CAPTURE_CAMERA_ORDER,
                 is_active: false,
                 clear_color: { ClearColorConfig::Custom(palette.canvas) },
                 computed: {
@@ -167,8 +234,53 @@ pub(super) fn spawn(
         BackdropCaptureRoot
     });
     commands.insert_resource(BackdropCaptureTarget {
-        image,
+        image: image.clone(),
         camera: capture_camera,
+        physical_size,
+        scale_factor,
+    });
+
+    // The SECOND optical layer's backdrop. It samples the FIRST layer's
+    // output image, so an overlay that refracts this image refracts the
+    // product's real first-layer glass rather than a painted stand-in for it.
+    let chain_image = Image::new_target_texture(
+        physical_size.x,
+        physical_size.y,
+        TextureFormat::Rgba8UnormSrgb,
+        None,
+    );
+    let chain_image = images.add(chain_image);
+    let chain_camera_image = chain_image.clone();
+    let chain_camera = commands
+        .spawn_scene(bsn! {
+            Camera2d
+            Camera {
+                order: CHAIN_CAMERA_ORDER,
+                is_active: false,
+                clear_color: { ClearColorConfig::Custom(palette.canvas) },
+                computed: {
+                    ComputedCameraValues {
+                    target_info: Some(RenderTargetInfo {
+                        physical_size,
+                        scale_factor,
+                    }),
+                    ..Default::default()
+                    }
+                }
+            }
+            template(move |_| {
+                Ok(RenderTarget::Image(ImageRenderTarget {
+                    handle: chain_camera_image.clone(),
+                    scale_factor,
+                }))
+            })
+            BackdropChainCamera
+        })
+        .id();
+    commands.insert_resource(BackdropChainTarget {
+        image: chain_image,
+        camera: chain_camera,
+        source: image,
         physical_size,
         scale_factor,
     });
@@ -193,17 +305,17 @@ fn capture_target_geometry(window: Option<&Window>) -> (UVec2, f32) {
 /// rebuilding the whole UI tree every frame. The image is resized only on a
 /// physical-size change; the camera target's scale factor is updated only on
 /// a DPI change.
-pub(super) fn sync_backdrop_capture(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    images: Option<ResMut<Assets<Image>>>,
-    target: Option<ResMut<BackdropCaptureTarget>>,
-    mut revision: Option<ResMut<BackdropRevision>>,
-    mut cameras: Query<(&mut RenderTarget, &mut Camera), With<BackdropCaptureCamera>>,
-    mut presentation_cameras: Query<
-        &mut Camera,
-        (With<PresentationCamera>, Without<BackdropCaptureCamera>),
-    >,
-) {
+pub(super) fn sync_backdrop_capture(access: BackdropCaptureAccess<'_, '_>) {
+    let BackdropCaptureAccess {
+        windows,
+        images,
+        target,
+        chain,
+        mut revision,
+        mut cameras,
+        mut chain_cameras,
+        mut presentation_cameras,
+    } = access;
     let Some(mut target) = target else {
         return;
     };
@@ -238,6 +350,26 @@ pub(super) fn sync_backdrop_capture(
             scale_factor,
         });
     }
+    if let Some(mut chain) = chain
+        && let Ok((mut render_target, mut camera)) = chain_cameras.get_mut(chain.camera)
+    {
+        if scale_changed && let RenderTarget::Image(image_target) = &mut *render_target {
+            image_target.scale_factor = scale_factor;
+        }
+        camera.computed.target_info = Some(RenderTargetInfo {
+            physical_size,
+            scale_factor,
+        });
+        if size_changed && let Some(mut image) = images.get_mut(&chain.image) {
+            image.resize(Extent3d {
+                width: physical_size.x,
+                height: physical_size.y,
+                depth_or_array_layers: 1,
+            });
+        }
+        chain.physical_size = physical_size;
+        chain.scale_factor = scale_factor;
+    }
     for mut camera in &mut presentation_cameras {
         camera.computed.target_info = Some(RenderTargetInfo {
             physical_size,
@@ -246,6 +378,21 @@ pub(super) fn sync_backdrop_capture(
     }
     target.physical_size = physical_size;
     target.scale_factor = scale_factor;
+}
+
+/// The capture targets, the cameras that render them, and the window they
+/// mirror. One named bundle keeps the system under Clippy's argument ceiling
+/// without hiding a whole `World`.
+#[derive(SystemParam)]
+pub(super) struct BackdropCaptureAccess<'w, 's> {
+    windows: Query<'w, 's, &'static Window, With<PrimaryWindow>>,
+    images: Option<ResMut<'w, Assets<Image>>>,
+    target: Option<ResMut<'w, BackdropCaptureTarget>>,
+    chain: Option<ResMut<'w, BackdropChainTarget>>,
+    revision: Option<ResMut<'w, BackdropRevision>>,
+    cameras: CaptureCameraQuery<'w, 's>,
+    chain_cameras: ChainCameraQuery<'w, 's>,
+    presentation_cameras: PresentationCameraQuery<'w, 's>,
 }
 
 /// Fold observer: live telemetry landed in the projection, so the lower
@@ -265,14 +412,17 @@ pub(super) fn bump_backdrop_revision(
 /// resize, or the first-ever surface. Without a live surface (the current
 /// `UNSUPPORTED` capability report) the controller stays dormant and the
 /// camera never renders.
-pub(super) fn drive_backdrop_capture(
-    revision: Option<Res<BackdropRevision>>,
-    mut state: ResMut<BackdropCaptureState>,
-    palette: Option<Res<WindowPalette>>,
-    route: Option<Res<Route>>,
-    surfaces: Query<Entity, With<OpticalGlassSurface>>,
-    mut cameras: Query<&mut Camera, With<BackdropCaptureCamera>>,
-) {
+pub(super) fn drive_backdrop_capture(access: BackdropDriveAccess<'_, '_>) {
+    let BackdropDriveAccess {
+        revision,
+        mut state,
+        palette,
+        route,
+        depths,
+        surfaces,
+        mut cameras,
+        mut chain_cameras,
+    } = access;
     let Some(revision) = revision else {
         return;
     };
@@ -288,6 +438,34 @@ pub(super) fn drive_backdrop_capture(
             camera.is_active = capture;
         }
     }
+    // The chain camera renders only when a real second optical layer
+    // exists. Its output is the composite a nested surface samples, so a
+    // composition without a stacked optical surface stays dormant.
+    let chain_capture = capture && depths.is_some_and(|depths| depths.has_nested_surface());
+    for mut camera in &mut chain_cameras {
+        if camera.is_active != chain_capture {
+            camera.is_active = chain_capture;
+        }
+    }
+}
+
+/// The invalidation controller's inputs. One named bundle keeps the system
+/// under Clippy's argument ceiling without hiding a whole `World`.
+#[derive(SystemParam)]
+pub(super) struct BackdropDriveAccess<'w, 's> {
+    revision: Option<Res<'w, BackdropRevision>>,
+    state: ResMut<'w, BackdropCaptureState>,
+    palette: Option<Res<'w, WindowPalette>>,
+    route: Option<Res<'w, Route>>,
+    depths: Option<Res<'w, OpticalNestingDepths>>,
+    surfaces: Query<'w, 's, Entity, With<OpticalGlassSurface>>,
+    cameras: Query<'w, 's, &'static mut Camera, With<BackdropCaptureCamera>>,
+    chain_cameras: Query<
+        'w,
+        's,
+        &'static mut Camera,
+        (With<BackdropChainCamera>, Without<BackdropCaptureCamera>),
+    >,
 }
 
 /// Register the invalidation resources and the fold observer. The drive

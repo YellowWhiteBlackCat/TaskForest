@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -42,6 +43,18 @@ OPERATIONS = [
     "Grain",
 ]
 
+# A nested-layer claim is only admissible when the GPU proof itself carries
+# the named assertions that compare the chain target with the painted lower
+# composite. Flipping the receipt string alone must never pass.
+NESTED_PROOF_TOKENS = (
+    "the chain must carry the first optical layer's real pixels",
+    "chain_only_capture",
+)
+
+NESTED_CEILING_PATTERN = re.compile(
+    r"OPTICAL_GLASS_MAX_NESTED_LAYERS\s*:\s*u8\s*=\s*(?P<ceiling>\d+)"
+)
+
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -61,6 +74,14 @@ def current_digest(repo: Path) -> str:
 def require(text: str, token: str, path: Path, findings: list[str]) -> None:
     if token not in text:
         findings.append(f"{path}: missing required optical wiring token: {token}")
+
+
+def nested_ceiling(capability: str) -> int | None:
+    """The nesting ceiling the renderer source declares."""
+    match = NESTED_CEILING_PATTERN.search(capability)
+    if match is None:
+        return None
+    return int(match.group("ceiling"))
 
 
 def check_implementation(repo: Path, findings: list[str]) -> None:
@@ -86,7 +107,17 @@ def check_implementation(repo: Path, findings: list[str]) -> None:
         findings,
     )
     if "nesting_layers_proven=true" in proof:
-        findings.append(f"{PROOF}: nesting proof is not implemented; receipt must say false")
+        # A nested claim must be backed by the proof's own chain assertions
+        # and by a declared ceiling above one layer.
+        for token in NESTED_PROOF_TOKENS:
+            require(proof, token, PROOF, findings)
+        ceiling = nested_ceiling(capability)
+        if ceiling is None:
+            findings.append(f"{CAPABILITY}: the nesting ceiling is not declared")
+        elif ceiling < 2:
+            findings.append(
+                f"{CAPABILITY}: a nested-layer claim needs a ceiling of at least 2"
+            )
 
 
 def check_wiring(repo: Path, findings: list[str]) -> None:
@@ -109,7 +140,13 @@ def check_wiring(repo: Path, findings: list[str]) -> None:
     )
 
 
-def evaluate_receipt(receipt: dict[str, object], *, current: str | None, mode: str) -> list[str]:
+def evaluate_receipt(
+    receipt: dict[str, object],
+    *,
+    current: str | None,
+    mode: str,
+    declared_ceiling: int | None = None,
+) -> list[str]:
     findings: list[str] = []
     if receipt.get("schema_version") != 1:
         findings.append("receipt: unsupported schema_version")
@@ -139,8 +176,21 @@ def evaluate_receipt(receipt: dict[str, object], *, current: str | None, mode: s
             )
     else:
         findings.append(f"receipt: unknown verdict {verdict}")
-    if bool(receipt.get("nesting_layers_proven")):
-        findings.append("receipt: nested optical layers are not proven")
+    nesting_proven = bool(receipt.get("nesting_layers_proven"))
+    receipt_nesting = receipt.get("max_nested_layers")
+    if nesting_proven:
+        if not isinstance(receipt_nesting, int) or receipt_nesting < 2:
+            findings.append(
+                "receipt: a proven nested-layer claim must record at least two layers"
+            )
+        elif declared_ceiling is not None and receipt_nesting != declared_ceiling:
+            findings.append(
+                "receipt: the recorded nesting ceiling differs from the declared one"
+            )
+    elif isinstance(receipt_nesting, int) and receipt_nesting > 1:
+        findings.append(
+            "receipt: a nesting ceiling above one layer requires a proven nested layer"
+        )
     return findings
 
 
@@ -160,7 +210,14 @@ def check_receipt(
         findings.append(f"{RECEIPT}: unreadable: {error}")
         return None
     current = current_digest(repo) if require_fresh else None
-    findings.extend(evaluate_receipt(receipt, current=current, mode=os.environ.get("TM_OPTICAL_GPU_GATE", "auto")))
+    findings.extend(
+        evaluate_receipt(
+            receipt,
+            current=current,
+            mode=os.environ.get("TM_OPTICAL_GPU_GATE", "auto"),
+            declared_ceiling=nested_ceiling(read(repo / CAPABILITY)),
+        )
+    )
     return receipt
 
 
@@ -197,6 +254,39 @@ def self_test() -> int:
             if bool(findings) != should_fail:
                 print(f"self-test FAIL: {verdict}/{mode} findings={findings}")
                 return 1
+
+        # A nested-layer claim is admissible only with a matching ceiling.
+        nested_ok = {
+            "schema_version": 1,
+            "kind": "bevy-optical-gpu-proof",
+            "source_digest": "current",
+            "verdict": "PROVEN",
+            "operations_proven": OPERATIONS,
+            "runtime_capability": "OPTICAL (proven)",
+            "nesting_layers_proven": True,
+            "max_nested_layers": 2,
+        }
+        findings = evaluate_receipt(
+            nested_ok, current="current", mode="auto", declared_ceiling=2
+        )
+        if findings:
+            print(f"self-test FAIL: a proven nested claim was rejected: {findings}")
+            return 1
+        findings = evaluate_receipt(
+            nested_ok, current="current", mode="auto", declared_ceiling=1
+        )
+        if not findings:
+            print("self-test FAIL: a nested claim with a mismatched ceiling was accepted")
+            return 1
+        nested_unproven = dict(nested_ok)
+        nested_unproven["nesting_layers_proven"] = False
+        nested_unproven["max_nested_layers"] = 2
+        findings = evaluate_receipt(
+            nested_unproven, current="current", mode="auto", declared_ceiling=2
+        )
+        if not findings:
+            print("self-test FAIL: an unproven ceiling above one layer was accepted")
+            return 1
 
         stale = json.loads((receipts / "PROVEN-auto.json").read_text(encoding="utf-8"))
         findings = evaluate_receipt(stale, current="new", mode="auto")

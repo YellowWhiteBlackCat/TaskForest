@@ -53,7 +53,7 @@ fn the_production_ceiling_reports_only_its_declared_operations_and_limits() {
     }
     assert_eq!(
         capability,
-        OpticalGlassCapability::reported_by_renderer(OpticalGlassOperations::COMPLETE, 1, 64,),
+        OpticalGlassCapability::reported_by_renderer(OpticalGlassOperations::COMPLETE, 2, 64,),
         "changing the renderer ceiling requires a fresh GPU proof and receipt"
     );
 
@@ -83,12 +83,18 @@ fn nesting_depth_beyond_the_proven_limit_fails_closed() {
     else {
         panic!("the one proven top-level layer must accept the production Card tier");
     };
+    let second = top_level.with_nesting_depth(1);
+    let OpticalGlassDecision::Optical { .. } =
+        theme.optical_glass_decision(GlassTier::Card, capability, second)
+    else {
+        panic!("the chain capture proves a second, nested optical layer");
+    };
     assert_eq!(
         theme.optical_glass_decision(GlassTier::Card, capability, nested),
         OpticalGlassDecision::Fallback {
             material: OpticalGlassFallback::Frosted,
             reason: OpticalGlassUnavailableReason::NestedLayerLimitExceeded,
         },
-        "a second glass layer cannot be relabelled optical without recursive capture proof"
+        "a third glass layer has no chain target and must fail closed"
     );
 }

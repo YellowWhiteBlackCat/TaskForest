@@ -17,11 +17,13 @@ use taskmanager_theme::optical_glass::{OpticalGlassCapability, OpticalGlassOpera
 pub(crate) const OPTICAL_GLASS_PROVEN_OPERATIONS: OpticalGlassOperations =
     OpticalGlassOperations::COMPLETE;
 
-/// Glass layers the production composition resolves at once. The marked card
-/// is the only layer with a verified lower composite today; a second nested
-/// layer therefore fails closed through the theme limit rather than pretending
-/// the backdrop-capture chain is recursive.
-pub(crate) const OPTICAL_GLASS_MAX_NESTED_LAYERS: u8 = 1;
+/// Glass layers the production composition resolves at once.
+///
+/// The first layer samples the painted lower composite. The second samples
+/// the chain target, which republishes that composite and re-renders the
+/// first layer's real optical material over it. A third layer has no chain
+/// target of its own, so the shared theme still fails it closed.
+pub(crate) const OPTICAL_GLASS_MAX_NESTED_LAYERS: u8 = 2;
 
 /// The largest physical blur radius the production sampler accepts. Larger
 /// radii fall back through the theme decision instead of silently sampling.
