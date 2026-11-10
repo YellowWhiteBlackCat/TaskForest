@@ -308,7 +308,10 @@ where
     let pick = iced::widget::pick_list(options, selected, move |picked: T| on_change(&picked))
         .placeholder(placeholder)
         .width(Length::Fill)
-        .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
+        .padding([
+            theme::control_padding_y(theme_snapshot, ControlRole::Input),
+            f32::from(tokens::SPACE_10),
+        ])
         .style(move |_theme, status| select_style(theme_snapshot, status));
     crate::focus::focusable_control(theme_snapshot, focus_target, pick.into(), confirm)
 }

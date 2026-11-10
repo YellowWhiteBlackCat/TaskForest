@@ -27,7 +27,7 @@ mod control_material;
 mod control_measurement;
 pub use control_material::control_glass_gradient;
 pub use control_measurement::{
-    control_extent, control_measurement, control_padding_x, ui_size_from_root,
+    control_extent, control_measurement, control_padding_x, control_padding_y, ui_size_from_root,
 };
 
 /// The control/surface visual state Iced paints from the shared presentation

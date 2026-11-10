@@ -420,3 +420,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         .into()
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/applications_priority_tests.rs"]
+mod applications_priority_tests;

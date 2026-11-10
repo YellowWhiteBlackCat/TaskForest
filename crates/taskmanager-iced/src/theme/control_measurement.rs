@@ -55,3 +55,9 @@ pub fn control_extent(theme: &Theme, role: ControlRole) -> f32 {
 pub fn control_padding_x(theme: &Theme, role: ControlRole) -> f32 {
     control_measurement(theme, role).padding_x
 }
+
+/// The role's resolved vertical padding in theme logical px.
+#[must_use]
+pub fn control_padding_y(theme: &Theme, role: ControlRole) -> f32 {
+    control_measurement(theme, role).padding_y
+}
