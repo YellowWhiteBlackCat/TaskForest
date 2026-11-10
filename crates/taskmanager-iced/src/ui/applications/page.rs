@@ -11,14 +11,12 @@ use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::surface::{self, StatePanelGeometry};
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body};
 
+use crate::ui::virtual_list::resolve_table_window;
 use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visible};
 use taskmanager_shell::{ProcessControlScope, SortDir};
-use taskmanager_theme::tokens::FONT_13;
-use taskmanager_theme::tokens::FONT_CAPTION;
+use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION};
 use taskmanager_ui_contract::IconId;
-
-use crate::ui::virtual_list::resolve_table_window;
 
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
@@ -354,30 +352,33 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                 text(t("proc.choose_priority")).into()
             };
             actions.push(
-                row![
-                    text(t("proc.priority"))
-                        .size(f32::from(FONT_CAPTION))
-                        .color(theme::muted_text_color(theme_snapshot)),
-                    priority_picker,
-                ]
-                .spacing(4)
-                .align_y(Alignment::Center)
+                iced::widget::container(
+                    row![
+                        text(t("proc.priority"))
+                            .size(f32::from(FONT_CAPTION))
+                            .color(theme::muted_text_color(theme_snapshot)),
+                        priority_picker,
+                    ]
+                    .spacing(4)
+                    .align_y(Alignment::Center),
+                )
+                .width(Length::Fixed(priority_group_width(theme_snapshot)))
                 .into(),
             );
-            actions.push(text(selection_hint(selected_target_count)).into());
-            if app.compact_layout() {
-                // Keep the action strip one bounded line so the Applications
-                // table retains a real row viewport. The full action vocabulary
-                // remains reachable through its own horizontal scroll axis.
-                scrollable(row(actions).spacing(8))
-                    .direction(Direction::Horizontal(crate::theme::scrollbar()))
-                    .style(crate::theme::scrollbar_style)
-                    .height(Length::Fixed(40.0))
-                    .width(Length::Fill)
-                    .into()
-            } else {
-                row(actions).spacing(8).into()
-            }
+            actions.push(
+                iced::widget::container(
+                    text(selection_hint(selected_target_count))
+                        .wrapping(iced::widget::text::Wrapping::None),
+                )
+                .width(Length::Shrink)
+                .into(),
+            );
+            // The full action vocabulary is one bounded horizontal group.
+            // A plain Fill row squeezed the last groups into half-painted
+            // fragments at the right edge; the shared strip keeps every
+            // control's intrinsic width and gives the overflow its own
+            // scroll owner without spending another table row.
+            crate::ui::components::bounded_toolbar(theme_snapshot, actions)
         };
 
     let view_selector = process_view_selector(theme_snapshot);

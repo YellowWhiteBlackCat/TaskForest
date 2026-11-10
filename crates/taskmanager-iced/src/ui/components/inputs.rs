@@ -305,14 +305,18 @@ where
         Some(current) => on_change(current),
         None => Message::Focus(focus_target),
     };
-    let pick = iced::widget::pick_list(options, selected, move |picked: T| on_change(&picked))
-        .placeholder(placeholder)
-        .width(Length::Fill)
-        .padding([
-            theme::control_padding_y(theme_snapshot, ControlRole::Input),
-            f32::from(tokens::SPACE_10),
-        ])
-        .style(move |_theme, status| select_style(theme_snapshot, status));
+    let extent = theme::control_extent(theme_snapshot, ControlRole::Input);
+    let padding_y = theme::control_padding_y(theme_snapshot, ControlRole::Input);
+    let pick = iced::widget::container(
+        iced::widget::pick_list(options, selected, move |picked: T| on_change(&picked))
+            .placeholder(placeholder)
+            .width(Length::Fill)
+            .padding([padding_y, f32::from(tokens::SPACE_10)])
+            .style(move |_theme, status| select_style(theme_snapshot, status)),
+    )
+    .height(Length::Fixed(extent))
+    .center_y(Length::Fixed(extent))
+    .width(Length::Fill);
     crate::focus::focusable_control(theme_snapshot, focus_target, pick.into(), confirm)
 }
 

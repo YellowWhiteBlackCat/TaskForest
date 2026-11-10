@@ -11,7 +11,7 @@
 //! - `app_history_view`: the App-history page.
 
 use iced::Element;
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{column, container, row, text};
 // Shared locale catalog (the process-wide resolver). Every iced surface — the
 // shared pages and the iced-owned modal chrome (settings / about / health /
 // containers) — resolves copy through this one `t`; the frontend owns no

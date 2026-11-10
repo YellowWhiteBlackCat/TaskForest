@@ -29,7 +29,7 @@ use taskmanager_ui_contract::find;
 
 mod emphasis;
 mod priority_choice;
-use priority_choice::{PriorityChoice, selection_hint};
+use priority_choice::{PriorityChoice, priority_group_width, selection_hint};
 mod process_menu;
 mod sort_tint;
 

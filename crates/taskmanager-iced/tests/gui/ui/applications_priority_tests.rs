@@ -7,12 +7,14 @@
 
 use super::*;
 use crate::app::IcedApp;
+use crate::text_metrics::measured_text_width;
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Id, Operation, Tree};
 use iced::{Element, Rectangle, Size};
 use taskmanager_assets::embedded_fonts;
+use taskmanager_theme::tokens::{FONT_CAPTION, SPACE_8};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
@@ -40,6 +42,7 @@ struct PageWidgets {
     text: Vec<(String, Rectangle)>,
     focus_ids: Vec<Id>,
     focus_bounds: Vec<(Id, Rectangle)>,
+    scroll_viewports: Vec<(Rectangle, Rectangle)>,
 }
 
 impl Operation for PageWidgets {
@@ -56,6 +59,17 @@ impl Operation for PageWidgets {
             self.focus_ids.push(id.clone());
             self.focus_bounds.push((id.clone(), bounds));
         }
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content_bounds: Rectangle,
+        _translation: iced::Vector,
+        _state: &mut dyn iced::advanced::widget::operation::Scrollable,
+    ) {
+        self.scroll_viewports.push((bounds, content_bounds));
     }
 }
 
@@ -109,8 +123,24 @@ fn the_priority_preset_rides_the_shared_select_component() {
         "the shared select must own a real, visible rectangle: {bounds:?}"
     );
     assert!(
-        bounds.height >= extent - 0.001,
-        "the shared select must keep the shared Input-role height: {bounds:?} vs {extent}"
+        page.scroll_viewports
+            .iter()
+            .any(|(viewport, _)| viewport.height >= extent - 0.001),
+        "the action strip must own the shared ControlRole extent: {extent} vs {:?}",
+        page.scroll_viewports
+    );
+    let priority_group_width = priority_group_width(&theme);
+    assert!(
+        bounds.width >= priority_group_width - caption_width(&theme) - 0.001,
+        "the priority trigger must keep its measured caption+placeholder slot: {bounds:?} vs {priority_group_width}"
+    );
+    assert!(
+        page.scroll_viewports
+            .iter()
+            .any(|(viewport, content)| content.width > viewport.width
+                && content.width >= bounds.x + bounds.width - viewport.x),
+        "the full action vocabulary must own a real horizontal scroll viewport: {:?}",
+        page.scroll_viewports
     );
 
     let rendered: Vec<&str> = page
@@ -158,8 +188,21 @@ fn the_priority_preset_stays_reachable_in_the_compact_frame() {
         bounds.width > 0.0 && bounds.height > 0.0,
         "the compact frame must keep the shared select measurable: {bounds:?}"
     );
+    assert!(
+        page.scroll_viewports
+            .iter()
+            .any(|(viewport, content)| content.width > viewport.width),
+        "the compact frame must keep the action strip horizontally scrollable: {:?}",
+        page.scroll_viewports
+    );
 }
 
 fn priority_id() -> Id {
     Id::from(crate::focus::focus_id(FocusTarget::ProcessPrioritySelect))
+}
+
+fn caption_width(theme: &Theme) -> f32 {
+    measured_text_width(t("proc.priority"), f32::from(FONT_CAPTION))
+        + f32::from(SPACE_8)
+        + crate::theme::control_padding_x(theme, ControlRole::Input)
 }

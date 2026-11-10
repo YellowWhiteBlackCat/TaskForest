@@ -7,6 +7,21 @@ use super::*;
 use taskforest_core::core::process::PriorityTier;
 use taskforest_core::core::process::ProcessBatchAction;
 use taskmanager_shell::presentation::priority_tier_label;
+use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION, SPACE_8};
+use taskmanager_ui_contract::presentation::sizes::ControlRole;
+
+/// The complete width the priority group needs to show its localized caption
+/// and placeholder. The measured text plus the shared `Input` padding keeps
+/// the trigger from collapsing to a handle-only sliver in a wide action row.
+#[must_use]
+pub(super) fn priority_group_width(theme_snapshot: &Theme) -> f32 {
+    let caption =
+        crate::text_metrics::measured_text_width(t("proc.priority"), f32::from(FONT_CAPTION));
+    let placeholder =
+        crate::text_metrics::measured_text_width(t("proc.choose_priority"), f32::from(FONT_13));
+    let padding = crate::theme::control_padding_x(theme_snapshot, ControlRole::Input);
+    caption + placeholder + padding * 2.0 + f32::from(SPACE_8)
+}
 
 /// The three nice-level presets the Applications action bar offers (mirrors the
 /// GPUI batch `SetPriority` high/normal/low projection). A small `Display` +

@@ -13,12 +13,14 @@ mod layout;
 #[path = "controls/spinner.rs"]
 mod spinner_module;
 mod state;
+mod strip;
 mod text;
 
 pub(crate) use activation::{check_box, glass_button, icon_button, pill};
 pub(crate) use layout::{label, section_header, toolbar};
 pub(crate) use spinner_module::spinner;
 pub(crate) use state::ButtonTone;
+pub(crate) use strip::bounded_toolbar;
 pub(crate) use text::plain_text_input;
 
 #[cfg(test)]

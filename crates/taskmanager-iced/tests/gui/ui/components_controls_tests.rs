@@ -6,10 +6,12 @@
 use iced::advanced::Shell;
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::Headless;
+use iced::advanced::widget::operation::Scrollable;
 use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, Physical};
 use iced::widget::text_editor;
 use iced::{Element, Event, Point, Rectangle, Size, mouse};
+use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{Language, with_language};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::ProcessStatusFilter;
@@ -77,6 +79,40 @@ fn editor_paint_state(status: text_editor::Status) -> ControlPaintState {
         text_editor::Status::Hovered => ControlPaintState::Hovered,
         text_editor::Status::Focused { .. } => ControlPaintState::Focused,
         text_editor::Status::Disabled => ControlPaintState::Disabled,
+    }
+}
+
+#[derive(Default)]
+struct StripBounds {
+    focus: Vec<(Id, Rectangle)>,
+    scroll: Vec<(Rectangle, Rectangle)>,
+}
+
+impl iced::advanced::widget::Operation<()> for StripBounds {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn iced::advanced::widget::Operation<()>)) {
+        visit(self);
+    }
+
+    fn focusable(
+        &mut self,
+        id: Option<&Id>,
+        bounds: Rectangle,
+        _state: &mut dyn iced::advanced::widget::operation::Focusable,
+    ) {
+        if let Some(id) = id {
+            self.focus.push((id.clone(), bounds));
+        }
+    }
+
+    fn scrollable(
+        &mut self,
+        _id: Option<&Id>,
+        bounds: Rectangle,
+        content: Rectangle,
+        _translation: iced::Vector,
+        _state: &mut dyn Scrollable,
+    ) {
+        self.scroll.push((bounds, content));
     }
 }
 
@@ -553,5 +589,77 @@ fn the_shared_progress_bar_keeps_the_shared_geometry_and_the_clamped_ratio() {
     assert_eq!(
         crate::ui::components::progress_fill(None),
         crate::ui::components::ProgressFill::Unknown
+    );
+}
+
+/// The bounded toolbar keeps every action group's intrinsic width and gives
+/// the overflow a real horizontal viewport instead of shrinking controls
+/// into half-painted fragments at the right edge.
+#[test]
+fn a_bounded_toolbar_keeps_complete_action_groups_and_one_scroll_owner() {
+    let theme = theme();
+    let renderer = renderer();
+    let size = Size::new(320.0, 80.0);
+    let actions: Vec<TestElement<'_>> = [
+        "End task",
+        "Force kill",
+        "Open file location",
+        "Search online",
+        "Suspend",
+        "Resume",
+        "Affinity",
+        "Efficiency mode",
+        "Choose columns",
+        "Run new task",
+        "Set priority…",
+        "Delete confirms",
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, label)| {
+        glass_button(
+            &theme,
+            FocusTarget::TableRow {
+                page: AppPage::Applications,
+                index,
+            },
+            label,
+            Message::Tick,
+            ButtonTone::Secondary,
+            true,
+        )
+    })
+    .collect();
+    let mut element: TestElement<'_> = crate::ui::components::bounded_toolbar(&theme, actions);
+    let mut tree = Tree::new(&element);
+    let node = layout(&mut element, &mut tree, &renderer, size);
+    let mut operation = StripBounds::default();
+    element
+        .as_widget_mut()
+        .operate(&mut tree, Layout::new(&node), &renderer, &mut operation);
+
+    let (viewport, content) = operation
+        .scroll
+        .first()
+        .copied()
+        .expect("the toolbar must register one horizontal scroll owner");
+    assert!(viewport.width <= size.width + 0.001);
+    assert!(content.width > viewport.width);
+    assert_eq!(viewport.height, node.bounds().height);
+    assert!(
+        operation
+            .focus
+            .iter()
+            .all(|(_, bounds)| bounds.width > 0.0 && bounds.height > 0.0),
+        "every complete action group must remain measurable: {:?}",
+        operation.focus
+    );
+    assert!(
+        operation
+            .focus
+            .iter()
+            .any(|(_, bounds)| bounds.x + bounds.width > viewport.width),
+        "the later action groups must live inside the horizontal content, not be shrunk: {:?}",
+        operation.focus
     );
 }

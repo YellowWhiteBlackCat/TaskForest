@@ -40,6 +40,13 @@ this product is single-line (like the GPUI reference input). These are
 PRESENTATION executions of the shared tokens, not new semantics: the
 three registered divergences above keep their reasons unchanged.
 
+The Applications action bar is a bounded horizontal scroll owner
+(`controls/strip.rs::bounded_toolbar`): complete action groups keep their
+intrinsic width, the priority select keeps its measured `ControlRole::Input`
+slot, and the lower process table never loses a vertical row to a wrapped
+toolbar. GPUI keeps the same vocabulary in an anchored overflow menu; this
+is a toolkit presentation execution, not a new capability.
+
 <!-- iced-capability-divergences: tooltip, toast, text-selection -->
 
 Below is the complementary PAGE-LEVEL registry: Performance-page skin
