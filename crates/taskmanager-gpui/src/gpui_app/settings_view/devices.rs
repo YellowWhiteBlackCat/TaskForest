@@ -12,7 +12,8 @@ use gpui::{Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
 
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
-use crate::gpui_app::root::{DevicePreference, RootView};
+use crate::gpui_app::root::RootView;
+use taskforest_core::core::config::{DeviceVisibilityKey, DeviceVisibilityPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -22,23 +23,9 @@ use taskmanager_theme::tokens;
 /// Each toggle's initial state comes from the immutable presentation snapshot
 /// threaded in from `render_settings`.
 #[derive(Clone, Copy)]
-pub(super) struct DeviceVisibility {
-    pub(super) cpu: bool,
-    pub(super) memory: bool,
-    pub(super) disks: bool,
-    pub(super) network: bool,
-    pub(super) network_wired: bool,
-    pub(super) network_wireless: bool,
-    pub(super) network_vpn: bool,
-    pub(super) network_virtual: bool,
-    pub(super) network_other: bool,
-    pub(super) gpus: bool,
-}
-
-#[derive(Clone, Copy)]
 struct DeviceToggleSpec {
     id: &'static str,
-    device: DevicePreference,
+    device: DeviceVisibilityKey,
     label: &'static str,
     on: bool,
 }
@@ -46,7 +33,7 @@ struct DeviceToggleSpec {
 pub(super) fn devices_row(
     t: &Theme,
     ent: Entity<RootView>,
-    visibility: DeviceVisibility,
+    visibility: DeviceVisibilityPreferences,
     switches: &HashMap<&'static str, Entity<SwitchState>>,
     cx: &mut Context<RootView>,
 ) -> Div {
@@ -58,10 +45,10 @@ pub(super) fn devices_row(
             t,
             ent.clone(),
             DeviceToggleSpec {
-                id: "device-cpu",
-                device: DevicePreference::Cpu,
-                label: i18n::t("settings.show_cpu"),
-                on: visibility.cpu,
+                id: DeviceVisibilityKey::Cpu.stable_id(),
+                device: DeviceVisibilityKey::Cpu,
+                label: i18n::t(DeviceVisibilityKey::Cpu.i18n_key()),
+                on: visibility.visible(DeviceVisibilityKey::Cpu),
             },
             switches,
             cx,
@@ -70,10 +57,10 @@ pub(super) fn devices_row(
             t,
             ent.clone(),
             DeviceToggleSpec {
-                id: "device-memory",
-                device: DevicePreference::Memory,
-                label: i18n::t("settings.show_memory"),
-                on: visibility.memory,
+                id: DeviceVisibilityKey::Memory.stable_id(),
+                device: DeviceVisibilityKey::Memory,
+                label: i18n::t(DeviceVisibilityKey::Memory.i18n_key()),
+                on: visibility.visible(DeviceVisibilityKey::Memory),
             },
             switches,
             cx,
@@ -82,10 +69,10 @@ pub(super) fn devices_row(
             t,
             ent.clone(),
             DeviceToggleSpec {
-                id: "device-disks",
-                device: DevicePreference::Disks,
-                label: i18n::t("settings.show_disks"),
-                on: visibility.disks,
+                id: DeviceVisibilityKey::Disks.stable_id(),
+                device: DeviceVisibilityKey::Disks,
+                label: i18n::t(DeviceVisibilityKey::Disks.i18n_key()),
+                on: visibility.visible(DeviceVisibilityKey::Disks),
             },
             switches,
             cx,
@@ -101,10 +88,10 @@ pub(super) fn devices_row(
             t,
             ent.clone(),
             DeviceToggleSpec {
-                id: "device-gpus",
-                device: DevicePreference::Gpus,
-                label: i18n::t("settings.show_gpus"),
-                on: visibility.gpus,
+                id: DeviceVisibilityKey::Gpus.stable_id(),
+                device: DeviceVisibilityKey::Gpus,
+                label: i18n::t(DeviceVisibilityKey::Gpus.i18n_key()),
+                on: visibility.visible(DeviceVisibilityKey::Gpus),
             },
             switches,
             cx,
@@ -114,7 +101,7 @@ pub(super) fn devices_row(
 fn network_visibility_group(
     t: &Theme,
     ent: Entity<RootView>,
-    visibility: DeviceVisibility,
+    visibility: DeviceVisibilityPreferences,
     switches: &HashMap<&'static str, Entity<SwitchState>>,
     cx: &mut Context<RootView>,
 ) -> Div {
@@ -126,64 +113,33 @@ fn network_visibility_group(
             t,
             ent.clone(),
             DeviceToggleSpec {
-                id: "device-network",
-                device: DevicePreference::Network,
-                label: i18n::t("settings.show_network"),
-                on: visibility.network,
+                id: DeviceVisibilityKey::Network.stable_id(),
+                device: DeviceVisibilityKey::Network,
+                label: i18n::t(DeviceVisibilityKey::Network.i18n_key()),
+                on: visibility.visible(DeviceVisibilityKey::Network),
             },
             switches,
             cx,
         ))
         .children(
-            [
-                (
-                    "network-wired",
-                    DevicePreference::NetworkWired,
-                    "settings.show_network_wired",
-                    visibility.network_wired,
-                ),
-                (
-                    "network-wireless",
-                    DevicePreference::NetworkWireless,
-                    "settings.show_network_wireless",
-                    visibility.network_wireless,
-                ),
-                (
-                    "network-vpn",
-                    DevicePreference::NetworkVpn,
-                    "settings.show_network_vpn",
-                    visibility.network_vpn,
-                ),
-                (
-                    "network-virtual",
-                    DevicePreference::NetworkVirtual,
-                    "settings.show_network_virtual",
-                    visibility.network_virtual,
-                ),
-                (
-                    "network-other",
-                    DevicePreference::NetworkOther,
-                    "settings.show_network_other",
-                    visibility.network_other,
-                ),
-            ]
-            .into_iter()
-            .map(|(id, device, label, on)| {
-                div()
-                    .pl(definite_length(tokens::SPACE_16))
-                    .child(device_toggle(
-                        t,
-                        ent.clone(),
-                        DeviceToggleSpec {
-                            id,
-                            device,
-                            label: i18n::t(label),
-                            on,
-                        },
-                        switches,
-                        cx,
-                    ))
-            }),
+            DeviceVisibilityKey::NETWORK_SUBCATEGORIES
+                .into_iter()
+                .map(|device| {
+                    div()
+                        .pl(definite_length(tokens::SPACE_16))
+                        .child(device_toggle(
+                            t,
+                            ent.clone(),
+                            DeviceToggleSpec {
+                                id: device.stable_id(),
+                                device,
+                                label: i18n::t(device.i18n_key()),
+                                on: visibility.visible(device),
+                            },
+                            switches,
+                            cx,
+                        ))
+                }),
         )
 }
 

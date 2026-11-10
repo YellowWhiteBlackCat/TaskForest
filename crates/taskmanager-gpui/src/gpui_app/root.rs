@@ -168,17 +168,15 @@ pub use navigation::{StableDeviceKind, TopPage};
 pub use page_state::{ProcessAffinityEditorState, ProcessesState, ServicesState, StartupState};
 use persistence::{apply_process_config, config_from_view};
 pub(crate) use presentation_preferences::{
-    AppearancePreferences, DeviceVisibilityPreferences, GraphPreferences, MagnitudeBase,
-    QuantityNotation,
+    AppearancePreferences, GraphPreferences, MagnitudeBase, QuantityNotation,
 };
-pub use presentation_preferences::{
-    DevicePreference, PresentationFingerprint, PresentationSnapshot,
-};
+pub use presentation_preferences::{PresentationFingerprint, PresentationSnapshot};
 pub use responsive::*;
 pub(crate) use startup::init_demo;
 use startup::page_token;
 pub use startup::{StartupEnvironment, StartupRuntime, init};
 use system_telemetry::SystemHistoryIngestionDiagnostic;
+use taskforest_core::core::config::DeviceVisibilityPreferences;
 pub(crate) use tooltip::ProcessHistories;
 pub(crate) use tooltip::ProcessTooltipIndex;
 pub use window_surface::{

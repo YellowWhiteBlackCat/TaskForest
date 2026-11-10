@@ -14,6 +14,7 @@ use gpui::{
 };
 use taskforest_contract::CapabilityId;
 use taskforest_contract::CapabilityStatus;
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens;
@@ -103,25 +104,19 @@ pub(super) fn compose_primary_dialogs(
             view.graph_points_slider = Some(slider.clone());
             slider
         };
-        for id in [
+        let mut ids = vec![
             "hc-switch",
-            "device-cpu",
-            "device-memory",
-            "device-disks",
-            "device-network",
-            "network-wired",
-            "network-wireless",
-            "network-vpn",
-            "network-virtual",
-            "network-other",
-            "device-gpus",
             "gray-zero-values",
             "smooth-graphs",
             "sliding-graphs",
             "network-dynamic-scaling",
             "desktop-notifications",
             "continuous-history",
-        ] {
+        ];
+        for key in DeviceVisibilityKey::ALL {
+            ids.push(key.stable_id());
+        }
+        for id in ids {
             view.settings_switches
                 .entry(id)
                 .or_insert_with(|| cx.new(|cx| SwitchState::new(cx)));
@@ -135,16 +130,7 @@ pub(super) fn compose_primary_dialogs(
                 theme,
                 hovered: view.hovered.as_ref(),
                 refresh_secs,
-                show_cpu: devices.cpu,
-                show_memory: devices.memory,
-                show_disks: devices.disks,
-                show_network: devices.network,
-                show_network_wired: devices.network_wired,
-                show_network_wireless: devices.network_wireless,
-                show_network_vpn: devices.network_vpn,
-                show_network_virtual: devices.network_virtual,
-                show_network_other: devices.network_other,
-                show_gpus: devices.gpus,
+                devices,
                 units: presentation.units,
                 graph_settings: view.performance_settings().graph,
                 graph_points_slider,

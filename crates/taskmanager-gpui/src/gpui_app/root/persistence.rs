@@ -123,7 +123,7 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
     // choice writes its own family and the host choice writes the explicit
     // marker, so one config file reads back as the same faces in every product.
     let (ui_font, mono_font) = appearance.font.config_tokens();
-    Config {
+    let mut config = Config {
         // Empty means "follow native desktop family". Persisting the
         // currently resolved skin here would turn an automatic first launch
         // into an accidental explicit override on the next restart.
@@ -147,16 +147,6 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // sentinel so an untouched preference round-trips byte-identically
         // with pre-preference config files.
         window_decorations: presentation.window_decorations.to_string(),
-        show_cpu: devices.cpu,
-        show_memory: devices.memory,
-        show_disks: devices.disks,
-        show_network: devices.network,
-        show_network_wired: devices.network_wired,
-        show_network_wireless: devices.network_wireless,
-        show_network_vpn: devices.network_vpn,
-        show_network_virtual: devices.network_virtual,
-        show_network_other: devices.network_other,
-        show_gpus: devices.gpus,
         memory_use_bytes: units.memory_use_bytes,
         memory_use_base2: units.memory_use_base2,
         drive_use_bytes: units.drive_use_bytes,
@@ -199,7 +189,13 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // motion switch this wave, so the writer returns the loaded token
         // instead of freezing Normal over a recorded Reduced/None choice.
         motion: view.motion_token.clone(),
-    }
+        // The ten device-category switches are written by the owner that
+        // owns the set, so the config schema and the rendered toggles cannot
+        // drift; the literal's defaults are placeholders for that one fold.
+        ..Config::default()
+    };
+    devices.apply_to(&mut config);
+    config
 }
 
 #[cfg(test)]

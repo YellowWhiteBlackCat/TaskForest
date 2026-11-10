@@ -1,6 +1,7 @@
 //! Settings-page unit tests (line split).
 
 use taskforest_core::core::DeviceGeneration;
+use taskforest_core::core::config::DeviceVisibilityPreferences;
 use taskforest_core::core::metrics::GpuMetrics;
 use taskmanager_ui::theme_binding::definite_length;
 mod tests_inner {
@@ -132,16 +133,7 @@ mod tests_inner {
                                 theme: &v.theme,
                                 hovered: None,
                                 refresh_secs: 1.0,
-                                show_cpu: true,
-                                show_memory: true,
-                                show_disks: true,
-                                show_network: true,
-                                show_network_wired: true,
-                                show_network_wireless: true,
-                                show_network_vpn: true,
-                                show_network_virtual: true,
-                                show_network_other: true,
-                                show_gpus: true,
+                                devices: DeviceVisibilityPreferences::default(),
                                 units: UnitPreferences::default(),
                                 graph_settings: GraphSettings::default(),
                                 graph_points_slider,

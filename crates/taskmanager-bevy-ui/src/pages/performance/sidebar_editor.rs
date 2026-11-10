@@ -18,11 +18,10 @@ use bevy::ui::widget::Text;
 use bevy::ui::{BackgroundColor, FlexDirection, FlexWrap, Node, UiRect, percent, px, rem};
 use bevy::ui_widgets::{Activate, Button};
 use std::sync::Arc;
-use taskforest_core::core::config::Config;
-use taskforest_core::core::config::sidebar::{
-    move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override,
+use taskforest_core::core::config::{
+    Config, DeviceVisibilityKey, DeviceVisibilityPreferences,
+    sidebar::{move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override},
 };
-use taskforest_core::core::metrics::NetworkAdapterType;
 use taskmanager_application::{ConfigSubmissionStatus, ConfigSubmitError};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_ui_contract::IconId;
@@ -46,29 +45,19 @@ impl PerformanceDeviceTarget {
 
 impl SidebarState {
     pub(crate) fn visible(&self, target: &PerformanceDeviceTarget, shell: &ShellApp) -> bool {
+        let devices = DeviceVisibilityPreferences::from_config(&self.0);
         let category = match target {
-            PerformanceDeviceTarget::Cpu => self.0.show_cpu,
-            PerformanceDeviceTarget::Memory => self.0.show_memory,
-            PerformanceDeviceTarget::Disk(_) => self.0.show_disks,
-            PerformanceDeviceTarget::Network(id) => {
-                self.0.show_network
-                    && metrics::network_devices(shell)
-                        .and_then(|devices| {
-                            devices
-                                .iter()
-                                .find(|device| device.device_id.as_ref() == id)
-                        })
-                        .is_some_and(|device| match device.adapter_type() {
-                            NetworkAdapterType::Ethernet => self.0.show_network_wired,
-                            NetworkAdapterType::WiFi => self.0.show_network_wireless,
-                            NetworkAdapterType::Vpn => self.0.show_network_vpn,
-                            NetworkAdapterType::Virtual => self.0.show_network_virtual,
-                            NetworkAdapterType::Other
-                            | NetworkAdapterType::Unknown
-                            | NetworkAdapterType::Loopback => self.0.show_network_other,
-                        })
-            }
-            PerformanceDeviceTarget::Gpu(_) => self.0.show_gpus,
+            PerformanceDeviceTarget::Cpu => devices.visible(DeviceVisibilityKey::Cpu),
+            PerformanceDeviceTarget::Memory => devices.visible(DeviceVisibilityKey::Memory),
+            PerformanceDeviceTarget::Disk(_) => devices.visible(DeviceVisibilityKey::Disks),
+            PerformanceDeviceTarget::Network(id) => metrics::network_devices(shell)
+                .and_then(|interfaces| {
+                    interfaces
+                        .iter()
+                        .find(|device| device.device_id.as_ref() == id)
+                })
+                .is_some_and(|device| devices.network_visible(device.adapter_type())),
+            PerformanceDeviceTarget::Gpu(_) => devices.visible(DeviceVisibilityKey::Gpus),
             PerformanceDeviceTarget::Battery(_) => true,
             PerformanceDeviceTarget::Fan(_) => true,
         };

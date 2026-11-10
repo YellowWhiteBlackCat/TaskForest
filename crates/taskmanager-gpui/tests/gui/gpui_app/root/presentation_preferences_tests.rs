@@ -1,4 +1,5 @@
 use super::*;
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskforest_core::core::units::QuantityFamily;
 use taskmanager_theme::tokens::UiSize;
 
@@ -18,7 +19,7 @@ fn named_mutations_invalidate_only_their_owned_projection_axis() {
     let mut preferences = PresentationPreferences::default();
 
     let before = preferences.fingerprint();
-    preferences.set_device_visible(DevicePreference::Cpu, false);
+    preferences.set_device_visible(DeviceVisibilityKey::Cpu, false);
     assert_eq!(
         changed_axes(before, preferences.fingerprint()),
         [false, true, false, false, false, false]

@@ -16,7 +16,9 @@
 //! launch behaves identically to before this module existed.
 
 use serde::{Deserialize, Serialize};
+pub mod device_visibility;
 pub mod sidebar;
+pub use device_visibility::{DeviceVisibilityKey, DeviceVisibilityPreferences};
 
 /// Platform-neutral canonical state for one user-created process view preset.
 ///

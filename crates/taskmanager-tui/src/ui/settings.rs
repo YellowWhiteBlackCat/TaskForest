@@ -25,7 +25,7 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use taskforest_core::core::config::Config;
+use taskforest_core::core::config::{Config, DeviceVisibilityPreferences};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{FontAvailability, FontChoice, FontRole, LightDark, ModePreference, Skin};
@@ -55,19 +55,6 @@ pub const QUIET_HOURS_MAX: u8 = 24;
 
 /// The unit-matrix families in field order: (use_bytes, use_base2) per family.
 pub const UNIT_FAMILIES: [&str; 3] = ["memory", "drive", "network"];
-
-const DEVICE_LABEL_KEYS: [&str; 10] = [
-    "settings.show_cpu",
-    "settings.show_memory",
-    "settings.show_disks",
-    "settings.show_network",
-    "settings.show_network_wired",
-    "settings.show_network_wireless",
-    "settings.show_network_vpn",
-    "settings.show_network_virtual",
-    "settings.show_network_other",
-    "settings.show_gpus",
-];
 
 use taskmanager_ui_contract::presentation::settings::{CAPACITY_CHOICES, REFRESH_CHOICES_MS};
 
@@ -434,16 +421,10 @@ pub fn apply_settings_to_config(
     config.density = form.density_token().into();
     config.language = Some(form.language_token().into());
     config.refresh_ms = form.refresh_ms();
-    config.show_cpu = form.show[0];
-    config.show_memory = form.show[1];
-    config.show_disks = form.show[2];
-    config.show_network = form.show[3];
-    config.show_network_wired = form.show[4];
-    config.show_network_wireless = form.show[5];
-    config.show_network_vpn = form.show[6];
-    config.show_network_virtual = form.show[7];
-    config.show_network_other = form.show[8];
-    config.show_gpus = form.show[9];
+    // The ten device-category switches are written through the owner that
+    // owns the set, so the persisted schema and the rendered form cannot
+    // drift from the categories the product offers.
+    DeviceVisibilityPreferences::from_array(form.show).apply_to(config);
     config.memory_use_bytes = form.units[0];
     config.memory_use_base2 = form.units[1];
     config.drive_use_bytes = form.units[2];

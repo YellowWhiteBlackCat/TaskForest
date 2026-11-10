@@ -1,6 +1,7 @@
 //! Rendering for the root application shell.
 
 use taskforest_contract::CapabilityId;
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::system_timeline::SystemPageSection;
 use taskmanager_theme::Theme;
 use taskmanager_ui::theme_binding::absolute;
@@ -264,7 +265,7 @@ impl Render for RootView {
             });
         }
         let settings_focus_id = if settings_switch_focus {
-            Some("device-cpu")
+            Some(DeviceVisibilityKey::Cpu.stable_id())
         } else if settings_zero_gray {
             Some("gray-zero-values")
         } else {
@@ -331,7 +332,7 @@ impl Render for RootView {
                             cx.notify();
                             return;
                         }
-                        if settings_focus_id == "device-cpu" {
+                        if settings_focus_id == DeviceVisibilityKey::Cpu.stable_id() {
                             view.capture_evidence.mark_settings_switch_focus_ready();
                         } else {
                             view.capture_evidence.mark_settings_zero_gray_ready();

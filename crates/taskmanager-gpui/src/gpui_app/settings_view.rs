@@ -55,7 +55,7 @@ mod units;
 mod zero_values;
 
 use self::appearance::mode_row;
-use self::devices::{DeviceVisibility, devices_row};
+use self::devices::devices_row;
 use self::graphs::graph_options_group;
 pub(crate) use self::graphs::init_data_points_slider;
 use self::history::history_persistence_row;
@@ -64,6 +64,7 @@ use self::privilege_center::render_privilege_center;
 use self::refresh::refresh_row;
 use self::units::units_group;
 use self::zero_values::zero_values_row;
+use taskforest_core::core::config::DeviceVisibilityPreferences;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::tokens::UiSize;
 
@@ -105,16 +106,7 @@ pub(crate) struct SettingsViewProps<'a> {
     pub theme: &'a Theme,
     pub hovered: Option<&'a Hover>,
     pub refresh_secs: f32,
-    pub show_cpu: bool,
-    pub show_memory: bool,
-    pub show_disks: bool,
-    pub show_network: bool,
-    pub show_network_wired: bool,
-    pub show_network_wireless: bool,
-    pub show_network_vpn: bool,
-    pub show_network_virtual: bool,
-    pub show_network_other: bool,
-    pub show_gpus: bool,
+    pub devices: DeviceVisibilityPreferences,
     pub units: UnitPreferences,
     pub graph_settings: GraphSettings,
     pub graph_points_slider: Entity<SliderState>,
@@ -151,16 +143,7 @@ pub(crate) fn render_settings(
         theme: t,
         hovered,
         refresh_secs,
-        show_cpu,
-        show_memory,
-        show_disks,
-        show_network,
-        show_network_wired,
-        show_network_wireless,
-        show_network_vpn,
-        show_network_virtual,
-        show_network_other,
-        show_gpus,
+        devices,
         units,
         graph_settings,
         graph_points_slider,
@@ -208,24 +191,7 @@ pub(crate) fn render_settings(
         .child(section(
             t,
             i18n::t("settings.devices"),
-            devices_row(
-                t,
-                ent.clone(),
-                DeviceVisibility {
-                    cpu: show_cpu,
-                    memory: show_memory,
-                    disks: show_disks,
-                    network: show_network,
-                    network_wired: show_network_wired,
-                    network_wireless: show_network_wireless,
-                    network_vpn: show_network_vpn,
-                    network_virtual: show_network_virtual,
-                    network_other: show_network_other,
-                    gpus: show_gpus,
-                },
-                switches,
-                cx,
-            ),
+            devices_row(t, ent.clone(), devices, switches, cx),
         ));
     if first_run_state.info.is_some() {
         system_sections = system_sections.child(section(

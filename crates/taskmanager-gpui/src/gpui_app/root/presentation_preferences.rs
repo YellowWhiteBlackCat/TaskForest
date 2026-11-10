@@ -13,28 +13,14 @@ use super::startup::text_rendering_mode_from_token;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
 use taskforest_core::core::config::{
-    COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
-    TEXT_RENDERING_PLATFORM_DEFAULT, WINDOW_DECORATIONS_SYSTEM,
+    COLOR_SCHEME_SYSTEM, DeviceVisibilityKey, DeviceVisibilityPreferences, STARTUP_PAGE_REMEMBER,
+    SidebarDeviceOverrideConfig, TEXT_RENDERING_PLATFORM_DEFAULT, WINDOW_DECORATIONS_SYSTEM,
 };
 use taskforest_core::core::units::{QuantityFamily, QuantitySetting, UnitPreferences};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{FontPreference, Skin};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DevicePreference {
-    Cpu,
-    Memory,
-    Disks,
-    Network,
-    NetworkWired,
-    NetworkWireless,
-    NetworkVpn,
-    NetworkVirtual,
-    NetworkOther,
-    Gpus,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum QuantityNotation {
@@ -81,69 +67,6 @@ impl Default for AppearancePreferences {
             text_rendering: TEXT_RENDERING_PLATFORM_DEFAULT,
             high_contrast: false,
             language: None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DeviceVisibilityPreferences {
-    pub(crate) cpu: bool,
-    pub(crate) memory: bool,
-    pub(crate) disks: bool,
-    pub(crate) network: bool,
-    pub(crate) network_wired: bool,
-    pub(crate) network_wireless: bool,
-    pub(crate) network_vpn: bool,
-    pub(crate) network_virtual: bool,
-    pub(crate) network_other: bool,
-    pub(crate) gpus: bool,
-}
-
-impl Default for DeviceVisibilityPreferences {
-    fn default() -> Self {
-        Self {
-            cpu: true,
-            memory: true,
-            disks: true,
-            network: true,
-            network_wired: true,
-            network_wireless: true,
-            network_vpn: true,
-            network_virtual: true,
-            network_other: true,
-            gpus: true,
-        }
-    }
-}
-
-impl DeviceVisibilityPreferences {
-    pub(crate) const fn visible(self, device: DevicePreference) -> bool {
-        match device {
-            DevicePreference::Cpu => self.cpu,
-            DevicePreference::Memory => self.memory,
-            DevicePreference::Disks => self.disks,
-            DevicePreference::Network => self.network,
-            DevicePreference::NetworkWired => self.network_wired,
-            DevicePreference::NetworkWireless => self.network_wireless,
-            DevicePreference::NetworkVpn => self.network_vpn,
-            DevicePreference::NetworkVirtual => self.network_virtual,
-            DevicePreference::NetworkOther => self.network_other,
-            DevicePreference::Gpus => self.gpus,
-        }
-    }
-
-    fn set_visible(&mut self, device: DevicePreference, visible: bool) {
-        match device {
-            DevicePreference::Cpu => self.cpu = visible,
-            DevicePreference::Memory => self.memory = visible,
-            DevicePreference::Disks => self.disks = visible,
-            DevicePreference::Network => self.network = visible,
-            DevicePreference::NetworkWired => self.network_wired = visible,
-            DevicePreference::NetworkWireless => self.network_wireless = visible,
-            DevicePreference::NetworkVpn => self.network_vpn = visible,
-            DevicePreference::NetworkVirtual => self.network_virtual = visible,
-            DevicePreference::NetworkOther => self.network_other = visible,
-            DevicePreference::Gpus => self.gpus = visible,
         }
     }
 }
@@ -293,7 +216,7 @@ impl PresentationSnapshot {
     }
 
     #[must_use]
-    pub const fn device_visible(&self, device: DevicePreference) -> bool {
+    pub const fn device_visible(&self, device: DeviceVisibilityKey) -> bool {
         self.devices.visible(device)
     }
 
@@ -410,12 +333,10 @@ impl PresentationPreferences {
         self.snapshot = next;
     }
 
-    pub(super) fn set_device_visible(&mut self, device: DevicePreference, visible: bool) {
-        if self.snapshot.devices.visible(device) == visible {
-            return;
+    pub(super) fn set_device_visible(&mut self, device: DeviceVisibilityKey, visible: bool) {
+        if self.snapshot.devices.set_visible(device, visible) {
+            self.snapshot.fingerprint.devices = bump(self.snapshot.fingerprint.devices);
         }
-        self.snapshot.devices.set_visible(device, visible);
-        self.snapshot.fingerprint.devices = bump(self.snapshot.fingerprint.devices);
     }
 
     pub(super) fn set_quantity_notation(
@@ -508,7 +429,7 @@ impl super::RootView {
 
     pub fn set_device_visibility(
         &mut self,
-        device: DevicePreference,
+        device: DeviceVisibilityKey,
         visible: bool,
         cx: &mut Context<Self>,
     ) {

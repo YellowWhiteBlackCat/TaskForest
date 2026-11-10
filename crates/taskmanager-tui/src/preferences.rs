@@ -11,7 +11,7 @@ use taskmanager_shell::saved_views::{sort_from_legacy_token, sort_token};
 use crate::TuiApp;
 use crate::theme::ThemeParams;
 use crate::ui::settings::SettingsForm;
-use taskforest_core::core::config::Config;
+use taskforest_core::core::config::{Config, DeviceVisibilityPreferences};
 use taskmanager_application::i18n::t;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::process_category_projection::default_category_expansions;
@@ -137,18 +137,7 @@ impl TuiApp {
                 .iter()
                 .position(|ms| *ms == config.refresh_ms)
                 .unwrap_or(1);
-            self.settings_form.show = [
-                config.show_cpu,
-                config.show_memory,
-                config.show_disks,
-                config.show_network,
-                config.show_network_wired,
-                config.show_network_wireless,
-                config.show_network_vpn,
-                config.show_network_virtual,
-                config.show_network_other,
-                config.show_gpus,
-            ];
+            self.settings_form.show = DeviceVisibilityPreferences::from_config(&config).to_array();
             self.settings_form.units = [
                 config.memory_use_bytes,
                 config.memory_use_base2,
@@ -175,18 +164,7 @@ impl TuiApp {
             }
         }
         self.prefs = AppliedPrefs {
-            show: [
-                config.show_cpu,
-                config.show_memory,
-                config.show_disks,
-                config.show_network,
-                config.show_network_wired,
-                config.show_network_wireless,
-                config.show_network_vpn,
-                config.show_network_virtual,
-                config.show_network_other,
-                config.show_gpus,
-            ],
+            show: DeviceVisibilityPreferences::from_config(&config).to_array(),
             units: [
                 config.memory_use_bytes,
                 config.memory_use_base2,
@@ -572,18 +550,7 @@ impl TuiApp {
             .iter()
             .position(|ms| *ms == config.refresh_ms)
             .unwrap_or(1);
-        self.settings_form.show = [
-            config.show_cpu,
-            config.show_memory,
-            config.show_disks,
-            config.show_network,
-            config.show_network_wired,
-            config.show_network_wireless,
-            config.show_network_vpn,
-            config.show_network_virtual,
-            config.show_network_other,
-            config.show_gpus,
-        ];
+        self.settings_form.show = DeviceVisibilityPreferences::from_config(&config).to_array();
         self.settings_form.units = [
             config.memory_use_bytes,
             config.memory_use_base2,

@@ -52,18 +52,7 @@ pub(super) fn apply_root_persisted_projection(
     );
     next.window_decorations = SharedString::from(decorations_pref.config_token());
     view.window_decorations_pref = decorations_pref;
-    next.devices = DeviceVisibilityPreferences {
-        cpu: cfg.show_cpu,
-        memory: cfg.show_memory,
-        disks: cfg.show_disks,
-        network: cfg.show_network,
-        network_wired: cfg.show_network_wired,
-        network_wireless: cfg.show_network_wireless,
-        network_vpn: cfg.show_network_vpn,
-        network_virtual: cfg.show_network_virtual,
-        network_other: cfg.show_network_other,
-        gpus: cfg.show_gpus,
-    };
+    next.devices = DeviceVisibilityPreferences::from_config(&cfg);
     next.units = UnitPreferences {
         memory_use_bytes: cfg.memory_use_bytes,
         memory_use_base2: cfg.memory_use_base2,

@@ -6,15 +6,15 @@
 
 use ratatui::layout::Rect;
 use ratatui::text::Line;
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::{FontRole, Skin};
 
 use super::footer::settings_footer_plain;
 use super::{
-    DEVICE_LABEL_KEYS, GRAPH_LABELS, REFRESH_LABELS, SETTINGS_FIELDS, UNIT_FAMILIES,
-    density_display_label, font_display_label, language_display_label, mode_display_label,
-    unit_label_key,
+    GRAPH_LABELS, REFRESH_LABELS, SETTINGS_FIELDS, UNIT_FAMILIES, density_display_label,
+    font_display_label, language_display_label, mode_display_label, unit_label_key,
 };
 use crate::ui::process_details::wrapped_content_height;
 use crate::ui::text::pad_cells;
@@ -79,10 +79,10 @@ pub(super) fn settings_field_rows(app: &crate::TuiApp) -> Vec<SettingsFieldRow> 
         label: t("settings.refresh_interval").to_owned(),
         value: REFRESH_LABELS[form.refresh].to_owned(),
     });
-    for (index, key) in DEVICE_LABEL_KEYS.iter().enumerate() {
+    for (index, key) in DeviceVisibilityKey::ALL.into_iter().enumerate() {
         rows.push(SettingsFieldRow {
             field: 8 + index,
-            label: t(key).to_owned(),
+            label: t(key.i18n_key()).to_owned(),
             value: if form.show[index] {
                 t("settings.on").to_owned()
             } else {
