@@ -339,6 +339,18 @@ pub fn startup_control_policy_label(policy: StartupControlPolicy) -> &'static st
     t(policy.i18n_key())
 }
 
+/// Localized verb for one startup enable/disable request. The two verbs are a
+/// typed boolean at the platform boundary, so this fold is the one place that
+/// turns it into catalog copy; no caller may spell "enable"/"disable" itself.
+#[must_use]
+pub fn startup_action_label(enabled: bool) -> &'static str {
+    t(if enabled {
+        "startup.enable"
+    } else {
+        "startup.disable"
+    })
+}
+
 /// The localized "… {count} more" overflow label.
 ///
 /// A bounded list that hides rows says so with one wording in every
@@ -371,15 +383,58 @@ pub fn process_details_section_label(section: ProcessDetailsSection) -> &'static
     t(section.i18n_key())
 }
 
+/// The one localized reason for a typed control failure. `FailureKind` owns
+/// the key vocabulary (a pure core fact); this is the only place a key meets
+/// the active language, so no layer below or above it can fork the copy.
+#[must_use]
+pub fn control_error_detail(failure: FailureKind) -> &'static str {
+    t(failure.i18n_key())
+}
+
 /// The rejection copy for a refused service-log stream request: the catalog
-/// sentence with the typed failure kind interpolated.
+/// sentence with the shared localized reason interpolated.
 ///
 /// Every frontend that refuses a stream says so with one wording; the
 /// placeholder spelling belongs to the catalog, and the interpolation rule
-/// belongs here — never in a view.
+/// belongs here — never in a view. A `Debug` dump of the typed failure is
+/// never the reason (it is an English enum variant, not copy).
 #[must_use]
 pub fn service_log_rejection_detail(failure: FailureKind) -> String {
-    t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}"))
+    t("service.log_request_rejected").replace("{reason}", control_error_detail(failure))
+}
+
+/// One control outcome's user-facing text.
+///
+/// Session, startup and service control outcomes all answer the same question
+/// ("what happened to the action on this target"), so they share one
+/// composition: the action label from its own typed vocabulary, the target,
+/// and — on failure — the shared localized reason. `accepted` selects the
+/// session-specific "request accepted" sentence (dispatch acceptance is not
+/// completion) versus the generic success sentence. A `Debug` dump of the
+/// typed failure is never the reason.
+#[must_use]
+pub fn control_outcome_text(
+    action: &str,
+    target: &str,
+    accepted: bool,
+    result: Result<(), FailureKind>,
+) -> String {
+    match result {
+        Ok(()) => {
+            let template = if accepted {
+                "feedback.session_request_accepted"
+            } else {
+                "feedback.action_succeeded"
+            };
+            t(template)
+                .replace("{action}", action)
+                .replace("{target}", target)
+        }
+        Err(failure) => t("feedback.action_failed_detail")
+            .replace("{action}", action)
+            .replace("{target}", target)
+            .replace("{detail}", control_error_detail(failure)),
+    }
 }
 
 pub fn t(key: &'static str) -> &'static str {
@@ -423,3 +478,7 @@ pub fn format_duration(seconds: u64) -> String {
 #[cfg(test)]
 #[path = "../tests/headless/application_i18n_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/headless/application_control_outcome_i18n_tests.rs"]
+mod control_outcome_tests;

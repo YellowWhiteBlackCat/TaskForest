@@ -43,9 +43,17 @@ from pathlib import Path
 
 SOURCE_ROOTS = ("crates", "src", "tests")
 
-# An owner path is a workspace crate name followed by `::`. The lookbehind keeps
-# a path fragment inside a longer identifier from matching.
-OWNER_PATH = re.compile(r"(?<![A-Za-z_:])taskmanager_[a-z_]+::")
+# An owner path is a workspace or shared-kit crate name followed by `::`.
+# The lookbehind keeps a path fragment inside a longer identifier from
+# matching; the shared `zhuge_ui_*` crates are owners too (ADR-063), so an
+# inline `zhuge_ui_core::value::interval_fraction(...)` is the same second
+# address as an inline `taskmanager_shell::...` and must be imported instead.
+# `taskforest_*` is deliberately left to the existing surface guards: adding
+# it here would turn fourteen historical qualified paths into a new census
+# without changing the owner-shape defect this rule closes.
+OWNER_PATH = re.compile(
+    r"(?<![A-Za-z_:])(?:taskmanager_[a-z_]+|zhuge_ui_[a-z_]+)::"
+)
 
 # A `use` declaration (including `pub use` / `pub(crate) use`) is the legal form
 # and is never counted; so is any text inside a string literal, which is data
@@ -208,6 +216,16 @@ def self_test() -> int:
             "unregistered crate is a violation",
             "fn f() { taskmanager_brand_new::thing(); }\n",
             EXIT_VIOLATION,
+        ),
+        (
+            "shared kit owner path is a violation",
+            "fn f() -> f32 { zhuge_ui_core::value::interval_fraction(1.0, 0.0, 2.0, 0.0) }\n",
+            EXIT_VIOLATION,
+        ),
+        (
+            "shared kit import is clean",
+            "use zhuge_ui_core::value::interval_fraction;\n",
+            EXIT_OK,
         ),
     ]
     failures = 0

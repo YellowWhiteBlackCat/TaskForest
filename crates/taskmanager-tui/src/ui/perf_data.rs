@@ -15,7 +15,8 @@ use taskforest_core::core::units::format_quantity_with;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::memory::{self, MemSegment, SwapBreakdown};
 use taskmanager_shell::presentation::{
-    MISSING_VALUE, missing_value, optional_bytes, temperature_c, wifi_signal_quality_percent,
+    MISSING_VALUE, memory_usage_rate_is_visible, missing_value, optional_bytes, temperature_c,
+    wifi_signal_quality_percent,
 };
 
 use super::units::{
@@ -24,12 +25,6 @@ use super::units::{
 };
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::duration;
-
-/// Below this absolute rate (MiB/s) the usage-rate row reports the shared
-/// dash instead of a sub-tick value, mirroring the gpui row gate
-/// (`memory_stats.rs`): a rate the kernel cannot distinguish from zero is
-/// honest absence, not a fabricated `+0 MiB/s`.
-const USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC: f32 = 0.05;
 
 /// One core grid cell's three-segment readout, folded from the core's
 /// current typed observations (utilization · frequency · temperature). A
@@ -88,7 +83,7 @@ pub(super) fn memory_stats_rows(
     };
     let usage_rate = memory
         .current_used_rate_mib_per_sec()
-        .filter(|rate| rate.abs() >= USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC)
+        .filter(|rate| memory_usage_rate_is_visible(*rate))
         .map_or_else(missing_value, |rate| {
             signed_memory_rate_readout(rate, use_bytes, use_base2)
         });

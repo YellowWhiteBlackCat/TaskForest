@@ -238,6 +238,22 @@ pub fn seed_smart_self_test_capabilities(app: &mut crate::ShellApp) {
     seed_projection_fact(app, ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))));
 }
 
+/// Seed the demo disk's SMART endurance past its rated life.
+///
+/// The critical-wear marker rides every surface that paints the endurance,
+/// so the capture that proves the marker's paint face needs a disk whose
+/// wear actually crossed the level. One seed, four frontends: the four
+/// captures prove the same fact instead of four private fixtures.
+pub fn seed_wear_critical_disk(snapshot: &mut taskforest_core::core::metrics::SystemSnapshot) {
+    let now = snapshot.timestamp_ms;
+    let Some(disk) = snapshot.disks.first_mut() else {
+        return;
+    };
+    disk.smart_availability = SmartAvailability::Available;
+    disk.smart_state = DeviceState::healthy(now);
+    disk.smart_percent_used = Some(104.0);
+}
+
 /// Inject one typed SMART observation batch through the normal shell reducer.
 ///
 /// This fixture seam deliberately shares the application's monotonic revision

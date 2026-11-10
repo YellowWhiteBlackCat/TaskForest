@@ -23,8 +23,8 @@ use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
 use taskmanager_theme::GlassTier;
 
 pub(crate) mod memory;
+pub(crate) use memory::segment_bar_scene;
 use memory::{memory_legend_container_scene, section_header, segment_row_scene, swap_bar_scene};
-pub(crate) use memory::{segment_bar_scene, sync_memory_legend_layout};
 use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 

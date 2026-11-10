@@ -96,10 +96,10 @@ pub fn device_source_health<T>(snapshot: &DeviceSourceSnapshot<T>) -> Capability
             let enrichment = source_health(&snapshot.enrichments);
             match enrichment {
                 CapabilityHealth::Unavailable(enrichment_failure) => {
-                    CapabilityHealth::Degraded(stronger_failure(failure, enrichment_failure.kind()))
+                    CapabilityHealth::Degraded(failure.stronger(enrichment_failure.kind()))
                 }
                 CapabilityHealth::Degraded(enrichment_failure) => {
-                    CapabilityHealth::Degraded(stronger_failure(failure, enrichment_failure))
+                    CapabilityHealth::Degraded(failure.stronger(enrichment_failure))
                 }
                 CapabilityHealth::Available => CapabilityHealth::Degraded(failure),
             }
@@ -229,10 +229,10 @@ fn system_observation_health(
         SystemObservationState::Partial { failure, .. } => match source_health(sources) {
             CapabilityHealth::Available => CapabilityHealth::Degraded(failure),
             CapabilityHealth::Degraded(source_failure) => {
-                CapabilityHealth::Degraded(stronger_failure(failure, source_failure))
+                CapabilityHealth::Degraded(failure.stronger(source_failure))
             }
             CapabilityHealth::Unavailable(source_failure) => {
-                CapabilityHealth::Degraded(stronger_failure(failure, source_failure.kind()))
+                CapabilityHealth::Degraded(failure.stronger(source_failure.kind()))
             }
         },
         SystemObservationState::Stale { failure, .. }
@@ -352,33 +352,7 @@ fn source_health_with_authoritative_discovery(sources: &[SourceStatus]) -> Capab
 }
 
 fn retain_strongest(current: &mut Option<FailureKind>, candidate: FailureKind) {
-    if current.is_none_or(|failure| failure_priority(candidate) > failure_priority(failure)) {
-        *current = Some(candidate);
-    }
-}
-
-const fn stronger_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(left) >= failure_priority(right) {
-        left
-    } else {
-        right
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        // Escalation-aware denial is the most actionable kind, so it wins a
-        // merge over a generic denial or a transient sibling failure.
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
-    }
+    *current = Some(FailureKind::strongest(*current, candidate));
 }
 
 #[cfg(test)]

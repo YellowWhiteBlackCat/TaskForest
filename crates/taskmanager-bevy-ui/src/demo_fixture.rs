@@ -7,7 +7,9 @@
 //! appends a renderer-private telemetry sequence.
 
 use taskmanager_shell::fixture::alerts::seed_shell_active_alert;
-use taskmanager_shell::fixture::health::{seed_shell_health, seed_smart_self_test_capabilities};
+use taskmanager_shell::fixture::health::{
+    seed_shell_health, seed_smart_self_test_capabilities, seed_wear_critical_disk,
+};
 use taskmanager_shell::fixture::process_insights::{
     process_insights_projection, seed_process_properties_history,
 };
@@ -404,6 +406,18 @@ pub(crate) fn seed_capture_confirmation_scenario(shell: &mut ShellApp, scenario:
                     disk.partitions = vec![p1];
                 }
                 seed_projection_fact(shell, ProjectionSeedFact::Snapshot(Box::new(Some(s))));
+            }
+        }
+        "smart-wear-critical" => {
+            // The disk whose endurance reached its rated life: the critical
+            // marker rides every surface that paints the endurance, and this
+            // is the disk that proves it.
+            if let Some(mut snapshot) = shell.projection().snapshot.clone() {
+                seed_wear_critical_disk(&mut snapshot);
+                seed_projection_fact(
+                    shell,
+                    ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+                );
             }
         }
         "gpu-engine-inventory" | "intel-gpu-telemetry" => {

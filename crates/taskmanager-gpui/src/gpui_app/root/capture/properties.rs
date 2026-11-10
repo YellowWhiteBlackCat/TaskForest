@@ -44,7 +44,7 @@ impl RootView {
             CaptureScenario::ProcessMemoryPssSwap => {
                 self.details_section == ProcessDetailsSection::Overview
                     && item.current_memory_pss_bytes().is_some()
-                    && item.current_memory_uss_bytes().is_some()
+                    && item.memory_uss_bytes().is_some()
                     && item.current_swap_bytes().is_some()
             }
             _ => {

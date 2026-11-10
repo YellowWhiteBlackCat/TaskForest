@@ -129,20 +129,8 @@ const ICED_ENTRIES: &[LayoutThresholdEntry] = &[
                      charging the GPUI inset would double-count it",
         },
     ),
-    entry(
-        LayoutAxis::MinimumWindowWidth,
-        AxisDecision::Absent {
-            reason: "unrecorded: the iced window builder keeps the toolkit default minimum; \
-                     convergence candidate",
-        },
-    ),
-    entry(
-        LayoutAxis::MinimumWindowHeight,
-        AxisDecision::Absent {
-            reason: "unrecorded: the iced window builder keeps the toolkit default minimum; \
-                     convergence candidate",
-        },
-    ),
+    entry(LayoutAxis::MinimumWindowWidth, AxisDecision::Shared),
+    entry(LayoutAxis::MinimumWindowHeight, AxisDecision::Shared),
     entry(
         LayoutAxis::VerticalChromeReserve,
         AxisDecision::Own {
@@ -162,40 +150,23 @@ const ICED_ENTRIES: &[LayoutThresholdEntry] = &[
 ];
 
 const BEVY_ENTRIES: &[LayoutThresholdEntry] = &[
-    entry(
-        LayoutAxis::ConstrainedContentHeight,
-        AxisDecision::Absent {
-            reason: "unrecorded: the Bevy shape composes Performance slots through BSN flex with \
-                     rem widths and does not consume the typed page-profile bands; \
-                     convergence candidate",
-        },
-    ),
-    entry(
-        LayoutAxis::GenerousContentHeight,
-        AxisDecision::Absent {
-            reason: "unrecorded: no vertical capacity axis in the BSN composition yet; \
-                     convergence candidate",
-        },
-    ),
-    entry(
-        LayoutAxis::ChartsRungContentHeight,
-        AxisDecision::Absent {
-            reason: "unrecorded: the chart inventory follows the sidebar's own visible-row count \
-                     instead of a content-height rung; convergence candidate",
-        },
-    ),
+    entry(LayoutAxis::ConstrainedContentHeight, AxisDecision::Shared),
+    entry(LayoutAxis::GenerousContentHeight, AxisDecision::Shared),
+    entry(LayoutAxis::ChartsRungContentHeight, AxisDecision::Shared),
     entry(
         LayoutAxis::StackedDetailsMinHeight,
         AxisDecision::Absent {
-            reason: "unrecorded: the statistics rail has no stacked form in this shape; \
-                     convergence candidate",
+            reason: "the statistics rail has no stacked form in this shape: it is one pinned \
+                     column at the registered rail width with its own declared scroll owner, \
+                     and the compact mode hides it wholesale",
         },
     ),
     entry(
         LayoutAxis::RootChromeSingleRowWidth,
         AxisDecision::Absent {
-            reason: "unrecorded: the nav strip and page chrome compose with flex in one column \
-                     at every width; convergence candidate",
+            reason: "the nav band composes in one flex row behind a declared horizontal scroll \
+                     owner at every frame width, and the rail form is a user toggle rather \
+                     than a width band, so no frame width decides the chrome row",
         },
     ),
     entry(LayoutAxis::PerformanceStatsMinWidth, AxisDecision::Shared),
@@ -204,25 +175,44 @@ const BEVY_ENTRIES: &[LayoutThresholdEntry] = &[
     entry(LayoutAxis::SidebarPreferenceWidth, AxisDecision::Shared),
     entry(
         LayoutAxis::NavigationHorizontalInset,
-        AxisDecision::Absent {
-            reason: "unrecorded: the rail's inset is the scaffold's own padding; convergence \
-                     candidate",
+        AxisDecision::Own {
+            value: 0.0,
+            reason: "the scaffold's own page padding separates the rail from the body, so the \
+                     shape charges no inset and subtracts only the rail; charging the shared \
+                     inset would double-count the padding",
         },
     ),
-    entry(LayoutAxis::MinimumWindowWidth, AxisDecision::Shared),
-    entry(LayoutAxis::MinimumWindowHeight, AxisDecision::Shared),
+    entry(
+        LayoutAxis::MinimumWindowWidth,
+        AxisDecision::Absent {
+            reason: "the Bevy window sets no minimum: its resolution comes from the capture \
+                     matrix or the compositor, and the surface adapts to whatever width it is \
+                     given, so the shape spends no window floor",
+        },
+    ),
+    entry(
+        LayoutAxis::MinimumWindowHeight,
+        AxisDecision::Absent {
+            reason: "the Bevy window sets no minimum: its resolution comes from the capture \
+                     matrix or the compositor, and the surface adapts to whatever height it is \
+                     given, so the shape spends no window floor",
+        },
+    ),
     entry(
         LayoutAxis::VerticalChromeReserve,
         AxisDecision::Absent {
-            reason: "unrecorded: the Bevy root reads live Node geometry per frame; convergence \
-                     candidate",
+            reason: "flex spends the nav band, the status line and the page padding, so the \
+                     shape subtracts no constant vertical reserve: the height admissions read \
+                     the live window height directly",
         },
     ),
     entry(
         LayoutAxis::HorizontalChromeReserve,
-        AxisDecision::Absent {
-            reason: "unrecorded: the Bevy root reads live Node geometry per frame; convergence \
-                     candidate",
+        AxisDecision::Own {
+            value: 64.0,
+            reason: "the vertical nav rail is one fixed 64.0 column and the Performance \
+                     compact breakpoint classifies the body left behind it, so the shape \
+                     subtracts exactly that width before classifying",
         },
     ),
 ];

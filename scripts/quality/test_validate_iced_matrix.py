@@ -51,6 +51,41 @@ class IcedMatrixMarkerRoutingTests(unittest.TestCase):
 
             validate_markers(markers, "cpu", "1180x780")
 
+            resolution = (
+                "profile=standard vertical=constrained padding=16.00 width_input=1160.00 "
+                "page_content_height=642.00 control_extent=38.00 hit_target=50.29 "
+                "control_height=38.00 body_font_size=16.00 renderer_scale=1.1429 "
+                "row_padding_y=6.00 line_height=1.40 rung=charts inventory=full "
+                "details=pinned device_nav=sidebar sidebar_visible=true "
+                "persisted_sidebar_width=none workspace_width=1160.00 "
+                "content_height=642.00 sidebar_width=248.00 stats_width=320.00 "
+                "main_width=580.00"
+            )
+            markers.write_text(
+                markers.read_text(encoding="utf-8").rstrip("\n")
+                + " "
+                + resolution
+                + "\n",
+                encoding="utf-8",
+            )
+            validate_markers(markers, "cpu", "1180x780")
+
+            markers.write_text(
+                markers.read_text(encoding="utf-8").replace(
+                    " line_height=1.40 rung=charts",
+                    " line_height=1.40 unknown=1 rung=charts",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(EvidenceError, "field set"):
+                validate_markers(markers, "cpu", "1180x780")
+            markers.write_text(
+                markers.read_text(encoding="utf-8").replace(
+                    " unknown=1", ""
+                ),
+                encoding="utf-8",
+            )
+
             fractional = markers.read_text(encoding="utf-8").replace(
                 "width=1180.00 height=780.00 page_width=1180.00 page_height=780.00",
                 "width=1180.38 height=779.62 page_width=1180.38 page_height=779.62",

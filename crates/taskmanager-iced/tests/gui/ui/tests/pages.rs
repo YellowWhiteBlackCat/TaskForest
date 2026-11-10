@@ -34,8 +34,8 @@ use taskforest_core::core::services::ServiceItem;
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::CommandId;
 use taskmanager_application::Modifiers;
-use taskmanager_application::ProcessAffinityReady;
 use taskmanager_application::i18n::t;
+use taskmanager_application::{ProcessAffinityReady, ProcessAffinityState};
 use taskmanager_icons::asset_bytes;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::command_help;
@@ -131,11 +131,13 @@ fn process_affinity_modal_renders_a_bounded_focusable_cpu_grid() {
         .expect("demo process must have an authoritative identity");
     seed_projection_fact(
         &mut app.shell,
-        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityReady {
-            request_id: RequestId::MIN,
-            target,
-            cpus: vec![0, 3],
-        })),
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityState::Ready(
+            ProcessAffinityReady {
+                request_id: RequestId::MIN,
+                target,
+                cpus: vec![0, 3],
+            },
+        ))),
     );
     let _ = app.update(crate::app::Message::OpenProcessAffinity);
 

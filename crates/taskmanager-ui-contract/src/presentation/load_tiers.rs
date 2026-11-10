@@ -3,30 +3,27 @@
 //!
 //! Iced's per-core matrix and the TUI grid each carried a private copy of the
 //! same `60`/`85` band with inclusive edges — one fact at two addresses. Bevy
-//! paints its per-core sidebar bars with a wider `80`/`95` band whose edges are
-//! exclusive, a difference that until now lived only as two loose constants.
+//! painted its per-core sidebar bars with a wider `80`/`95` band whose edges
+//! were exclusive, so the same core read as a warning in one shape and as
+//! calm in another: the band is one product fact — when a core's load reads
+//! as a warning — and it now has one answer for every shape that paints it.
 //! GPUI tints per-core cells by CPU type and never by a utilization band, so it
 //! declares the axis absent with the mechanism that replaces it instead of
 //! silently spending someone else's number.
 //!
 //! Declared here as data, exactly like [`crate::presentation::thresholds`]
-//! declares layout bands: the band edges, and which side an edge value falls
-//! on. What is NOT owned here is which ink each tier paints with and how an
+//! declares layout bands: the band edges, and the rule that an edge value
+//! itself belongs to the higher band. What is NOT owned here is which ink each tier paints with and how an
 //! unobserved or non-finite reading looks. Those are visible-paint facts per
-//! shape, and converging them needs capture evidence (TODO-101 discipline),
-//! not a silent constant change.
+//! shape, and their binding is settled: a calm tier wears the theme's success
+//! ink — the theme's own rule that a positive state never borrows the
+//! interactive accent — and an unobserved reading wears the dim missing ink,
+//! never a fabricated calm band. Each shape binds those roles to its own
+//! theme tokens.
 
-use crate::keybindings::FrontendShape;
 use taskforest_core::core::percent::ClampedPercent;
 
-/// How a reading that sits exactly on a band edge is counted.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EdgeMembership {
-    /// The edge value already belongs to the higher band: `pct >= edge`.
-    AtEdgeIsHigher,
-    /// A reading must exceed the edge to reach the higher band: `pct > edge`.
-    AboveEdgeOnly,
-}
+use crate::keybindings::FrontendShape;
 
 /// The two band edges, in percent, one shape's load-tier paint reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -35,8 +32,6 @@ pub struct LoadTierEdges {
     pub warn: f32,
     /// The edge at which a reading becomes an alarm.
     pub danger: f32,
-    /// Which side of an edge the edge value itself falls on.
-    pub membership: EdgeMembership,
 }
 
 impl LoadTierEdges {
@@ -45,7 +40,6 @@ impl LoadTierEdges {
     pub const SHARED: Self = Self {
         warn: 60.0,
         danger: 85.0,
-        membership: EdgeMembership::AtEdgeIsHigher,
     };
 }
 
@@ -55,11 +49,6 @@ pub enum LoadTierDecision {
     /// The shape paints [`LoadTierEdges::SHARED`]. No reason needed: this is
     /// the shared fact, owned here.
     Shared,
-    /// The shape paints its own band, with the architecture driver.
-    Own {
-        edges: LoadTierEdges,
-        reason: &'static str,
-    },
     /// The shape has no load-tier paint, with the mechanism that replaces it.
     Absent { reason: &'static str },
 }
@@ -92,16 +81,7 @@ pub const DECLARATIONS: &[LoadTierDeclaration] = &[
     },
     LoadTierDeclaration {
         frontend: FrontendShape::Bevy,
-        decision: LoadTierDecision::Own {
-            edges: LoadTierEdges {
-                warn: 80.0,
-                danger: 95.0,
-                membership: EdgeMembership::AboveEdgeOnly,
-            },
-            reason: "one two-metric bar per core saturates visually far earlier than the \
-                     dense cell matrix, so its band starts higher and an edge value keeps \
-                     the lower band until a capture proves the difference away",
-        },
+        decision: LoadTierDecision::Shared,
     },
 ];
 
@@ -121,7 +101,6 @@ pub fn load_tier_declaration(frontend: FrontendShape) -> Option<LoadTierDecision
 pub fn load_tier_edges(frontend: FrontendShape) -> Option<LoadTierEdges> {
     match load_tier_declaration(frontend)? {
         LoadTierDecision::Shared => Some(LoadTierEdges::SHARED),
-        LoadTierDecision::Own { edges, .. } => Some(edges),
         LoadTierDecision::Absent { .. } => None,
     }
 }
@@ -130,7 +109,13 @@ pub fn load_tier_edges(frontend: FrontendShape) -> Option<LoadTierEdges> {
 ///
 /// The clamp onto the percent scale is part of the fold, so no shape re-spells
 /// it: a reading outside the percent domain buckets as if it sat on the nearer
-/// edge. A non-finite reading has no tier — that is an absence, and the shape
+/// edge. The edge value itself always belongs to the higher band: `pct >= edge`.
+/// That used to be a per-shape axis, and one shape did answer it differently —
+/// which is exactly how the same core read as a warning in one product surface
+/// and as calm in another. Once every shape paints the one shared band there is
+/// only one answer left, so the axis is gone rather than kept as a knob with a
+/// single setting: a declared-but-unused alternative is how the divergence comes
+/// back. A non-finite reading has no tier — that is an absence, and the shape
 /// keeps its own missing-value ink for it.
 #[must_use]
 pub fn tier_within(edges: LoadTierEdges, percent: f32) -> Option<LoadTier> {
@@ -138,10 +123,7 @@ pub fn tier_within(edges: LoadTierEdges, percent: f32) -> Option<LoadTier> {
         return None;
     }
     let value = percent.clamped_percent();
-    let crossed = |edge: f32| match edges.membership {
-        EdgeMembership::AtEdgeIsHigher => value >= edge,
-        EdgeMembership::AboveEdgeOnly => value > edge,
-    };
+    let crossed = |edge: f32| value >= edge;
     Some(if crossed(edges.danger) {
         LoadTier::Alarm
     } else if crossed(edges.warn) {
@@ -165,7 +147,8 @@ pub enum LoadTier {
     Calm,
     /// Between the warning and alarm edges.
     Warning,
-    /// At or beyond the alarm edge, as the shape's membership rule decides.
+    /// At or beyond the alarm edge. The edge value itself belongs here for
+    /// every shape, exactly as [`tier_within`] states.
     Alarm,
 }
 

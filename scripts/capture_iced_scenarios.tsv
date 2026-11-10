@@ -150,6 +150,7 @@ diagnostic-failure-compact	diagnostic-failure	720x480	gnome-dark
 smart-missing-tool	smart-missing-tool	1180x780	gnome-dark
 smart-missing-tool-compact	smart-missing-tool	720x480	gnome-dark
 smart-permission	smart-permission	1180x780	gnome-dark
+smart-wear-critical	smart-wear-critical	1180x780	gnome-dark
 smart-permission-compact	smart-permission	720x480	gnome-dark
 partition-disk-usage	partition-disk-usage	1180x780	gnome-dark
 partition-disk-usage-compact	partition-disk-usage	720x480	gnome-dark

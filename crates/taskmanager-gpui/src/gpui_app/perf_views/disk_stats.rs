@@ -11,8 +11,9 @@ use taskmanager_shell::presentation::GraphSummaryItem;
 use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::graph_summary_item_label;
 use taskmanager_shell::presentation::graph_summary_text;
-use taskmanager_shell::presentation::observed_percentage;
-use taskmanager_shell::presentation::smart::smart_section_visible;
+use taskmanager_shell::presentation::smart::{
+    endurance_used_readout, smart_section_visible, smart_temperature_label, spare_pool_readout,
+};
 
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
@@ -142,12 +143,10 @@ pub(super) fn disk_stats(
     // The critical-warning prefix surfaces the most actionable SMART bit the
     // hwmon layer carries; otherwise a plain temperature readout.
     if let Some(temp) = d.smart_temperature_c {
-        let warn = d.smart_critical_warning == Some(true);
-        let label = if warn {
-            format!("{} \u{26a0}", i18n::t("common.temperature"))
-        } else {
-            i18n::t("common.temperature").to_string()
-        };
+        let label = smart_temperature_label(
+            i18n::t("common.temperature"),
+            d.smart_critical_warning == Some(true),
+        );
         let val = match d.smart_temp_critical_c {
             Some(crit) if crit > 0.0 => format!("{:.0} / {:.0} \u{b0}C", temp, crit),
             _ => format!("{:.0} \u{b0}C", temp),
@@ -171,21 +170,14 @@ pub(super) fn disk_stats(
     if let Some(pct) = d.smart_percent_used {
         stats.push(StatRow::text(
             i18n::t("disk.endurance_used"),
-            Some(observed_percentage(Some(pct))),
+            Some(endurance_used_readout(Some(pct), None)),
         ));
     }
-    if let Some(spare) = d.smart_available_spare_pct {
-        let warning_threshold = d.smart_spare_warning_threshold_pct();
-        let value = if d.smart_spare_pool_needs_warning() {
-            format!(
-                "{} ⚠ (≤{})",
-                percent_text(spare),
-                percent_text(warning_threshold)
-            )
-        } else {
-            percent_text(spare)
-        };
-        stats.push(StatRow::text(i18n::t("disk.available_spare"), Some(value)));
+    if d.smart_available_spare_pct.is_some() {
+        stats.push(StatRow::text(
+            i18n::t("disk.available_spare"),
+            Some(spare_pool_readout(d, None)),
+        ));
     }
     if let Some(hours) = d.smart_power_on_hours {
         // Power-on hours → years/days for a glanceable wear figure.

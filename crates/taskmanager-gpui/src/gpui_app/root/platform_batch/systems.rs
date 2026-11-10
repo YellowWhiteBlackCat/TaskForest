@@ -7,9 +7,9 @@ use taskmanager_application::{DesktopAppearanceEvent, RefreshRequest, SystemTele
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use taskmanager_shell::BatchFoldOutput;
+use taskmanager_shell::ProcessControlKind;
 use taskmanager_shell::app::alert_rows::AlertRowFamily;
 
-use super::super::ProcessControlAction;
 use super::{
     PlatformBatchChanges, RootView, ingest_correlated_system_outcome,
     record_history_ingestion_error,
@@ -240,12 +240,19 @@ impl RootView {
                 self.processes_state.affinity_editor.cpus = ready.cpus.into_iter().collect();
             }
             ProcessAffinityState::Failed {
-                target, failure, ..
+                target,
+                failure,
+                last_good,
+                ..
             } => {
                 self.processes_state.affinity_editor.cpus.clear();
                 if let Some(identity) = target.live_key() {
+                    // The affinity mask is the request echo, not part of the
+                    // notice text; carry the last observed mask when the failed
+                    // read produced none.
+                    let mask = last_good.map_or_else(Vec::new, |ready| ready.cpus);
                     self.record_process_control_result(
-                        ProcessControlAction::SetAffinity,
+                        ProcessControlKind::Affinity(mask),
                         identity,
                         Err(failure),
                         cx,

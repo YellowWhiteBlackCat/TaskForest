@@ -527,19 +527,21 @@ fn source_status_pair<A, B>(
             (true, true, candidate) => {
                 successful = successful.saturating_add(1);
                 item_count = item_count.saturating_add(1);
-                failure =
-                    candidate.map_or(failure, |candidate| strongest_failure(failure, candidate));
+                if let Some(candidate) = candidate {
+                    failure = Some(FailureKind::strongest(failure, candidate));
+                }
             }
             (true, false, candidate) => {
                 successful = successful.saturating_add(1);
-                failure =
-                    candidate.map_or(failure, |candidate| strongest_failure(failure, candidate));
+                if let Some(candidate) = candidate {
+                    failure = Some(FailureKind::strongest(failure, candidate));
+                }
             }
             (false, _, Some(candidate)) => {
-                failure = strongest_failure(failure, candidate);
+                failure = Some(FailureKind::strongest(failure, candidate));
             }
             (false, _, None) => {
-                failure = strongest_failure(failure, FailureKind::ProviderFault);
+                failure = Some(FailureKind::strongest(failure, FailureKind::ProviderFault));
             }
         }
     }
@@ -574,27 +576,6 @@ fn observation_truth<T>(observation: &ResourceObservation<T>) -> (bool, bool, Op
     }
 }
 
-fn strongest_failure(current: Option<FailureKind>, candidate: FailureKind) -> Option<FailureKind> {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => Some(current),
-        _ => Some(candidate),
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::IdentityChanged => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::TimedOut => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::Rejected => 1,
-    }
-}
-
 fn source_state(sources: &[SourceStatus], now_ms: u64) -> DeviceState {
     let failure = sources
         .iter()
@@ -602,7 +583,7 @@ fn source_state(sources: &[SourceStatus], now_ms: u64) -> DeviceState {
             SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => Some(failure),
             SourceOutcome::Available | SourceOutcome::Empty => None,
         })
-        .max_by_key(|failure| failure_priority(*failure));
+        .reduce(FailureKind::stronger);
     let status = match failure {
         Some(FailureKind::PermissionDenied) => DeviceStatus::PermissionDenied,
         Some(FailureKind::Unsupported)

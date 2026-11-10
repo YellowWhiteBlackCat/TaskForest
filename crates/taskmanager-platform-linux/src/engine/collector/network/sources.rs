@@ -162,7 +162,7 @@ pub(super) fn read_sysfs_inventory(root: &Path, now_ms: u64) -> SysfsInventoryOb
         });
         metadata_item_count += usize::from(metadata.values > 0);
         if let Some(failure) = metadata.failure {
-            metadata_failure = Some(select_failure(metadata_failure, failure));
+            metadata_failure = Some(FailureKind::strongest(metadata_failure, failure));
         }
     }
     let by_ifindex = interfaces
@@ -218,7 +218,7 @@ impl MetadataAudit {
             }
             Ok(None) => None,
             Err(failure) => {
-                self.failure = Some(select_failure(self.failure, failure));
+                self.failure = Some(FailureKind::strongest(self.failure, failure));
                 None
             }
         }
@@ -228,7 +228,7 @@ impl MetadataAudit {
         if observed.availability().is_current() {
             self.values += 1;
         } else if let Some(failure) = observed.availability().failure() {
-            self.failure = Some(select_failure(self.failure, failure));
+            self.failure = Some(FailureKind::strongest(self.failure, failure));
         }
         observed
     }
@@ -406,26 +406,6 @@ fn prefer_ipv6(current: Option<&str>, candidate: Ipv6Addr) -> bool {
     current.is_none()
         || (!candidate.is_unicast_link_local()
             && current.is_some_and(|value| value.starts_with("fe80:")))
-}
-
-fn select_failure(current: Option<FailureKind>, candidate: FailureKind) -> FailureKind {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => current,
-        _ => candidate,
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 8,
-        FailureKind::PermissionDenied => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::TimedOut => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
 }
 
 fn io_failure(error: &io::Error) -> FailureKind {

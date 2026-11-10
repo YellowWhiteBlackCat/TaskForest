@@ -4,7 +4,7 @@ use super::CatalogEntry;
 
 pub(super) fn select_candidate<'a>(
     candidates: Vec<(&'a CatalogEntry, u8)>,
-    argv: &[std::borrow::Cow<'_, str>],
+    argv: &[String],
 ) -> Option<&'a CatalogEntry> {
     let has_required_args = candidates
         .iter()
@@ -44,8 +44,8 @@ pub(super) fn select_candidate<'a>(
     (!tied).then_some(best).flatten()
 }
 
-fn argument_matches(required: &str, argv: &[std::borrow::Cow<'_, str>]) -> bool {
-    if argv.iter().any(|value| value.as_ref() == required) {
+fn argument_matches(required: &str, argv: &[String]) -> bool {
+    if argv.iter().any(|value| value.as_str() == required) {
         return true;
     }
     let Some((flag, value)) = required.split_once('=') else {
@@ -55,7 +55,7 @@ fn argument_matches(required: &str, argv: &[std::borrow::Cow<'_, str>]) -> bool 
         && !value.is_empty()
         && argv
             .windows(2)
-            .any(|pair| pair[0].as_ref() == flag && pair[1].as_ref() == value)
+            .any(|pair| pair[0] == flag && pair[1] == value)
 }
 
 fn required_args(entry: &CatalogEntry) -> impl Iterator<Item = &str> {

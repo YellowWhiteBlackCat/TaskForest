@@ -86,7 +86,12 @@ Detail behind the README module map:
 - `src/pages/performance/scene/sidebar/cores.rs` — the per-core grid: the
   P/E/LP-E class groups, the NUMA/socket envelopes, the cells with their
   independent label/value slots, the column policy (four columns wide, two in
-  the 720×480 fold) and the typed reveal motion.
+  the 720×480 fold) and the typed reveal motion. The reveal obeys the house
+  measured-motion rule it shares with the storage surface: a body whose open
+  height layout has not measured yet keeps its authored automatic height,
+  because a clipped body measures its own content as the collapsed height and
+  the motion would then never learn the open height — a card header above an
+  empty grid, forever.
 - `src/pages/performance/device_curves/storage.rs` + `storage/sync.rs` — the
   storage surface: the per-partition capacity ring, the SMART status badge, the
   wear gauge, the mount alarm row and the missing-tool guidance card, with a

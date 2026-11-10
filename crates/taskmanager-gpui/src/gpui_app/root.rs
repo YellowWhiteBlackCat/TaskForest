@@ -126,7 +126,6 @@ mod presentation_preferences;
 mod proc_action;
 mod process_control;
 mod process_details_stats;
-mod process_feedback;
 mod process_insights_ui;
 mod projection_caches;
 mod projection_materialization;
@@ -175,8 +174,6 @@ pub(crate) use presentation_preferences::{
 pub use presentation_preferences::{
     DevicePreference, PresentationFingerprint, PresentationSnapshot, UnitFamily,
 };
-pub use process_feedback::ProcessControlAction;
-pub(crate) use process_feedback::process_control_feedback;
 pub use responsive::*;
 pub(crate) use startup::init_demo;
 use startup::page_token;

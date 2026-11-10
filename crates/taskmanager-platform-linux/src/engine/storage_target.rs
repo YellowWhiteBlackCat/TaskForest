@@ -237,21 +237,7 @@ fn authority_failure(
             SourceOutcome::Available | SourceOutcome::Empty => None,
             SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => Some(failure),
         })
-        .max_by_key(|failure| failure_priority(*failure))
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::IdentityChanged => 3,
-        FailureKind::Rejected => 2,
-        FailureKind::Unsupported => 1,
-    }
+        .reduce(FailureKind::stronger)
 }
 
 const fn provider_failure(failure: FailureKind) -> ProviderFailure {

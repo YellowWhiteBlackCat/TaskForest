@@ -20,7 +20,6 @@ use taskmanager_application::{
 };
 
 use super::{BatchFoldOutput, ShellApp};
-use taskmanager_application::ProcessAffinityReady;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RequestSessions {
@@ -245,16 +244,15 @@ impl ShellApp {
 }
 
 impl RequestSessions {
-    pub(crate) fn seed_affinity(&mut self, ready: Option<ProcessAffinityReady>) {
+    /// Seed one affinity session state verbatim. The state *is* the fact, so a
+    /// fixture that wants a failed read places one instead of replaying a
+    /// fabricated attempt through the correlation lane.
+    pub(crate) fn seed_affinity(&mut self, state: Option<ProcessAffinityState>) {
         self.affinity.close();
-        let Some(ready) = ready else {
+        let Some(state) = state else {
             return;
         };
-        let attempt = self.affinity.begin_attempt(ready.target.clone());
-        let _ = self.affinity.accept_attempt(attempt, ready.request_id);
-        let _ = self
-            .affinity
-            .complete(ready.request_id, ready.target, ready.cpus);
+        self.affinity.seed_state(state);
     }
 
     #[must_use]

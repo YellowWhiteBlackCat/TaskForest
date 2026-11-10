@@ -47,7 +47,8 @@ use taskmanager_application::i18n;
 use taskmanager_application::i18n::{session_family_label, t};
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 
-use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
+use taskmanager_application::i18n::control_error_detail;
+use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
@@ -169,17 +170,12 @@ pub(crate) fn empty_state_text(sources: Option<&[SourceStatus]>) -> String {
 /// One accepted session-control outcome as display text (GPUI/TUI feedback
 /// parity: success and failure both name the action and the target).
 pub(crate) fn feedback_line_text(outcome: &SessionControlOutcome) -> String {
-    let target = outcome.identity.session_id.to_string();
-    let action = i18n::session_control_action_label(outcome.action);
-    match outcome.result {
-        Ok(()) => t("feedback.session_request_accepted")
-            .replace("{action}", action)
-            .replace("{target}", &target),
-        Err(error) => t("feedback.action_failed_detail")
-            .replace("{action}", action)
-            .replace("{target}", &target)
-            .replace("{detail}", control_error_detail(error)),
-    }
+    i18n::control_outcome_text(
+        i18n::session_control_action_label(outcome.action),
+        outcome.identity.session_id.as_str(),
+        true,
+        outcome.result,
+    )
 }
 
 /// The summary line under the title: honest count plus the active sort.

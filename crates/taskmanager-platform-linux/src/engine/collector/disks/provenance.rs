@@ -15,12 +15,7 @@ pub(super) struct SourceFailures {
 
 impl SourceFailures {
     pub(super) fn record(&mut self, failure: FailureKind) {
-        if self
-            .strongest
-            .is_none_or(|current| failure_priority(failure) > failure_priority(current))
-        {
-            self.strongest = Some(failure);
-        }
+        self.strongest = Some(FailureKind::strongest(self.strongest, failure));
     }
 
     pub(super) fn record_io(&mut self, error: &std::io::Error) {
@@ -125,19 +120,5 @@ pub(super) fn io_failure_kind(error: &std::io::Error) -> FailureKind {
         ErrorKind::PermissionDenied => FailureKind::PermissionDenied,
         ErrorKind::TimedOut => FailureKind::TimedOut,
         _ => FailureKind::ProviderFault,
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::IdentityChanged => 3,
-        FailureKind::Rejected => 2,
-        FailureKind::Unsupported => 1,
     }
 }

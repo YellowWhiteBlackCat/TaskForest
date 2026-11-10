@@ -459,3 +459,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     };
     action_bar
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/gui/gpui_app/processes_view/action_bar_behavior_tests.rs"]
+mod behavior_tests;

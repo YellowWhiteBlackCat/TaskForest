@@ -466,7 +466,6 @@ impl TuiApp {
         let services_revision_before = self.shell.projection().services_revision;
         let startup_revision_before = self.shell.projection().startup_revision;
         let sessions_revision_before = self.shell.projection().sessions_revision;
-        let affinity_state_before = self.shell.process_affinity_state().clone();
         for event in &batch.desktop_appearance_events {
             let DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
             self.apply_desktop_appearance(snapshot.value);
@@ -508,14 +507,10 @@ impl TuiApp {
         // provider going dark) cannot stay selected into the next paint — the
         // anchor falls back fail-closed to the first still-backed resource.
         self.reconcile_perf_device_anchor();
-        // Same-wave fold for the open CPU affinity editor: only a batch that
-        // actually moved the shell's affinity session may rewrite the visible
-        // mask, so an unrelated telemetry wave never clobbers in-progress
-        // edits. The sync itself is target-guarded (see
-        // `sync_process_affinity_modal`).
-        if &affinity_state_before != self.shell.process_affinity_state() {
-            self.sync_process_affinity_modal();
-        }
+        // The open CPU affinity editor is projected from the shell's session
+        // by `sync_process_affinity_modal`, which the run loop calls every
+        // cycle: a read outcome is applied by the effect seam rather than by a
+        // batch fold, so a fold-only hook would never see a rejected read.
     }
 
     /// Return the retry scope for the visible inventory page when its source

@@ -14,7 +14,7 @@ categories = ["os", "command-line-utilities"]
 include = ["src/**/*", "tests/**/*", "README.md", "Cargo.toml", "LICENSE"]
 
 [dependencies]
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 taskforest-ipc = { path = "../taskforest-ipc", version = "0.5.1" }
 taskmanager-history-store = { path = "../taskmanager-history-store", version = "0.5.1" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }

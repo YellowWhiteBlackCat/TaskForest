@@ -14,6 +14,8 @@ from frontend_source_manifest import source_paths
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
 
+import instrument_budget
+
 
 EXPECTED_APP_ID = "io.github.YellowWhiteBlackCat.TaskForestI"
 REQUIRED_METADATA = {
@@ -65,7 +67,7 @@ def metadata(path: Path) -> dict[str, str]:
 
 def current(*command: str, cwd: Path) -> str:
     return subprocess.run(
-        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=15
+        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=instrument_budget.seconds()
     ).stdout.strip()
 
 

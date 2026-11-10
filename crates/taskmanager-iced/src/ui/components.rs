@@ -13,7 +13,8 @@ use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{RefreshRequest, SourceNotice, SourceStateKind, merge_source_lines};
 
-use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_application::i18n::control_error_detail;
+use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use zhuge_ui_kit_iced::surface;
@@ -248,11 +249,9 @@ pub(crate) fn source_notice_banner<'a>(
     Some(
         container(
             row![
-                text("⚠")
-                    .size(f32::from(tokens::FONT_16))
-                    .color(crate::theme_binding::color(
-                        theme_snapshot.palette().warning
-                    )),
+                text(ALERT_MARKER).size(f32::from(tokens::FONT_16)).color(
+                    crate::theme_binding::color(theme_snapshot.palette().warning)
+                ),
                 column![
                     text(title).size(f32::from(tokens::FONT_12)),
                     text(reason).size(f32::from(tokens::FONT_11))

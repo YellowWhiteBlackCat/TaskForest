@@ -12,12 +12,15 @@ use crate::window::{Role, TextRole};
 use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
-use bevy::ui::prelude::{AlignItems, FlexDirection, Node, UiRect, Val, percent, rem};
+use bevy::ui::prelude::{AlignItems, FlexDirection, Node, Overflow, UiRect, Val, percent, rem};
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_ui_contract::IconId;
+
+use crate::icons::{IconInk, IconPlate};
 
 const MAX_VISIBLE_STATS_ROWS: usize = 15;
 
@@ -53,6 +56,39 @@ pub(super) fn stat_text_row(label: String, value: String, palette: &UiPalette) -
             Text(value)
             TextRole(Role::Body)
             TextLayout { linebreak: LineBreak::NoWrap }
+        }),
+        palette,
+    ))
+}
+
+/// A stat row whose fact crossed its typed level: the row wears the alert
+/// plate beside its value, so the crossing is visible where the number is
+/// read. The plate is a semantic bitmap sibling, never a decoration
+/// codepoint inside the value text (the tofu law).
+pub(super) fn stat_alert_row(label: String, value: String, palette: &UiPalette) -> Box<dyn Scene> {
+    Box::new(stat_row_scene(
+        label,
+        Box::new(bsn! {
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(space_2()),
+                flex_shrink: 1.0,
+                overflow: Overflow::clip_x(),
+            }
+            Children [
+                Node {
+                    width: rem(palette.icon_rem),
+                    height: rem(palette.icon_rem),
+                    flex_shrink: 0.0,
+                }
+                IconPlate({ IconId::Alert })
+                IconInk({ palette.warning_color })
+            --
+                Text(value)
+                TextRole(Role::Body)
+                TextLayout { linebreak: LineBreak::NoWrap }
+            ]
         }),
         palette,
     ))
@@ -254,7 +290,13 @@ pub(super) fn memory_stats_card(shell: &ShellApp, palette: &UiPalette) -> Box<dy
 pub(super) fn disk_stats_card(shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
     let rows = disk_stat_rows(shell)
         .into_iter()
-        .map(|row| stat_text_row(row.label, row.value, palette))
+        .map(|row| {
+            if row.alert {
+                stat_alert_row(row.label, row.value, palette)
+            } else {
+                stat_text_row(row.label, row.value, palette)
+            }
+        })
         .collect();
     Box::new(super::summary_card_scene(
         capped_stats_rows(rows, palette),

@@ -11,9 +11,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from frontend_source_manifest import source_paths
+from presentation_resolution_marker_fields import RESOLUTION_MARKER_FIELDS
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
+
+import instrument_budget
 
 try:
     from capture_supervisor import SupervisorError, validate_supervised_metadata
@@ -109,7 +112,7 @@ def parse_window(value: str) -> tuple[int, int]:
 
 def current(*command: str, cwd: Path) -> str:
     return subprocess.run(
-        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=15
+        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=instrument_budget.seconds()
     ).stdout.strip()
 
 
@@ -241,12 +244,28 @@ def validate_markers(
             raise EvidenceError(
                 f"expected one app-received Performance viewport marker in {path}, got {viewport_lines!r}"
             )
+        tokens = viewport_lines[0].split()
+        resolution_start = next(
+            (index for index, token in enumerate(tokens) if token.startswith("profile=")),
+            len(tokens),
+        )
         fields: dict[str, str] = {}
-        for field in viewport_lines[0].split()[5:]:
+        for field in tokens[5:resolution_start]:
             key, separator, value = field.partition("=")
             if not separator or key in fields:
                 raise EvidenceError(f"invalid Performance viewport field: {field!r}")
             fields[key] = value
+        if resolution_start < len(tokens):
+            resolution_fields: dict[str, str] = {}
+            for field in tokens[resolution_start:]:
+                key, separator, value = field.partition("=")
+                if not separator or key in resolution_fields:
+                    raise EvidenceError(f"invalid Resolution marker field: {field!r}")
+                resolution_fields[key] = value
+            if set(resolution_fields) != set(RESOLUTION_MARKER_FIELDS):
+                raise EvidenceError(
+                    "Resolution marker field set does not match the shared contract"
+                )
         try:
             requested_width, requested_height = parse_window(expected_window)
             viewport_width = float(fields["width"])

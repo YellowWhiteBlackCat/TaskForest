@@ -14,6 +14,8 @@ use crate::{
     BatchMenuTarget, CommandPalette, ProcessMenuTarget, ServiceMenuTarget, SessionMenuTarget,
     StartupMenuTarget, TuiApp,
 };
+use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskforest_core::core::target::ServiceId;
 use zhuge_ui_core::row_page::page_of;
@@ -42,18 +44,31 @@ pub struct AffinityModalState {
     /// toggles and apply stay inert: an unobserved mask is never fabricated
     /// into an editable default (the Iced editor fails closed the same way).
     pub mask_observed: bool,
+    /// Which authoritative read `selected_mask` was last seeded from. A
+    /// *fresh* read for the same identity rewrites in-progress edits (the
+    /// Iced editor's same-wave sync rule), while re-projecting the same read
+    /// every cycle must not — so the absorbed request id is what makes the
+    /// per-cycle projection idempotent.
+    pub observed_read: Option<RequestId>,
+    /// The shared reason a correlated read failed for `target`, if the latest
+    /// outcome was a failure. The header paints it through the owner's
+    /// resolver; it never becomes a local sentence or a `Debug` dump.
+    pub failure: Option<FailureKind>,
 }
 
 impl AffinityModalState {
     #[must_use]
     pub fn new(
         target: FrozenProcessIdentity,
-        current_mask: Option<Vec<u32>>,
+        current: Option<(RequestId, Vec<u32>)>,
         logical_cpu_count: usize,
     ) -> Self {
         let logical_cpu_count = logical_cpu_count.max(1);
-        let mask_observed = current_mask.is_some();
-        let selected_mask = current_mask.unwrap_or_default();
+        let (observed_read, selected_mask) = match current {
+            Some((request_id, cpus)) => (Some(request_id), cpus),
+            None => (None, Vec::new()),
+        };
+        let mask_observed = observed_read.is_some();
         Self {
             target,
             selected_cpu: 0,
@@ -61,6 +76,8 @@ impl AffinityModalState {
             logical_cpu_count,
             scroll: 0,
             mask_observed,
+            observed_read,
+            failure: None,
         }
     }
 
@@ -93,7 +110,7 @@ impl AffinityModalState {
     }
 
     pub fn toggle_selected(&mut self) {
-        if !self.mask_observed {
+        if !self.is_editable() {
             return;
         }
         if let Ok(cpu) = u32::try_from(self.selected_cpu) {
@@ -107,7 +124,7 @@ impl AffinityModalState {
     }
 
     pub fn toggle_all(&mut self) {
-        if !self.mask_observed {
+        if !self.is_editable() {
             return;
         }
         if self.selected_mask.len() >= self.logical_cpu_count {
@@ -120,14 +137,43 @@ impl AffinityModalState {
     /// Copy an authoritative read into the editor. Only a snapshot whose
     /// frozen target matches the modal's captured identity may rewrite the
     /// visible mask, so a recycled PID can never retarget the open editor.
-    pub fn observe_mask(&mut self, mask: &[u32]) {
+    pub fn observe_mask(&mut self, request_id: RequestId, mask: &[u32]) {
         let bounded = mask
             .iter()
             .copied()
             .filter(|cpu| usize::try_from(*cpu).is_ok_and(|index| index < self.logical_cpu_count))
             .collect::<Vec<_>>();
         self.selected_mask = bounded;
+        self.observed_read = Some(request_id);
         self.mask_observed = true;
+    }
+
+    /// Record the latest read outcome for the modal's captured identity: the
+    /// shared failure reason when the read failed, cleared when it did not.
+    /// The grid's fail-closed rule is unchanged — a failed read never seeds a
+    /// mask; only `observe_mask` on an authoritative snapshot does.
+    pub fn observe_failure(&mut self, failure: Option<FailureKind>) {
+        self.failure = failure;
+    }
+
+    /// Drop the displayed mask back to "never observed". A failed read means
+    /// the current mask is unknown, so the editor shows no mask and stays
+    /// read-only until an authoritative read lands (Iced and GPUI agree).
+    pub fn unobserve_mask(&mut self) {
+        self.selected_mask.clear();
+        self.selected_cpu = 0;
+        self.scroll = 0;
+        self.mask_observed = false;
+        self.observed_read = None;
+    }
+
+    /// Whether the displayed mask may be edited or submitted: only an
+    /// observed mask whose latest read did not fail. While a read failed the
+    /// editor is read-only and says why, exactly like Iced and GPUI — a stale
+    /// last-good mask is shown for context, never submitted as current.
+    #[must_use]
+    pub fn is_editable(&self) -> bool {
+        self.mask_observed && self.failure.is_none()
     }
 
     fn adjust_scroll(&mut self) {

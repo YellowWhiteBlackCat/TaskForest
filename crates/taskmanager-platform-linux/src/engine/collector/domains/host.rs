@@ -14,7 +14,7 @@ use taskforest_core::{
     SourceOutcome, SourceStatus, SystemLoadAverage,
 };
 
-use super::{LinuxSystemDomainCollector, SourceQuality, source_quality, stronger_failure};
+use super::{LinuxSystemDomainCollector, SourceQuality, source_quality};
 
 const UPTIME_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-uptime");
 const PROCESS_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-processes");
@@ -298,14 +298,14 @@ fn observe_processes(proc_root: &Path, now_ms: u64) -> ProcessScan {
             Ok(entry) => entry,
             Err(error) => {
                 let failure = io_failure(&error);
-                process_failure = Some(stronger_failure(process_failure, failure));
-                thread_failure = Some(stronger_failure(thread_failure, failure));
+                process_failure = Some(FailureKind::strongest(process_failure, failure));
+                thread_failure = Some(FailureKind::strongest(thread_failure, failure));
                 continue;
             }
         };
         let file_name = entry.file_name();
         let Some(name) = file_name.to_str() else {
-            process_failure = Some(stronger_failure(
+            process_failure = Some(FailureKind::strongest(
                 process_failure,
                 FailureKind::ProviderFault,
             ));
@@ -324,7 +324,7 @@ fn observe_processes(proc_root: &Path, now_ms: u64) -> ProcessScan {
                 thread_samples = thread_samples.saturating_add(1);
             }
             Err(failure) => {
-                thread_failure = Some(stronger_failure(thread_failure, failure));
+                thread_failure = Some(FailureKind::strongest(thread_failure, failure));
             }
         }
     }

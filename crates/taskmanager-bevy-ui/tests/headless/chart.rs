@@ -1,6 +1,8 @@
 use super::*;
 use crate::widgets::chart::geometry::{ChartScale, ChartVertex, chart_runs, chart_runs_in};
+use crate::widgets::chart::painter::slide_offset;
 use taskmanager_shell::presentation::ChartSlots;
+use taskmanager_ui_contract::presentation::motion::chart_slide_ramp;
 
 #[test]
 fn chart_projection_maps_extrema_and_keeps_newest_at_right_edge() {
@@ -220,5 +222,47 @@ fn the_pointer_resolves_the_slot_the_curve_was_drawn_in() {
         warming.index_at(0.0),
         Some(0),
         "before the curve is the oldest"
+    );
+}
+
+#[test]
+fn the_chart_slide_rides_the_shared_ramp() {
+    // The slide's curve is the shared chart-slide ramp, the same one the GPUI
+    // graph and the Iced chart slide on. The toolkit's cubic smoothstep
+    // answered 0.15625 at progress 0.25 against the shared ramp's 0.125;
+    // this surface now answers the shared value.
+    let width = 400.0;
+    let points = 5;
+    let slot = width / (points - 1) as f32;
+    for progress in [0.0, 0.25, 0.5, 0.75, 1.0] {
+        let eased = 1.0 + slide_offset(progress, width, points) / slot;
+        assert_eq!(
+            eased,
+            chart_slide_ramp(progress),
+            "the slide at progress {progress} must ride the shared ramp"
+        );
+    }
+    assert_eq!(
+        chart_slide_ramp(0.25),
+        0.125,
+        "the shared ramp's quarter point"
+    );
+}
+
+#[test]
+fn the_chart_slide_never_overshoots_its_slot() {
+    // The slide starts one slot off the right edge and settles exactly on
+    // it: an out-of-range progress can never push the curve past its slot.
+    let width = 400.0;
+    let points = 5;
+    let slot = width / (points - 1) as f32;
+    assert_eq!(slide_offset(0.0, width, points), -slot);
+    assert_eq!(slide_offset(1.0, width, points), 0.0);
+    assert_eq!(slide_offset(-1.0, width, points), -slot);
+    assert_eq!(slide_offset(2.0, width, points), 0.0);
+    assert_eq!(
+        slide_offset(0.5, width, 1),
+        0.0,
+        "a window with no slot does not slide"
     );
 }

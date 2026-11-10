@@ -242,13 +242,14 @@ impl DirectoryScanTotals {
     }
 
     /// Mark the byte sum partial without claiming a whole directory was
-    /// unreadable (e.g. one file inside a readable directory raced away).
+    /// unreadable (e.g. one file inside a readable directory raced away). The
+    /// recorded cause is [`FailureKind::strongest`], never the last error seen.
     pub fn record_partial(&mut self, failure: FailureKind) {
         self.bytes_counted = match self.bytes_counted.current_value() {
             Some(sum) => ScalarObservation::partial(
                 *sum,
                 self.observed_at(),
-                stronger_failure(self.bytes_counted.availability().failure(), failure),
+                FailureKind::strongest(self.bytes_counted.availability().failure(), failure),
             ),
             None => self.bytes_counted,
         };
@@ -257,38 +258,6 @@ impl DirectoryScanTotals {
     #[must_use]
     pub fn observed_at(&self) -> u64 {
         self.bytes_counted.last_success_ms().unwrap_or(0)
-    }
-}
-
-/// Strongest of two failures (mirrors the runtime health merge priorities).
-#[must_use]
-pub fn stronger_failure(left: Option<FailureKind>, right: FailureKind) -> FailureKind {
-    match left {
-        Some(left) => stronger_of(left, right),
-        None => right,
-    }
-}
-
-#[must_use]
-pub const fn stronger_of(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(right) > failure_priority(left) {
-        right
-    } else {
-        left
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
     }
 }
 

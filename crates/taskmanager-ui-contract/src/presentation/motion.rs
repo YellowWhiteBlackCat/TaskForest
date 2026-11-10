@@ -53,13 +53,14 @@ pub const CHART_SLIDE_DURATION: Duration = Duration::from_millis(180);
 /// `smoothstep` ramp already applies, so a ramp never paints an overshoot and
 /// never propagates a `NaN` into a layout length.
 ///
-/// The one surface still easing this slide differently is Bevy: it advances a
-/// per-frame accumulator rather than an absolute clock and shapes it with the
-/// shared `smoothstep` ramp, which is a different curve — at progress 0.25 it
-/// answers 0.15625 against this ramp's 0.125, and at 0.75 it answers 0.84375
-/// against 0.875. That is a visible paint difference, so binding it here waits
-/// for a capture comparison; the two graphical surfaces that already agreed
-/// are folded now.
+/// The third surface that slides this chart — Bevy — is folded in too. It
+/// advances a per-frame accumulator rather than an absolute clock, but it
+/// eases the same fact, and it used to shape that progress with the
+/// toolkit's cubic `smoothstep`: at progress 0.25 it answered 0.15625 against
+/// this ramp's 0.125, and at 0.75 it answered 0.84375 against 0.875. That was
+/// the same slide in two curves, so the slide now has one curve everywhere.
+/// The accumulator stays a Bevy fact — it is how that surface measures
+/// elapsed time — but the curve it shapes the progress with is this one.
 #[must_use]
 pub fn chart_slide_ramp(progress: f32) -> f32 {
     let t = if progress.is_finite() {

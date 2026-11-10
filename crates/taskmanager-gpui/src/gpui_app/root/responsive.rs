@@ -33,7 +33,7 @@ use taskmanager_ui_contract::presentation::budget::{
 };
 use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, LayoutBands, bands, number};
 use taskmanager_ui_contract::presentation::vocabulary::{
-    LayoutProfile, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, NAV_RAIL_WIDTH, NavigationPresentation,
+    LayoutProfile, MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH, NAV_RAIL_WIDTH, NavigationPresentation,
     VerticalSpace,
 };
 
@@ -43,8 +43,10 @@ mod dashboard;
 pub(crate) mod device_strip;
 pub(crate) use dashboard::{DashboardBudget, DashboardSummaries};
 
-pub const MIN_WIDTH: f32 = MIN_WINDOW_WIDTH;
-pub const MIN_HEIGHT: f32 = MIN_WINDOW_HEIGHT;
+// The window floor is a per-shape band (the terminal and Bevy spend none), so
+// it has one address: the threshold registry this shape declares against.
+pub const MIN_WIDTH: f32 = number(FrontendShape::Gpui, LayoutAxis::MinimumWindowWidth);
+pub const MIN_HEIGHT: f32 = number(FrontendShape::Gpui, LayoutAxis::MinimumWindowHeight);
 // The registered layout bands resolve through the threshold registry — this
 // shape never restates a number it has already declared there (ADR-064).
 pub const PERFORMANCE_STATS_MIN_WIDTH: f32 =
@@ -383,8 +385,8 @@ pub fn parse_window_size(value: &str) -> Option<Size<Pixels>> {
         return None;
     }
     Some(size(
-        px(width.clamp(MIN_WIDTH, 3840.0)),
-        px(height.clamp(MIN_HEIGHT, 2160.0)),
+        px(width.clamp(MIN_WIDTH, MAX_WINDOW_WIDTH)),
+        px(height.clamp(MIN_HEIGHT, MAX_WINDOW_HEIGHT)),
     ))
 }
 
@@ -399,7 +401,7 @@ pub fn disconnected_device(theme: &Theme, stable_id: Option<&str>) -> impl IntoE
     let layer = theme.glass_card();
     let mut card = div()
         .max_w(px(460.0))
-        .p(px(18.0))
+        .p(px(f32::from(tokens::SPACE_18)))
         .rounded(rem_length(tokens::card_radius(theme)))
         .border(rems(GlassTier::Card.edge_width_rem()))
         .border_color(hsla(layer.edge))

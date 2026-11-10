@@ -9,7 +9,6 @@ use gpui::Context;
 use taskmanager_application::{PlatformEffect, ProcessControlRequest, SmartControlRequest};
 
 use super::RootView;
-use super::process_feedback::ProcessControlAction;
 
 impl RootView {
     pub(crate) fn dispatch_confirmed_effect(
@@ -22,12 +21,7 @@ impl RootView {
                 let Some(identity) = target.live_key() else {
                     return false;
                 };
-                self.submit_process_control(
-                    ProcessControlRequest::EndTask(target),
-                    ProcessControlAction::EndTask,
-                    identity,
-                    cx,
-                )
+                self.submit_process_control(ProcessControlRequest::EndTask(target), identity, cx)
             }
             PlatformEffect::ExecuteBatch(intent) => {
                 self.submit_process_batch_intent(intent, cx);

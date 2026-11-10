@@ -18,6 +18,8 @@ from pathlib import Path
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_chunk, png_receipt
 
+import instrument_budget
+
 try:
     from capture_supervisor import SupervisorError, validate_supervised_metadata
     from capture_tui_terminal_profiles import MatrixError, read_profiles
@@ -360,20 +362,41 @@ def validate_terminal_profile(values: dict[str, str], markers: str) -> dict[str,
 
 def current(*command: str, cwd: Path) -> str:
     return subprocess.run(
-        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=15
+        command, cwd=cwd, check=True, text=True, capture_output=True, timeout=instrument_budget.seconds()
     ).stdout.strip()
 
 
 def validate_source_manifest(path: Path, root: Path) -> None:
+    root = root.resolve()
+    allowed_external: set[Path] | None = None
+    seen: set[Path] = set()
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         digest, separator, relative = line.partition("  ")
         if not separator or len(digest) != 64 or not relative:
             raise EvidenceError(f"invalid source manifest line {number}")
+        if Path(relative).is_absolute():
+            raise EvidenceError(f"source path is not repository-relative: {relative}")
         source = (root / relative).resolve()
         try:
             source.relative_to(root)
-        except ValueError as error:
-            raise EvidenceError(f"source path escapes repository: {relative}") from error
+        except ValueError:
+            if allowed_external is None:
+                try:
+                    sys.path.insert(0, str(Path(__file__).resolve().parent))
+                    from frontend_source_manifest import source_paths
+
+                    allowed_external = {
+                        entry.resolve() for entry in source_paths(root, "tui")
+                    }
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as error:
+                    raise EvidenceError(f"cannot resolve allowed source scope: {error}") from error
+            if source not in allowed_external:
+                raise EvidenceError(
+                    f"source path is outside tui production scope: {relative}"
+                )
+        if source in seen:
+            raise EvidenceError(f"duplicate source manifest path: {relative}")
+        seen.add(source)
         if not source.is_file() or file_sha256(source) != digest:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 

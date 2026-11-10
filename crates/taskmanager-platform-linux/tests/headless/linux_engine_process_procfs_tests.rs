@@ -190,3 +190,117 @@ fn process_io_fields_fail_independently_without_fabricating_zero() {
     assert_eq!(missing.write_bytes, Err(FailureKind::Unsupported));
     assert_eq!(missing.cancelled_write_bytes, Err(FailureKind::Unsupported));
 }
+
+/// Build a stat payload with an explicit comm and state so identity tests can
+/// exercise the characters the kernel actually allows inside field 2.
+fn stat_with(comm: &str, state: &str, parent: &str) -> String {
+    let mut fields = vec!["0".to_owned(); 20];
+    fields[0] = state.to_owned();
+    fields[1] = parent.to_owned();
+    fields[7] = "100".to_owned();
+    fields[9] = "200".to_owned();
+    fields[11] = "1500".to_owned();
+    fields[12] = "40".to_owned();
+    fields[16] = "-5".to_owned();
+    fields[17] = "8".to_owned();
+    fields[19] = "2".to_owned();
+    format!("7 ({comm}) {}", fields.join(" "))
+}
+
+#[test]
+fn identity_and_scalars_come_from_one_payload_and_never_disagree() {
+    let text = stat_with("worker name", "S", "1");
+    let identity = parse_proc_identity(&text).expect("a well-formed stat has identity");
+    assert_eq!(identity.comm, "worker name");
+    assert_eq!(identity.state.label(), "Sleeping");
+    assert_eq!(identity.parent_pid, Some(1));
+    // The scalar half parses from the same bytes, so a row cannot carry one
+    // process's name and another process's counters.
+    let scalars = parse_proc_stat(&text).expect("the same payload yields scalars");
+    assert_eq!(scalars.start_ticks, 2);
+    assert_eq!(scalars.threads, 8);
+}
+
+#[test]
+fn comm_containing_parentheses_and_spaces_uses_the_outermost_delimiters() {
+    // proc(5): the only safe split points are the FIRST '(' and the LAST ')'.
+    let text = stat_with("a (b) c", "R", "42");
+    let identity = parse_proc_identity(&text).expect("nested parentheses parse");
+    assert_eq!(identity.comm, "a (b) c");
+    assert_eq!(identity.state.label(), "Running");
+    assert_eq!(identity.parent_pid, Some(42));
+    assert!(
+        parse_proc_stat(&text).is_some(),
+        "the scalar half must use the same delimiters"
+    );
+}
+
+#[test]
+fn parent_pid_zero_is_absent_rather_than_a_process_named_zero() {
+    let identity = parse_proc_identity(&stat_with("init", "S", "0")).expect("parses");
+    assert_eq!(identity.parent_pid, None);
+}
+
+#[test]
+fn malformed_or_short_stat_yields_no_identity() {
+    assert_eq!(parse_proc_identity("7 malformed S 1"), None);
+    // A ')' before '(' would invert the slice; it is a parse failure, not a
+    // panic and not a garbage comm.
+    assert_eq!(parse_proc_identity("7 ) ( S 1"), None);
+    assert_eq!(parse_proc_stat("7 ) ( S 1"), None);
+    // State and parent are the first two tail fields; a payload with only the
+    // state has no parent to publish.
+    assert_eq!(parse_proc_identity("7 (x) S"), None);
+}
+
+#[test]
+fn every_kernel_state_byte_maps_to_the_published_status_vocabulary() {
+    let cases = [
+        ("R", "Running"),
+        ("S", "Sleeping"),
+        ("I", "Idle"),
+        ("D", "UninterruptibleDiskSleep"),
+        ("Z", "Zombie"),
+        ("T", "Stopped"),
+        ("t", "Tracing"),
+        ("X", "Dead"),
+        ("x", "Dead"),
+        ("K", "Wakekill"),
+        ("W", "Waking"),
+        ("P", "Parked"),
+        ("Q", "Other"),
+        ("", "Other"),
+    ];
+    for (state, label) in cases {
+        let text = stat_with("proc", state, "1");
+        let identity = parse_proc_identity(&text);
+        if state.is_empty() {
+            // An empty state field collapses into the next whitespace split,
+            // so the honest result is either Other or a typed parse failure —
+            // never a guessed state.
+            assert!(
+                identity.is_none() || identity.expect("parsed").state.label() == label,
+                "an empty state field must not invent a state"
+            );
+            continue;
+        }
+        assert_eq!(identity.expect("parses").state.label(), label, "{state}");
+    }
+    assert_eq!(ProcessState::from_stat_field(None).label(), "Other");
+}
+
+#[test]
+fn cmdline_splits_on_nul_and_keeps_the_published_arguments_verbatim() {
+    assert_eq!(split_cmdline(b"grep\0 foo \0"), ["grep", " foo "]);
+    // Only the trailing terminator is dropped; an interior empty argument is
+    // real argv and must not shift the display.
+    assert_eq!(split_cmdline(b"a\0\0b\0"), ["a", "", "b"]);
+    assert_eq!(split_cmdline(b"a\0b"), ["a", "b"]);
+    assert_eq!(split_cmdline(&[]), Vec::<String>::new());
+    assert_eq!(split_cmdline(b"\0"), Vec::<String>::new());
+    // Non-UTF-8 argv is lossy-decoded for display, never dropped.
+    let decoded = split_cmdline(b"a\xffb\0c\0");
+    assert_eq!(decoded.len(), 2);
+    assert_eq!(decoded[1], "c");
+    assert!(decoded[0].contains('b'));
+}

@@ -1,7 +1,7 @@
 use crate::FrontendShape;
 use crate::presentation::load_tiers::{
-    DECLARATIONS, EdgeMembership, LoadTier, LoadTierDecision, LoadTierEdges, load_tier,
-    load_tier_declaration, load_tier_edges, tier_within,
+    DECLARATIONS, LoadTier, LoadTierDecision, LoadTierEdges, load_tier, load_tier_declaration,
+    load_tier_edges, tier_within,
 };
 
 #[test]
@@ -20,7 +20,7 @@ fn every_shape_declares_the_load_tier_axis_exactly_once() {
 }
 
 #[test]
-fn the_two_cell_grid_shapes_paint_the_shared_band() {
+fn every_shape_that_paints_a_load_tier_paints_the_shared_band() {
     assert_eq!(
         load_tier_edges(FrontendShape::Iced),
         Some(LoadTierEdges::SHARED)
@@ -29,12 +29,24 @@ fn the_two_cell_grid_shapes_paint_the_shared_band() {
         load_tier_edges(FrontendShape::Tui),
         Some(LoadTierEdges::SHARED)
     );
+    assert_eq!(
+        load_tier_edges(FrontendShape::Bevy),
+        Some(LoadTierEdges::SHARED),
+        "the per-core bar band is the product's load band, not a second one"
+    );
     assert_eq!(LoadTierEdges::SHARED.warn, 60.0);
     assert_eq!(LoadTierEdges::SHARED.danger, 85.0);
-    assert_eq!(
-        LoadTierEdges::SHARED.membership,
-        EdgeMembership::AtEdgeIsHigher
-    );
+    // No shape can answer the load-tier axis with a band of its own: every
+    // shape that paints tiers resolves to exactly the one shared band.
+    for frontend in FrontendShape::ALL {
+        if let Some(edges) = load_tier_edges(frontend) {
+            assert_eq!(
+                edges,
+                LoadTierEdges::SHARED,
+                "{frontend:?} must paint the shared band, not a second one"
+            );
+        }
+    }
 }
 
 #[test]
@@ -50,22 +62,6 @@ fn the_shape_without_load_tier_paint_declares_absence_not_a_number() {
     // An absent shape can never borrow the fold: it resolves to no band and no tier.
     assert_eq!(load_tier_edges(FrontendShape::Gpui), None);
     assert_eq!(load_tier(FrontendShape::Gpui, 99.0), None);
-}
-
-#[test]
-fn bevy_keeps_its_registered_wider_bar_band() {
-    let bevy = load_tier_edges(FrontendShape::Bevy).expect("Bevy paints a load-tier band");
-    assert_eq!(bevy.warn, 80.0);
-    assert_eq!(bevy.danger, 95.0);
-    assert_eq!(bevy.membership, EdgeMembership::AboveEdgeOnly);
-    let reason = match load_tier_declaration(FrontendShape::Bevy) {
-        Some(LoadTierDecision::Own { reason, .. }) => reason,
-        other => panic!("Bevy must register its own band, got {other:?}"),
-    };
-    assert!(
-        !reason.trim().is_empty(),
-        "a divergent band must carry its driver"
-    );
 }
 
 #[test]
@@ -87,12 +83,29 @@ fn the_shared_band_buckets_across_both_edges() {
 }
 
 #[test]
-fn the_bar_band_keeps_an_edge_value_in_the_lower_tier() {
-    let bevy = load_tier_edges(FrontendShape::Bevy).expect("Bevy paints a load-tier band");
-    assert_eq!(tier_within(bevy, 80.0), Some(LoadTier::Calm));
-    assert_eq!(tier_within(bevy, 80.1), Some(LoadTier::Warning));
-    assert_eq!(tier_within(bevy, 95.0), Some(LoadTier::Warning));
-    assert_eq!(tier_within(bevy, 95.1), Some(LoadTier::Alarm));
+fn an_edge_value_always_belongs_to_the_higher_band() {
+    // The inclusive edge is a property of the fold, not a per-shape setting:
+    // no declaration can put an edge value back into the lower tier, which is
+    // precisely what used to let the same core read as a warning in one surface
+    // and as calm in another. Any band the owner hands out obeys one rule.
+    let band = LoadTierEdges {
+        warn: 80.0,
+        danger: 95.0,
+    };
+    assert_eq!(tier_within(band, 79.9), Some(LoadTier::Calm));
+    assert_eq!(tier_within(band, 80.0), Some(LoadTier::Warning));
+    assert_eq!(tier_within(band, 94.9), Some(LoadTier::Warning));
+    assert_eq!(tier_within(band, 95.0), Some(LoadTier::Alarm));
+    // The same reading cannot tier differently per shape: an edge value is
+    // never calm anywhere the axis is painted, and is absent only where the
+    // shape declared the axis away.
+    for frontend in FrontendShape::ALL {
+        assert_ne!(
+            load_tier(frontend, 60.0),
+            Some(LoadTier::Calm),
+            "{frontend:?} may not read the shared warn edge as calm"
+        );
+    }
 }
 
 #[test]

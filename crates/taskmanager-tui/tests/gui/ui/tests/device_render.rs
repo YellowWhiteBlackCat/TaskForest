@@ -1105,3 +1105,46 @@ fn gpu_selector_enumerates_every_projected_adapter() {
         "the second projected GPU adapter must render in selector instances: {text}"
     );
 }
+
+/// The endurance readout wears the critical marker once the device reached
+/// its rated life. The marker rides EVERY surface that paints the number,
+/// so a device past its rated life says so where the endurance is read.
+#[test]
+fn the_endurance_readout_carries_the_critical_marker() {
+    let mut app = crate::demo_app();
+    app.perf_device = crate::PerfDevice::Disk;
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        let disk = snapshot
+            .disks
+            .first_mut()
+            .expect("demo app should carry one disk");
+        disk.smart_percent_used = Some(104.0);
+    });
+
+    let text = frame_text(&app, 140, 48);
+    assert!(
+        text.contains("Endurance used 104% ⚠"),
+        "a device past its rated life says so where the endurance is read: {text}"
+    );
+
+    let mut app = crate::demo_app();
+    app.perf_device = crate::PerfDevice::Disk;
+    edit_snapshot(&mut app.shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        let disk = snapshot
+            .disks
+            .first_mut()
+            .expect("demo app should carry one disk");
+        disk.smart_percent_used = Some(99.0);
+    });
+    let text = frame_text(&app, 140, 48);
+    assert!(
+        text.contains("Endurance used 99%"),
+        "a device inside its rated life wears no marker: {text}"
+    );
+    assert!(
+        !text.contains("⚠"),
+        "an uncritical device paints no warning marker at all: {text}"
+    );
+}

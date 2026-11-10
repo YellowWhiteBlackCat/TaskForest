@@ -136,29 +136,11 @@ struct FailureSummary {
 
 impl FailureSummary {
     fn record(&mut self, failure: FailureKind) {
-        if self
-            .failure
-            .is_none_or(|current| priority(failure) > priority(current))
-        {
-            self.failure = Some(failure);
-        }
+        self.failure = Some(FailureKind::strongest(self.failure, failure));
     }
 
     fn record_io(&mut self, error: &io::Error) {
         self.record(classify_io(error));
-    }
-}
-
-const fn priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
     }
 }
 

@@ -32,6 +32,7 @@ use taskforest_core::core::hardware::{CpuType, HardwareInfo};
 use taskforest_core::core::metrics::{
     CpuMetrics, CpuPackageMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
 };
+use taskmanager_shell::demo_app;
 use taskmanager_shell::fixture;
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_theme::Theme;
@@ -41,7 +42,7 @@ use super::*;
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::pages::performance::tests::{
-    Folded, GIB, cpu_outcome, headless_perf_app, memory_metrics, projection,
+    Folded, GIB, cpu_outcome, headless_perf_app, memory_metrics, projection, route_to_performance,
 };
 use crate::pages::performance::{DynField, DynText};
 use crate::palette::ui_palette;
@@ -382,20 +383,47 @@ fn socket_envelopes_group_the_cores_of_each_package() {
     );
 }
 
-/// BEVY-111: the bar ink follows the utilization bands — calm, amber above
-/// the warn band, red above the alarm band.
+/// BEVY-111: the bar ink follows the utilization bands — the theme's success
+/// ink while calm, amber above the warn band, red above the alarm band.
 #[test]
 fn the_core_bar_ink_follows_the_utilization_bands() {
     let palette = ui_palette(&Theme::dark(), UiSize::Standard);
-    assert_eq!(core_bar_ink(Some(10.0), &palette), palette.accent);
-    assert_eq!(core_bar_ink(Some(80.0), &palette), palette.accent);
-    assert_eq!(core_bar_ink(Some(85.0), &palette), palette.warning_color);
-    assert_eq!(core_bar_ink(Some(95.0), &palette), palette.warning_color);
+    assert_eq!(core_bar_ink(Some(10.0), &palette), palette.success_color);
+    assert_eq!(
+        core_bar_ink(Some(59.9), &palette),
+        palette.success_color,
+        "a core below the shared warn edge is calm"
+    );
+    assert_eq!(
+        core_bar_ink(Some(60.0), &palette),
+        palette.warning_color,
+        "the shared warn edge belongs to the higher band"
+    );
+    assert_eq!(core_bar_ink(Some(80.0), &palette), palette.warning_color);
+    assert_eq!(
+        core_bar_ink(Some(84.9), &palette),
+        palette.warning_color,
+        "a core below the shared alarm edge is a warning"
+    );
+    assert_eq!(
+        core_bar_ink(Some(85.0), &palette),
+        palette.danger_color,
+        "the shared alarm edge belongs to the alarm band"
+    );
+    assert_eq!(
+        core_bar_ink(Some(85.1), &palette),
+        palette.danger_color,
+        "a core above the shared alarm edge is an alarm"
+    );
     assert_eq!(core_bar_ink(Some(96.0), &palette), palette.danger_color);
     assert_eq!(
         core_bar_ink(None, &palette),
-        palette.accent,
-        "an unobserved core never paints a warning"
+        palette.dim_color,
+        "an unobserved core wears the missing ink, never a warning and never a calm band"
+    );
+    assert_ne!(
+        palette.success_color, palette.accent,
+        "the calm tier must not borrow the theme's interactive accent"
     );
 }
 
@@ -403,7 +431,7 @@ fn the_core_bar_ink_follows_the_utilization_bands() {
 /// observation its width shows.
 #[test]
 fn the_folded_core_bar_paints_the_observed_utilization_band() {
-    let folded = folded_cores(&[96.0, 85.0, 10.0], Vec::new(), Vec::new());
+    let folded = folded_cores(&[96.0, 80.0, 10.0], Vec::new(), Vec::new());
     let mut app = core_grid_app(1280, 960);
     app.world_mut().non_send_mut::<FrontendTrack>().shell = folded.shell.clone();
     mount_grid(&mut app, &folded.shell);
@@ -424,9 +452,50 @@ fn the_folded_core_bar_paints_the_observed_utilization_band() {
         vec![
             (0, palette.danger_color),
             (1, palette.warning_color),
-            (2, palette.accent),
+            (2, palette.success_color),
         ],
         "each bar's ink follows its own folded utilization"
+    );
+}
+
+/// The missing ink paints no pixel: an unplaced reading collapses the bar's
+/// fill to zero width, so the dim ink the unobserved core wears never
+/// reaches the screen. This is the evidence that the missing-ink axis is a
+/// code-level difference, not a visible paint divergence.
+#[test]
+fn an_unplaced_core_reading_paints_no_fill_width() {
+    let folded = folded_cores(&[96.0, f32::NAN, 10.0], Vec::new(), Vec::new());
+    let mut app = core_grid_app(1280, 960);
+    app.world_mut().non_send_mut::<FrontendTrack>().shell = folded.shell.clone();
+    mount_grid(&mut app, &folded.shell);
+    app.update();
+    app.world_mut().commands().trigger(ShellProjectionFolded);
+    app.update();
+
+    let world = app.world_mut();
+    let mut fills = world.query::<(&CoreBarFill, &ComputedNode)>();
+    let mut widths: Vec<(usize, f32)> = fills
+        .iter(world)
+        .map(|(fill, node)| (fill.0, node.size().x))
+        .collect();
+    widths.sort_unstable_by_key(|(index, _)| *index);
+    let unplaced = widths
+        .iter()
+        .find(|(index, _)| *index == 1)
+        .map(|(_, width)| *width)
+        .expect("the unplaced core keeps its cell");
+    assert!(
+        unplaced <= 0.0,
+        "an unplaced reading paints no fill width: {unplaced}"
+    );
+    let observed = widths
+        .iter()
+        .find(|(index, _)| *index == 2)
+        .map(|(_, width)| *width)
+        .expect("the observed core keeps its cell");
+    assert!(
+        observed > 0.0,
+        "an observed reading paints a visible fill width: {observed}"
     );
 }
 
@@ -693,4 +762,64 @@ fn the_core_grid_reveal_eases_between_the_collapsed_and_open_heights() {
         "the reopened grid settles on the content's own measured height:          reopened={reopened} (={}px) open_height={open_height}",
         reopened * 16.0
     );
+}
+
+/// The composed Cores card reveals its whole measured grid. The card mounts
+/// inside the device body's scroll viewport, where a body that owns a height
+/// it never measured inherits the collapsed height the viewport hands it and
+/// stays a header above an empty grid forever — the failure this pins.
+#[test]
+fn the_composed_cores_card_reveals_its_full_grid() {
+    let mut app = core_grid_app(1280, 800);
+    app.world_mut().non_send_mut::<FrontendTrack>().shell = demo_app();
+    route_to_performance(&mut app);
+    for _ in 0..8 {
+        app.update();
+    }
+
+    let world = app.world_mut();
+    let mut bodies = world
+        .query_filtered::<(&ComputedNode, &UiGlobalTransform, &Children), With<CoreGridReveal>>();
+    let mut contents = world.query::<&ComputedNode>();
+    let (body, body_transform, children) = bodies
+        .single(world)
+        .expect("the composed Performance page mounts one core grid body");
+    let content = children
+        .first()
+        .and_then(|entity| contents.get(world, *entity).ok())
+        .expect("the reveal body owns its measured content node");
+    assert!(
+        content.size().y > 0.0,
+        "the open grid measures its own height"
+    );
+    assert!(
+        body.size().y + 0.5 >= content.size().y,
+        "the reveal body shows the whole grid: body={}, content={}",
+        body.size().y,
+        content.size().y
+    );
+
+    let body_top = body_transform.translation.y - body.size().y / 2.0;
+    let body_bottom = body_transform.translation.y + body.size().y / 2.0;
+    let mut cells = world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<CoreCell>>();
+    let painted: Vec<(f32, f32)> = cells
+        .iter(world)
+        .filter(|(node, _)| node.size().y > 0.0)
+        .map(|(node, transform)| {
+            (
+                transform.translation.y - node.size().y / 2.0,
+                transform.translation.y + node.size().y / 2.0,
+            )
+        })
+        .collect();
+    assert!(
+        !painted.is_empty(),
+        "the composed grid paints its core cells"
+    );
+    for (top, bottom) in painted {
+        assert!(
+            top >= body_top - 0.5 && bottom <= body_bottom + 0.5,
+            "no core cell is clipped away by the reveal body: cell=[{top}, {bottom}], body=[{body_top}, {body_bottom}]"
+        );
+    }
 }

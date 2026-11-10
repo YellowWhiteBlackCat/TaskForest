@@ -4,33 +4,23 @@ use taskforest_core::core::alerts::{AlertRuleId, AlertTargetIdentity};
 use taskforest_core::core::metrics::CpuMetrics;
 use taskforest_core::core::session::SessionIncarnation;
 use taskmanager_application::DeviceLifecycleSnapshotRevision;
+use taskmanager_application::i18n;
 
 impl ShellApp {
+    /// Test-only outcome delivery: the product notice composition is the
+    /// shell's own `report_control_outcome`, never a second copy here.
     pub(crate) fn apply_session_control_outcome(
         &mut self,
         outcome: SessionControlOutcome,
     ) -> Option<SessionControlOutcome> {
         let accepted = self.data.apply_session_control_outcome(outcome.clone());
         if let Some(outcome) = accepted.as_ref() {
-            let (severity, lifecycle, text) = match &outcome.result {
-                Ok(()) => (
-                    FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
-                    format!(
-                        "Session {} {:?} request accepted",
-                        outcome.identity.session_id, outcome.action
-                    ),
-                ),
-                Err(error) => (
-                    FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
-                    format!(
-                        "Session {} {:?} failed: {error:?}",
-                        outcome.identity.session_id, outcome.action
-                    ),
-                ),
-            };
-            self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
+            self.report_control_outcome(
+                i18n::session_control_action_label(outcome.action),
+                outcome.identity.session_id.as_str(),
+                true,
+                outcome.result,
+            );
         }
         accepted
     }
@@ -41,20 +31,12 @@ impl ShellApp {
     ) -> Option<StartupControlOutcome> {
         let accepted = self.data.apply_startup_control_outcome(outcome.clone());
         if let Some(outcome) = accepted.as_ref() {
-            let intent = if outcome.enabled { "enable" } else { "disable" };
-            let (severity, lifecycle, text) = match &outcome.result {
-                Ok(()) => (
-                    FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
-                    format!("Startup {} {intent} completed", outcome.target_name),
-                ),
-                Err(error) => (
-                    FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
-                    format!("Startup {} {intent} failed: {error:?}", outcome.target_name),
-                ),
-            };
-            self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
+            self.report_control_outcome(
+                i18n::startup_action_label(outcome.enabled),
+                &outcome.target_name,
+                false,
+                outcome.result,
+            );
         }
         accepted
     }
@@ -435,8 +417,12 @@ fn session_control_completion_accepts_only_the_latest_intent() {
         "the latest intent's outcome must replace the feedback"
     );
     assert!(
-        feedback.contains("PermissionDenied"),
-        "the typed failure kind is the stable, locale-independent signal: {feedback}"
+        feedback.contains(i18n::control_error_detail(FailureKind::PermissionDenied)),
+        "the shared localized reason is the signal, not a Debug dump: {feedback}"
+    );
+    assert!(
+        !feedback.contains("PermissionDenied"),
+        "never the Debug spelling of the typed failure: {feedback}"
     );
 }
 
@@ -521,10 +507,14 @@ fn startup_control_completion_accepts_only_the_latest_intent() {
         enabled: second.enabled,
         result: Ok(()),
     });
+    let status = app.feedback_text();
     assert!(
-        app.feedback_text().contains("enable completed"),
-        "accepted enable outcome must surface in status: {}",
-        app.feedback_text()
+        status.contains(i18n::startup_action_label(true)) && status.contains("SSH Agent"),
+        "the accepted enable outcome names the shared verb and its target: {status}"
+    );
+    assert!(
+        !status.contains("enable completed"),
+        "the sentence comes from the catalog, not source: {status}"
     );
 }
 

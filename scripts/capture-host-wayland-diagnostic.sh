@@ -260,6 +260,15 @@ fail() {
   exit 1
 }
 
+# Exit 3 is reserved for "the instrument never finished", which is a host-speed
+# condition and not a judgement about the capture. Callers must map it to an
+# unavailable leg, never to a rejected product.
+fail_incomplete() {
+  printf '%s\n' "$*" >"$RUN_DIR/runner-failure.txt"
+  printf 'HOST WAYLAND DIAGNOSTIC INCOMPLETE: %s\n' "$*" >&2
+  exit 3
+}
+
 # Cargo must use the repository NVMe target and a lease-owned scratch directory.
 # Re-install our trap after enter: the lease manager's generated EXIT trap is
 # intentionally superseded by cleanup(), which removes the exact recorded lease
@@ -630,6 +639,9 @@ PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=10s "${CAPTURE_VALIDATOR_TIMEOUT:
   validator_rc=$?
 case "$validator_rc" in
   0) ;;
+  3)
+    fail_incomplete "independent host diagnostic validator could not finish an instrument (no verdict was reached)"
+    ;;
   124 | 137)
     fail "independent host diagnostic validator timed out after ${CAPTURE_VALIDATOR_TIMEOUT:-180s} (no verdict was reached)"
     ;;

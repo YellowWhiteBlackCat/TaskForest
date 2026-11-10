@@ -11,8 +11,8 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskforest_core::core::metrics::ScalarAvailability;
 use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::presentation::control_error_detail;
 
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_8};

@@ -16,7 +16,7 @@ use taskforest_core::core::startup::{
     StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{self, t};
 use taskmanager_application::{AppAction, AppPage, PlatformEffect};
 
 use taskmanager_shell::ShellApp;
@@ -289,12 +289,15 @@ fn startup_bidirectional_control_channel_flow() {
     });
 
     // Verify feedback notice
+    let startup_feedback = shell.feedback_text();
     assert!(
-        shell
-            .feedback_text()
-            .contains("Startup SSH Agent disable completed"),
-        "feedback notice updated: {}",
-        shell.feedback_text()
+        startup_feedback.contains("SSH Agent")
+            && startup_feedback.contains(i18n::startup_action_label(false)),
+        "the startup outcome names the shared verb and its target: {startup_feedback}"
+    );
+    assert!(
+        !startup_feedback.contains("disable completed"),
+        "the sentence comes from the catalog, not source: {startup_feedback}"
     );
 
     // Verify shell queued a post-control refresh for startup inventory
@@ -347,12 +350,20 @@ fn session_bidirectional_control_channel_flow() {
     });
 
     // Verify feedback notice
+    let session_feedback = shell.feedback_text();
     assert!(
-        shell
-            .feedback_text()
-            .contains("Session c2 Disconnect request accepted"),
-        "feedback notice updated: {}",
-        shell.feedback_text()
+        session_feedback.contains("c2")
+            && session_feedback.contains(i18n::session_control_action_label(target.action)),
+        "the session outcome names the shared verb and its target: {session_feedback}"
+    );
+    assert!(
+        session_feedback.contains(&i18n::control_outcome_text(
+            i18n::session_control_action_label(target.action),
+            target.identity.session_id.as_str(),
+            true,
+            Ok(()),
+        )),
+        "the sentence is the one owner composition: {session_feedback}"
     );
 
     // Verify shell queued a post-control refresh for sessions inventory

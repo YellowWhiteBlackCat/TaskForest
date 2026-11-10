@@ -4,7 +4,7 @@ use crate::pages::performance::metrics::memory_metrics;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_shell::presentation::{bytes, memory_usage_rate_is_visible, missing_value};
 
 /// The stat rail's typed row keys. A key is a semantic slot, not a localized
 /// label: locales may rename labels, but the rail keeps one authority per
@@ -109,7 +109,7 @@ pub(crate) fn stat_value(shell: &ShellApp, key: StatKey) -> String {
         }
         StatKey::UsageRate => memory
             .current_used_rate_mib_per_sec()
-            .filter(|rate| rate.abs() >= 0.05)
+            .filter(|rate| memory_usage_rate_is_visible(*rate))
             .map_or_else(missing_value, |rate| format!("{rate:+.1} MiB/s")),
         StatKey::SwapInRate => memory
             .current_swap_in_bytes_per_sec()

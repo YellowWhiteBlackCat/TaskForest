@@ -43,7 +43,10 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 PX_LITERAL = re.compile(r"\bpx\s*\(\s*(?P<sign>-)?\s*(?P<num>\d+(?:\.\d+)?)\s*\)")
 
 # `tokens::SPACE_*` 阶梯的成员值；阶梯外的 inset 也是债务，理由里注明需扩展阶梯。
-SPACE_LADDER = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 24.0}
+SPACE_LADDER = {
+    1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 13.0, 14.0,
+    16.0, 18.0, 20.0, 24.0, 48.0, -8.0,
+}
 
 INSET_PROPERTY = re.compile(
     r"(?<!\w)(?:gap|p|pl|pr|pt|pb|mx|my|ml|mr|mt|mb|top|left|bottom|right|"

@@ -327,6 +327,14 @@ def run_failure(
     failure even when the cause was a timeout or a rejected capture.
     """
     pieces = [f"supervisor exit_code={process.poll()}"]
+    if process.poll() == 3:
+        # The capture script reserves exit 3 for "a validator instrument never
+        # finished". That is a host-speed condition: this leg has no verdict at
+        # all, so it must reach the harness as UNAVAILABLE (skippable) rather
+        # than as a code failure.
+        return IsolationUnavailable(
+            "run " + str(run_root) + " reached no verdict: " + "; ".join(pieces)
+        )
     if run_root is not None:
         try:
             payload = json.loads((run_root / "supervisor.json").read_text(encoding="utf-8"))
@@ -344,6 +352,29 @@ def run_failure(
     return IsolationError(
         f"run {run_root} {description}\n" + "\n".join(pieces)
     )
+
+
+INCOMPLETE_STATUS = "incomplete"
+
+
+def validation_outcome(payload: dict[str, object], run_root: Path | str) -> None:
+    """Map one validation receipt onto the answers it can honestly give.
+
+    `pass` proves the leg. `reject` is a verdict about the capture.
+    `incomplete` means a validator instrument (OCR, hashing) ran out of its
+    budget -- no verdict exists, and inventing a failure here is how a loaded
+    host once failed `capture-isolation` for a reason that read
+    "tesseract timed out after 15 seconds".
+    """
+    status = payload.get("status")
+    if status == "pass":
+        return
+    if status == INCOMPLETE_STATUS:
+        raise IsolationUnavailable(
+            f"run {run_root} validation instrument did not finish: "
+            f"{payload.get('reason')!r}; isolation was never judged"
+        )
+    raise IsolationError(f"run {run_root} validation receipt is not a pass: {status!r}")
 
 
 def wait_for_receipt(repo_root: Path, process: subprocess.Popen[str]) -> RunReceipt:
@@ -388,9 +419,7 @@ def wait_for_receipt(repo_root: Path, process: subprocess.Popen[str]) -> RunRece
             if payload.get("status") == "pass":
                 metadata.update(read_metadata(run_root / "metadata.txt"))
                 return RunReceipt(process=process, run_root=run_root, metadata=metadata)
-            raise IsolationError(
-                f"run {run_root} validation receipt is not a pass: {payload.get('status')!r}"
-            )
+            validation_outcome(payload, run_root)
         if process.poll() is not None:
             raise run_failure(process, run_root, "exited without a validation receipt")
         if time.monotonic() >= validation_deadline:
@@ -493,6 +522,30 @@ def prewarm_capture_build(
         raise IsolationError(
             f"capture build prewarm failed: {str(detail).strip()[-400:]}"
         ) from error
+
+
+def verdict_self_test() -> None:
+    """The three receipt shapes must not collapse into one answer."""
+    validation_outcome({"status": "pass"}, "fixture")
+    for status, expected, fragment in (
+        ("incomplete", IsolationUnavailable, "did not finish"),
+        ("reject", IsolationError, "not a pass"),
+        (None, IsolationError, "not a pass"),
+    ):
+        try:
+            validation_outcome({"status": status, "reason": "tesseract budget"}, "fixture")
+        except expected as error:
+            if fragment not in str(error):
+                raise IsolationError(f"{status!r} verdict does not explain itself: {error}")
+        except IsolationError as error:
+            if expected is IsolationUnavailable:
+                raise IsolationError(
+                    f"a {status!r} receipt was filed as a code failure, not an unavailable "
+                    f"leg: {error}"
+                ) from error
+            raise
+        else:
+            raise IsolationError(f"{status!r} receipt raised nothing")
 
 
 def prewarm_self_test(repo_root: Path) -> None:
@@ -623,6 +676,7 @@ def main(argv: list[str]) -> int:
     if args.self_test:
         assert uuid.UUID(str(uuid.uuid4()))
         prewarm_self_test(args.repo_root.resolve())
+        verdict_self_test()
         print("capture isolation self-test: PASS")
         return 0
     if args.preflight:

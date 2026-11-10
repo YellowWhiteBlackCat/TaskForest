@@ -20,29 +20,27 @@ use taskmanager_application::{
 
 use taskmanager_shell::ProcessControlKind;
 
-use super::{ProcessControlAction, RootView, process_control_feedback};
+use super::RootView;
 
 impl RootView {
     pub(crate) fn accept_shared_process_control_feedback(
         &mut self,
         feedback: &ProcessControlFeedback,
     ) {
-        let (text, succeeded) = process_control_notice_text(feedback);
+        let (text, succeeded) =
+            process_control_notice_text(&feedback.kind, feedback.target.pid, feedback.result);
         self.report_process_control_notice(text, succeeded);
     }
 
     pub fn record_process_control_result(
         &mut self,
-        action: ProcessControlAction,
+        kind: ProcessControlKind,
         identity: ProcessLiveKey,
         result: Result<(), FailureKind>,
         cx: &mut Context<Self>,
     ) {
-        let succeeded = result.is_ok();
-        self.report_process_control_notice(
-            process_control_feedback(action, identity.pid(), result),
-            succeeded,
-        );
+        let (text, succeeded) = process_control_notice_text(&kind, identity.pid(), result);
+        self.report_process_control_notice(text, succeeded);
         cx.notify();
     }
 
@@ -75,7 +73,6 @@ impl RootView {
     pub(crate) fn submit_process_control(
         &mut self,
         request: ProcessControlRequest,
-        action: ProcessControlAction,
         identity: ProcessLiveKey,
         cx: &mut Context<Self>,
     ) -> bool {
@@ -88,43 +85,19 @@ impl RootView {
                     .map_err(submission_failure_kind)
             },
         );
+        // The neutral kind is derived once from the request, so the correlation
+        // slot and the rejection notice can never name different actions.
         match result {
             Ok(request_id) => {
-                match &request {
-                    ProcessControlRequest::EndTask(target) => {
-                        self.shell.begin_process_control(
-                            request_id,
-                            target.clone(),
-                            ProcessControlKind::EndTask,
-                        );
-                    }
-                    ProcessControlRequest::SendSignal { target, signal } => {
-                        self.shell.begin_process_control(
-                            request_id,
-                            target.clone(),
-                            ProcessControlKind::Signal(*signal),
-                        );
-                    }
-                    ProcessControlRequest::Suspend { target } => {
-                        self.shell.begin_process_control(
-                            request_id,
-                            target.clone(),
-                            ProcessControlKind::Suspend,
-                        );
-                    }
-                    ProcessControlRequest::Resume { target } => {
-                        self.shell.begin_process_control(
-                            request_id,
-                            target.clone(),
-                            ProcessControlKind::Resume,
-                        );
-                    }
-                    ProcessControlRequest::ExecuteBatch(_) => {}
+                if let Some((target, kind)) = single_control_request(&request) {
+                    self.shell.begin_process_control(request_id, target, kind);
                 }
                 true
             }
             Err(kind) => {
-                self.record_process_control_result(action, identity, Err(kind), cx);
+                if let Some((_, action)) = single_control_request(&request) {
+                    self.record_process_control_result(action, identity, Err(kind), cx);
+                }
                 false
             }
         }
@@ -171,7 +144,7 @@ impl RootView {
     ) -> bool {
         let ProcessAffinityState::Ready(ready) = self.shell.process_affinity_state().clone() else {
             self.record_process_control_result(
-                ProcessControlAction::SetAffinity,
+                ProcessControlKind::Affinity(cpus.clone()),
                 identity,
                 Err(FailureKind::TemporarilyUnavailable),
                 cx,
@@ -181,7 +154,7 @@ impl RootView {
         let target = ready.target;
         if self.frozen_process(identity).as_ref() != Some(&target) {
             self.record_process_control_result(
-                ProcessControlAction::SetAffinity,
+                ProcessControlKind::Affinity(cpus.clone()),
                 identity,
                 Err(FailureKind::IdentityChanged),
                 cx,
@@ -215,7 +188,7 @@ impl RootView {
             }
             Err(kind) => {
                 self.record_process_control_result(
-                    ProcessControlAction::SetAffinity,
+                    ProcessControlKind::Affinity(cpus.clone()),
                     identity,
                     Err(kind),
                     cx,
@@ -223,6 +196,30 @@ impl RootView {
                 false
             }
         }
+    }
+}
+
+/// The frozen target and neutral correlation kind of one single-process
+/// control request. A batch intent is submitted through its own path
+/// ([`RootView::submit_process_batch_intent`]), never through
+/// [`RootView::submit_process_control`], so it carries no single-target kind.
+fn single_control_request(
+    request: &ProcessControlRequest,
+) -> Option<(FrozenProcessIdentity, ProcessControlKind)> {
+    match request {
+        ProcessControlRequest::EndTask(target) => {
+            Some((target.clone(), ProcessControlKind::EndTask))
+        }
+        ProcessControlRequest::SendSignal { target, signal } => {
+            Some((target.clone(), ProcessControlKind::Signal(*signal)))
+        }
+        ProcessControlRequest::Suspend { target } => {
+            Some((target.clone(), ProcessControlKind::Suspend))
+        }
+        ProcessControlRequest::Resume { target } => {
+            Some((target.clone(), ProcessControlKind::Resume))
+        }
+        ProcessControlRequest::ExecuteBatch(_) => None,
     }
 }
 

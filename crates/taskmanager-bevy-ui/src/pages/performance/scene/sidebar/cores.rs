@@ -140,10 +140,10 @@ impl CoreGridTransition {
 pub(crate) struct CoreGridReveal {
     /// The transition the body eases through.
     pub(crate) transition: CoreGridTransition,
-    /// Whether the body's natural height has been measured yet.
-    pub(crate) measured: bool,
-    /// The open grid's natural height, in rem, captured while the body is
-    /// OPEN.
+    /// The open grid's natural height, in rem, captured on the first frame
+    /// the body measured itself while OPEN. `None` is the state before that
+    /// measurement, and the one fact the reveal needs: the transition is
+    /// seeded in the same step that records the height.
     ///
     /// While the body is collapsed the content is measured INSIDE the
     /// collapsed body, so re-measuring the target every frame would shrink it
@@ -216,24 +216,32 @@ pub(crate) fn core_cell_width_percent(columns: usize) -> f32 {
     (100.0 / columns.max(1) as f32) - 2.0
 }
 
-/// The ink of one core bar: the accent while the core is calm, the warning
-/// ink above the warn band, the danger ink above the alarm band. The band
-/// edges, their exclusive membership and the percent clamp come from the
-/// shared load-tier contract, where this shape's wider bar band carries its
-/// registered driver. Which ink each tier wears stays a Bevy palette fact. An
-/// unobserved core keeps the calm ink — a missing fact is never painted as
-/// a warning.
+/// The ink of one core bar: the theme's success ink while the core is calm,
+/// the warning ink above the warn band, the danger ink above the alarm band.
+/// The band edges, their edge-membership rule and the percent clamp come
+/// from the shared load-tier contract: this shape paints the product's one
+/// load band, not a bar-shaped second one. Which ink each tier wears stays
+/// a Bevy palette fact — and the calm tier wears the SUCCESS token, the ink the
+/// Iced matrix and the TUI grid paint for the same tier and the ink this
+/// frontend's own NVMe wear band paints for a healthy device. The accent is
+/// the theme's interactive ink, and a frontend never borrows it to paint a
+/// positive state.
+///
+/// An unobserved core wears the dim missing ink, like the Iced matrix and
+/// the TUI grid: a missing fact is never painted as a warning, and never as
+/// a calm band either. The bar's fill is zero width for an absent reading,
+/// so this ink paints no pixel — it states the rule rather than the paint.
 pub(crate) fn core_bar_ink(usage_pct: Option<f32>, palette: &UiPalette) -> bevy::color::Color {
     let Some(pct) = usage_pct.filter(|value| value.is_finite()) else {
-        return palette.accent;
+        return palette.dim_color;
     };
     match load_tier(FrontendShape::Bevy, pct) {
         Some(LoadTier::Alarm) => palette.danger_color,
         Some(LoadTier::Warning) => palette.warning_color,
-        Some(LoadTier::Calm) => palette.accent,
+        Some(LoadTier::Calm) => palette.success_color,
         // The finite filter above already covers absence; a reading the shared
         // fold cannot place keeps the calm ink rather than inventing a band.
-        None => palette.accent,
+        None => palette.success_color,
     }
 }
 
@@ -493,7 +501,6 @@ pub(super) fn core_grid_body_scene(shell: &ShellApp, palette: &UiPalette) -> imp
     let grid = core_grid_sections_scene(shell, palette);
     let toggle = core_grid_toggle_scene(palette);
     let transition = CoreGridTransition::default();
-    let measured = false;
     bsn! {
         Node {
             width: percent(100.0),
@@ -517,7 +524,7 @@ pub(super) fn core_grid_body_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                     height: Val::Auto,
                     overflow: Overflow::clip_y(),
                 }
-                CoreGridReveal { transition, measured }
+                CoreGridReveal { transition, natural_height: None }
                 Children [
                     Node {
                         width: percent(100.0),
@@ -748,7 +755,9 @@ pub(crate) fn apply_core_grid_columns(
 /// The reveal advance: the grid body eases its height toward the toggled
 /// state and follows the content's own height while it stays open. The
 /// clock is passed in, so the fold observer and a per-frame animator drive
-/// the same easing.
+/// the same easing. A body that has not yet measured its open height keeps
+/// the automatic height it was authored with: the reveal owns the height
+/// only from the frame the open grid measures itself.
 pub(crate) fn advance_core_grid(
     now: f32,
     palette: &UiPalette,
@@ -765,23 +774,31 @@ pub(crate) fn advance_core_grid(
             continue;
         };
         let measured = computed.size().y / palette.rem_px;
-        // The natural height is captured ONCE, on the first frame the body is
-        // open. A collapsed body measures its content as the collapsed height,
-        // so re-measuring the target from there would shrink the reopen
-        // towards zero — the same rule the storage surface follows.
-        if reveal.natural_height.is_none() && measured > 0.0 {
-            reveal.natural_height = Some(measured);
-        }
-        let natural = reveal.natural_height.unwrap_or(measured);
+        let natural = match reveal.natural_height {
+            Some(height) => height,
+            // The open height has not been measured yet, so the body keeps
+            // the automatic height it was authored with. Collapsing it now
+            // would measure the grid INSIDE the collapsed body, where the
+            // scroll viewport resolves it to zero, and the reveal would never
+            // learn its open height again: the card would stay a header above
+            // an empty body forever.
+            None if measured > 0.0 => {
+                // The first frame the open body measures itself seeds the
+                // transition AT that height, so an expanded grid appears open
+                // with no invented motion and a grid the operator already
+                // collapsed eases closed from the height it really showed.
+                reveal.natural_height = Some(measured);
+                reveal.transition = CoreGridTransition {
+                    from: measured,
+                    to: if expanded { measured } else { 0.0 },
+                    started_at: now,
+                };
+                measured
+            }
+            None => continue,
+        };
         let target = if expanded { natural } else { 0.0 };
-        if !reveal.measured {
-            reveal.measured = true;
-            reveal.transition = CoreGridTransition {
-                from: natural,
-                to: target,
-                started_at: now,
-            };
-        } else if (reveal.transition.to - target).abs() > f32::EPSILON {
+        if (reveal.transition.to - target).abs() > f32::EPSILON {
             // The intent changed: start a new transition from the height the
             // body currently shows.
             reveal.transition = CoreGridTransition {

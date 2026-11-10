@@ -8,6 +8,7 @@ use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::power::BatteryInfo;
 use taskforest_core::core::sensors::SensorQuantity;
+use taskforest_core::core::storage_health::is_nvme_wear_critical;
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::effective_smart_status;
@@ -348,10 +349,30 @@ pub(super) fn disk_spare_warning(disk: &DiskMetrics) -> bool {
     disk.smart_spare_pool_needs_warning()
 }
 
-pub(super) fn disk_spare_warning_for(shell: &ShellApp, device_id: &str) -> bool {
+/// Whether the disk's endurance reached its rated life. The rule is the
+/// shared core one (`is_nvme_wear_critical`); this page asks the question once
+/// for every surface that paints the endurance.
+pub(super) fn disk_wear_critical(disk: &DiskMetrics) -> bool {
+    disk.smart_percent_used
+        .filter(|value| value.is_finite())
+        .is_some_and(is_nvme_wear_critical)
+}
+
+/// Whether the disk carries a SMART marker its surfaces must show: the spare
+/// pool crossed its warning level, or the endurance reached the rated life.
+///
+/// The critical-wear marker rides EVERY surface that paints the endurance —
+/// this page's caption plate and its statistics rows alike — so a device
+/// past its rated life says so wherever the number appears. The severity
+/// nuance rides the NVMe gauge's critical band, the surface that owns it.
+pub(super) fn disk_smart_alert(disk: &DiskMetrics) -> bool {
+    disk_spare_warning(disk) || disk_wear_critical(disk)
+}
+
+pub(super) fn disk_smart_alert_for(shell: &ShellApp, device_id: &str) -> bool {
     disks(shell)
         .and_then(|devices| devices.iter().find(|disk| disk.device_id == device_id))
-        .is_some_and(disk_spare_warning)
+        .is_some_and(disk_smart_alert)
 }
 
 pub(super) fn battery_sidebar_title(battery: &BatteryInfo, index: usize) -> String {

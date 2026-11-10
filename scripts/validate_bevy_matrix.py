@@ -19,6 +19,8 @@ from frontend_source_manifest import source_paths
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
 
+import instrument_budget
+
 try:
     from capture_supervisor import SupervisorError, validate_supervised_metadata
 except ModuleNotFoundError:
@@ -184,11 +186,11 @@ def validate_action(path: Path, window_id: str) -> None:
 def validate_current_worktree(root: Path, values: dict[str, str]) -> None:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=root, check=True, text=True,
-        capture_output=True, timeout=15,
+        capture_output=True, timeout=instrument_budget.seconds(),
     ).stdout.strip()
     status = subprocess.run(
         ["git", "status", "--short"], cwd=root, check=True, text=True,
-        capture_output=True, timeout=15,
+        capture_output=True, timeout=instrument_budget.seconds(),
     ).stdout.encode()
     if head != values["git_head"]:
         raise EvidenceError("capture git head differs from current worktree")

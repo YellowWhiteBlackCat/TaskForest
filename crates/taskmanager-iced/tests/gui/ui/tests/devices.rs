@@ -746,6 +746,38 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
     set_language(Language::En);
 }
 
+/// The endurance readout wears the critical marker once the device reached
+/// its rated life. The marker rides EVERY surface that paints the number,
+/// so a device past its rated life says so where the endurance is read — not
+/// only inside the SMART overlay.
+#[test]
+fn the_endurance_readout_carries_the_critical_marker() {
+    use taskmanager_application::i18n::{Language, set_language};
+    set_language(Language::En);
+
+    let critical = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
+        .smart_percent_used(Some(104.0))
+        .build();
+    let critical_rows = disk_summary_lines(&critical, true, true, &[]);
+    let rows = flat(&critical_rows);
+    assert!(
+        rows.contains(&("Endurance used", "104% ⚠")),
+        "a device past its rated life says so where the endurance is read: {rows:?}"
+    );
+
+    let inside = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
+        .smart_percent_used(Some(99.0))
+        .build();
+    let inside_rows = disk_summary_lines(&inside, true, true, &[]);
+    let rows = flat(&inside_rows);
+    assert!(
+        rows.contains(&("Endurance used", "99%")),
+        "a device inside its rated life wears no marker: {rows:?}"
+    );
+}
+
 #[test]
 fn disk_summary_renders_observed_iops_latency_and_queue_depth() {
     use taskmanager_application::i18n::{Language, set_language};

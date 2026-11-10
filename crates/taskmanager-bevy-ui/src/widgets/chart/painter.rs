@@ -24,8 +24,7 @@ use bevy::scene::{EntityWorldMutSceneExt, Scene, bsn};
 use bevy::time::Time;
 use bevy::ui::widget::{ImageNode, NodeImageMode, Text};
 use bevy::ui::{ComputedNode, Display, Node, Overflow, PositionType, Val, percent, px};
-use taskmanager_ui_contract::presentation::motion::CHART_SLIDE_DURATION;
-use zhuge_ui_core::easing::smoothstep;
+use taskmanager_ui_contract::presentation::motion::{CHART_SLIDE_DURATION, chart_slide_ramp};
 
 use crate::widgets::chart::canvas::{
     CanvasCrosshair, CanvasFill, CanvasFlow, CanvasGrid, CanvasImage, CanvasSpec, rasterize,
@@ -236,11 +235,19 @@ fn canvas_runs(canvas: &ChartCanvas, size: Vec2) -> Vec<ChartRun> {
 
 /// The horizontal shift of the settling slide: the curve enters one slot from
 /// the right and slides left into place.
+///
+/// The easing is the shared chart-slide ramp
+/// (`taskmanager_ui_contract::presentation::motion::chart_slide_ramp`), the
+/// same curve the GPUI graph and the Iced chart slide on: one fact, one
+/// owner. This surface used to shape the progress with the toolkit's
+/// cubic `smoothstep`, which answered 0.15625 at progress 0.25 against the
+/// shared ramp's 0.125 — the same slide, two curves, and a per-frame
+/// position the other frontends never painted.
 pub(crate) fn slide_offset(progress: f32, width: f32, points: usize) -> f32 {
     if points < 2 {
         return 0.0;
     }
-    let eased = smoothstep(progress);
+    let eased = chart_slide_ramp(progress);
     let slot = width / (points - 1) as f32;
     -(1.0 - eased) * slot
 }

@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+import instrument_budget
+
 try:
     from capture_supervisor import SupervisorError, validate_supervised_metadata
     from validate_capture_evidence import (
@@ -163,13 +165,12 @@ def scaled_size(logical: tuple[int, int], scale: Decimal) -> tuple[int, int]:
 
 
 def current(*command: str, cwd: Path) -> str:
-    result = subprocess.run(
+    result = instrument_budget.run(
         command,
         cwd=cwd,
         check=True,
         text=True,
         capture_output=True,
-        timeout=15,
     )
     return result.stdout.strip()
 
@@ -312,13 +313,12 @@ def ocr_text(path: Path) -> str:
     # the bounded OCR step from oversubscribing concurrent capture processes.
     environment = os.environ.copy()
     environment.update(OMP_THREAD_LIMIT="1", OMP_NUM_THREADS="1")
-    result = subprocess.run(
+    result = instrument_budget.run(
         ["tesseract", str(path), "stdout", "--psm", "11"],
         env=environment,
         check=True,
         text=True,
         capture_output=True,
-        timeout=15,
     )
     return result.stdout
 
@@ -641,7 +641,7 @@ def main() -> int:
         try:
             self_test()
             return 0
-        except (EvidenceError, OSError, ValueError) as error:
+        except (EvidenceError, OSError, ValueError, instrument_budget.InstrumentIncomplete) as error:
             print(f"host diagnostic validator self-test: FAIL: {error}", file=sys.stderr)
             return 1
 
@@ -668,6 +668,26 @@ def main() -> int:
             f"({payload['image_width']}x{payload['image_height']}; diagnostic-only, not parity)"
         )
         return 0
+    except instrument_budget.InstrumentIncomplete as error:
+        # The instrument ran out of budget. That is a host-speed condition and
+        # says nothing about the capture, so it must not be written as a
+        # product verdict: `reject` here once failed `capture-isolation` with
+        # the reason literally reading "tesseract timed out after 15 seconds".
+        incomplete = {
+            "schema_version": 1,
+            "status": "incomplete",
+            "diagnostic_only": True,
+            "parity_evidence": False,
+            "reason": str(error),
+        }
+        try:
+            if args.metadata.is_file():
+                incomplete["run_id"] = read_metadata(args.metadata).get("run_id", "unknown")
+            write_receipt(args.receipt, incomplete)
+        except (OSError, EvidenceError):
+            pass
+        print(f"host Wayland diagnostic validation: INCOMPLETE: {error}", file=sys.stderr)
+        return 3
     except (EvidenceError, OSError, ValueError, subprocess.SubprocessError) as error:
         rejection = {
             "schema_version": 1,

@@ -111,7 +111,7 @@ fn aggregate_discovery_outcome(sources: &[SourceStatus], discovered_count: usize
             SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => Some(failure),
             SourceOutcome::Available | SourceOutcome::Empty => None,
         })
-        .max_by_key(|failure| failure_priority(*failure));
+        .reduce(FailureKind::stronger);
     match failure {
         Some(failure) if discovered_count == 0 => SourceOutcome::Unavailable(failure),
         Some(failure) => SourceOutcome::Partial(failure),

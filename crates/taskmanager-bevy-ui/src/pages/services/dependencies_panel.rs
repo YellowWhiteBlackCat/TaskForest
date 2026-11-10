@@ -23,9 +23,9 @@ use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::target::ServiceId;
 use taskmanager_application::ServiceDependenciesLifecycle;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::control_error_detail;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;

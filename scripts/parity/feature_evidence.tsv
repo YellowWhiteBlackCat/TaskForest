@@ -383,7 +383,7 @@ process.scheduler-policy	gpui	gpui_app::root::chrome::tests::overview_and_comman
 process.scheduler-policy	iced	ui::overlays::process_details::vm_parity_tests::property_pairs_mirror_the_neutral_vm	anchored	-	-
 process.scheduler-policy	tui	ui::process_properties::vm_parity_tests::overview_rows_mirror_the_neutral_vm	anchored	-	-
 process.scheduler-policy	bevy	pages::processes::details::tests::selected_projection_uses_the_shared_vm_and_keeps_insights_typed	anchored	-	-
-process.priority-mapping	gpui	gpui_app::root::process_feedback::tests::priority_tier_actions_render_localized_feedback	anchored	-	-
+process.priority-mapping	gpui	gpui_app::processes_view::chrome::action_bar::behavior_tests::priority_pick_submits_the_neutral_typed_verb	anchored	-	-
 process.priority-mapping	iced	ui::applications::priority_choice::tests::priority_choice_maps_to_typed_priority_tiers_and_localizes	anchored	-	-
 process.priority-mapping	tui	runtime::tests::process_batch::suspend_resume_and_priority_emit_execute_batch_directly	anchored	-	-
 process.priority-mapping	bevy	pages::processes::menu::tests::the_priority_picks_submit_the_neutral_set_priority_request	anchored	-	-

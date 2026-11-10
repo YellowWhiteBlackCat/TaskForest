@@ -14,16 +14,6 @@ const DEBT_BASELINE: &[LayoutDebtCell] = &[
     cell(FrontendShape::Iced, LayoutAxis::PerformanceStatsMinWidth),
     cell(FrontendShape::Iced, LayoutAxis::PerformanceStatsMaxWidth),
     cell(FrontendShape::Iced, LayoutAxis::PerformanceSidebarMinWidth),
-    cell(FrontendShape::Iced, LayoutAxis::MinimumWindowWidth),
-    cell(FrontendShape::Iced, LayoutAxis::MinimumWindowHeight),
-    cell(FrontendShape::Bevy, LayoutAxis::ConstrainedContentHeight),
-    cell(FrontendShape::Bevy, LayoutAxis::GenerousContentHeight),
-    cell(FrontendShape::Bevy, LayoutAxis::ChartsRungContentHeight),
-    cell(FrontendShape::Bevy, LayoutAxis::StackedDetailsMinHeight),
-    cell(FrontendShape::Bevy, LayoutAxis::RootChromeSingleRowWidth),
-    cell(FrontendShape::Bevy, LayoutAxis::NavigationHorizontalInset),
-    cell(FrontendShape::Bevy, LayoutAxis::VerticalChromeReserve),
-    cell(FrontendShape::Bevy, LayoutAxis::HorizontalChromeReserve),
 ];
 
 const fn cell(frontend: FrontendShape, axis: LayoutAxis) -> LayoutDebtCell {
@@ -171,6 +161,19 @@ fn the_two_recorded_legacy_differences_are_registered_not_erased() {
         number(FrontendShape::Iced, LayoutAxis::HorizontalChromeReserve),
         20.0
     );
+    // Bevy's two registered answers: the rail it subtracts before classifying,
+    // and the inset it charges nobody but its own scaffold padding. The
+    // production `RAIL_WIDTH` binds from this row, so 64.0 has one address.
+    assert_eq!(
+        number(FrontendShape::Bevy, LayoutAxis::HorizontalChromeReserve),
+        64.0
+    );
+    assert_eq!(
+        number(FrontendShape::Bevy, LayoutAxis::NavigationHorizontalInset),
+        0.0,
+        "the shape subtracts only the rail: charging the shared inset would double-count \
+         the page padding it already spends"
+    );
     let registered = divergent_axes(FrontendShape::Gpui, FrontendShape::Iced);
     for axis in [
         LayoutAxis::ConstrainedContentHeight,
@@ -182,8 +185,6 @@ fn the_two_recorded_legacy_differences_are_registered_not_erased() {
         LayoutAxis::PerformanceSidebarMinWidth,
         LayoutAxis::SidebarPreferenceWidth,
         LayoutAxis::NavigationHorizontalInset,
-        LayoutAxis::MinimumWindowWidth,
-        LayoutAxis::MinimumWindowHeight,
         LayoutAxis::VerticalChromeReserve,
         LayoutAxis::HorizontalChromeReserve,
         LayoutAxis::StackedDetailsMinHeight,
@@ -339,4 +340,77 @@ fn declaration_for(frontend: FrontendShape) -> &'static LayoutThresholdDeclarati
         .iter()
         .find(|declaration| declaration.frontend == frontend)
         .expect("every shape has a declaration")
+}
+
+/// The window floor is the one band some shapes spend and others do not, so
+/// it is the band where a declaration can silently lie: a shape that claims
+/// `Shared` while setting no minimum at all makes the registry describe a
+/// product that does not exist.
+///
+/// This pins both directions. The shapes that DO spend it (the GPUI and Iced
+/// windows set a minimum and clamp to it) declare the shared baseline, so
+/// their bindings resolve to 720x480; the shapes that spend none (the terminal
+/// owns its viewport, the Bevy window takes the compositor's size) resolve to
+/// `None`. A shape that flipped to `Absent` while still binding the number —
+/// or to `Shared` while spending nothing — fails here.
+#[test]
+fn the_window_floor_is_declared_by_the_shapes_that_actually_spend_it() {
+    use crate::presentation::thresholds::AxisDecision;
+
+    for shape in [FrontendShape::Gpui, FrontendShape::Iced] {
+        assert_eq!(
+            decision(shape, LayoutAxis::MinimumWindowWidth),
+            Some(AxisDecision::Shared),
+            "{} sets a window minimum, so it must declare the shared floor",
+            shape.name()
+        );
+        assert_eq!(
+            decision(shape, LayoutAxis::MinimumWindowHeight),
+            Some(AxisDecision::Shared),
+            "{} sets a window minimum, so it must declare the shared floor",
+            shape.name()
+        );
+        assert_eq!(
+            number(shape, LayoutAxis::MinimumWindowWidth),
+            720.0,
+            "{} binds the shared window floor, so the registry is the only address",
+            shape.name()
+        );
+        assert_eq!(
+            number(shape, LayoutAxis::MinimumWindowHeight),
+            480.0,
+            "{} binds the shared window floor, so the registry is the only address",
+            shape.name()
+        );
+    }
+
+    for shape in [FrontendShape::Tui, FrontendShape::Bevy] {
+        assert_eq!(
+            optional(shape, LayoutAxis::MinimumWindowWidth),
+            None,
+            "{} sets no window minimum, so it must not claim the shared floor",
+            shape.name()
+        );
+        assert_eq!(
+            optional(shape, LayoutAxis::MinimumWindowHeight),
+            None,
+            "{} sets no window minimum, so it must not claim the shared floor",
+            shape.name()
+        );
+    }
+}
+
+/// The floor is the same number for every shape that spends it, so the two
+/// desktop windows cannot drift apart by one editing its own copy.
+#[test]
+fn every_shape_that_spends_the_window_floor_spends_the_same_one() {
+    let widths: Vec<f32> = [FrontendShape::Gpui, FrontendShape::Iced]
+        .iter()
+        .map(|shape| number(*shape, LayoutAxis::MinimumWindowWidth))
+        .collect();
+    assert_eq!(
+        widths,
+        vec![720.0, 720.0],
+        "the shapes that set a window minimum share one floor"
+    );
 }

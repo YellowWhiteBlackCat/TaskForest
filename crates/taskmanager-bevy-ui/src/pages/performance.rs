@@ -66,9 +66,7 @@ use taskmanager_shell::presentation::{
 
 use crate::app::{PageContext, ShellTrack};
 use crate::palette::{UiPalette, space_2};
-use crate::widgets::layout::{
-    PerformanceLayoutMode, cpu_core_grid_visible, performance_sidebar_width,
-};
+use crate::widgets::layout::{PerformanceLayoutMode, performance_sidebar_width};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod device_curves;
@@ -239,18 +237,11 @@ pub(crate) struct PerformanceCompactNav;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceCompactDevicePills;
 
-/// Optional lower band of the CPU surface. The compact contract hides the
-/// whole core group when its footprint cannot fit; the main pane has no
-/// scroll owner, so it must never leave a half-rendered group at the bottom.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct PerformanceOptionalCoreGrid;
-
 type DeviceRailQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceDeviceSidebar>>;
 type StatsRailQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceStatsRail>>;
 type WideNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceWideNav>>;
 type CompactNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactNav>>;
 type CompactPillsQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactDevicePills>>;
-type OptionalCoreGridQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceOptionalCoreGrid>>;
 
 /// One rewritable text node. The field names the fact it renders, so the
 /// refresh observer is a flat query with no hierarchy walks.
@@ -286,11 +277,13 @@ pub(crate) struct DynSection(pub(crate) Section);
 #[derive(Component, Clone, Default)]
 pub(crate) struct DynBlock(pub(crate) Section, pub(crate) String);
 
-/// Visibility marker for the disk SMART spare-pool warning plate. The icon is
-/// mounted once with the disk block and only its display token changes as the
-/// folded projection changes, so a warning never becomes stale between ticks.
+/// Visibility marker for the disk SMART alert plate. The icon is mounted once
+/// with the disk block and only its display token changes as the folded
+/// projection changes, so a warning never becomes stale between ticks. The
+/// plate covers every SMART crossing this page paints: the spare pool below
+/// its warning level and the endurance past the device's rated life.
 #[derive(Component, Clone, Default)]
-pub(crate) struct DynDiskSpareAlert(pub(crate) String);
+pub(crate) struct DynDiskSmartAlert(pub(crate) String);
 
 /// One curve card root. The CPU/memory/network cards are always wanted; the
 /// GPU card stays `Display::None` until GPU facts exist ("add GPU when data
@@ -550,7 +543,6 @@ pub(crate) fn sync_performance_layout(
         WideNavQuery<'_, '_>,
         CompactNavQuery<'_, '_>,
         CompactPillsQuery<'_, '_>,
-        OptionalCoreGridQuery<'_, '_>,
     )>,
 ) {
     let width = windows.iter().next().map_or(1180.0, Window::width)
@@ -562,7 +554,6 @@ pub(crate) fn sync_performance_layout(
         } else {
             0.0
         };
-    let height = windows.iter().next().map_or(780.0, Window::height);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;
     let replay_on = replay
@@ -610,13 +601,6 @@ pub(crate) fn sync_performance_layout(
             PerformanceLayoutMode::Compact => Display::Flex,
         };
     }
-    for mut node in &mut rails.p5() {
-        node.display = match mode {
-            PerformanceLayoutMode::Wide if cpu_core_grid_visible(height) => Display::Flex,
-            PerformanceLayoutMode::Compact => Display::None,
-            PerformanceLayoutMode::Wide => Display::None,
-        };
-    }
 }
 
 /// The marker query surface a folded projection rewrites.
@@ -627,6 +611,10 @@ pub(crate) fn sync_performance_layout(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_bounds_probe.rs"]
+mod bounds_probe_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance_cpu.rs"]

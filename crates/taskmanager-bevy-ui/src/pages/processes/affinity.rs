@@ -21,7 +21,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button, ScrollArea};
+use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::FrozenProcessIdentity;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformEffect, ProcessAffinityState};
 use taskmanager_shell::ShellApp;
@@ -51,7 +53,14 @@ pub(crate) struct AffinitySession {
     pub(crate) target: FrozenProcessIdentity,
     pub(crate) logical_cpu_count: usize,
     pub(crate) selected_mask: Vec<u32>,
+    /// Whether a correlated read has ever seeded `selected_mask`. Until it
+    /// does, the grid paints nothing selected and the toggles keep the mask
+    /// unchanged: an unobserved mask is never fabricated into an editable
+    /// default (the Iced editor and the TUI modal fail closed the same way).
     pub(crate) mask_observed: bool,
+    /// The shared reason the latest read for `target` failed, if it did. The
+    /// status line paints it through the owner's resolver.
+    pub(crate) failure: Option<FailureKind>,
 }
 
 #[derive(Resource, Default)]
@@ -62,12 +71,12 @@ pub(crate) struct ProcessAffinityModalState {
 impl ProcessAffinityModalState {
     pub(crate) fn open(&mut self, target: FrozenProcessIdentity, logical_cpu_count: usize) {
         let count = logical_cpu_count.max(1);
-        let default_mask = (0..count as u32).collect();
         self.session = Some(AffinitySession {
             target,
             logical_cpu_count: count,
-            selected_mask: default_mask,
+            selected_mask: Vec::new(),
             mask_observed: false,
+            failure: None,
         });
     }
 
@@ -79,6 +88,9 @@ impl ProcessAffinityModalState {
         let Some(session) = self.session.as_mut() else {
             return;
         };
+        if !session.is_editable() {
+            return;
+        }
         if let Some(pos) = session.selected_mask.iter().position(|&c| c == cpu) {
             if session.selected_mask.len() > 1 {
                 session.selected_mask.remove(pos);
@@ -93,6 +105,9 @@ impl ProcessAffinityModalState {
         let Some(session) = self.session.as_mut() else {
             return;
         };
+        if !session.is_editable() {
+            return;
+        }
         if session.selected_mask.len() == session.logical_cpu_count {
             session.selected_mask = vec![0];
         } else {
@@ -101,8 +116,56 @@ impl ProcessAffinityModalState {
     }
 
     pub(crate) fn apply(&mut self, shell: &mut ShellApp) -> Option<PlatformEffect> {
+        if !self
+            .session
+            .as_ref()
+            .is_some_and(AffinitySession::is_editable)
+        {
+            return None;
+        }
         let session = self.session.take()?;
         shell.request_process_affinity_control_for(session.target, session.selected_mask)
+    }
+}
+
+impl AffinitySession {
+    /// Whether the displayed mask may be edited or submitted: only an observed
+    /// mask whose latest read did not fail. A failed read leaves the last-good
+    /// mask visible for context but never submits it as current.
+    #[must_use]
+    pub(crate) fn is_editable(&self) -> bool {
+        self.mask_observed && self.failure.is_none()
+    }
+
+    /// Fold one shared read outcome into the editor and report whether
+    /// anything it paints changed.
+    ///
+    /// The outcome must be about this session's frozen identity (the caller
+    /// checks `ProcessAffinityState::target`), so a recycled pid or another
+    /// process's read can never rewrite an open editor (ADR-027). A failed
+    /// read drops the mask — the current one is unknown — and carries the
+    /// shared reason; an authoritative read seeds the grid once and never
+    /// clobbers the user's in-progress edits.
+    pub(crate) fn absorb_outcome(&mut self, affinity: &ProcessAffinityState) -> bool {
+        let failure = affinity.failure_for_target(&self.target);
+        let mut changed = self.failure != failure;
+        self.failure = failure;
+        if failure.is_some() {
+            if self.mask_observed || !self.selected_mask.is_empty() {
+                self.mask_observed = false;
+                self.selected_mask.clear();
+                changed = true;
+            }
+        } else if !self.mask_observed
+            && let Some(cpus) = affinity
+                .last_good_for_target(&self.target)
+                .map(|ready| ready.cpus.clone())
+        {
+            self.selected_mask = cpus;
+            self.mask_observed = true;
+            changed = true;
+        }
+        changed
     }
 }
 
@@ -136,12 +199,22 @@ pub(crate) fn affinity_modal_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let title = format!("{} · {}", t("dialog.cpu_affinity"), session.target.name);
-    let subtitle = format!(
-        "PID: {} · {}/{} CPUs",
-        session.target.pid,
-        session.selected_mask.len(),
-        session.logical_cpu_count
-    );
+    // The status slot reads the shared read outcome: a failed read shows the
+    // owner's reason (never a Debug dump), an unobserved mask says so instead
+    // of being reported as a count, and only an observed mask is summarized.
+    let status = if let Some(failure) = session.failure {
+        control_error_detail(failure).to_owned()
+    } else if session.mask_observed {
+        format!(
+            "{}/{} {}",
+            session.selected_mask.len(),
+            session.logical_cpu_count,
+            t("proc.logical_cpus")
+        )
+    } else {
+        t("common.collecting_telemetry").to_owned()
+    };
+    let subtitle = format!("PID: {} · {status}", session.target.pid);
 
     let mut cpu_buttons: Vec<Box<dyn Scene>> = Vec::with_capacity(session.logical_cpu_count);
     for cpu in 0..session.logical_cpu_count as u32 {
@@ -360,12 +433,13 @@ pub(crate) fn on_affinity_fold_sync(
     let Some(session) = state.session.as_mut() else {
         return;
     };
-    if let ProcessAffinityState::Ready(ready) = track.shell().process_affinity_state()
-        && ready.target == session.target
-        && !session.mask_observed
-    {
-        session.selected_mask = ready.cpus.clone();
-        session.mask_observed = true;
+    // Only an outcome for the identity captured at open time may rewrite this
+    // editor; the fold itself is the session's own `absorb_outcome`.
+    let affinity = track.shell().process_affinity_state();
+    if affinity.target() != Some(&session.target) {
+        return;
+    }
+    if session.absorb_outcome(affinity) {
         commands.trigger(ProcessAffinityRepaintRequired);
     }
 }

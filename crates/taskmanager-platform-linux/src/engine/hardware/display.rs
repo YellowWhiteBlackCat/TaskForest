@@ -39,7 +39,7 @@ pub(super) fn collect_displays(root: &Path) -> (Vec<DisplayInfo>, SourceOutcome)
             Ok(status) => status,
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => {
-                failure = Some(select_failure(failure, io_failure(&error)));
+                failure = Some(FailureKind::strongest(failure, io_failure(&error)));
                 continue;
             }
         };
@@ -60,14 +60,14 @@ pub(super) fn collect_displays(root: &Path) -> (Vec<DisplayInfo>, SourceOutcome)
             Ok(edid) if !edid.is_empty() => match parse_edid(&display.connector, &edid) {
                 Some(parsed) => display = merge_mode_fallback(parsed, &display),
                 None => {
-                    failure = Some(select_failure(failure, FailureKind::ProviderFault));
+                    failure = Some(FailureKind::strongest(failure, FailureKind::ProviderFault));
                 }
             },
             Ok(_) => {
-                failure = Some(select_failure(failure, FailureKind::Unsupported));
+                failure = Some(FailureKind::strongest(failure, FailureKind::Unsupported));
             }
             Err(error) => {
-                failure = Some(select_failure(failure, io_failure(&error)));
+                failure = Some(FailureKind::strongest(failure, io_failure(&error)));
             }
         }
         displays.push(display);
@@ -165,26 +165,6 @@ pub(super) fn parse_edid(connector: &str, edid: &[u8]) -> Option<DisplayInfo> {
         refresh_hz,
         hdr_supported,
     })
-}
-
-fn select_failure(current: Option<FailureKind>, candidate: FailureKind) -> FailureKind {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => current,
-        _ => candidate,
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 8,
-        FailureKind::PermissionDenied => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::TimedOut => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
 }
 
 fn io_failure(error: &io::Error) -> FailureKind {

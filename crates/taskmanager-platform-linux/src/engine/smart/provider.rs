@@ -121,12 +121,8 @@ pub(crate) fn aggregate_smart_sources(
             SourceOutcome::Available | SourceOutcome::Empty => None,
             SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => Some(failure),
         };
-        if let Some(failure) = failure
-            && aggregate.failure.is_none_or(|current| {
-                smart_failure_priority(failure) > smart_failure_priority(current)
-            })
-        {
-            aggregate.failure = Some(failure);
+        if let Some(failure) = failure {
+            aggregate.failure = Some(FailureKind::strongest(aggregate.failure, failure));
         }
     }
     by_provider
@@ -156,20 +152,6 @@ const fn smart_failure_kind(failure: SmartProviderFailureKind) -> FailureKind {
         }
         SmartProviderFailureKind::DeviceUnavailable
         | SmartProviderFailureKind::TemporarilyUnavailable => FailureKind::TemporarilyUnavailable,
-    }
-}
-
-const fn smart_failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::IdentityChanged => 3,
-        FailureKind::Rejected => 2,
-        FailureKind::Unsupported => 1,
     }
 }
 

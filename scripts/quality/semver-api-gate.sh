@@ -54,11 +54,12 @@
 #                                   JSON and the nightly toolchain is installed
 #   SEMVER_RUSTDOC_TOOLCHAIN        toolchain that can emit rustdoc JSON
 #                                   (default: nightly; rustdoc JSON is unstable)
-#   SEMVER_SCRATCH                  run-directory root for the baseline tree, logs
-#                                   and probe (default: repo `.tmp/`, because the
-#                                   per-user quota on `/tmp` is shared machine-wide
-#                                   and a quota-exhausted scratch shows up as I/O
-#                                   errors inside the check, not as an API break)
+#   SEMVER_SCRATCH                  first-choice run-directory root; candidates are
+#                                   tried in order and each must pass a real write
+#                                   probe. The repository's `.tmp/semver-gate`
+#                                   outranks an ambient TMPDIR (owner:
+#                                   scripts/quality/semver_scratch.sh)
+#   SEMVER_SCRATCH_SELF_TEST=1      run the scratch-selection self-test and exit
 #
 # Exit codes:
 #   0  every checked crate kept its public API
@@ -77,6 +78,33 @@
 # flag is reported explicitly instead of being passed blindly.
 
 set -euo pipefail
+
+if [[ "${1:-}" == "--self-test" ]]; then
+    eval "$(sed -n '/^semver_failure_levels()/,/^}/p' "${BASH_SOURCE[0]}")"
+    scratch="$(mktemp -d)"
+    trap 'rm -rf "$scratch"' EXIT
+    pass=0
+    printf '%s\n' 'Summary semver requires new major version: 3 major and 0 minor checks failed' >"$scratch/major"
+    printf '%s\n' 'Summary semver requires new minor version: 0 major and 2 minor checks failed' >"$scratch/minor"
+    printf '%s\n' 'Summary semver requires new major version: 3 major and 1 minor checks failed' >"$scratch/mixed"
+    [[ "$(semver_failure_levels "$scratch/major")" == "major" ]] && pass=$((pass + 1)) ||
+        echo "FAIL a pure major summary was not classified"
+    [[ -z "$(semver_failure_levels "$scratch/minor")" ]] && pass=$((pass + 1)) ||
+        echo "FAIL a minor-only summary was treated as planned major"
+    [[ -z "$(semver_failure_levels "$scratch/mixed")" ]] && pass=$((pass + 1)) ||
+        echo "FAIL a mixed summary was treated as planned major"
+    echo "semver major bump classifier self-test: PASS ($pass cases)"
+    [[ "$pass" -eq 3 ]]
+    exit $?
+fi
+
+# A self-test must not pay for the gate's preflight (tool discovery, baseline
+# resolution, 20-crate manifest scan) just to prove a scratch-selection rule.
+source "$(dirname "${BASH_SOURCE[0]}")/semver_scratch.sh"
+if [[ "${SEMVER_SCRATCH_SELF_TEST:-0}" == "1" ]]; then
+    semver_scratch_self_test
+    exit $?
+fi
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
@@ -252,6 +280,81 @@ baseline_has_crate() {
     return 1
 }
 
+# cargo-semver-checks treats a major version bump as "no semver update
+# required" and skips every lint (observed: 0 checks, 260 skip). A worktree
+# that bumps an unpublished crate's major version must therefore never read
+# that vacuous verdict as a green public-API gate. Force the current rustdoc
+# JSON back to the baseline version so the tool runs every lint; a result
+# containing only major-level findings proves the planned breaking release,
+# while a minor/patch finding is an unplanned break and fails the gate.
+manifest_version() {
+    local root="$1" manifest="$2"
+    sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$root/$manifest" | head -n 1
+}
+
+major_of() {
+    local version="$1"
+    local first="${version%%.*}"
+    if [[ "$first" != "0" ]]; then
+        printf '%s' "$first"
+        return
+    fi
+    # Cargo treats 0.x as pre-1.0: the second component carries the breaking
+    # version step, and cargo-semver-checks skips every lint for that bump.
+    local rest="${version#*.}"
+    printf '%s' "0.${rest%%.*}"
+}
+
+major_bump_crate() {
+    local crate_name="$1" manifest
+    manifest="crates/$crate_name/Cargo.toml"
+    [[ -f "$repo/$manifest" ]] || return 1
+    local current baseline
+    current="$(manifest_version "$repo" "$manifest")"
+    baseline="$(git -C "$repo" show "${baseline_sha}:${manifest}" 2>/dev/null | sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)"
+    [[ -n "$current" && -n "$baseline" ]] || return 1
+    local current_major baseline_major
+    current_major="$(major_of "$current")"
+    baseline_major="$(major_of "$baseline")"
+    [[ "$current_major" != "$baseline_major" ]]
+}
+
+force_baseline_version() {
+    local current_json="$1" baseline_json="$2"
+    SEMVER_FORCED_JSON="$current_json" SEMVER_BASELINE_JSON="$baseline_json" \
+        timeout 60s python3 -c '
+import json, os, sys
+current_path = os.environ["SEMVER_FORCED_JSON"]
+baseline_path = os.environ["SEMVER_BASELINE_JSON"]
+try:
+    with open(current_path, encoding="utf-8") as stream:
+        current = json.load(stream)
+    with open(baseline_path, encoding="utf-8") as stream:
+        baseline = json.load(stream)
+    version = baseline.get("crate_version")
+    if not isinstance(version, str) or not version:
+        sys.exit(1)
+    current["crate_version"] = version
+    with open(current_path, "w", encoding="utf-8") as stream:
+        json.dump(current, stream)
+except Exception:
+    sys.exit(1)
+'
+}
+
+semver_failure_levels() {
+    local logfile="$1"
+    local summary
+    summary="$(grep -m1 -E 'semver requires new (major|minor|patch)' "$logfile" 2>/dev/null || true)"
+    [[ -n "$summary" ]] || return 0
+    local major_count minor_count patch_count
+    major_count="$(grep -oE '[0-9]+ major' <<<"$summary" | grep -oE '[0-9]+' | head -n 1)"
+    minor_count="$(grep -oE '[0-9]+ minor' <<<"$summary" | grep -oE '[0-9]+' | head -n 1)"
+    patch_count="$(grep -oE '[0-9]+ patch' <<<"$summary" | grep -oE '[0-9]+' | head -n 1)"
+    [[ "${major_count:-0}" -gt 0 && "${minor_count:-0}" -eq 0 && "${patch_count:-0}" -eq 0 ]] &&
+        printf '%s' "major"
+}
+
 # ---------------------------------------------------------------------------
 # Ignore list
 # ---------------------------------------------------------------------------
@@ -399,37 +502,17 @@ fi
 # ---------------------------------------------------------------------------
 # Per-crate checks
 # ---------------------------------------------------------------------------
-# Scratch placement is a gate-reliability decision, not a style one. The
-# baseline-tree extraction, the per-crate logs and the write probe all live
-# here; a filesystem with a tight per-user quota (a qgroup-capped /tmp, for
-# example) turns a machine condition into "Disk quota exceeded" I/O errors
-# inside the check, which the old flow reported as "broke the public API".
-# Default to the repository's ignored `.tmp/`, keep honoring an explicit
-# TMPDIR, and refuse to run when nothing is writable rather than emit a
-# misattributed FAIL.
-scratch_root="${SEMVER_SCRATCH:-${TMPDIR:-$repo/.tmp/semver-gate}}"
-mkdir -p "$scratch_root" 2>/dev/null ||
-    scratch_root="$repo/.tmp/semver-gate"
-mkdir -p "$scratch_root" 2>/dev/null || {
-    fail "no scratch root is writable: '$SEMVER_SCRATCH', TMPDIR and '$repo/.tmp' all failed."
-    fail "point SEMVER_SCRATCH at a writable directory outside any exhausted quota."
-    exit 2
-}
-# A directory can be writable and still be quota-dead for the gigabytes this
-# gate extracts. Probe with a real write before spending minutes building.
-probe_dir="$(mktemp -d "${scratch_root%/}/semver-probe.XXXXXX")" || {
-    fail "cannot create a probe directory under '$scratch_root'"
-    exit 2
-}
-if ! head -c 134217728 /dev/zero >"$probe_dir/write-probe" 2>"$probe_dir/write-probe.err"; then
-    fail "scratch root '$scratch_root' cannot hold the gate's own writes:"
-    sed 's/^/semver-gate:   /' "$probe_dir/write-probe.err" >&2 || true
-    fail "the gate would report an I/O condition as a public-API break; refusing to run."
-    fail "point SEMVER_SCRATCH at a filesystem with at least 128 MiB of writable space."
-    rm -rf "$probe_dir"
-    exit 2
-fi
-rm -rf "$probe_dir"
+# Scratch placement is a gate-reliability decision, not a style one, and it
+# has one owner: `scripts/quality/semver_scratch.sh`. The baseline-tree
+# extraction, per-crate logs and cache need gigabytes of ordinary writes; a
+# qgroup-capped `/tmp` turns that into EDQUOT *inside* the check, which used to
+# be printed as "broke the public API". An ambient TMPDIR outranking the
+# repository's own scratch made the opposite escape hatch: exit 2 -> SKIP, so
+# a blocking gate could disappear from CI without anyone noticing. The helper
+# proves each candidate with a real write and falls through in a fixed order;
+# when none qualifies it refuses loudly instead of judging an API it never saw.
+scratch_root="$(select_scratch_root "$repo")" || exit 2
+log "scratch root: $scratch_root"
 
 log_dir="$(mktemp -d "${scratch_root%/}/semver-api-gate.XXXXXX")" || {
     fail "cannot create the run directory under '$scratch_root'"
@@ -463,8 +546,8 @@ summarize_failures() {
         else
             lints="$lints, $line"
         fi
-    done < <(grep -E '^--- (error|warning) [A-Za-z0-9_]+:' "$logfile" 2>/dev/null |
-        sed -E 's/^--- (error|warning) ([A-Za-z0-9_]+):.*/\1:\2/' | sort -u || true)
+    done < <(grep -E '^--- (error|warning|failure) [A-Za-z0-9_]+:' "$logfile" 2>/dev/null |
+        sed -E 's/^--- (error|warning|failure) ([A-Za-z0-9_]+):.*/\1:\2/' | sort -u || true)
     printf '%s' "$lints"
 }
 
@@ -529,6 +612,7 @@ rustdoc_json_for() {
 results=()
 failures=0
 compared=0
+planned_breaks=0
 
 # Baseline side of the lockfile-pinned flow: the exact baseline tree, checked
 # out beside the current one, so its own Cargo.lock pins its own build.
@@ -553,6 +637,10 @@ for crate_name in "${publishable_crates[@]}"; do
         results+=("$crate_name"$'\t'"SKIP"$'\t'"not present in the baseline revision")
         continue
     fi
+    planned_major=0
+    if major_bump_crate "$crate_name"; then
+        planned_major=1
+    fi
 
     # Preferred: build both sides here with `cargo rustdoc --locked` and hand
     # the two JSON files over, so the baseline side is pinned by the baseline
@@ -566,6 +654,13 @@ for crate_name in "${publishable_crates[@]}"; do
         if rustdoc_json_for "$repo" "$crate_name" "$cur_json" "$rustdoc_target" &&
             rustdoc_json_for "$baseline_tree" "$crate_name" "$base_json" "$rustdoc_target"; then
             used_rustdoc=1
+            if [[ "$planned_major" -eq 1 ]] && ! force_baseline_version "$cur_json" "$base_json"; then
+                log "  $crate_name: FAIL — cannot force the baseline version into current rustdoc JSON"
+                results+=("$crate_name"$'\t'"FAIL"$'\t'"planned major bump could not be fully scanned")
+                failures=$((failures + 1))
+                compared=$((compared + 1))
+                continue
+            fi
         else
             log "  $crate_name: rustdoc JSON could not be produced; using the tool-driven baseline"
         fi
@@ -613,13 +708,22 @@ for crate_name in "${publishable_crates[@]}"; do
             verdict="PASS"
             detail="$(grep -m1 -E 'no semver update required' "$log_dir/$crate_name.log" 2>/dev/null || true)"
             [[ -n "$detail" ]] || detail="no breaking change"
+            if [[ "$planned_major" -eq 1 && "$used_rustdoc" -eq 1 ]]; then
+                detail="planned major bump: full lint scan clean"
+            fi
             ;;
         100)
             verdict="FAIL"
             detail="$(summarize_failures "$log_dir/$crate_name.log")"
             [[ -n "$detail" ]] || detail="semver violation"
+            levels="$(semver_failure_levels "$log_dir/$crate_name.log")"
+            if [[ "$planned_major" -eq 1 && "$used_rustdoc" -eq 1 && "$levels" == "major" ]]; then
+                verdict="PASS"
+                detail="planned major bump: only major API removals ($detail); publish 0.6.0 before claiming a clean baseline"
+                planned_breaks=$((planned_breaks + 1))
+            fi
             bump="$(grep -m1 -E 'semver requires new' "$log_dir/$crate_name.log" 2>/dev/null || true)"
-            if [[ -n "$bump" ]]; then
+            if [[ -n "$bump" && "$verdict" == "FAIL" ]]; then
                 detail="$detail; $bump"
             fi
             ;;
@@ -675,5 +779,9 @@ if [[ "$compared" -eq 0 ]]; then
     exit 1
 fi
 
-log "compared $compared crate(s) against $baseline_rev ($baseline_sha); every one of them kept its public API."
+if [[ "$planned_breaks" -gt 0 ]]; then
+    log "$planned_breaks crate(s) carry planned breaking releases; publish the new version before it becomes the semver baseline."
+else
+    log "compared $compared crate(s) against $baseline_rev ($baseline_sha); every one of them kept its public API."
+fi
 exit 0

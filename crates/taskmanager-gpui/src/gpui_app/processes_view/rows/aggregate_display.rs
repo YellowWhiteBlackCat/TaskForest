@@ -5,7 +5,7 @@ use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::process::aggregate::AggregateMetric;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::i18n;
-use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_application::i18n::control_error_detail;
 
 /// One stable text projection for aggregate CPU. Its full string is reused by
 /// the table tooltip and accessibility summary; the bounded cell truncates

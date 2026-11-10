@@ -53,6 +53,11 @@ Testing follows a strict three-tier verification contract:
    menu, and their readiness gate refuses to emit a frame unless the whole
    glass card is inside the window — a popover that flips past an edge and
    clips its first verbs cannot be recorded as a passing capture.
+   The `performance`/`perf-cpu*` rows likewise wait for the Cores card's
+   measured reveal: a grid body that does not yet show its whole measured
+   content is a card header above an empty grid. A group the shared rung does
+   not admit — a compact window, or another device's detail view — owns no
+   pixels and gates nothing.
 
 ## Testing Disciplines & Anti-False-Pass Rules
 

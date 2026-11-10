@@ -20,8 +20,8 @@ use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
 use taskmanager_application::SmbiosMemoryState;
 use taskmanager_application::i18n;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{InfoSortCol, SortDir};
 use zhuge_ui_core::row_page::RowPage;
 
@@ -492,21 +492,16 @@ pub(super) fn render_users(
 /// while no outcome has been accepted.
 fn session_feedback_line(app: &TuiApp, theme: TuiTheme) -> Option<Line<'static>> {
     let outcome = app.shell.projection().session_control_feedback.as_ref()?;
-    let target = outcome.identity.session_id.to_string();
-    let action = i18n::session_control_action_label(outcome.action);
-    match &outcome.result {
-        Ok(()) => Some(Line::from(Span::styled(
-            t("feedback.session_request_accepted")
-                .replace("{action}", action)
-                .replace("{target}", &target),
-            Style::new().fg(theme.good),
-        ))),
-        Err(error) => Some(Line::from(Span::styled(
-            t("feedback.action_failed_detail")
-                .replace("{action}", action)
-                .replace("{target}", &target)
-                .replace("{detail}", &format!("{error:?}")),
-            Style::new().fg(theme.danger),
-        ))),
-    }
+    let text = i18n::control_outcome_text(
+        i18n::session_control_action_label(outcome.action),
+        outcome.identity.session_id.as_str(),
+        true,
+        outcome.result,
+    );
+    let color = if outcome.result.is_ok() {
+        theme.good
+    } else {
+        theme.danger
+    };
+    Some(Line::from(Span::styled(text, Style::new().fg(color))))
 }

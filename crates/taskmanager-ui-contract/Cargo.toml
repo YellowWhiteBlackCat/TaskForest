@@ -1,6 +1,6 @@
 [package]
 name = "taskmanager-ui-contract"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.99.1"
 license = "Apache-2.0"
@@ -11,7 +11,7 @@ homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 documentation = "https://docs.rs/taskmanager-ui-contract"
 
 [dependencies]
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 

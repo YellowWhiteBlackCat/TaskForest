@@ -12,7 +12,7 @@ documentation = "https://docs.rs/taskmanager-platform-conformance"
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 
 [lib]

@@ -10,11 +10,29 @@ use taskforest_core::core::percent::percent_text;
 pub(crate) struct StatsRow {
     pub(crate) label: String,
     pub(crate) value: String,
+    /// The fact crossed its typed level and the row wears the alert plate.
+    /// The plate is a semantic bitmap sibling, never a decoration codepoint
+    /// in the value text (the tofu law).
+    pub(crate) alert: bool,
 }
 
 impl StatsRow {
     fn new(label: String, value: String) -> Self {
-        Self { label, value }
+        Self {
+            label,
+            value,
+            alert: false,
+        }
+    }
+
+    /// A row whose fact crossed its typed level: the row wears the alert
+    /// plate so the crossing is visible where the number is read.
+    fn with_alert(label: String, value: String, alert: bool) -> Self {
+        Self {
+            label,
+            value,
+            alert,
+        }
     }
 }
 
@@ -287,15 +305,17 @@ pub(crate) fn disk_stat_rows(shell: &ShellApp) -> Vec<StatsRow> {
         ));
     }
     if let Some(value) = disk.smart_available_spare_pct {
-        rows.push(StatsRow::new(
+        rows.push(StatsRow::with_alert(
             t("disk.available_spare").to_owned(),
             percent_text(value),
+            super::disk_spare_warning(disk),
         ));
     }
     if let Some(value) = disk.smart_percent_used {
-        rows.push(StatsRow::new(
+        rows.push(StatsRow::with_alert(
             t("disk.endurance_used").to_owned(),
             percent_text(value),
+            super::disk_wear_critical(disk),
         ));
     }
     if let Some(hours) = disk.smart_power_on_hours {

@@ -73,7 +73,7 @@ impl ApplicationCatalog {
     pub(super) fn observe(
         &mut self,
         executable: &ProcessMetadataObservation<PathBuf>,
-        argv: &[std::borrow::Cow<'_, str>],
+        argv: &[String],
         observed_at_ms: u64,
     ) -> (
         ProcessMetadataObservation<ProcessApplicationIdentity>,
@@ -165,7 +165,7 @@ impl ApplicationCatalog {
         pid: u32,
         expected_start_token: Result<u64, FailureKind>,
         executable: &ProcessMetadataObservation<PathBuf>,
-        argv: &[std::borrow::Cow<'_, str>],
+        argv: &[String],
         observed_at_ms: u64,
     ) -> (
         ProcessMetadataObservation<ProcessApplicationIdentity>,
@@ -185,7 +185,7 @@ impl ApplicationCatalog {
     fn find_match(
         &self,
         executable: &Path,
-        argv: &[std::borrow::Cow<'_, str>],
+        argv: &[String],
     ) -> Result<ProcessApplicationIdentity, CatalogMatch> {
         let process_path = normalize_executable_path(executable);
         let process_basename = executable_key_from_path(executable).ok_or(CatalogMatch::NoEntry)?;

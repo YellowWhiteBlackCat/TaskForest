@@ -6,6 +6,7 @@ use super::*;
 use crate::pages::performance::metrics::battery_sidebar_title;
 use crate::pages::performance::sidebar_editor::SidebarState;
 use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
+use crate::widgets::layout_budget::PerformanceLowerBand;
 use bevy::ui_widgets::ScrollArea;
 
 fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
@@ -46,6 +47,10 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
 /// The per-core grid card: the shared graph card owns the card chrome, and
 /// the per-core body beside it owns the class groups, the socket envelopes,
 /// the responsive column policy, and the collapse/expand reveal.
+///
+/// The card composes the per-core grid. Its production mount owns the
+/// lower-band marker, so one-off scene tests can still measure the card
+/// itself without the frame-level admission policy.
 pub(super) fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
     let body = super::cores::core_grid_body_scene(shell, palette);
     let card = graph_card_scene(
@@ -202,6 +207,11 @@ pub(crate) fn cpu_main_scene(
     let selector = metric_selector_scene(shell, palette);
     let headers = super::headers::all_device_headers_scene(shell);
 
+    let core_grid = bsn! {
+        Node { width: percent(100), display: Display::Flex }
+        PerformanceLowerBand
+        Children [ @cpu_core_grid_scene(shell, palette) ]
+    };
     let cpu_container = bsn! {
         Node {
             width: percent(100),
@@ -212,7 +222,7 @@ pub(crate) fn cpu_main_scene(
         DeviceViewCategory(DeviceCategoryKind::Cpu)
         Children [
              @cpu_metric_strip_scene(shell, palette) --
-             @cpu_core_grid_scene(shell, palette)
+             @{ core_grid }
         ]
     };
 

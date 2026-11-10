@@ -145,6 +145,7 @@ diagnostic-failure-compact	performance	default	54	16	gnome-dark
 smart-missing-tool	performance	disk	120	36	gnome-dark
 smart-missing-tool-compact	performance	disk	54	16	gnome-dark
 smart-permission	performance	disk	120	36	gnome-dark
+smart-wear-critical	performance	disk	120	48	gnome-dark
 smart-permission-compact	performance	disk	54	16	gnome-dark
 partition-disk-usage	performance	disk	120	36	gnome-dark
 partition-disk-usage-compact	performance	disk	54	16	gnome-dark

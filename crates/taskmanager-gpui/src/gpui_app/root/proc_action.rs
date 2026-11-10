@@ -7,10 +7,10 @@ use taskforest_core::core::process::{
 };
 use taskmanager_application::ProcessControlRequest;
 use taskmanager_application::ProcessDetailsSection;
+use taskmanager_shell::presentation::ALERT_MARKER;
 
 use super::{Hover, ProcMenuAction, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
-use crate::gpui_app::root::process_feedback::ProcessControlAction;
 
 /// A single-target control intent extracted from a process-menu action.
 /// `Suspend`/`Resume` route through the neutral request vocabulary
@@ -24,26 +24,18 @@ enum MenuControlRequest {
     Signal(ProcessSignal),
 }
 
-/// Compose the neutral control request and its feedback label once the frozen
-/// target resolves. Pure so the menu vocabulary mapping is testable without a
-/// platform client.
+/// Compose the neutral control request once the frozen target resolves. Pure so
+/// the menu vocabulary mapping is testable without a platform client; the
+/// notice's action label resolves from the request's own neutral kind at the
+/// submission boundary (`single_control_request`).
 fn menu_control_submission(
     control: MenuControlRequest,
     target: FrozenProcessIdentity,
-) -> (ProcessControlRequest, ProcessControlAction) {
+) -> ProcessControlRequest {
     match control {
-        MenuControlRequest::Suspend => (
-            ProcessControlRequest::Suspend { target },
-            ProcessControlAction::Suspend,
-        ),
-        MenuControlRequest::Resume => (
-            ProcessControlRequest::Resume { target },
-            ProcessControlAction::Resume,
-        ),
-        MenuControlRequest::Signal(signal) => (
-            ProcessControlRequest::SendSignal { target, signal },
-            ProcessControlAction::Signal(signal),
-        ),
+        MenuControlRequest::Suspend => ProcessControlRequest::Suspend { target },
+        MenuControlRequest::Resume => ProcessControlRequest::Resume { target },
+        MenuControlRequest::Signal(signal) => ProcessControlRequest::SendSignal { target, signal },
     }
 }
 
@@ -52,7 +44,13 @@ impl RootView {
         use taskmanager_ui::overlays::toast::{ToastEvent, ToastState};
         use zhuge_ui_tokens::StatusKind;
         let msg = msg.into();
-        let kind = if msg.starts_with("\u{26a0} ") {
+        // The marker plus one space is the prefix a failure notice is written
+        // with; the space is part of the routing, so it is matched rather than
+        // folded into the marker's own spelling.
+        let kind = if msg
+            .strip_prefix(ALERT_MARKER)
+            .is_some_and(|rest| rest.starts_with(' '))
+        {
             StatusKind::Danger
         } else {
             StatusKind::Info
@@ -170,8 +168,8 @@ impl RootView {
             && let Some(control) = control
             && let Some(target) = self.frozen_process(identity)
         {
-            let (request, feedback_action) = menu_control_submission(control, target);
-            self.submit_process_control(request, feedback_action, identity, cx);
+            let request = menu_control_submission(control, target);
+            self.submit_process_control(request, identity, cx);
         }
         cx.notify();
     }

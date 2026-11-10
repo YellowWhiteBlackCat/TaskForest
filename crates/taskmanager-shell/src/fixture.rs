@@ -54,7 +54,7 @@ use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedEvent, MsrReadoutEvent, PlatformEventBatch, PlatformEventContext,
-    ProcessAffinityReady, ProjectedProcessInsights, RequestAttemptId,
+    ProcessAffinityState, ProjectedProcessInsights, RequestAttemptId,
 };
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
@@ -98,7 +98,7 @@ pub enum ProjectionSeedFact {
     ServicesSource(Option<Vec<SourceStatus>>),
     StartupSource(Option<Vec<SourceStatus>>),
     SessionsSource(Option<Vec<SourceStatus>>),
-    ProcessAffinity(Option<ProcessAffinityReady>),
+    ProcessAffinity(Option<ProcessAffinityState>),
     ProcessInsights(Box<Option<ProjectedProcessInsights>>),
     AdvanceRevision(ProjectionSeedDomain),
     AdvanceRefresh,

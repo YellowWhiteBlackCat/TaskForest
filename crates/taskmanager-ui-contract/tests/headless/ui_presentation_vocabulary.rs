@@ -1,4 +1,5 @@
 use super::*;
+use crate::presentation::thresholds::{LayoutAxis, number};
 
 #[test]
 fn the_horizontal_bands_classify_on_their_edges() {
@@ -184,12 +185,17 @@ fn the_shared_bands_are_stated_once_at_their_exact_values() {
     assert_eq!(PERFORMANCE_STATS_STACK_HEIGHT, 220.0);
     assert_eq!(PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);
     assert_eq!(BOTTOM_SAFETY_BAND, 8.0);
-    assert_eq!(MIN_WINDOW_WIDTH, 720.0);
-    assert_eq!(MIN_WINDOW_HEIGHT, 480.0);
     const {
-        assert!(MAX_WINDOW_WIDTH > MIN_WINDOW_WIDTH && MAX_WINDOW_HEIGHT > MIN_WINDOW_HEIGHT);
+        // The smallest admissible window is a per-shape band and lives in the
+        // threshold registry, not here: this module owns the bands every
+        // shape spends, and a shape that spends no window floor (the terminal
+        // owns its viewport, Bevy takes the compositor's size) cannot be
+        // expressed by a shared constant.
+        let min_width = number(crate::FrontendShape::Gpui, LayoutAxis::MinimumWindowWidth);
+        let min_height = number(crate::FrontendShape::Gpui, LayoutAxis::MinimumWindowHeight);
+        assert!(MAX_WINDOW_WIDTH > min_width && MAX_WINDOW_HEIGHT > min_height);
         assert!(
-            MIN_WINDOW_WIDTH - NAV_RAIL_WIDTH - BOTTOM_SAFETY_BAND < ULTRA_COMPACT_CONTENT_WIDTH,
+            min_width - NAV_RAIL_WIDTH - BOTTOM_SAFETY_BAND < ULTRA_COMPACT_CONTENT_WIDTH,
             "the smallest admissible window must still reach the Ultra-Compact rung, so the \
              degradation path is exercised rather than unreachable"
         );

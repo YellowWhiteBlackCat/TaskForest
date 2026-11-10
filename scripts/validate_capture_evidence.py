@@ -19,6 +19,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from unittest.mock import patch
 
+import instrument_budget
+
 MANIFEST_FIELDS = (
     "captured_at",
     "git_head",
@@ -375,7 +377,7 @@ def validate_window_receipts(
 
 def command_output(*args: str, cwd: Path) -> str:
     result = subprocess.run(
-        args, cwd=cwd, check=True, text=True, capture_output=True, timeout=15
+        args, cwd=cwd, check=True, text=True, capture_output=True, timeout=instrument_budget.seconds()
     )
     return result.stdout.strip()
 

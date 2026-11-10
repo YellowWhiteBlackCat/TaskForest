@@ -39,7 +39,7 @@ serde_json = "1.0"
 sysinfo = "0.39"
 zbus = { version = "5.19", features = ["blocking-api"] }
 taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 # Per-feature escalation seam (ADR-023): consulted at the Intel PMU denial point
 # to type a perf_event_open EACCES as RequiresEscalation(IntelPmu) rather than a
 # bare PermissionDenied. Pure safe-Rust leaf, no transitive capability grant.

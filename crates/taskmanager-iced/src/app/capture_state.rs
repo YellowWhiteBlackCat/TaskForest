@@ -474,6 +474,7 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         app.performance.sidebar_visible = false;
     } else if target == "smart-missing-tool"
         || target == "smart-permission"
+        || target == "smart-wear-critical"
         || target == "partition-disk-usage"
         || target == "partition-live-usage"
     {

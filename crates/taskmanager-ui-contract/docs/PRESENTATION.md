@@ -42,11 +42,30 @@ A deliberate per-shape difference is an explicit row in `thresholds` with an
 architecture driver, or an `unrecorded:` debt cell in the census. The probe
 grid computes `unexplained_differences(left, right)`; "(GPUI parity)" prose is
 not evidence (ARCH § 8.3).
-`load_tiers` applies the same discipline to the per-core load band: Iced and
-the TUI share the reference edges, Bevy's wider bar band carries its driver in
-the declaration, and GPUI declares the axis absent because its matrix tints by
-CPU type. The ink each tier paints with and the missing-sample convention stay
-per-shape paint facts until a capture decides them.
+`load_tiers` applies the same discipline to the per-core load band: Iced, the
+TUI and Bevy all paint the reference edges, and GPUI declares the axis absent
+because its matrix tints by CPU type. The ink each tier wears and the
+missing-sample convention stay per-shape bindings with one settled rule: the
+calm tier binds the theme's success ink and an unobserved reading binds the
+dim missing ink, because the theme reserves the accent for interactive states
+and a positive state never borrows it.
+
+The census is answered cell by cell, never shape by shape. A cell closes when
+the declaration says what the shape really spends: the number it subtracts is
+bound from the registry into its own `const`, the mechanism that replaces a
+band is named, or the row stays `unrecorded:` debt. Bevy now spends its rail
+width (`HorizontalChromeReserve`, which its own `RAIL_WIDTH` binds) and
+charges no rail inset (`NavigationHorizontalInset = 0.0`, because the
+scaffold's page padding already separates rail from body), and names what
+stands in for the three bands it does not spend: the flex-composed chrome row
+behind a declared scroll owner, the pinned scroll-owned statistics rail with
+no stacked form, and the layout engine's own chrome spending instead of a
+subtracted reserve. Bevy now resolves the same measured page slot through
+`ContentSlot` / `PageLayoutBudget` / `PerformancePageBudget`: the shared
+Constrained/Generous buckets decide its vertical whole-group admission and the
+Charts rung decides the extended chart inventory, so those three axes are
+`Shared` instead of `unrecorded:`. The frame's typed verdict is the only input
+the page markers consume; the raw window height no longer decides a group.
 
 ## Evidence
 

@@ -148,12 +148,8 @@ pub fn collect_namespace_audit(
                     std::io::ErrorKind::TimedOut => FailureKind::TimedOut,
                     _ => FailureKind::TemporarilyUnavailable,
                 };
-                failure = Some(failure.map_or(candidate, |current| {
-                    if failure_priority(current) >= failure_priority(candidate) {
-                        current
-                    } else {
-                        candidate
-                    }
+                failure = Some(failure.map_or(candidate, |current: FailureKind| {
+                    current.stronger(candidate)
                 }));
                 NamespaceAuditStatus::Unavailable(candidate)
             }
@@ -170,19 +166,6 @@ pub fn collect_namespace_audit(
     };
     let state = state_for_status(status, now_ms);
     LinuxNamespaceAudit::from_entries(state, entries)
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 8,
-        FailureKind::PermissionDenied => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::TimedOut => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
 }
 
 /// Parse the first uid namespace mapping. A mapping that does not include

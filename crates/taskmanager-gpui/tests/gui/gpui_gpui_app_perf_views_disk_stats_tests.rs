@@ -243,3 +243,33 @@ fn disk_stats_render_the_smart_health_evidence_families() {
         );
     }
 }
+
+/// The endurance readout wears the critical marker once the device reached
+/// its rated life. The marker rides EVERY surface that paints the number,
+/// so a device past its rated life says so where the endurance is read — not
+/// only inside the SMART dialog.
+#[test]
+fn the_endurance_readout_carries_the_critical_marker() {
+    pin_english();
+    let critical = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
+        .smart_percent_used(Some(104.0))
+        .build();
+    let rows = disk_stats(&critical, UnitPreferences::default(), &[]);
+    assert_eq!(
+        keyed_value(&rows, "disk.endurance_used").as_deref(),
+        Some("104% ⚠"),
+        "a device past its rated life says so where the endurance is read"
+    );
+
+    let inside = DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
+        .smart_percent_used(Some(99.0))
+        .build();
+    let rows = disk_stats(&inside, UnitPreferences::default(), &[]);
+    assert_eq!(
+        keyed_value(&rows, "disk.endurance_used").as_deref(),
+        Some("99%"),
+        "a device inside its rated life wears no marker"
+    );
+}

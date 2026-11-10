@@ -698,6 +698,15 @@ where
                 cycle.ancillary_effect = true;
             }
         }
+        cycle.frame_timing_sink = frame_timing.is_some();
+
+        // The open CPU affinity editor is projected from the shell's session
+        // here, once per cycle: its read outcome is applied by the effect seam
+        // rather than by a batch fold, so a fold-only hook would never see a
+        // rejected read. The sync is idempotent and target-guarded.
+        if app.sync_process_affinity_modal() {
+            pending_draw = true;
+        }
 
         // Idle-skip: only paint when this cycle produced new data to show
         // (or the previous cycle queued a keypress/resize, or it's the

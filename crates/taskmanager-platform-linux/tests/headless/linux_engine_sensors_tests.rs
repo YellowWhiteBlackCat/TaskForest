@@ -29,11 +29,11 @@ fn strongest_enumeration_failure_is_order_independent() {
             FailureKind::PermissionDenied,
         ),
     ] {
-        assert_eq!(stronger_failure(Some(left), right), expected);
-        assert_eq!(stronger_failure(Some(right), left), expected);
+        assert_eq!(left.stronger(right), expected);
+        assert_eq!(right.stronger(left), expected);
     }
     assert_eq!(
-        stronger_failure(None, FailureKind::Unsupported),
+        FailureKind::strongest(None, FailureKind::Unsupported),
         FailureKind::Unsupported
     );
 }

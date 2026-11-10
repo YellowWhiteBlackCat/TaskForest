@@ -274,7 +274,7 @@ pub(crate) fn render_settings(
         .flex()
         .flex_col()
         .w_full()
-        .gap(px(20.0))
+        .gap(px(f32::from(tokens::SPACE_20)))
         .child(group(
             t,
             "settings.group_general",

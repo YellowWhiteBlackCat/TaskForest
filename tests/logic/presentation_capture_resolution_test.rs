@@ -52,6 +52,14 @@ fn marker_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// An embedded resolution record begins at `profile=`; the viewport marker's
+/// own `rung`/`inventory` fields belong to a different contract and must not
+/// overwrite the resolution record when a single capture line carries both.
+fn resolution_record(line: &str) -> &str {
+    line.find(" profile=")
+        .map_or(line, |start| &line[start + 1..])
+}
+
 /// One captured resolution line, with the frontend that produced it.
 fn captured_resolutions() -> Vec<(FrontendShape, String)> {
     let mut records = Vec::new();
@@ -74,12 +82,14 @@ fn captured_resolutions() -> Vec<(FrontendShape, String)> {
                 if !frontend.contains("control_extent=") || !frontend.contains("profile=") {
                     continue;
                 }
-                let shape = if frontend.contains("ICED_CAPTURE_MARKER") {
+                let shape = if text.contains("ICED_CAPTURE_MARKER")
+                    || path.to_string_lossy().contains("iced-evidence")
+                {
                     FrontendShape::Iced
                 } else {
                     FrontendShape::Gpui
                 };
-                records.push((shape, frontend.to_owned()));
+                records.push((shape, resolution_record(frontend).to_owned()));
             }
         }
     }

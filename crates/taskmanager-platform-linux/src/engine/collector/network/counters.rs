@@ -335,7 +335,7 @@ fn summarize(
             ]
         })
         .flatten()
-        .reduce(select_failure)
+        .reduce(FailureKind::stronger)
         .unwrap_or(FailureKind::TemporarilyUnavailable);
     let any_partial = value.values().any(|counter| {
         matches!(
@@ -435,28 +435,6 @@ pub(super) fn link_utilization_pct(
     Some(
         (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamped_percent() as f32,
     )
-}
-
-const fn select_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(right) > failure_priority(left) {
-        right
-    } else {
-        left
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::ProviderFault => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::TemporarilyUnavailable => 5,
-        FailureKind::MissingDependency => 4,
-        FailureKind::IdentityChanged => 3,
-        FailureKind::Rejected => 2,
-        FailureKind::Unsupported => 1,
-    }
 }
 
 trait SourceOutcomeFailure {

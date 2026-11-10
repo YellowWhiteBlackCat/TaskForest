@@ -55,7 +55,7 @@ mod system_health;
 use fixtures::{
     dynamic_power_fixture, dynamic_sensor_fixture, npu_inventory_fixture, prepare_active_alert,
     prepare_gpu_engine_inventory, prepare_hotplug, prepare_intel_gpu, prepare_missing_tool_disk,
-    prepare_partition_disk, prepare_permission_disk,
+    prepare_partition_disk, prepare_permission_disk, prepare_wear_critical_disk,
 };
 /// Emit the resolved presentation facts of the captured frame (ADR-064).
 pub(crate) use marker::emit_resolution_marker;
@@ -173,6 +173,7 @@ impl CaptureEvidence {
         match self.scenario {
             Some(CaptureScenario::SmartMissingTool) => prepare_missing_tool_disk(snapshot),
             Some(CaptureScenario::SmartPermission) => prepare_permission_disk(snapshot),
+            Some(CaptureScenario::SmartWearCritical) => prepare_wear_critical_disk(snapshot),
             Some(CaptureScenario::DeviceHotplug) => prepare_hotplug(snapshot, self.snapshot_count),
             Some(CaptureScenario::GpuEngineInventory) => prepare_gpu_engine_inventory(snapshot),
             Some(CaptureScenario::PartitionDiskUsage) => prepare_partition_disk(snapshot),
@@ -187,6 +188,7 @@ impl CaptureEvidence {
             Some(
                 CaptureScenario::SmartMissingTool
                     | CaptureScenario::SmartPermission
+                    | CaptureScenario::SmartWearCritical
                     | CaptureScenario::PartitionDiskUsage
                     | CaptureScenario::IntelGpuTelemetry
             )

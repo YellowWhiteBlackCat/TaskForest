@@ -93,6 +93,58 @@ fn affinity_session_covers_replace_close_retry_and_exact_identity_terminals() {
     );
 }
 
+/// The affinity read outcome is one authority for the four frontends: which
+/// target the session describes, the last authoritative mask for that exact
+/// frozen identity, and the shared failure reason. A recycled pid is a
+/// different target, so its failure and its mask never leak into an editor
+/// opened for the previous identity.
+#[test]
+fn affinity_state_projects_the_read_outcome_for_one_frozen_identity() {
+    let first = process(42, 100);
+    let reused_pid = process(42, 200);
+    let mut session = ProcessAffinitySession::default();
+
+    assert_eq!(session.state().target(), None);
+    assert!(session.state().last_good_for_target(&first).is_none());
+    assert!(session.state().failure_for_target(&first).is_none());
+
+    let attempt = session.begin_attempt(first.clone());
+    assert!(session.accept_attempt(attempt, request(1)));
+    assert!(session.complete(request(1), first.clone(), vec![0, 2]));
+    assert_eq!(session.state().target(), Some(&first));
+    assert_eq!(
+        session
+            .state()
+            .last_good_for_target(&first)
+            .map(|ready| ready.cpus.clone()),
+        Some(vec![0, 2])
+    );
+    assert!(session.state().failure_for_target(&first).is_none());
+
+    // A refresh for the same identity fails: the reason is this target's, and
+    // the last good mask stays reachable for the editor to seed from.
+    let refresh = session.begin_attempt(first.clone());
+    assert!(session.accept_attempt(refresh, request(2)));
+    assert!(session.fail(request(2), FailureKind::PermissionDenied));
+    assert_eq!(
+        session.state().failure_for_target(&first),
+        Some(FailureKind::PermissionDenied)
+    );
+    assert_eq!(
+        session
+            .state()
+            .last_good_for_target(&first)
+            .map(|ready| ready.cpus.clone()),
+        Some(vec![0, 2])
+    );
+
+    // The same pid with a different start token is a different process: it
+    // must not inherit either the reason or the mask.
+    assert_eq!(session.state().target(), Some(&first));
+    assert!(session.state().failure_for_target(&reused_pid).is_none());
+    assert!(session.state().last_good_for_target(&reused_pid).is_none());
+}
+
 #[test]
 fn batch_session_accepts_one_matching_intent_and_retries_submission_failure() {
     let target = process(77, 700);

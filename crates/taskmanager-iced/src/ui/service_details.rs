@@ -12,7 +12,8 @@ use taskforest_core::core::services::{
 };
 use taskmanager_application::i18n::t;
 
-use taskmanager_shell::presentation::{control_error_detail, missing_value};
+use taskmanager_application::i18n::control_error_detail;
+use taskmanager_shell::presentation::missing_value;
 use taskmanager_theme::{Theme, tokens};
 
 use super::overlays::modal_overlay;

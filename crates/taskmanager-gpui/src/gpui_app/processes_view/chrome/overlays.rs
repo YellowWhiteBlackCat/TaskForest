@@ -4,7 +4,7 @@ use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, Window, div
 use std::collections::HashSet;
 use taskforest_core::core::failure::FailureKind;
 use taskmanager_application::ProcessAffinityState;
-use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
@@ -53,12 +53,20 @@ pub(super) fn affinity_overlay(
         ProcessAffinityState::Ready(ready) if ready.target.live_key() == Some(identity) => {
             affinity_content(theme, count, cpus, hover_chip, hovered, &entity, cx)
         }
-        ProcessAffinityState::Failed { failure, .. } => {
+        // Guarded by the same live identity the `Ready` arm uses: a failure
+        // recorded for another process must not paint here as this editor's
+        // reason.
+        ProcessAffinityState::Failed {
+            target: failed,
+            failure,
+            ..
+        } if failed.live_key() == Some(identity) => {
             affinity_status_content(theme, identity, Some(*failure), hovered, cx)
         }
         ProcessAffinityState::Closed
         | ProcessAffinityState::Loading { .. }
-        | ProcessAffinityState::Ready(_) => {
+        | ProcessAffinityState::Ready(_)
+        | ProcessAffinityState::Failed { .. } => {
             affinity_status_content(theme, identity, None, hovered, cx)
         }
     };

@@ -11,7 +11,7 @@ homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
 documentation = "https://docs.rs/taskmanager-accessibility-linux"
 
 [dependencies]
-taskmanager-ui-contract = { path = "../taskmanager-ui-contract", version = "0.5.1" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract", version = "0.6.0" }
 # Core accesskit types (Node/Role/TreeUpdate) are pure Rust and used by the
 # snapshot mapper on every target so the mapping is unit-testable off-Linux.
 accesskit = "0.24.1"

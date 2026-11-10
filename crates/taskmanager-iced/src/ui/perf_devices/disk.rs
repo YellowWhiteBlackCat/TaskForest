@@ -1,7 +1,9 @@
 //! Performance page Disk detail block, throughput chart and partition summary.
 
 use std::rc::Rc;
-use taskmanager_shell::presentation::smart::smart_section_visible;
+use taskmanager_shell::presentation::smart::{
+    endurance_used_readout, smart_section_visible, smart_temperature_label, spare_pool_readout,
+};
 
 use super::*;
 use iced::Element;
@@ -152,12 +154,10 @@ pub(crate) fn disk_summary_lines(
     // The critical-warning prefix surfaces the most actionable SMART bit the
     // hwmon layer carries; otherwise a plain temperature readout.
     if let Some(temp) = disk.smart_temperature_c {
-        let warn = disk.smart_critical_warning == Some(true);
-        let label = if warn {
-            format!("{} \u{26a0}", t("common.temperature"))
-        } else {
-            t("common.temperature").to_string()
-        };
+        let label = smart_temperature_label(
+            t("common.temperature"),
+            disk.smart_critical_warning == Some(true),
+        );
         let val = match disk.smart_temp_critical_c {
             Some(crit) if crit > 0.0 => format!("{:.0} / {:.0} \u{b0}C", temp, crit),
             _ => format!("{:.0} \u{b0}C", temp),
@@ -181,17 +181,14 @@ pub(crate) fn disk_summary_lines(
     if let Some(pct) = disk.smart_percent_used {
         rows.push(StatRow::text(
             t("disk.endurance_used"),
-            Some(percent_text(pct)),
+            Some(endurance_used_readout(Some(pct), None)),
         ));
     }
-    if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_spare_warning_threshold_pct();
-        let value = if disk.smart_spare_pool_needs_warning() {
-            format!("{} ⚠ (≤{})", percent_text(spare), percent_text(threshold))
-        } else {
-            percent_text(spare)
-        };
-        rows.push(StatRow::text(t("disk.available_spare"), Some(value)));
+    if disk.smart_available_spare_pct.is_some() {
+        rows.push(StatRow::text(
+            t("disk.available_spare"),
+            Some(spare_pool_readout(disk, None)),
+        ));
     }
     if let Some(hours) = disk.smart_power_on_hours {
         let days = hours / 24;

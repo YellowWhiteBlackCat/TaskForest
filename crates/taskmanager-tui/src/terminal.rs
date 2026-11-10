@@ -10,6 +10,7 @@ use std::env;
 
 use ratatui::style::Color;
 use taskmanager_application::i18n::{Language, current_language};
+use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_shell::presentation::icon_glyph;
 use taskmanager_ui_contract::IconId;
 
@@ -192,7 +193,7 @@ impl TuiTerminalProfile {
             "…" => ".",
             "×" | "✗" | "✕" | "✖" => "x",
             "✓" | "✔" => "v",
-            "⚠" | "△" | "⚡" => "!",
+            symbol if symbol == ALERT_MARKER || symbol == "△" || symbol == "⚡" => "!",
             "↑" | "⇧" | "▴" | "▲" => "^",
             "↓" | "⇩" | "▾" | "▼" => "v",
             "←" | "⇦" | "◀" | "◁" => "<",

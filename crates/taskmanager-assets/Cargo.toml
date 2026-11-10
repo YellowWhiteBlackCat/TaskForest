@@ -9,7 +9,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 
 [dev-dependencies]
 usvg = "0.48.1"
