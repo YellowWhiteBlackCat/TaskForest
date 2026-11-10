@@ -3,11 +3,10 @@
 use super::super::super::metrics::{segment_bytes_value, segment_key};
 use super::super::super::{DynField, Section};
 use crate::palette::{UiPalette, space_2, space_4, space_8};
+use crate::widgets::layout_budget::PerformanceVerticalGroup;
 use crate::window::{Role, TextRole};
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
-use bevy::ecs::query::With;
-use bevy::ecs::system::Query;
 use bevy::scene::{Scene, bsn};
 use bevy::ui::BackgroundColor;
 use bevy::ui::prelude::{
@@ -15,8 +14,8 @@ use bevy::ui::prelude::{
     px, rem,
 };
 use bevy::ui::widget::Text;
-use bevy::window::{PrimaryWindow, Window};
 use taskforest_core::core::metrics::MemoryMetrics;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments};
@@ -28,23 +27,6 @@ pub(super) const SEGMENT_BAR_HEIGHT_REM: f32 = 0.875;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceOptionalMemoryLegend;
 
-pub(crate) fn sync_memory_legend_layout(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    mut legends: Query<&mut Node, With<PerformanceOptionalMemoryLegend>>,
-) {
-    let height = windows.iter().next().map_or(780.0, Window::height);
-    let display = if crate::widgets::layout::memory_legend_visible(height) {
-        Display::Flex
-    } else {
-        Display::None
-    };
-    for mut node in &mut legends {
-        if node.display != display {
-            node.display = display;
-        }
-    }
-}
-
 pub(super) fn memory_legend_container_scene(rows: Vec<Box<dyn Scene>>) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node {
@@ -53,7 +35,7 @@ pub(super) fn memory_legend_container_scene(rows: Vec<Box<dyn Scene>>) -> Box<dy
             row_gap: Val::Px(space_2()),
             display: Display::None,
         }
-        PerformanceOptionalMemoryLegend
+        PerformanceOptionalMemoryLegend PerformanceVerticalGroup
         Children [ { rows } ]
     })
 }
@@ -90,7 +72,7 @@ pub(super) fn segment_row_scene(
     let memory = crate::pages::performance::metrics::memory_segments_total(shell);
     let segment_percent = memory
         .filter(|total| *total > 0)
-        .map(|total| (segment.bytes as f32 / total as f32 * 100.0).clamp(0.0, 100.0))
+        .map(|total| (segment.bytes as f32 / total as f32 * 100.0).clamped_percent())
         .unwrap_or(0.0);
     let value = segment_bytes_value(shell, segment.kind);
     let kind = segment.kind;

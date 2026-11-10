@@ -104,7 +104,11 @@ fn compose_pause(
         px(crate::gpui_app::chrome::titlebar_height(theme) + 6.0)
     };
     root.child(deferred(
-        div().absolute().top(top).right(px(48.0)).child(badge),
+        div()
+            .absolute()
+            .top(top)
+            .right(px(f32::from(tokens::SPACE_48)))
+            .child(badge),
     ))
 }
 

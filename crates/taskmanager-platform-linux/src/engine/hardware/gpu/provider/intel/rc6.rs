@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{DeviceId, FailureKind};
 
 use super::super::super::{GpuFieldRead, preferred_gpu_failure};
@@ -48,7 +49,7 @@ impl IntelRc6Tracker {
             return unavailable(FailureKind::TemporarilyUnavailable);
         }
         let idle_pct =
-            (((counter - previous) as f32 / (elapsed * 1_000.0)) * 100.0).clamp(0.0, 100.0);
+            (((counter - previous) as f32 / (elapsed * 1_000.0)) * 100.0).clamped_percent();
         IntelRc6Observation {
             utilization_pct: Some(100.0 - idle_pct),
             idle_pct: Some(idle_pct),

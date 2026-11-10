@@ -1,8 +1,8 @@
 use super::*;
 use taskforest_contract::RequestId;
 use taskmanager_application::PlatformEffect;
-use taskmanager_application::ProcessAffinityReady;
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_application::{ProcessAffinityReady, ProcessAffinityState};
 use taskmanager_shell::fixture::ProjectionSeedFact;
 use taskmanager_shell::fixture::seed_projection_fact;
 
@@ -16,11 +16,13 @@ fn process_affinity_editor_freezes_identity_and_applies_a_sorted_mask() {
         .expect("demo process must have an authoritative identity");
     seed_projection_fact(
         &mut app.shell,
-        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityReady {
-            request_id: RequestId::MIN,
-            target: target.clone(),
-            cpus: vec![2, 0],
-        })),
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityState::Ready(
+            ProcessAffinityReady {
+                request_id: RequestId::MIN,
+                target: target.clone(),
+                cpus: vec![2, 0],
+            },
+        ))),
     );
 
     let _ = app.update(Message::OpenProcessAffinity);
@@ -68,4 +70,44 @@ fn process_affinity_editor_rejects_unobserved_or_empty_masks() {
         "an empty mask must keep the editor open"
     );
     assert!(app.shell.feedback_text().contains("Select at least one"));
+}
+
+/// The editor's status line reads the owner's localized reason for a failed
+/// read — never a `Debug` dump of the typed failure, and never a sentence
+/// spelled inside the frontend. Only an observed mask is summarized; an
+/// unobserved one says so.
+#[test]
+fn process_affinity_status_reads_the_shared_failure_reason() {
+    use taskforest_core::core::failure::FailureKind;
+    use taskmanager_application::i18n::control_error_detail;
+    use taskmanager_application::i18n::t;
+
+    set_language(Language::En);
+    let collected = crate::ui::affinity::affinity_status_text(None, false, 0, 8);
+    assert_eq!(collected, t("common.collecting_telemetry"));
+
+    let observed = crate::ui::affinity::affinity_status_text(None, true, 3, 8);
+    assert!(
+        observed.contains('3') && observed.contains('8'),
+        "{observed}"
+    );
+
+    for failure in [
+        FailureKind::PermissionDenied,
+        FailureKind::Unsupported,
+        FailureKind::TemporarilyUnavailable,
+        FailureKind::TimedOut,
+        FailureKind::Rejected,
+        FailureKind::IdentityChanged,
+        FailureKind::MissingDependency,
+        FailureKind::ProviderFault,
+        FailureKind::RequiresEscalation,
+    ] {
+        let status = crate::ui::affinity::affinity_status_text(Some(failure), false, 0, 8);
+        assert_eq!(status, control_error_detail(failure));
+        assert!(
+            !status.contains(&format!("{failure:?}")),
+            "the status must never be a Debug dump: {status}"
+        );
+    }
 }

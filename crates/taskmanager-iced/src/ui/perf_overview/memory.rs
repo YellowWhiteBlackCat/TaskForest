@@ -10,6 +10,7 @@ use taskmanager_theme::tokens;
 use crate::app::Message;
 use crate::theme;
 use crate::ui::components::segmented_fill_style;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::memory::MemSegment;
 use taskmanager_shell::memory::MemSegmentKind;
@@ -131,7 +132,7 @@ fn legend_row(
     let pct = if total == 0 {
         0.0
     } else {
-        (seg.bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0)
+        (seg.bytes as f64 / total as f64 * 100.0).clamped_percent()
     };
     row!(
         container(column![])

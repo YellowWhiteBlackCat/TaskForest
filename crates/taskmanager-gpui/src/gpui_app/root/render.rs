@@ -35,6 +35,7 @@ use gpui::{
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
 use taskforest_core::core::SystemSnapshot;
+use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::window_chrome_state;
@@ -390,11 +391,11 @@ impl Render for RootView {
             )
         {
             self.decoration_outcome_reported = true;
-            // The "⚠ " prefix routes the toast to the Danger kind (see
+            // The alert-marker prefix routes the toast to the Danger kind (see
             // `RootView::show_local_feedback`).
             self.show_local_feedback(
                 format!(
-                    "\u{26a0} {}",
+                    "{ALERT_MARKER} {}",
                     crate::gpui_app::chrome::decoration_outcome_label(notice)
                 ),
                 cx,

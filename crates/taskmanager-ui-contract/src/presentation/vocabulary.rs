@@ -14,11 +14,17 @@
 // Bands shared by every shape (identical by construction, so they are stated
 // exactly once here). Per-shape measured thresholds are NOT here; they live in
 // the threshold registry.
+//
+// The smallest window a shape accepts is one of those thresholds and NOT a
+// vocabulary band: the GPUI and Iced shapes spend a 720x480 floor, the
+// terminal owns its viewport and the Bevy window is whatever the compositor
+// gives it. A fact that only some shapes spend has to be declared per shape,
+// so its one address is [`crate::presentation::thresholds::LayoutAxis`]:
+// `MinimumWindowWidth` / `MinimumWindowHeight`, whose shared baseline is the
+// value the shapes that DO spend it bind. Restating that number here would
+// give the same fact two addresses, and the registry's own doctrine calls
+// such a mirror "a second authority and a gate finding".
 
-/// Smallest window the desktop shapes accept as a viable canvas.
-pub const MIN_WINDOW_WIDTH: f32 = 720.0;
-/// Smallest window height the desktop shapes accept.
-pub const MIN_WINDOW_HEIGHT: f32 = 480.0;
 /// Largest capture/launch width the window parsers clamp to.
 pub const MAX_WINDOW_WIDTH: f32 = 3840.0;
 /// Largest capture/launch height the window parsers clamp to.

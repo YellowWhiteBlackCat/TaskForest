@@ -77,37 +77,28 @@ fn menu_control_vocabulary_maps_to_neutral_requests() {
 
     assert_eq!(
         menu_control_submission(MenuControlRequest::Suspend, target.clone()),
-        (
-            ProcessControlRequest::Suspend {
-                target: target.clone(),
-            },
-            super::ProcessControlAction::Suspend,
-        )
+        ProcessControlRequest::Suspend {
+            target: target.clone(),
+        }
     );
     assert_eq!(
         menu_control_submission(MenuControlRequest::Resume, target.clone()),
-        (
-            ProcessControlRequest::Resume {
-                target: target.clone(),
-            },
-            super::ProcessControlAction::Resume,
-        )
+        ProcessControlRequest::Resume {
+            target: target.clone(),
+        }
     );
     assert_eq!(
         menu_control_submission(MenuControlRequest::Signal(ProcessSignal::Hangup), target),
-        (
-            ProcessControlRequest::SendSignal {
-                target: FrozenProcessIdentity::from_authoritative_parts(
-                    42,
-                    "fixture-worker".to_string(),
-                    100,
-                    1_000,
-                )
-                .expect("valid fixture identity"),
-                signal: ProcessSignal::Hangup,
-            },
-            super::ProcessControlAction::Signal(ProcessSignal::Hangup),
-        )
+        ProcessControlRequest::SendSignal {
+            target: FrozenProcessIdentity::from_authoritative_parts(
+                42,
+                "fixture-worker".to_string(),
+                100,
+                1_000,
+            )
+            .expect("valid fixture identity"),
+            signal: ProcessSignal::Hangup,
+        }
     );
 }
 

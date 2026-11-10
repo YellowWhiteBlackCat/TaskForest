@@ -186,6 +186,56 @@ fn disk_caption_renders_observed_smart_evidence_rows() {
     }
 }
 
+/// The critical-wear marker rides every surface that paints the endurance:
+/// the disk caption's alert plate and the statistics row's alert plate alike.
+/// The judgment is the shared core rule; the plate is this shape's idiom.
+#[test]
+fn the_critical_wear_marker_reaches_every_endurance_surface() {
+    let mut disk = DiskMetrics::default();
+    disk.smart_percent_used = Some(104.0);
+    assert!(
+        super::metrics::disk_wear_critical(&disk),
+        "an endurance past the rated life is the critical wear"
+    );
+    assert!(
+        super::metrics::disk_smart_alert(&disk),
+        "the disk caption's plate must rise for the critical wear"
+    );
+
+    let mut inside = DiskMetrics::default();
+    inside.smart_percent_used = Some(99.0);
+    assert!(
+        !super::metrics::disk_wear_critical(&inside),
+        "an endurance inside the rated life is not the critical wear"
+    );
+    assert!(
+        !super::metrics::disk_smart_alert(&inside),
+        "a healthy disk raises no SMART plate"
+    );
+
+    // The statistics row carries the same crossing, so the number and its
+    // marker are never painted by two different folds.
+    let mut shell = demo_app();
+    edit_snapshot(&mut shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        snapshot
+            .disks
+            .first_mut()
+            .expect("demo app should carry one disk")
+            .smart_percent_used = Some(104.0);
+    });
+    let rows = super::metrics::disk_stat_rows(&shell);
+    let endurance = rows
+        .iter()
+        .find(|row| row.label == t("disk.endurance_used"))
+        .expect("the endurance row is present");
+    assert!(
+        endurance.alert,
+        "the endurance row must wear the alert plate"
+    );
+    assert_eq!(endurance.value, "104%");
+}
+
 #[test]
 fn gpu_section_enumerates_every_projected_adapter() {
     use taskforest_core::core::metrics::{

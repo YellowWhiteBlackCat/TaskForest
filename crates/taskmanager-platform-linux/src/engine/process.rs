@@ -1,11 +1,9 @@
 //! Linux process enumeration and control provider.
 
 use std::collections::HashSet;
-use std::fs;
 use std::time::{Duration, Instant};
 
-use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
-use sysinfo::{ProcessRefreshKind, ProcessStatus, System};
+use crate::config::{FD_COUNT_REFRESH_EVERY_N_TICKS, SMAPS_REFRESH_EVERY_N_TICKS};
 use taskforest_contract::PartialSourceSnapshot;
 use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskforest_core::{
@@ -16,6 +14,7 @@ use taskforest_core::{
 mod application;
 pub mod batch;
 mod control;
+mod enumerate;
 mod foreign_control;
 mod memory_maps;
 mod metadata;
@@ -30,9 +29,11 @@ mod tree;
 
 #[cfg(feature = "test-support")]
 pub use batch::{ProcessBatchSubmitError, ProcessBatchWorker};
+use enumerate::{ProcfsProbe, list_procfs, read_process_entry};
 #[cfg(feature = "test-support")]
 pub use open::parent_dir;
 pub use open::{open_file_location, read_exe_path};
+use procfs::retain_strongest;
 #[cfg(feature = "test-support")]
 pub use procfs::{
     ProcIoFields, ProcStatFields, parse_proc_io, parse_proc_stat, parse_proc_status_memory,
@@ -46,13 +47,14 @@ pub(crate) use foreign_control::{
 };
 use memory_maps::{MemoryMaps, ProcessMemoryObservation};
 use metadata::{PasswdLabels, load_passwd_labels, observe_process_metadata};
-use observation::{observe_clock_ticks, observe_process_scalars};
+use observation::{ProcessObservationContext, observe_clock_ticks, observe_process_scalars};
 use previous::{PreviousItems, PreviousProcessView};
+use procfs::MemorySample;
 pub(crate) use procfs::validate_exact_start_token;
 use rates::ProcessRateState;
 use taskforest_core::ScalarObservation;
 use taskforest_core::core::time::unix_millis;
-use tree::{io_failure, read_boot_time_secs};
+use tree::read_boot_time_secs;
 
 /// Owner-label map from `/etc/passwd`, cached across ticks.
 ///
@@ -142,7 +144,6 @@ enum RefreshPurpose {
 }
 
 pub struct ProcessManager {
-    system: System,
     histories: ProcessHistoryStore,
     history_started_at: Instant,
     rates: ProcessRateState,
@@ -156,6 +157,11 @@ pub struct ProcessManager {
     /// is a low-frequency-drift column; sampling it ~1×/s bounds syscall cost
     /// while intermediate ticks reuse the retained previous value.
     fd_tick: u32,
+    /// Monotonic refresh counter used to defer the per-process
+    /// `/proc/<pid>/smaps_rollup` page-table walk to every Nth tick (see
+    /// `SMAPS_REFRESH_EVERY_N_TICKS`). USS and huge pages are the two counters
+    /// that need it; RSS, hybrid PSS and VmSwap come from `status` every tick.
+    smaps_tick: u32,
     /// Whether the one-time cumulative-counter warmup has run. See
     /// [`ProcessManager::refresh_at`].
     rate_baseline_warmed: bool,
@@ -182,7 +188,6 @@ impl ProcessManager {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            system: System::new(),
             histories: ProcessHistoryStore::default(),
             history_started_at: Instant::now(),
             rates: ProcessRateState::default(),
@@ -192,6 +197,7 @@ impl ProcessManager {
             memory_maps: MemoryMaps::default(),
             applications: ApplicationCatalog::default(),
             fd_tick: 0,
+            smaps_tick: 0,
             rate_baseline_warmed: false,
         }
     }
@@ -239,10 +245,16 @@ impl ProcessManager {
         // a published tick, so it must not consume a decimation slot.
         let want_fd_count =
             !seed_only && self.fd_tick.rem_euclid(FD_COUNT_REFRESH_EVERY_N_TICKS) == 0;
+        let want_smaps = !seed_only && self.smaps_tick.rem_euclid(SMAPS_REFRESH_EVERY_N_TICKS) == 0;
         if !seed_only {
             self.fd_tick = self.fd_tick.wrapping_add(1);
+            self.smaps_tick = self.smaps_tick.wrapping_add(1);
         }
-        let procfs_probe = match probe_procfs() {
+        // One `/proc` pass yields both the availability probe and the live pid
+        // list. The inventory owns every descriptor it opens and closes it
+        // before returning, so the process's descriptor table no longer tracks
+        // the host's process population.
+        let listing = match list_procfs() {
             Err(failure) => {
                 self.rates.clear();
                 let items = self.previous_items.stale_items(&self.histories, failure);
@@ -256,35 +268,17 @@ impl ProcessManager {
                     )],
                 );
             }
-            Ok(probe) => probe,
+            Ok(listing) => listing,
         };
+        let procfs_probe = listing.probe;
 
         if !seed_only {
             self.histories
                 .begin_refresh(self.history_started_at.elapsed());
         }
         // The process inventory never consumes per-thread `sysinfo::Process`
-        // rows; it reads the aggregate thread count from procfs separately.
-        // Asking sysinfo for tasks multiplies its internal process map and
-        // repeats memory/cmdline data for every thread on hosts such as
-        // Chromium-heavy desktops.
-        self.system.refresh_processes_specifics(
-            sysinfo::ProcessesToUpdate::All,
-            true,
-            ProcessRefreshKind::nothing()
-                .with_memory()
-                .with_cpu()
-                .with_disk_usage()
-                .without_tasks(),
-        );
-        let mut process_pids: Vec<u32> = self
-            .system
-            .processes()
-            .keys()
-            .map(|pid| pid.as_u32())
-            .collect();
-        process_pids.sort_unstable();
-        self.memory_maps.refresh(&process_pids, observed_at_ms);
+        // rows; the aggregate thread count comes from procfs separately.
+        self.memory_maps.refresh(&listing.pids, observed_at_ms);
         let passwd = self.passwd_cache.labels(observed_at_ms);
         let boot_time = self.boot_time_cache.value(observed_at_ms);
         let clock_ticks = observe_clock_ticks();
@@ -302,56 +296,45 @@ impl ProcessManager {
         let mut process_executable = FieldSourceSummary::default();
         let mut process_application = FieldSourceSummary::default();
         let mut items = Vec::new();
-        for (pid, process) in self.system.processes() {
-            let status = match process.status() {
-                ProcessStatus::Run => "Running",
-                ProcessStatus::Sleep => "Sleeping",
-                ProcessStatus::Idle => "Idle",
-                ProcessStatus::UninterruptibleDiskSleep => "UninterruptibleDiskSleep",
-                ProcessStatus::Stop => "Stopped",
-                ProcessStatus::Tracing => "Tracing",
-                ProcessStatus::Zombie => "Zombie",
-                ProcessStatus::Dead => "Dead",
-                ProcessStatus::Wakekill => "Wakekill",
-                ProcessStatus::Waking => "Waking",
-                ProcessStatus::Parked => "Parked",
-                ProcessStatus::LockBlocked => "LockBlocked",
-                ProcessStatus::Suspended => "Suspended",
-                _ => "Other",
-            }
-            .to_owned();
-            // Borrowed argv pieces (no per-arg String) with the display
-            // cmdline built by pushing — the previous Vec<String> + join
-            // allocated twice per process per tick.
-            let process_argv: Vec<std::borrow::Cow<'_, str>> = process
-                .cmd()
-                .iter()
-                .map(|part| part.to_string_lossy())
-                .collect();
-            let mut cmdline = String::new();
-            for (index, part) in process_argv.iter().enumerate() {
-                if index > 0 {
-                    cmdline.push(' ');
+        for pid in listing.pids {
+            let entry = match read_process_entry(pid) {
+                Ok(entry) => entry,
+                Err(failure) => {
+                    // A pid that vanished or cannot be parsed contributes a
+                    // typed source failure and no row. Publishing a row with a
+                    // guessed name would fabricate an identity.
+                    process_stat.record(SourceOutcome::Unavailable(failure));
+                    continue;
                 }
-                cmdline.push_str(part);
-            }
-            let cmdline = if process_argv.is_empty() {
-                process.name().to_string_lossy().into_owned()
+            };
+            let name = entry.identity.comm;
+            let status = entry.identity.state.label().to_owned();
+            let parent_pid = entry.identity.parent_pid;
+            let cmdline = if entry.argv.is_empty() {
+                name.clone()
             } else {
+                let mut cmdline = String::new();
+                for (index, part) in entry.argv.iter().enumerate() {
+                    if index > 0 {
+                        cmdline.push(' ');
+                    }
+                    cmdline.push_str(part);
+                }
                 cmdline
             };
-            let pid = pid.as_u32();
-            let name = process.name().to_string_lossy().into_owned();
             let previous = self
                 .previous_items
                 .find(pid)
                 .map(|previous| previous as &dyn PreviousProcessView);
             let (scalar_observations, evidence) = observe_process_scalars(
                 pid,
-                &boot_time,
-                &clock_ticks,
-                observed_at_ms,
-                previous,
+                Ok(entry.stat),
+                ProcessObservationContext {
+                    boot_time: &boot_time,
+                    clock_ticks: &clock_ticks,
+                    observed_at_ms,
+                    previous,
+                },
                 &mut self.rates,
                 want_fd_count,
             );
@@ -367,7 +350,17 @@ impl ProcessManager {
                         .unwrap_or(FailureKind::IdentityChanged)
                 });
             let memory_observation = current_start_token
-                .map(|start_token| self.memory_maps.observe(pid, start_token))
+                .map(|start_token| {
+                    self.memory_maps.observe(
+                        pid,
+                        start_token,
+                        if want_smaps {
+                            MemorySample::Full
+                        } else {
+                            MemorySample::Status
+                        },
+                    )
+                })
                 .unwrap_or_else(ProcessMemoryObservation::unavailable);
             let mut scalar_observations = scalar_observations;
             scalar_observations.memory_pss_bytes = match memory_observation.pss {
@@ -405,7 +398,7 @@ impl ProcessManager {
                     pid,
                     current_start_token,
                     &metadata_observations.executable_path,
-                    &process_argv,
+                    &entry.argv,
                     observed_at_ms,
                 );
             let application_identity =
@@ -414,8 +407,22 @@ impl ProcessManager {
             process_fds.record(evidence.fds);
             process_memory.record(evidence.memory);
             process_memory_pss.record(memory_observation.pss_outcome);
-            process_memory_uss.record(memory_observation.uss_outcome);
-            process_memory_anon_huge_pages.record(memory_observation.anon_huge_pages_outcome);
+            process_memory_uss.record(deferred_detail_outcome(
+                memory_observation.uss_outcome,
+                want_smaps,
+                scalar_observations
+                    .memory_uss_bytes
+                    .last_known_value()
+                    .is_some(),
+            ));
+            process_memory_anon_huge_pages.record(deferred_detail_outcome(
+                memory_observation.anon_huge_pages_outcome,
+                want_smaps,
+                scalar_observations
+                    .memory_anon_huge_pages_bytes
+                    .last_known_value()
+                    .is_some(),
+            ));
             process_swap.record(memory_observation.swap_outcome);
             process_io.record(evidence.io);
             process_rates.record(evidence.rates);
@@ -424,7 +431,7 @@ impl ProcessManager {
             process_executable.record(metadata_evidence.executable_path);
             process_application.record(application_outcome);
             let mut item = ProcessItem::new(pid, name);
-            item.parent_pid = process.parent().map(|parent| parent.as_u32());
+            item.parent_pid = parent_pid;
             item.cmdline = cmdline;
             item.status = status;
             item.scheduling_policy = evidence.policy;
@@ -612,30 +619,6 @@ const PROCESS_EXECUTABLE_PROVIDER: ProviderId =
 const PROCESS_APPLICATION_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.process.desktop.application");
 
-/// Procfs availability once a filesystem-level failure has been excluded.
-/// The unavailable state is represented by the `Err` of [`probe_procfs`], so
-/// the refresh path handles it before any item work and the later outcome
-/// match is exhaustive without a panic arm.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ProcfsProbe {
-    Complete,
-    Partial(FailureKind),
-}
-
-fn probe_procfs() -> Result<ProcfsProbe, FailureKind> {
-    let entries = match fs::read_dir("/proc") {
-        Ok(entries) => entries,
-        Err(error) => return Err(io_failure(&error)),
-    };
-    let mut strongest = None;
-    for entry in entries {
-        if let Err(error) = entry {
-            retain_strongest(&mut strongest, io_failure(&error));
-        }
-    }
-    Ok(strongest.map_or(ProcfsProbe::Complete, ProcfsProbe::Partial))
-}
-
 #[derive(Default)]
 struct FieldSourceSummary {
     successes: usize,
@@ -683,6 +666,27 @@ fn source_status(provider: ProviderId, outcome: SourceOutcome, item_count: usize
     }
 }
 
+/// Resolve the source outcome of a decimated detail counter.
+///
+/// A deferred tick performed no measurement, so it is neither a success nor a
+/// provider failure. When the unchanged identity still carries a prior value,
+/// `retain_previous` bridges it as `Stale` and the column stays `Available` —
+/// the value's own availability already says it was not freshly read. With no
+/// prior value the column is honestly `Empty`. Reporting `Unavailable` here
+/// would flap the aggregate source 1-Available : 4-Empty across the cadence,
+/// which is the defect the fd decimation already fixed once.
+fn deferred_detail_outcome(
+    measured: SourceOutcome,
+    sampled: bool,
+    has_retained: bool,
+) -> SourceOutcome {
+    match (sampled, has_retained) {
+        (true, _) => measured,
+        (false, true) => SourceOutcome::Available,
+        (false, false) => SourceOutcome::Empty,
+    }
+}
+
 fn boot_time_outcome(boot_time: &Result<u64, FailureKind>, process_count: usize) -> SourceOutcome {
     match boot_time {
         Ok(_) if process_count == 0 => SourceOutcome::Empty,
@@ -695,26 +699,6 @@ fn scalar_result_outcome<T>(result: &Result<T, FailureKind>) -> SourceOutcome {
     match result {
         Ok(_) => SourceOutcome::Available,
         Err(failure) => SourceOutcome::Unavailable(*failure),
-    }
-}
-
-fn retain_strongest(current: &mut Option<FailureKind>, candidate: FailureKind) {
-    if current.is_none_or(|failure| failure_priority(candidate) > failure_priority(failure)) {
-        *current = Some(candidate);
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
     }
 }
 

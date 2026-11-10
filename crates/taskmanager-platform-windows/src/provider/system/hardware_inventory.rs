@@ -323,7 +323,7 @@ fn collect_displays() -> (Vec<DisplayInfo>, SourceStatus) {
                 // Present but invalid EDID: a provider fault, not a missing
                 // capability.
                 None => {
-                    worst = select_failure(worst, FailureKind::ProviderFault);
+                    worst = Some(FailureKind::strongest(worst, FailureKind::ProviderFault));
                     DisplayInfo {
                         connector,
                         ..DisplayInfo::default()
@@ -333,7 +333,7 @@ fn collect_displays() -> (Vec<DisplayInfo>, SourceStatus) {
             // No cached EDID: an honest absence (remote/virtual/override-
             // shadowed display), never a fabricated block.
             None => {
-                worst = select_failure(worst, FailureKind::Unsupported);
+                worst = Some(FailureKind::strongest(worst, FailureKind::Unsupported));
                 DisplayInfo {
                     connector,
                     ..DisplayInfo::default()
@@ -358,28 +358,6 @@ fn collect_displays() -> (Vec<DisplayInfo>, SourceStatus) {
             item_count: count,
         },
     )
-}
-
-/// Keep the first, highest-priority EDID-related failure for the source
-/// receipt, matching the Linux display inventory's failure precedence.
-fn select_failure(current: Option<FailureKind>, candidate: FailureKind) -> Option<FailureKind> {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => Some(current),
-        _ => Some(candidate),
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 8,
-        FailureKind::PermissionDenied => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::TimedOut => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
 }
 
 fn display_failure_kind(failure: WindowsApiError) -> FailureKind {

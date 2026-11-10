@@ -9,6 +9,7 @@ use taskforest_contract::{
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
 use taskforest_core::core::target::ServiceId;
+use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, ControlRequestId, CorrelatedEvent, PlatformClient, PlatformEvent,
     PlatformEventContext, PlatformFacets, PlatformHandle, ServiceControlOutcome,
@@ -205,8 +206,16 @@ fn service_control_outcome_accepts_only_the_latest_matching_intent() {
         ServiceAction::Restart,
         Ok(()),
     ));
-    assert!(app.feedback_text().contains("completed"));
-    assert!(app.feedback_text().contains("Restart"));
+    let service_feedback = app.feedback_text();
+    assert!(
+        service_feedback.contains(&i18n::control_outcome_text(
+            i18n::service_action_label(ServiceAction::Restart),
+            "fixture.service:docker.service",
+            false,
+            Ok(()),
+        )),
+        "the notice is the one owner composition, not a source sentence: {service_feedback}"
+    );
     assert_eq!(app.data.service_control_requests.pending(), None);
 
     // A repeated stale completion after acceptance is still ignored.

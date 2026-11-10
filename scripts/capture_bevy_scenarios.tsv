@@ -91,6 +91,7 @@ perf-battery-compact-dark	perf-battery	720x480	gnome-dark
 performance-wide	performance	1180x780	gnome-light
 perf-cpu-compact	performance	720x480	gnome-light
 perf-cpu-dark	performance	1180x780	gnome-dark
+perf-cpu-tall	performance	1280x800	gnome-light
 perf-cpu-compact-dark	performance	720x480	gnome-dark
 settings-windows-dark	settings	1180x780	windows-dark
 settings-macos-light	settings	1180x780	macos-light
@@ -158,6 +159,7 @@ alert-rules-manager-compact	alert-rules-manager	720x480	gnome-light
 smart-missing-tool	smart-missing-tool	1180x780	gnome-light
 smart-missing-tool-compact	smart-missing-tool	720x480	gnome-light
 smart-permission	smart-permission	1180x780	gnome-light
+smart-wear-critical	smart-wear-critical	1180x780	gnome-light
 smart-permission-compact	smart-permission	720x480	gnome-light
 partition-disk-usage	partition-disk-usage	1180x780	gnome-light
 partition-disk-usage-compact	partition-disk-usage	720x480	gnome-light

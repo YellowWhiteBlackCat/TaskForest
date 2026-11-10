@@ -103,24 +103,36 @@ fn recorded_reads(
         .clone()
 }
 
-/// Open the editor for the selected process and complete its queued read with
-/// `cpus` — the same open → effect → shared seam → correlated batch chain the
-/// live runtime runs.
-fn open_and_observe(app: &mut TuiApp, cpus: Vec<u32>) -> FrozenProcessIdentity {
-    let recorder = Arc::new(RecordingAffinityReads::default());
-    let effect = app
-        .open_process_affinity()
-        .expect("the affinity editor opens for a selected process");
+/// Fold one platform batch exactly like the run loop does: apply it, then run
+/// the per-cycle affinity projection that publishes the session's read
+/// outcome to the open editor (idempotent, target-guarded).
+fn fold_and_project(app: &mut TuiApp, batch: PlatformEventBatch) {
+    app.apply_platform_batch(batch);
+    let _ = app.sync_process_affinity_modal();
+}
+
+/// Submit one queued read through the shared effect seam and complete it with
+/// `cpus` for its frozen target — the same effect → seam → correlated batch →
+/// per-cycle projection chain the live runtime runs. One long-lived client
+/// serves every read, like the runtime's, so the shell's correlation ids are
+/// unique per read.
+fn complete_read(
+    app: &mut TuiApp,
+    client: &mut PlatformClient,
+    recorder: &Arc<RecordingAffinityReads>,
+    effect: PlatformEffect,
+    cpus: Vec<u32>,
+    sequence: u64,
+) -> FrozenProcessIdentity {
     let PlatformEffect::ProcessAffinity(request) = &effect else {
         panic!("opening queues the correlated read, got {effect:?}");
     };
     let target = request.target.clone();
-    let mut client = affinity_client(Arc::clone(&recorder));
-    queue_effect(&mut app.shell, &mut client, effect);
+    queue_effect(&mut app.shell, client, effect);
 
-    let reads = recorded_reads(&recorder);
+    let reads = recorded_reads(recorder);
     let (request_id, _) = reads
-        .first()
+        .last()
         .cloned()
         .expect("exactly one affinity read is submitted");
     let mut batch = PlatformEventBatch::default();
@@ -128,15 +140,26 @@ fn open_and_observe(app: &mut TuiApp, cpus: Vec<u32>) -> FrozenProcessIdentity {
         request_id,
         capability: CapabilityId::PROCESS_AFFINITY,
         provider: None,
-        sequence: EventSequence::new(1),
-        observed_at_ms: 1_000,
+        sequence: EventSequence::new(sequence),
+        observed_at_ms: 1_000 * sequence,
         event: ProcessAffinityEvent::Snapshot {
             target: target.clone(),
             cpus,
         },
     });
-    app.apply_platform_batch(batch);
+    fold_and_project(app, batch);
     target
+}
+
+/// Open the editor for the selected process and complete its queued read with
+/// `cpus`.
+fn open_and_observe(app: &mut TuiApp, cpus: Vec<u32>) -> FrozenProcessIdentity {
+    let recorder = Arc::new(RecordingAffinityReads::default());
+    let mut client = affinity_client(Arc::clone(&recorder));
+    let effect = app
+        .open_process_affinity()
+        .expect("the affinity editor opens for a selected process");
+    complete_read(app, &mut client, &recorder, effect, cpus, 1)
 }
 
 #[test]
@@ -428,7 +451,13 @@ fn navigation_arrows_move_selected_cpu() {
 fn fresh_authoritative_read_rewrites_in_progress_edits() {
     let mut app = app_on_processes();
     let all_cpus: Vec<u32> = (0..app.logical_cpu_count() as u32).collect();
-    let target = open_and_observe(&mut app, all_cpus);
+    // One client for the whole editor session, like the runtime's.
+    let recorder = Arc::new(RecordingAffinityReads::default());
+    let mut client = affinity_client(Arc::clone(&recorder));
+    let effect = app
+        .open_process_affinity()
+        .expect("the affinity editor opens for a selected process");
+    let target = complete_read(&mut app, &mut client, &recorder, effect, all_cpus, 1);
     let count = app.logical_cpu_count();
 
     // The user toggles CPU 0 off…
@@ -440,30 +469,19 @@ fn fresh_authoritative_read_rewrites_in_progress_edits() {
 
     // …then a NEW correlated read for the same frozen identity lands (the
     // runtime queued a second read through the same seam).
-    let recorder = Arc::new(RecordingAffinityReads::default());
     let effect = app
         .shell
         .request_process_affinity()
         .expect("the selected row has an identity");
-    let mut client = affinity_client(Arc::clone(&recorder));
-    queue_effect(&mut app.shell, &mut client, effect);
-    let (request_id, _) = recorded_reads(&recorder)
-        .first()
-        .cloned()
-        .expect("the second read is submitted");
-    let mut batch = PlatformEventBatch::default();
-    batch.process_affinity_events.push(CorrelatedEvent {
-        request_id,
-        capability: CapabilityId::PROCESS_AFFINITY,
-        provider: None,
-        sequence: EventSequence::new(2),
-        observed_at_ms: 2_000,
-        event: ProcessAffinityEvent::Snapshot {
-            target: target.clone(),
-            cpus: (0..count as u32).collect(),
-        },
-    });
-    app.apply_platform_batch(batch);
+    let reread = complete_read(
+        &mut app,
+        &mut client,
+        &recorder,
+        effect,
+        (0..count as u32).collect(),
+        2,
+    );
+    assert_eq!(reread, target);
 
     // The authoritative read wins over the in-progress edit (the Iced
     // editor's same-wave sync rule), and the count moves back to full.
@@ -494,10 +512,87 @@ fn a_foreign_identity_read_never_enters_the_editor() {
             cpus: (0..8u32).collect(),
         },
     });
-    app.apply_platform_batch(batch);
+    fold_and_project(&mut app, batch);
 
     // The editor stays unobserved: no foreign mask, no fabricated default.
     let modal = app.process_affinity().expect("modal stays open");
     assert!(!modal.mask_observed);
     assert!(modal.selected_mask.is_empty());
+}
+
+/// An affinity read port whose submission fails at the boundary, so the
+/// correlated session lands in the typed `Failed` state.
+#[derive(Default)]
+struct FailingAffinityReads;
+impl RequestPort for FailingAffinityReads {
+    type Request = ProcessAffinityRequest;
+
+    fn try_submit(&self, _request: RequestEnvelope<Self::Request>) -> Result<(), SubmissionError> {
+        Err(SubmissionError {
+            capability: CapabilityId::PROCESS_AFFINITY,
+            kind: taskforest_contract::SubmissionErrorKind::Busy,
+        })
+    }
+}
+
+/// A rejected read is not "still collecting". The editor shows the owner's
+/// localized reason (never a `Debug` dump), keeps no stale mask, refuses Enter
+/// with that same reason, and stays open for a retry — the same fail-closed
+/// shape the Iced editor, the GPUI overlay and the Bevy modal now share.
+#[test]
+fn a_failed_read_reports_the_shared_reason_and_stays_read_only() {
+    use taskforest_core::core::failure::FailureKind;
+    use taskmanager_application::i18n::control_error_detail;
+
+    let mut app = app_on_processes();
+    let effect = app.open_process_affinity().expect("the editor opens");
+    let mut client = PlatformClient::new(PlatformHandle::new(
+        Arc::new(EmptyCapabilities),
+        Arc::new(EmptyEvents),
+        PlatformFacets::default()
+            .with_process(ProcessFacets::default().with_affinity(Arc::new(FailingAffinityReads))),
+    ));
+    queue_effect(&mut app.shell, &mut client, effect);
+    // The run loop projects the modal from the shell's session once per cycle
+    // (a read outcome is applied by the effect seam, not by a batch fold).
+    assert!(
+        app.sync_process_affinity_modal(),
+        "the rejected read must reach the modal"
+    );
+
+    let failure = FailureKind::TemporarilyUnavailable;
+    let reason = control_error_detail(failure);
+    let modal = app.process_affinity().expect("the editor stays open");
+    assert_eq!(modal.failure, Some(failure));
+    assert!(
+        !modal.mask_observed && modal.selected_mask.is_empty(),
+        "a rejected read seeds no mask"
+    );
+    assert!(!modal.is_editable());
+
+    let text = frame_text(&app, 100, 30);
+    assert!(
+        text.contains(reason),
+        "the header shows the shared reason:\n{text}"
+    );
+    assert!(
+        !text.contains("TemporarilyUnavailable"),
+        "never a Debug dump of the typed failure:\n{text}"
+    );
+    assert!(
+        !text.contains("Collecting telemetry"),
+        "a failed read is not a collecting state:\n{text}"
+    );
+
+    let effect = handle_key(&mut app, KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(effect.is_none(), "a failed read never submits");
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(TuiSurfaceKind::ProcessAffinity)
+    );
+    assert!(
+        app.feedback_text().contains(reason),
+        "Enter reports the same shared reason, got: {}",
+        app.feedback_text()
+    );
 }

@@ -13,6 +13,8 @@ import tomllib
 import zlib
 from pathlib import Path, PureWindowsPath
 
+import instrument_budget
+
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 CAPTURE_API = "windows.graphics.capture (windows-capture 1.5.0)"
@@ -417,7 +419,7 @@ def current(*command: str, cwd: Path) -> str:
             check=True,
             text=True,
             capture_output=True,
-            timeout=15,
+            timeout=instrument_budget.seconds(),
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         raise EvidenceError(f"cannot collect current provenance {command[0]}: {error}") from error

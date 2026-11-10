@@ -9,6 +9,7 @@ use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::session::SessionControlAction;
 use taskforest_core::core::time::unix_millis;
 use taskmanager_application::i18n;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::{
     RefreshRequest, SessionControlOutcome, SessionControlRequest, SessionControlTarget,
     StartupControlOutcome, StartupControlRequest,
@@ -163,11 +164,7 @@ pub(crate) fn session_outcome_feedback(
 }
 
 fn startup_action_label(enabled: bool) -> &'static str {
-    if enabled {
-        i18n::t("common.enable")
-    } else {
-        i18n::t("common.disable")
-    }
+    i18n::startup_action_label(enabled)
 }
 
 fn session_action_label(action: SessionControlAction) -> &'static str {
@@ -176,22 +173,6 @@ fn session_action_label(action: SessionControlAction) -> &'static str {
 
 fn session_target(session_id: &str) -> String {
     format!("{} {session_id}", i18n::t("users.session_word"))
-}
-
-pub(crate) fn control_error_detail(kind: FailureKind) -> &'static str {
-    match kind {
-        FailureKind::Unsupported => i18n::t("feedback.unsupported"),
-        FailureKind::TemporarilyUnavailable => i18n::t("feedback.provider_unavailable"),
-        // RequiresEscalation is an escalatable denial; fold into the denial key.
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            i18n::t("feedback.permission_denied")
-        }
-        FailureKind::MissingDependency => i18n::t("feedback.provider_unavailable"),
-        FailureKind::TimedOut => i18n::t("feedback.timed_out"),
-        FailureKind::Rejected => i18n::t("feedback.request_rejected"),
-        FailureKind::IdentityChanged => i18n::t("feedback.target_changed"),
-        FailureKind::ProviderFault => i18n::t("feedback.provider_failed"),
-    }
 }
 
 #[cfg(test)]

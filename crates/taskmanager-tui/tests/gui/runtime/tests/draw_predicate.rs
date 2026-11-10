@@ -54,8 +54,20 @@ fn ancillary_effect_flags_the_cycle_dirty() {
 }
 
 #[test]
+fn an_active_frame_timing_sink_flags_the_cycle_dirty() {
+    // The opt-in sink records only real `terminal.draw` calls. A soak has no
+    // input to dirty the loop, so the sink itself must request one delivered
+    // frame per cycle rather than fabricating a separate observation path.
+    let inputs = DrawCycleInputs {
+        frame_timing_sink: true,
+        ..Default::default()
+    };
+    assert!(should_draw(inputs));
+}
+
+#[test]
 fn any_one_signal_flips_the_predicate_regardless_of_the_others() {
-    // The predicate is an OR over the three in-cycle signals, so any one of
+    // The predicate is an OR over the four in-cycle signals, so any one of
     // them being true forces a draw even when the others are false. Verified
     // in both directions (set + unset) to guard against a future regression
     // that swaps the OR for an AND or an XOR.
@@ -75,29 +87,38 @@ fn any_one_signal_flips_the_predicate_regardless_of_the_others() {
         ancillary_effect: true,
         ..base
     }));
+    assert!(should_draw(DrawCycleInputs {
+        frame_timing_sink: true,
+        ..base
+    }));
 
     // Two-set combinations (guards against an accidental "exactly one" rule).
     assert!(should_draw(DrawCycleInputs {
         platform_batch: true,
         refresh_queued: true,
         ancillary_effect: false,
+        ..base
     }));
     assert!(should_draw(DrawCycleInputs {
         platform_batch: false,
         refresh_queued: true,
         ancillary_effect: true,
+        ..base
     }));
     assert!(should_draw(DrawCycleInputs {
         platform_batch: true,
         refresh_queued: false,
         ancillary_effect: true,
+        ..base
     }));
 
-    // All three set (the busy case: telemetry tick + insights + service log).
+    // All signals set (the busy case: telemetry tick + insights + service log
+    // with a soak observing the delivered cadence).
     assert!(should_draw(DrawCycleInputs {
         platform_batch: true,
         refresh_queued: true,
         ancillary_effect: true,
+        frame_timing_sink: true,
     }));
 }
 
@@ -111,6 +132,7 @@ fn empty_drain_alone_does_not_flag_dirty() {
         platform_batch: false,
         refresh_queued: false,
         ancillary_effect: false,
+        frame_timing_sink: false,
     };
     assert_eq!(empty_drain, DrawCycleInputs::default());
     assert!(!should_draw(empty_drain));

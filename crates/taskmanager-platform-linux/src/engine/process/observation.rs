@@ -44,11 +44,11 @@ struct ProcessScalarInputs {
 }
 
 #[derive(Clone, Copy)]
-struct ProcessObservationContext<'a, P: PreviousProcessView + ?Sized = ProcessItem> {
-    boot_time: &'a Result<u64, FailureKind>,
-    clock_ticks: &'a Result<u64, FailureKind>,
-    observed_at_ms: u64,
-    previous: Option<&'a P>,
+pub(super) struct ProcessObservationContext<'a, P: PreviousProcessView + ?Sized = ProcessItem> {
+    pub(super) boot_time: &'a Result<u64, FailureKind>,
+    pub(super) clock_ticks: &'a Result<u64, FailureKind>,
+    pub(super) observed_at_ms: u64,
+    pub(super) previous: Option<&'a P>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -62,14 +62,11 @@ struct CurrentProcessInputs {
 
 pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
     pid: u32,
-    boot_time: &Result<u64, FailureKind>,
-    clock_ticks: &Result<u64, FailureKind>,
-    observed_at_ms: u64,
-    previous: Option<&P>,
+    stat: Result<ProcStatFields, FailureKind>,
+    context: ProcessObservationContext<'_, P>,
     rate_state: &mut ProcessRateState,
     want_fd_count: bool,
 ) -> (ProcessScalarObservations, ProcessScalarEvidence) {
-    let stat = read_proc_stat(pid);
     let fds = if want_fd_count {
         Some(read_fd_count(pid))
     } else {
@@ -78,6 +75,11 @@ pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
     let memory = read_proc_status_memory(pid);
     let io = read_proc_io(pid);
     let oom_score = read_proc_oom_score(pid);
+    // `stat` is the enumeration read — the same payload that produced the
+    // row's identity, so name and scalars can never describe two different
+    // processes. This second read is the identity confirmation: it narrows the
+    // pid-reuse race across the per-pid reads above. It is deliberately a fresh
+    // open, not a retained handle.
     let confirmation = match stat {
         Ok(_) => read_proc_stat(pid).map(|stat| stat.start_ticks),
         Err(failure) => Err(failure),
@@ -92,12 +94,7 @@ pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
             io,
             oom_score,
         },
-        ProcessObservationContext {
-            boot_time,
-            clock_ticks,
-            observed_at_ms,
-            previous,
-        },
+        context,
         rate_state,
     )
 }
@@ -441,7 +438,7 @@ fn result_pair_outcome<T>(
 ) -> SourceOutcome {
     match (left, right) {
         (Ok(_), Ok(_)) => SourceOutcome::Available,
-        (Err(left), Err(right)) => SourceOutcome::Unavailable(stronger_failure(*left, *right)),
+        (Err(left), Err(right)) => SourceOutcome::Unavailable(left.stronger(*right)),
         (Err(failure), Ok(_)) | (Ok(_), Err(failure)) => SourceOutcome::Partial(*failure),
     }
 }
@@ -459,34 +456,12 @@ fn rate_outcome(observations: &ProcessScalarObservations) -> SourceOutcome {
     let failure = availability
         .iter()
         .filter_map(|value| value.failure())
-        .reduce(stronger_failure);
+        .reduce(FailureKind::stronger);
     match (successes, failure) {
         (3, None) => SourceOutcome::Available,
         (0, Some(failure)) => SourceOutcome::Unavailable(failure),
         (_, Some(failure)) => SourceOutcome::Partial(failure),
         _ => SourceOutcome::Empty,
-    }
-}
-
-fn stronger_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(left) >= failure_priority(right) {
-        left
-    } else {
-        right
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
     }
 }
 

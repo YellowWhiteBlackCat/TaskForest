@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{
     DeviceId, FailureKind, ScalarAvailability, ScalarObservation, SourceOutcome,
 };
@@ -334,7 +335,7 @@ fn summarize(
             ]
         })
         .flatten()
-        .reduce(select_failure)
+        .reduce(FailureKind::stronger)
         .unwrap_or(FailureKind::TemporarilyUnavailable);
     let any_partial = value.values().any(|counter| {
         matches!(
@@ -432,30 +433,8 @@ pub(super) fn link_utilization_pct(
     let bytes_per_second = rx_bytes_per_sec.saturating_add(tx_bytes_per_sec);
     let capacity_bits_per_second = link_speed_mbps as f64 * 1_000_000.0;
     Some(
-        (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamp(0.0, 100.0) as f32,
+        (bytes_per_second as f64 * 8.0 / capacity_bits_per_second * 100.0).clamped_percent() as f32,
     )
-}
-
-const fn select_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(right) > failure_priority(left) {
-        right
-    } else {
-        left
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::ProviderFault => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::TemporarilyUnavailable => 5,
-        FailureKind::MissingDependency => 4,
-        FailureKind::IdentityChanged => 3,
-        FailureKind::Rejected => 2,
-        FailureKind::Unsupported => 1,
-    }
 }
 
 trait SourceOutcomeFailure {

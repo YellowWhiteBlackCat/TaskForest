@@ -25,11 +25,10 @@ use taskmanager_ui_contract::IconId;
 
 pub(crate) mod battery;
 pub(super) mod blocks;
-pub(crate) use blocks::sync_memory_legend_layout;
 pub(crate) mod chart;
 pub(crate) mod hover;
 pub(crate) mod npu_power;
-pub(super) mod sidebar;
+pub(crate) mod sidebar;
 
 use super::replay::{PerformanceLiveBody, PerformanceReplayRoot, entry_scene};
 use sidebar::cpu::cpu_main_scene;
@@ -38,11 +37,13 @@ use sidebar::{device_sidebar_scene, stats_rail_scene};
 /// Separation between the device panel and the detail surface.
 const DEVICE_PANEL_GAP_REM: f32 = 0.375;
 
-/// The disk spare warning is a semantic plate sibling of the live caption.
+/// The disk SMART alert is a semantic plate sibling of the live caption.
 /// Keeping the icon outside the text node preserves both the tofu law and the
-/// caption's single dynamic text authority.
+/// caption's single dynamic text authority. The plate covers every SMART
+/// crossing the caption reports — the spare pool below its warning level and
+/// the endurance past the device's rated life.
 pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box<dyn Scene> {
-    let visible = super::metrics::disk_spare_warning(disk);
+    let visible = super::metrics::disk_smart_alert(disk);
     let warning_display = if visible {
         Display::Flex
     } else {
@@ -69,7 +70,7 @@ pub(super) fn disk_caption_scene(disk: &DiskMetrics, palette: &UiPalette) -> Box
                     flex_shrink: 0.0,
                     display: { warning_display },
                 }
-                DynDiskSpareAlert({ key })
+                DynDiskSmartAlert({ key })
                 IconPlate({ IconId::Alert })
                 IconInk({ palette.warning_color })
             --

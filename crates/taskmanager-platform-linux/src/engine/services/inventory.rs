@@ -321,16 +321,15 @@ fn scan_openrc_update(
         InventoryCommandResult::Success(stdout) => {
             let parsed = parse_openrc_update_inventory(&stdout);
             let failure = if parsed.malformed {
-                preferred_failure(primary_failure, FailureKind::ProviderFault)
+                primary_failure.stronger(FailureKind::ProviderFault)
             } else {
                 primary_failure
             };
             describe_openrc(InventoryObservation::recovered(parsed.items, failure))
         }
-        InventoryCommandResult::Failure(fallback_failure) => InventoryObservation::failed(
-            Vec::new(),
-            preferred_failure(primary_failure, fallback_failure),
-        ),
+        InventoryCommandResult::Failure(fallback_failure) => {
+            InventoryObservation::failed(Vec::new(), primary_failure.stronger(fallback_failure))
+        }
     }
 }
 
@@ -440,28 +439,6 @@ const fn classify_nonzero_exit() -> FailureKind {
     // The command ran and rejected the operation. Its stderr is provider- and
     // locale-specific text, so it must never be used as a failure discriminator.
     FailureKind::Rejected
-}
-
-fn preferred_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(right) > failure_priority(left) {
-        right
-    } else {
-        left
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::TimedOut => 7,
-        FailureKind::MissingDependency => 6,
-        FailureKind::Rejected => 5,
-        FailureKind::ProviderFault => 4,
-        FailureKind::TemporarilyUnavailable => 3,
-        FailureKind::Unsupported => 2,
-        FailureKind::IdentityChanged => 1,
-    }
 }
 
 #[cfg(test)]

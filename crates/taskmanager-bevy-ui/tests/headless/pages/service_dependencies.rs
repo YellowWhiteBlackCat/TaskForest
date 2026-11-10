@@ -23,9 +23,9 @@ use taskforest_core::core::services::{
 use taskforest_core::core::target::ServiceId;
 use taskmanager_application::PlatformEffect;
 use taskmanager_application::ServiceDependenciesLifecycle;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_test_support::pin_english;
 use taskmanager_theme::GlassTier;
 use taskmanager_theme::tokens::UiSize;

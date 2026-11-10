@@ -62,12 +62,6 @@ pub(crate) fn performance_sidebar_width(preferred: f32, workspace_width: f32) ->
 /// before this bound is violated; it must not squeeze labels or invent a
 /// horizontal overflow path.
 pub(crate) const MAIN_GRAPH_MIN_WIDTH_PX: f32 = PERFORMANCE_MAIN_MIN_WIDTH;
-/// Minimum window height for the optional multi-row CPU core group. Below
-/// this threshold the whole optional group is hidden, so a short capture can
-/// never paint a partial final row at the window edge.
-pub(crate) const CPU_CORE_GRID_MIN_WINDOW_HEIGHT_PX: f32 = 920.0;
-pub(crate) const MEMORY_LEGEND_MIN_WINDOW_HEIGHT_PX: f32 = 750.0;
-
 /// The height of one performance chart slot, in rem.
 ///
 /// The device curves and the GPU metric curve share one slot budget, so the
@@ -99,16 +93,6 @@ pub(crate) const fn performance_layout_mode(content_width: f32) -> PerformanceLa
     } else {
         PerformanceLayoutMode::Wide
     }
-}
-
-#[must_use]
-pub(crate) const fn cpu_core_grid_visible(window_height: f32) -> bool {
-    window_height >= CPU_CORE_GRID_MIN_WINDOW_HEIGHT_PX
-}
-
-#[must_use]
-pub(crate) const fn memory_legend_visible(window_height: f32) -> bool {
-    window_height >= MEMORY_LEGEND_MIN_WINDOW_HEIGHT_PX
 }
 
 #[cfg(test)]

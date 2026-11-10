@@ -1,7 +1,8 @@
 use super::*;
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::tooltip::TooltipText;
-use taskmanager_shell::presentation::{bytes, control_error_detail};
+use taskmanager_application::i18n::control_error_detail;
+use taskmanager_shell::presentation::bytes;
 
 #[test]
 fn aggregate_metric_states_reach_the_production_row_scene_and_semantic_nodes() {

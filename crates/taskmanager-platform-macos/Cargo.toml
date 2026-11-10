@@ -29,7 +29,7 @@ test-support = []
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application", version = "0.5.1" }
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 taskmanager-platform-portable = { path = "../taskmanager-platform-portable", version = "0.5.1" }
 taskmanager-platform-provider = { path = "../taskmanager-platform-provider", version = "0.5.1" }

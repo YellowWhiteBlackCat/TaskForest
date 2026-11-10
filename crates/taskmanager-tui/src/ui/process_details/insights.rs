@@ -27,6 +27,7 @@ pub(crate) use formatting::{
 use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process_telemetry::ThreadWaitKind;
 use taskmanager_application::ProcessAffinityState;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_shell::presentation::{
     capabilities_summary, namespaces_summary, network_connection_counters_summary,
     sandbox_details_summary,
@@ -435,6 +436,18 @@ pub(crate) fn insights_lines_with_limit(
                     "  {} {}",
                     t("proc.affinity"),
                     t("common.collecting_telemetry"),
+                )));
+            }
+            // A failed read is a fact about this process, not a missing one:
+            // the row stays and carries the owner's reason, like the Iced
+            // editor and the GPUI overlay.
+            ProcessAffinityState::Failed {
+                target, failure, ..
+            } if target.live_key() == Some(identity) => {
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("proc.affinity"),
+                    control_error_detail(*failure),
                 )));
             }
             _ => {}

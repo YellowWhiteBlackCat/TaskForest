@@ -136,13 +136,9 @@ struct FailureSummary {
 
 impl FailureSummary {
     fn record_field(&mut self, field: &'static str, failure: FailureKind) {
-        if self
-            .fields
-            .get(field)
-            .is_none_or(|current| priority(failure) > priority(*current))
-        {
-            self.fields.insert(field, failure);
-        }
+        let current = self.fields.get(field).copied();
+        self.fields
+            .insert(field, FailureKind::strongest(current, failure));
     }
 
     fn record(&mut self, failure: FailureKind) {
@@ -150,23 +146,7 @@ impl FailureSummary {
     }
 
     fn aggregate(&self) -> Option<FailureKind> {
-        self.fields
-            .values()
-            .copied()
-            .max_by_key(|failure| priority(*failure))
-    }
-}
-
-const fn priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
+        self.fields.values().copied().reduce(FailureKind::stronger)
     }
 }
 

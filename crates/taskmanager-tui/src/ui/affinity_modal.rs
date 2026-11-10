@@ -5,6 +5,7 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
@@ -49,7 +50,11 @@ pub(super) fn render_affinity_modal_at(
                 Style::new().fg(theme.dim),
             ),
             Span::styled(
-                if state.mask_observed {
+                if let Some(failure) = state.failure {
+                    // A failed read is not "still collecting": the header
+                    // carries the owner's reason so the user can act on it.
+                    format!("  {}", control_error_detail(failure))
+                } else if state.mask_observed {
                     format!(
                         "  ({}/{} CPUs enabled)",
                         state.selected_mask.len(),
@@ -58,7 +63,11 @@ pub(super) fn render_affinity_modal_at(
                 } else {
                     format!("  {}", t("common.collecting_telemetry"))
                 },
-                Style::new().fg(theme.accent),
+                Style::new().fg(if state.failure.is_some() {
+                    theme.danger
+                } else {
+                    theme.accent
+                }),
             ),
         ]),
         Line::from(""),

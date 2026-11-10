@@ -21,9 +21,15 @@ use bevy::ui::{
 use bevy::ui_widgets::{Activate, Button};
 use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
+use taskmanager_ui_contract::FrontendShape;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
-pub(crate) const RAIL_WIDTH: f32 = 64.0;
+use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, number};
+
+/// The vertical rail's width, which is also the horizontal chrome the shape
+/// subtracts before it classifies a frame: it is bound from the threshold
+/// registry (`HorizontalChromeReserve`) instead of restated here.
+pub(crate) const RAIL_WIDTH: f32 = number(FrontendShape::Bevy, LayoutAxis::HorizontalChromeReserve);
 #[derive(QueryData)]
 #[query_data(mutable)]
 pub(crate) struct ChromeNode {

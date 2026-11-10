@@ -10369,7 +10369,7 @@ dependencies = [
 
 [[package]]
 name = "taskforest-core"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -10951,7 +10951,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-ui-contract"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "taskforest-contract",
  "taskforest-core",

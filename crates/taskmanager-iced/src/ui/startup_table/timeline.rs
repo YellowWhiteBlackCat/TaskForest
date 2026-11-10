@@ -16,6 +16,7 @@ use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
 
 use taskmanager_theme::tokens;
+use zhuge_ui_core::value::interval_fraction;
 
 use crate::app::Message;
 use crate::text_metrics::{measured_text_width, truncate_to_width};
@@ -364,7 +365,7 @@ pub(crate) fn timeline_gantt(
 /// A zero total yields `0.0` for every window: there is nothing to scale by,
 /// and a full-width bar would be a fabricated measurement.
 fn share_of_total(value_ms: u64, total_ms: u64) -> f32 {
-    zhuge_ui_core::value::interval_fraction(value_ms as f32, 0.0, total_ms as f32, 0.0)
+    interval_fraction(value_ms as f32, 0.0, total_ms as f32, 0.0)
 }
 
 /// The axis' tick interval: a "nice" 1/2/5 × 10ⁿ step that keeps the tick

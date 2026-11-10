@@ -14,7 +14,7 @@ use gpui::{
     KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Pixels,
     Point, RenderOnce, Styled, Window, canvas, div, px, relative,
 };
-use taskmanager_theme::Palette;
+use taskmanager_theme::{Palette, tokens};
 
 /// Typed slider event payload.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -162,7 +162,7 @@ impl RenderOnce for Slider {
             .bg(crate::theme_binding::fill(palette.accent))
             .border(px(2.0))
             .border_color(crate::theme_binding::hsla(palette.surface))
-            .mx(px(-8.0));
+            .mx(px(f32::from(tokens::SPACE_NEGATIVE_8)));
 
         // Keyboard: arrows step by `step`, Home/End jump to the ends.
         let keyboard = {

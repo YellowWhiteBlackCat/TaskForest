@@ -6,6 +6,7 @@ mod runtime;
 pub enum CaptureScenario {
     SmartMissingTool,
     SmartPermission,
+    SmartWearCritical,
     DeviceHotplug,
     GpuEngineInventory,
     IntelGpuTelemetry,
@@ -69,6 +70,7 @@ impl CaptureScenario {
         match value {
             "smart-missing-tool" => Some(Self::SmartMissingTool),
             "smart-permission" => Some(Self::SmartPermission),
+            "smart-wear-critical" => Some(Self::SmartWearCritical),
             "device-hotplug" => Some(Self::DeviceHotplug),
             "gpu-engine-inventory" => Some(Self::GpuEngineInventory),
             "intel-gpu-telemetry" => Some(Self::IntelGpuTelemetry),
@@ -133,6 +135,7 @@ impl CaptureScenario {
         match self {
             Self::SmartMissingTool => "smart-missing-tool",
             Self::SmartPermission => "smart-permission",
+            Self::SmartWearCritical => "smart-wear-critical",
             Self::DeviceHotplug => "device-hotplug",
             Self::GpuEngineInventory => "gpu-engine-inventory",
             Self::IntelGpuTelemetry => "intel-gpu-telemetry",

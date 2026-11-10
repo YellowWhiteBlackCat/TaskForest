@@ -71,7 +71,7 @@ use taskmanager_application::AppAction;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 
-use taskmanager_shell::presentation::control_error_detail;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};

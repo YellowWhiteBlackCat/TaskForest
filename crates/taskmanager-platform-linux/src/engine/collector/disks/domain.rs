@@ -8,6 +8,7 @@ use taskforest_contract::DeviceSourceSnapshot;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::identity::DeviceId;
 use taskforest_core::core::metrics::{DiskMetrics, ScalarObservation};
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::source::SourceOutcome;
 
 use super::super::sources::{DiskstatsObservation, apply_smart, parse_proc_diskstats};
@@ -237,7 +238,7 @@ impl DiskRateSample {
             .checked_add(writes)
             .ok_or(FailureKind::ProviderFault)?;
         let active_time_pct =
-            ((io_time_ms as f64 / (elapsed_secs * 1_000.0)) * 100.0).clamp(0.0, 100.0) as f32;
+            ((io_time_ms as f64 / (elapsed_secs * 1_000.0)) * 100.0).clamped_percent() as f32;
         let average_queue_depth = (elapsed_secs > 0.0)
             .then(|| (weighted_time_ms as f64 / (elapsed_secs * 1_000.0)) as f32)
             .filter(|value| value.is_finite() && *value >= 0.0);

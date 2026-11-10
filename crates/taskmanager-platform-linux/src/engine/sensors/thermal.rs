@@ -489,9 +489,7 @@ fn io_failure(kind: ErrorKind, root: bool) -> FailureKind {
 }
 
 fn record_failure(current: &mut Option<FailureKind>, observed: FailureKind) {
-    if current.is_none_or(|failure| failure_priority(observed) > failure_priority(failure)) {
-        *current = Some(observed);
-    }
+    *current = Some(FailureKind::strongest(*current, observed));
 }
 
 fn zone_status_source(zones: &[ThermalZoneStatus]) -> SourceStatus {
@@ -573,29 +571,8 @@ fn summarize_fields<const N: usize>(
     let failure = fields
         .into_iter()
         .filter_map(ScalarAvailability::failure)
-        .reduce(select_failure);
+        .reduce(FailureKind::stronger);
     (complete, failure)
-}
-
-const fn select_failure(left: FailureKind, right: FailureKind) -> FailureKind {
-    if failure_priority(right) > failure_priority(left) {
-        right
-    } else {
-        left
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@
 //! process rows, CPU graph, memory percentage and the live status line — are
 //! computed here once, so no frontend can spell a second conversion.
 
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_ui_contract::{GraphSummary, ProcessRowInput, SemanticSnapshotBuilder};
@@ -25,7 +26,7 @@ pub fn default_status_announcement(shell: &ShellApp) -> String {
 pub fn semantic_cpu_graph(current_usage_pct: Option<f32>) -> Option<GraphSummary> {
     let current = current_usage_pct
         .filter(|value| value.is_finite())
-        .map(|value| f64::from(value.clamp(0.0, 100.0)))?;
+        .map(|value| f64::from(value.clamped_percent()))?;
     Some(GraphSummary {
         current,
         peak: current,
@@ -37,7 +38,7 @@ pub fn semantic_cpu_graph(current_usage_pct: Option<f32>) -> Option<GraphSummary
 #[must_use]
 pub fn memory_percentage(value: Option<u64>, total: Option<u64>) -> Option<f64> {
     let (value, total) = (value?, total.filter(|total| *total > 0)?);
-    let percentage = (value as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
+    let percentage = (value as f64 / total as f64 * 100.0).clamped_percent();
     percentage.is_finite().then_some(percentage)
 }
 
@@ -60,7 +61,7 @@ pub fn semantic_process_row(
         cpu_percent: process
             .current_cpu_percentage()
             .filter(|value| value.is_finite())
-            .map(|value| f64::from(value.clamp(0.0, 100.0))),
+            .map(|value| f64::from(value.clamped_percent())),
         memory_percent: memory_percentage(process.current_memory_bytes(), memory_total_bytes),
         selected,
     }

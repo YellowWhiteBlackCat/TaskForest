@@ -68,6 +68,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "alert-rules-manager" => Some("alert-rules-manager"),
         "smart-missing-tool" => Some("smart-missing-tool"),
         "smart-permission" => Some("smart-permission"),
+        "smart-wear-critical" => Some("smart-wear-critical"),
         "partition-disk-usage" => Some("partition-disk-usage"),
         "partition-live-usage" => Some("partition-live-usage"),
         "gpu-engine-inventory" => Some("gpu-engine-inventory"),
@@ -111,6 +112,7 @@ pub(crate) fn performance_device_target(
         "perf-disk"
         | "smart-missing-tool"
         | "smart-permission"
+        | "smart-wear-critical"
         | "partition-disk-usage"
         | "partition-live-usage" => projection
             .snapshot
@@ -189,6 +191,7 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "sidebar-hidden"
         | "smart-missing-tool"
         | "smart-permission"
+        | "smart-wear-critical"
         | "partition-disk-usage"
         | "partition-live-usage"
         | "gpu-engine-inventory"

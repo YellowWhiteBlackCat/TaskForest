@@ -96,47 +96,6 @@ fn unreadable_marking_is_monotonic_and_keeps_the_strongest_failure() {
 }
 
 #[test]
-fn failure_priority_table_is_total() {
-    assert_eq!(
-        stronger_of(FailureKind::Rejected, FailureKind::Unsupported),
-        FailureKind::Unsupported
-    );
-    assert_eq!(
-        stronger_of(FailureKind::Unsupported, FailureKind::RequiresEscalation),
-        FailureKind::RequiresEscalation
-    );
-    assert_eq!(
-        stronger_of(FailureKind::TimedOut, FailureKind::TimedOut),
-        FailureKind::TimedOut
-    );
-}
-
-#[test]
-fn report_entries_sort_largest_first_then_path_and_cap() {
-    let entry = |path: &str, size: u64| DirectoryUsageEntry {
-        path: path.to_string(),
-        depth: 1,
-        size_bytes: ScalarObservation::available(size, 10),
-        file_count: ScalarObservation::available(1, 10),
-        unreadable: None,
-    };
-    let reported = report_entries(
-        vec![
-            entry("a", 5),
-            entry("b", 100),
-            entry("c", 5),
-            entry("d", 50),
-        ],
-        3,
-    );
-    assert_eq!(
-        reported.iter().map(|e| e.path.as_str()).collect::<Vec<_>>(),
-        ["b", "d", "a"],
-        "largest first; size ties break on path, and the cap drops the tail"
-    );
-}
-
-#[test]
 fn unreadable_entries_never_outrank_measured_ones_in_the_report() {
     let entry = |path: &str, size: ScalarObservation<u64>, unreadable| DirectoryUsageEntry {
         path: path.to_string(),

@@ -12,7 +12,7 @@ documentation = "https://docs.rs/taskmanager-telemetry-store"
 
 [dependencies]
 ringbuf = "0.5"
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }

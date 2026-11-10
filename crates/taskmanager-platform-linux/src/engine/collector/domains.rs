@@ -55,10 +55,10 @@ fn source_quality(sources: &[SourceStatus]) -> SourceQuality {
             SourceOutcome::Available | SourceOutcome::Empty => has_success = true,
             SourceOutcome::Partial(candidate) => {
                 has_success = true;
-                failure = Some(stronger_failure(failure, candidate));
+                failure = Some(FailureKind::strongest(failure, candidate));
             }
             SourceOutcome::Unavailable(candidate) => {
-                failure = Some(stronger_failure(failure, candidate));
+                failure = Some(FailureKind::strongest(failure, candidate));
             }
         }
     }
@@ -83,7 +83,7 @@ fn device_quality(
         {
             match source_quality(sources) {
                 SourceQuality::Partial(failure) | SourceQuality::Unavailable(failure) => {
-                    SourceQuality::Partial(stronger_failure(Some(discovery_failure), failure))
+                    SourceQuality::Partial(discovery_failure.stronger(failure))
                 }
                 SourceQuality::Current => SourceQuality::Partial(discovery_failure),
             }
@@ -91,27 +91,6 @@ fn device_quality(
         SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => {
             SourceQuality::Unavailable(failure)
         }
-    }
-}
-
-const fn stronger_failure(current: Option<FailureKind>, candidate: FailureKind) -> FailureKind {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => current,
-        Some(_) | None => candidate,
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::TimedOut => 7,
-        FailureKind::IdentityChanged => 6,
-        FailureKind::TemporarilyUnavailable => 5,
-        FailureKind::MissingDependency => 4,
-        FailureKind::Rejected => 3,
-        FailureKind::ProviderFault => 2,
-        FailureKind::Unsupported => 1,
     }
 }
 

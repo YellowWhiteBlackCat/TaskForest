@@ -100,7 +100,7 @@ case "$CAPTURE_SCENE" in
   startup-impact|startup-failure-evidence|startup-boot-markers) CAPTURE_PAGE=startup ;;
   services-search-highlight|service-details-logs) CAPTURE_PAGE=services ;;
   application-history-replay) CAPTURE_PAGE=app-history ;;
-  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|health-review-events|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
+  smart-self-test-confirm|about|system-about|storage-health|sensor-center|active-alert|alert-rules-manager|telemetry-paused|diagnostic-preview|diagnostic-failure|smart-missing-tool|smart-permission|smart-wear-critical|partition-disk-usage|partition-live-usage|gpu-engine-inventory|intel-gpu-telemetry|settings-zero-gray|settings-switch-focus|first-run|event-center|health-review-events|settings-permission-center|saved-view-presets|sidebar-edit|history-replay|battery-fan-performance|battery-live-performance|device-hotplug) CAPTURE_PAGE=performance ;;
   *)
     printf 'unsupported TM_TUI_CAPTURE_SCENE=%s\n' "$CAPTURE_SCENE" >&2
     exit 2

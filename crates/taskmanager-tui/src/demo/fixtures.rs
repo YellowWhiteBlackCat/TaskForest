@@ -29,6 +29,7 @@ use taskmanager_application::{
     CorrelatedEvent, NpuInventoryEvent, PlatformEventBatch, PlatformEventContext,
 };
 use taskmanager_shell::ShellApp;
+use taskmanager_shell::fixture::health::seed_wear_critical_disk;
 use taskmanager_shell::fixture::{
     ProjectionSeedFact, record_demo_history_frame, seed_projection_fact,
 };
@@ -352,6 +353,11 @@ pub(super) fn seed_capture_storage_scenario(snapshot: &mut SystemSnapshot, targe
                 .smart_state
                 .transition(DeviceStatus::PermissionDenied, snapshot.timestamp_ms);
         }
+    } else if target == "smart-wear-critical" {
+        // The disk whose endurance reached its rated life: the critical
+        // marker rides every surface that paints the endurance, and this is
+        // the disk that proves it.
+        seed_wear_critical_disk(snapshot);
     } else if target == "partition-disk-usage" || target == "partition-live-usage" {
         if let Some(disk) = snapshot.disks.first_mut() {
             let now = snapshot.timestamp_ms;

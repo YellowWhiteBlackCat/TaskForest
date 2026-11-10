@@ -24,7 +24,7 @@ hardware-all = [
 nvidia = ["taskmanager-platform-linux/nvidia"]
 
 [dependencies]
-taskforest-core = { path = "../taskforest-core", version = "0.5.1" }
+taskforest-core = { path = "../taskforest-core", version = "0.6.0" }
 taskforest-contract = { path = "../taskforest-contract", version = "0.5.1" }
 taskforest-ipc = { path = "../taskforest-ipc", version = "0.5.1" }
 

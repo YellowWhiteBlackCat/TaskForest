@@ -162,11 +162,8 @@ fn power_scalar_source_status(batteries: &[BatteryInfo]) -> SourceStatus {
         {
             total = total.saturating_add(1);
             successful = successful.saturating_add(usize::from(availability.is_current()));
-            if let Some(candidate) = availability.failure()
-                && failure
-                    .is_none_or(|current| failure_priority(candidate) > failure_priority(current))
-            {
-                failure = Some(candidate);
+            if let Some(candidate) = availability.failure() {
+                failure = Some(FailureKind::strongest(failure, candidate));
             }
         }
     }
@@ -389,17 +386,16 @@ fn observe_energy(
                     ScalarObservation::available(value, observed_at_ms)
                 }
                 Some(value) => ScalarObservation::partial(value, observed_at_ms, direct_failure),
-                None => ScalarObservation::unavailable(strongest_failure([
-                    direct_failure,
-                    FailureKind::ProviderFault,
-                ])),
+                None => ScalarObservation::unavailable(
+                    direct_failure.stronger(FailureKind::ProviderFault),
+                ),
             }
         }
-        _ => ScalarObservation::unavailable(strongest_failure([
-            direct_failure,
-            scalar_failure(charge_uah),
-            scalar_failure(conversion_voltage),
-        ])),
+        _ => ScalarObservation::unavailable(
+            direct_failure
+                .stronger(scalar_failure(charge_uah))
+                .stronger(scalar_failure(conversion_voltage)),
+        ),
     }
 }
 
@@ -468,17 +464,16 @@ fn observe_power(
                     ScalarObservation::available(value, observed_at_ms)
                 }
                 Some(value) => ScalarObservation::partial(value, observed_at_ms, direct_failure),
-                None => ScalarObservation::unavailable(strongest_failure([
-                    direct_failure,
-                    FailureKind::ProviderFault,
-                ])),
+                None => ScalarObservation::unavailable(
+                    direct_failure.stronger(FailureKind::ProviderFault),
+                ),
             }
         }
-        _ => ScalarObservation::unavailable(strongest_failure([
-            direct_failure,
-            scalar_failure(current_ua),
-            scalar_failure(voltage_uv),
-        ])),
+        _ => ScalarObservation::unavailable(
+            direct_failure
+                .stronger(scalar_failure(current_ua))
+                .stronger(scalar_failure(voltage_uv)),
+        ),
     }
 }
 
@@ -495,27 +490,6 @@ fn scalar_failure<T>(observation: ScalarObservation<T>) -> FailureKind {
         .availability()
         .failure()
         .unwrap_or(FailureKind::ProviderFault)
-}
-
-fn strongest_failure(failures: impl IntoIterator<Item = FailureKind>) -> FailureKind {
-    failures
-        .into_iter()
-        .max_by_key(|failure| failure_priority(*failure))
-        .unwrap_or(FailureKind::ProviderFault)
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
-    }
 }
 
 const fn classify_scalar_io_error(kind: ErrorKind) -> FailureKind {

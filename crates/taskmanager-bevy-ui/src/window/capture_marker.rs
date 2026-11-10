@@ -25,6 +25,7 @@ use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::table::ZeroValueCell;
+use crate::window::capture_marker_cores::CoreGridCaptureAccess;
 use crate::window::capture_marker_interactive::InteractiveCaptureAccess;
 use crate::window::{FeedbackLine, WindowPalette};
 use crate::window_surface::{ModalBody, WindowSurfaceKind, WindowSurfaceState};
@@ -129,6 +130,7 @@ pub(super) struct CaptureAccess<'w, 's> {
             &'static ComputedNode,
         ),
     >,
+    cores: CoreGridCaptureAccess<'w, 's>,
     replay: Query<
         'w,
         's,
@@ -195,6 +197,12 @@ fn apps_zero_gray_ready(access: &mut CaptureAccess) -> bool {
 pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
     let route = access.route.page;
     if access.state.emitted || access.pages.iter().all(|content| content.page != route) {
+        return;
+    }
+    // The card chrome mounts on the frame the page arrives, while the grid
+    // body learns its open height on a later frame: a frame admitted in
+    // between is a card header above an empty grid.
+    if route == Page::Performance && !super::capture_marker_cores::core_grid_ready(&access.cores) {
         return;
     }
     if let Some(target) = capture_perf_device_target(&access.track.shell) {

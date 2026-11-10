@@ -212,7 +212,7 @@ fn cooling_activity(
             ]
             .into_iter()
             .flatten()
-            .reduce(super::select_failure)
+            .reduce(FailureKind::stronger)
             .unwrap_or(FailureKind::TemporarilyUnavailable),
         ),
     }

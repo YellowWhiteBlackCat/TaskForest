@@ -21,10 +21,11 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
-use taskmanager_shell::presentation::smart::smart_section_visible;
+use taskmanager_shell::presentation::smart::{
+    endurance_used_readout, smart_section_visible, spare_pool_readout,
+};
 
 use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
-use taskforest_core::core::percent::percent_text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
@@ -437,7 +438,7 @@ fn disk_lines(
         if smart_section_visible(disk) {
             let temp =
                 smart_temperature_readout(disk.smart_temperature_c, disk.smart_temp_critical_c);
-            let used = super::observed_percentage(disk.smart_percent_used);
+            let used = endurance_used_readout(disk.smart_percent_used, None);
             lines.push(ratatui::text::Line::from(format!(
                 "  {} {} · {} {}",
                 t("common.temperature"),
@@ -491,13 +492,8 @@ fn disk_lines(
                     hours / 24,
                 )));
             }
-            if let Some(spare) = disk.smart_available_spare_pct {
-                let threshold = disk.smart_spare_warning_threshold_pct();
-                let value = if disk.smart_spare_pool_needs_warning() {
-                    format!("{} ⚠ (≤{})", percent_text(spare), percent_text(threshold))
-                } else {
-                    percent_text(spare)
-                };
+            if disk.smart_available_spare_pct.is_some() {
+                let value = spare_pool_readout(disk, None);
                 lines.push(ratatui::text::Line::from(format!(
                     "  {} {}",
                     t("disk.available_spare"),

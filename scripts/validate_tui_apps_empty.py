@@ -13,6 +13,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import instrument_budget
+
 
 class EvidenceError(RuntimeError):
     """The captured Applications frame does not prove the empty state."""
@@ -90,7 +92,7 @@ def ocr_text(image: Path) -> str:
             check=True,
             text=True,
             capture_output=True,
-            timeout=15,
+            timeout=instrument_budget.seconds(),
         )
     except (OSError, subprocess.SubprocessError) as error:
         raise EvidenceError(f"Applications empty-state OCR failed: {error}") from error

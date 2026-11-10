@@ -35,6 +35,7 @@ use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
 use stats::memory_stats_rows;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::duration;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
@@ -59,13 +60,13 @@ fn overview_gauges(app: &crate::IcedApp) -> Element<'static, Message, iced::Them
     let snapshot = app.shell.projection().snapshot.as_ref();
     let cpu_value = snapshot
         .and_then(|snapshot| projection::CpuObservation::from(&snapshot.cpu).usage_pct)
-        .map(|value| value.clamp(0.0, 100.0));
+        .map(|value| value.clamped_percent());
     let memory_value = snapshot
         .and_then(|snapshot| snapshot.memory.used_percentage_observed())
-        .map(|value| value.clamp(0.0, 100.0));
+        .map(|value| value.clamped_percent());
     let swap_value = snapshot
         .and_then(|snapshot| snapshot.memory.swap_percentage_observed())
-        .map(|value| value.clamp(0.0, 100.0));
+        .map(|value| value.clamped_percent());
     row![
         gauge(t("common.cpu"), cpu_value, *app.theme()),
         gauge(t("common.memory"), memory_value, *app.theme()),

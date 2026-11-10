@@ -78,6 +78,10 @@ struct DrawCycleInputs {
     /// An ancillary effect was queued this cycle (selected-process insights
     /// refresh, service-log tail poll, desktop notification submission).
     ancillary_effect: bool,
+    /// An opt-in frame-timing sink is active. A soak must observe the
+    /// loop's delivered cadence, so every cycle produces one real draw even
+    /// when the product state did not change.
+    frame_timing_sink: bool,
 }
 
 /// The dirty-flag predicate: return `true` when this cycle produced new data
@@ -86,7 +90,10 @@ struct DrawCycleInputs {
 /// crossterm `Terminal` (which needs a real tty).
 #[must_use]
 fn should_draw(inputs: DrawCycleInputs) -> bool {
-    inputs.platform_batch || inputs.refresh_queued || inputs.ancillary_effect
+    inputs.platform_batch
+        || inputs.refresh_queued
+        || inputs.ancillary_effect
+        || inputs.frame_timing_sink
 }
 
 pub fn run_live() -> io::Result<()> {

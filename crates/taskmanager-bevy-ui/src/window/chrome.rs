@@ -5,6 +5,7 @@ use crate::app::nav_strip::nav_strip_scene;
 use crate::app::{ContentSlot, Page};
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::widgets::focus_ring::focus_ring_halo_scene;
+use crate::widgets::layout_budget::PerformanceBudgetSlot;
 use crate::window::edge::edge_highlight_scene;
 use bevy::ecs::{component::Component, hierarchy::Children};
 use bevy::scene::{Scene, bsn};
@@ -48,7 +49,7 @@ pub(super) fn app_shell_scene(
                 @{strip} --
                 Node {min_width:px(0.0),min_height:px(0.0),flex_direction:FlexDirection::Column,flex_grow:1.0,flex_basis:px(0.0)}
                 Children [{status} --
-                    Node {width:percent(100),min_width:px(0.0),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),padding:UiRect::all(Val::Px(space_8()))} BackgroundColor({palette.canvas}) ContentSlot]
+                    Node {width:percent(100),min_width:px(0.0),min_height:px(0.0),flex_grow:1.0,flex_basis:px(0.0),padding:UiRect::all(Val::Px(space_8()))} BackgroundColor({palette.canvas}) ContentSlot PerformanceBudgetSlot]
             ]
         ]
     })

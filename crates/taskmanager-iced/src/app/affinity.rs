@@ -7,11 +7,10 @@
 //! retargeted while the modal is open.
 
 use super::{IcedApp, Message, PlatformEffect};
+use taskmanager_application::ProcessAffinityState;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{ProcessAffinityReady, ProcessAffinityState};
 
 use taskforest_core::core::hardware::CpuType;
-use taskforest_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 impl IcedApp {
@@ -71,7 +70,11 @@ impl IcedApp {
         });
         self.process_presentation.affinity_cpus = None;
 
-        if let Some(snapshot) = affinity_last_good(self.shell.process_affinity_state(), &target) {
+        if let Some(snapshot) = self
+            .shell
+            .process_affinity_state()
+            .last_good_for_target(&target)
+        {
             self.process_presentation.affinity_cpus = Some(snapshot.cpus.iter().copied().collect());
         }
 
@@ -85,14 +88,19 @@ impl IcedApp {
         let Some(target) = self.affinity_target().cloned() else {
             return;
         };
-        if matches!(
-            self.shell.process_affinity_state(),
-            ProcessAffinityState::Failed { target: failed, .. } if failed == &target
-        ) {
+        if self
+            .shell
+            .process_affinity_state()
+            .failure_for_target(&target)
+            .is_some()
+        {
             self.process_presentation.affinity_cpus = None;
             return;
         }
-        let Some(snapshot) = affinity_last_good(self.shell.process_affinity_state(), &target)
+        let Some(snapshot) = self
+            .shell
+            .process_affinity_state()
+            .last_good_for_target(&target)
         else {
             return;
         };
@@ -316,28 +324,5 @@ impl IcedApp {
             .filter(|count| *count > 0)
             .unwrap_or_else(|| std::thread::available_parallelism().map_or(8, |count| count.get()))
             .min(128)
-    }
-}
-
-fn affinity_last_good<'a>(
-    state: &'a ProcessAffinityState,
-    target: &FrozenProcessIdentity,
-) -> Option<&'a ProcessAffinityReady> {
-    match state {
-        ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),
-        ProcessAffinityState::Loading {
-            target: loading,
-            last_good: Some(ready),
-            ..
-        }
-        | ProcessAffinityState::Failed {
-            target: loading,
-            last_good: Some(ready),
-            ..
-        } if loading == target => Some(ready),
-        ProcessAffinityState::Closed
-        | ProcessAffinityState::Loading { .. }
-        | ProcessAffinityState::Ready(_)
-        | ProcessAffinityState::Failed { .. } => None,
     }
 }

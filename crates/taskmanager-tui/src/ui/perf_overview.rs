@@ -22,6 +22,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, Gauge, GraphType, Paragraph, Wrap};
 use taskforest_core::core::hardware::HardwareInfo;
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_application::MsrReadoutState;
 use taskmanager_application::RaplPowerState;
@@ -359,7 +360,7 @@ fn render_gauge(
 ) {
     let bounded = value
         .filter(|value| value.is_finite())
-        .map(|value| value.clamp(0.0, 100.0));
+        .map(|value| value.clamped_percent());
     let label = bounded.map_or_else(missing_value, percent_text);
     frame.render_widget(
         Gauge::default()

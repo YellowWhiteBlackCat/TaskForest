@@ -11,6 +11,75 @@ use taskforest_core::{FailureKind, FrozenProcessIdentity};
 use super::tree::io_failure;
 use taskforest_core::ProcessSchedulingPolicy;
 
+/// The scheduling state byte of one `/proc/<pid>/stat` read, typed at the
+/// procfs boundary. The label vocabulary is the product's process-status
+/// column; an unrecognized or absent byte is [`ProcessState::Other`], never a
+/// guessed state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ProcessState {
+    Running,
+    Sleeping,
+    Idle,
+    UninterruptibleDiskSleep,
+    Zombie,
+    Stopped,
+    Tracing,
+    Dead,
+    Wakekill,
+    Waking,
+    Parked,
+    Other,
+}
+
+impl ProcessState {
+    /// Decode the kernel state byte (`proc(5)` § /proc/pid/stat, field 3).
+    pub(super) fn from_stat_field(field: Option<&str>) -> Self {
+        match field.and_then(|field| field.chars().next()) {
+            Some('R') => Self::Running,
+            Some('S') => Self::Sleeping,
+            Some('I') => Self::Idle,
+            Some('D') => Self::UninterruptibleDiskSleep,
+            Some('Z') => Self::Zombie,
+            Some('T') => Self::Stopped,
+            Some('t') => Self::Tracing,
+            Some('X' | 'x') => Self::Dead,
+            Some('K') => Self::Wakekill,
+            Some('W') => Self::Waking,
+            Some('P') => Self::Parked,
+            _ => Self::Other,
+        }
+    }
+
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Running => "Running",
+            Self::Sleeping => "Sleeping",
+            Self::Idle => "Idle",
+            Self::UninterruptibleDiskSleep => "UninterruptibleDiskSleep",
+            Self::Zombie => "Zombie",
+            Self::Stopped => "Stopped",
+            Self::Tracing => "Tracing",
+            Self::Dead => "Dead",
+            Self::Wakekill => "Wakekill",
+            Self::Waking => "Waking",
+            Self::Parked => "Parked",
+            Self::Other => "Other",
+        }
+    }
+}
+
+/// The identity half of one `/proc/<pid>/stat` read: command name, scheduling
+/// state and parent. Kept separate from [`ProcStatFields`] so the scalar
+/// record stays `Copy` and the two halves can fail independently.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ProcIdentity {
+    pub(super) comm: String,
+    pub(super) state: ProcessState,
+    /// `None` for pid 0's children (the kernel reports ppid 0 for init and for
+    /// kernel threads whose parent is not a user-space process).
+    pub(super) parent_pid: Option<u32>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcStatFields {
     pub(super) threads: u32,
@@ -87,10 +156,22 @@ pub(super) struct ProcMemoryObservations {
     pub(super) anon_huge_pages_bytes: Result<u64, FailureKind>,
 }
 
+/// Which memory sources one observation samples.
+///
+/// `Status` reads only `/proc/<pid>/status`: RSS components and `VmSwap` stay
+/// fresh every tick. `Full` additionally reads `smaps_rollup` for the USS and
+/// transparent-huge-page counters, which the kernel computes by walking every
+/// page table of the target (~1.2 ms per process against ~36 µs for status).
+/// A deferred sample is typed `TemporarilyUnavailable`, never zero, so the
+/// row's `retain_previous` pass bridges the prior value as `Stale`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum MemorySample {
+    Status,
+    Full,
+}
+
 pub fn parse_proc_stat(text: &str) -> Option<ProcStatFields> {
-    let _ = text.find('(')?;
-    let rparen = text.rfind(')')?;
-    let tail = &text[rparen + 1..];
+    let (_, tail) = split_stat_text(text)?;
     // Indices: 7=minflt, 9=majflt, 11=utime, 12=stime, 16=nice, 17=threads, 19=starttime
     let [
         minflt,
@@ -116,6 +197,33 @@ pub fn parse_proc_stat(text: &str) -> Option<ProcStatFields> {
         policy,
         minflt: minflt.parse().ok()?,
         majflt: majflt.parse().ok()?,
+    })
+}
+
+/// Split one `/proc/<pid>/stat` payload into `(comm, tail)`.
+///
+/// The kernel wraps field 2 in parentheses and the command name may itself
+/// contain spaces and parentheses, so the only safe delimiters are the FIRST
+/// '(' and the LAST ')' in the whole line. A payload whose ')' precedes its
+/// '(' is malformed and yields `None` rather than an inverted slice.
+fn split_stat_text(text: &str) -> Option<(&str, &str)> {
+    let open = text.find('(')?;
+    let close = text.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+    Some((&text[open + 1..close], &text[close + 1..]))
+}
+
+/// Parse the identity fields from the same payload [`parse_proc_stat`] reads.
+/// Tail indices: 0=state, 1=ppid (`proc(5)` fields 3 and 4).
+pub(super) fn parse_proc_identity(text: &str) -> Option<ProcIdentity> {
+    let (comm, tail) = split_stat_text(text)?;
+    let [state, parent] = nth_fields(tail, [0, 1])?;
+    Some(ProcIdentity {
+        comm: comm.to_owned(),
+        state: ProcessState::from_stat_field(Some(state)),
+        parent_pid: parent.parse::<u32>().ok().filter(|pid| *pid != 0),
     })
 }
 
@@ -185,10 +293,50 @@ fn write_proc_path<'a>(
 }
 
 pub(super) fn read_proc_stat(pid: u32) -> Result<ProcStatFields, FailureKind> {
-    let mut path = [0_u8; 32];
-    let text = fs::read_to_string(write_proc_path(&mut path, pid, "stat")?)
-        .map_err(|error| io_failure(&error))?;
+    let text = read_proc_stat_text(pid)?;
     parse_proc_stat(&text).ok_or(FailureKind::ProviderFault)
+}
+
+/// One shared read of `/proc/<pid>/stat` for callers that need both halves.
+/// Enumeration parses identity and scalars from this single payload; nothing
+/// re-opens the file to obtain the other half.
+pub(super) fn read_proc_stat_text(pid: u32) -> Result<String, FailureKind> {
+    let mut path = [0_u8; 32];
+    fs::read_to_string(write_proc_path(&mut path, pid, "stat")?).map_err(|error| io_failure(&error))
+}
+
+/// Split a raw `/proc/<pid>/cmdline` payload into argv.
+///
+/// The kernel separates arguments with NUL and terminates the payload with
+/// one trailing NUL. Only that terminator is dropped: interior empty
+/// arguments and argument whitespace are preserved verbatim, because the
+/// command line is displayed evidence and trimming it would silently rewrite
+/// what the process actually published.
+pub(super) fn split_cmdline(bytes: &[u8]) -> Vec<String> {
+    let body = match bytes.last() {
+        Some(0) => &bytes[..bytes.len() - 1],
+        _ => bytes,
+    };
+    if body.is_empty() {
+        return Vec::new();
+    }
+    body.split(|byte| *byte == 0)
+        .map(|argument| String::from_utf8_lossy(argument).into_owned())
+        .collect()
+}
+
+/// Read argv for one pid. An unreadable or empty cmdline (kernel threads,
+/// ptrace-restricted processes, exit races) yields an empty vector; the caller
+/// falls back to the command name. No failure is fabricated as an argument.
+pub(super) fn read_proc_cmdline(pid: u32) -> Vec<String> {
+    let mut path = [0_u8; 32];
+    let Ok(file_path) = write_proc_path(&mut path, pid, "cmdline") else {
+        return Vec::new();
+    };
+    match fs::read(file_path) {
+        Ok(bytes) => split_cmdline(&bytes),
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Re-read the provider-native identity immediately before one process read or
@@ -244,11 +392,15 @@ pub(super) fn parse_proc_status_memory_fields(
 
 pub(super) fn read_proc_memory_observations(
     pid: u32,
+    sample: MemorySample,
 ) -> Result<ProcMemoryObservations, FailureKind> {
     let mut path = [0_u8; 32];
     let text = fs::read_to_string(write_proc_path(&mut path, pid, "status")?)
         .map_err(|error| io_failure(&error))?;
-    let smaps = read_proc_smaps_rollup(pid);
+    let smaps = match sample {
+        MemorySample::Full => read_proc_smaps_rollup(pid),
+        MemorySample::Status => Err(FailureKind::TemporarilyUnavailable),
+    };
     let (uss_bytes, anon_huge_pages_bytes) = match smaps {
         Ok(fields) => {
             let ProcSmapsRollupFields {
@@ -412,24 +564,8 @@ fn parse_unique_kib_field(text: &str, key: &str) -> Result<u64, FailureKind> {
     value.ok_or(FailureKind::Unsupported)
 }
 
-fn retain_strongest(current: &mut Option<FailureKind>, candidate: FailureKind) {
-    if current.is_none_or(|failure| failure_priority(candidate) > failure_priority(failure)) {
-        *current = Some(candidate);
-    }
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
-    }
+pub(super) fn retain_strongest(current: &mut Option<FailureKind>, candidate: FailureKind) {
+    *current = Some(FailureKind::strongest(*current, candidate));
 }
 
 #[cfg(test)]

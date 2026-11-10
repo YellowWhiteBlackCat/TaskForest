@@ -5,6 +5,7 @@ use crate::gpui_app::root::{RootView, TopPage, WindowSurfaceKind};
 use crate::gpui_app::sidebar::SelectedDevice;
 use gpui::{Context, Window};
 use taskforest_core::core::device_state::DeviceStatus;
+use taskforest_core::core::storage_health::is_nvme_wear_critical;
 use taskmanager_application::PendingConfirmation;
 use taskmanager_shell::presentation::effective_smart_status;
 
@@ -25,6 +26,15 @@ fn ready(view: &RootView) -> bool {
                     .disks
                     .first()
                     .is_some_and(|disk| effective_smart_status(disk) == expected)
+        }
+        Some(CaptureScenario::SmartWearCritical) => {
+            view.page == TopPage::Performance
+                && view.selected == SelectedDevice::Disk(0)
+                && view
+                    .system_snapshot()
+                    .disks
+                    .first()
+                    .is_some_and(|disk| disk.smart_percent_used.is_some_and(is_nvme_wear_critical))
         }
         Some(CaptureScenario::ServiceDetailsLogs) => view
             .service_details_target()

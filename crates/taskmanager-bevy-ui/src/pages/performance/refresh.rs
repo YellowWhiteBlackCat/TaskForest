@@ -15,12 +15,12 @@ use taskmanager_shell::ShellApp;
 
 use super::device_curves::storage::{ExpandTarget, StorageExpand};
 use super::metrics::{
-    core_usage_fill_pct, curve_badge_text, curve_samples, curve_wanted, disk_spare_warning_for,
+    core_usage_fill_pct, curve_badge_text, curve_samples, curve_wanted, disk_smart_alert_for,
     dyn_field_text,
 };
 use super::scene::blocks::block_scene;
 use super::{
-    CpuField, CurveBadge, CurveGate, DynBar, DynBlock, DynDiskSpareAlert, DynSection, DynText,
+    CpuField, CurveBadge, CurveGate, DynBar, DynBlock, DynDiskSmartAlert, DynSection, DynText,
     PerformanceDeviceFocus, PerformanceFocus, SparkStrip, SystemCurve, section_keys,
 };
 use crate::app::ShellTrack;
@@ -36,8 +36,8 @@ pub(crate) struct PerformanceRefreshQueries<'w, 's> {
     texts: Query<'w, 's, (&'static DynText, &'static mut Text)>,
     /// Marked core-fill bars.
     bars: Query<'w, 's, (&'static DynBar, &'static mut Node), Without<DynText>>,
-    /// Marked disk-spare alerts.
-    disk_alerts: Query<'w, 's, (&'static DynDiskSpareAlert, &'static mut Node), Without<DynBar>>,
+    /// Marked disk SMART alert plates.
+    disk_alerts: Query<'w, 's, (&'static DynDiskSmartAlert, &'static mut Node), Without<DynBar>>,
     /// Curve strips with their canvas and chart surface.
     strips: Query<
         'w,
@@ -60,7 +60,7 @@ pub(crate) struct PerformanceRefreshQueries<'w, 's> {
     /// shut before it leaves the projection.
     expands: Query<'w, 's, &'static mut StorageExpand, With<DynBlock>>,
     /// Bare node query shared by the strip and gate adapters.
-    nodes: Query<'w, 's, &'static mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
+    nodes: Query<'w, 's, &'static mut Node, (Without<DynBar>, Without<DynDiskSmartAlert>)>,
 }
 
 /// The pages' data-refresh trigger consumer (see [`crate::drain`]): re-read
@@ -79,7 +79,7 @@ pub(crate) fn refresh_on_fold(
     let shell = track.shell();
     rewrite_texts(shell, &mut surface.texts);
     rewrite_core_bars(shell, &mut surface.bars);
-    sync_disk_spare_alerts(shell, &mut surface.disk_alerts);
+    sync_disk_smart_alerts(shell, &mut surface.disk_alerts);
     sync_strips(shell, &mut surface.strips);
     sync_curve_badges(shell, &mut surface.badges, &mut surface.nodes);
     sync_card_gates(
@@ -99,12 +99,12 @@ pub(crate) fn refresh_on_fold(
     );
 }
 
-fn sync_disk_spare_alerts(
+fn sync_disk_smart_alerts(
     shell: &ShellApp,
-    alerts: &mut Query<(&DynDiskSpareAlert, &mut Node), Without<DynBar>>,
+    alerts: &mut Query<(&DynDiskSmartAlert, &mut Node), Without<DynBar>>,
 ) {
     for (alert, mut node) in alerts.iter_mut() {
-        let wanted = if disk_spare_warning_for(shell, &alert.0) {
+        let wanted = if disk_smart_alert_for(shell, &alert.0) {
             Display::Flex
         } else {
             Display::None
@@ -132,7 +132,7 @@ fn rewrite_texts(shell: &ShellApp, texts: &mut Query<(&DynText, &mut Text)>) {
 fn sync_curve_badges(
     shell: &ShellApp,
     badges: &mut Query<(Entity, &CurveBadge)>,
-    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
+    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSmartAlert>)>,
 ) {
     for (entity, badge) in badges.iter() {
         let wanted = if curve_badge_text(shell, badge.0).is_some() {
@@ -193,7 +193,7 @@ fn sync_card_gates(
     focus: SystemCurve,
     show: bool,
     gates: &Query<(Entity, &CurveGate)>,
-    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
+    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSmartAlert>)>,
 ) {
     let active = if curve_wanted(shell, focus) {
         focus

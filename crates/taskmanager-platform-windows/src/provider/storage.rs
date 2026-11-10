@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use taskforest_contract::{CompositeSourceSnapshot, ProviderFailure};
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 use taskforest_core::{
     DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec, DirectoryUsageSnapshot,
@@ -219,7 +220,7 @@ fn parse_remaining_percent(line: &str) -> Option<f32> {
         return None;
     }
     let remaining: f32 = before[start..pct_pos].parse().ok()?;
-    Some((100.0 - remaining).clamp(0.0, 100.0))
+    Some((100.0 - remaining).clamped_percent())
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -264,7 +265,7 @@ fn parse_ata_selftest_row(row: &str) -> SelfTestParse {
             .and_then(|digits| digits.parse::<f32>().ok())
     {
         if entry.phase == SmartSelfTestPhase::Running {
-            entry.progress_pct = Some((100.0 - remaining).clamp(0.0, 100.0));
+            entry.progress_pct = Some((100.0 - remaining).clamped_percent());
         }
         if let Some(lifetime) = tokens.get(idx + 1) {
             entry.lifetime_hours = lifetime.parse::<u64>().ok();

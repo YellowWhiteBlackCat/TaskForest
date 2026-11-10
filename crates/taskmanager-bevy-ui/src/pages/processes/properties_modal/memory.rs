@@ -90,8 +90,8 @@ impl MemorySegments {
 /// map; the swap is the process's swapped-out memory.
 pub(super) fn memory_segments(process: &ProcessItem) -> MemorySegments {
     MemorySegments {
-        unique_bytes: process.current_memory_uss_bytes(),
-        shared_bytes: process.current_memory_proportional_shared_bytes(),
+        unique_bytes: process.memory_uss_bytes(),
+        shared_bytes: process.memory_proportional_shared_bytes(),
         swap_bytes: process.current_swap_bytes(),
     }
 }

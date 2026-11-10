@@ -13,7 +13,9 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual
 // family availability labels, action buttons) that was previously hard-coded.
 use taskforest_core::core::session::{SessionControlAction, SessionFamily, SessionFamilyFact};
 use taskmanager_application::RefreshRequest;
-use taskmanager_application::i18n::{session_family_label, t};
+use taskmanager_application::i18n::{
+    control_outcome_text, session_control_action_label, session_family_label, t,
+};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
@@ -474,20 +476,12 @@ fn session_feedback_line<'a>(
     shell: &ShellApp,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let outcome = shell.projection().session_control_feedback.as_ref()?;
-    let action = i18n::session_control_action_label(outcome.action);
-    let detail = match &outcome.result {
-        Ok(()) => None,
-        Err(error) => Some(&format!("{error:?}")),
-    };
-    let text_value = match detail {
-        Some(detail) => t("feedback.action_failed_detail")
-            .replace("{action}", action)
-            .replace("{target}", outcome.identity.session_id.as_str())
-            .replace("{detail}", detail),
-        None => t("feedback.session_request_accepted")
-            .replace("{action}", action)
-            .replace("{target}", outcome.identity.session_id.as_str()),
-    };
+    let text_value = control_outcome_text(
+        session_control_action_label(outcome.action),
+        outcome.identity.session_id.as_str(),
+        true,
+        outcome.result,
+    );
     let color = match outcome.result {
         Ok(()) => crate::theme_binding::color(theme_snapshot.palette().success),
         Err(_) => crate::theme_binding::color(theme_snapshot.palette().danger),

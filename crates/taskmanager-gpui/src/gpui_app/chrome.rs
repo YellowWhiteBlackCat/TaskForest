@@ -199,7 +199,7 @@ pub fn traffic_lights(
     };
     div()
         .h_full()
-        .pl(px(13.0))
+        .pl(px(f32::from(tokens::SPACE_13)))
         .pr(definite_length(tokens::SPACE_6))
         .flex()
         .flex_row()

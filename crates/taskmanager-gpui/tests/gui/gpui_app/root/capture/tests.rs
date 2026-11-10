@@ -797,7 +797,7 @@ fn process_memory_capture_fixture_keeps_pss_and_swap_separate() {
     let process = processes.first().expect("properties process");
     assert_eq!(process.current_memory_bytes(), Some(315 * 1024 * 1024));
     assert_eq!(process.current_memory_pss_bytes(), Some(240 * 1024 * 1024));
-    assert_eq!(process.current_memory_uss_bytes(), Some(192 * 1024 * 1024));
+    assert_eq!(process.memory_uss_bytes(), Some(192 * 1024 * 1024));
     assert_eq!(process.current_swap_bytes(), Some(64 * 1024 * 1024));
     assert!(
         !evidence.scenario_ready(),

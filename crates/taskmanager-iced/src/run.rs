@@ -24,6 +24,16 @@ use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::FeedbackLifecycle;
 use taskmanager_shell::FeedbackSeverity;
 use taskmanager_shell::FeedbackSource;
+use taskmanager_ui_contract::FrontendShape;
+use taskmanager_ui_contract::presentation::thresholds::{LayoutAxis, number};
+
+/// The smallest window this shape accepts. It is a per-shape band, so it has
+/// one address: the threshold registry row this shape declares against (the
+/// terminal and Bevy spend none, which is why the number cannot live in the
+/// shared vocabulary).
+const MIN_WINDOW_WIDTH: f32 = number(FrontendShape::Iced, LayoutAxis::MinimumWindowWidth);
+/// The smallest window height this shape accepts.
+const MIN_WINDOW_HEIGHT: f32 = number(FrontendShape::Iced, LayoutAxis::MinimumWindowHeight);
 
 type InstanceLease = (
     Option<Box<dyn InstanceGuard>>,
@@ -41,7 +51,10 @@ pub(crate) fn initial_window_size() -> iced::Size {
             let (width, height) = value.split_once('x')?;
             let width = width.parse::<f32>().ok()?;
             let height = height.parse::<f32>().ok()?;
-            (width.is_finite() && height.is_finite() && width >= 720.0 && height >= 480.0)
+            (width.is_finite()
+                && height.is_finite()
+                && width >= MIN_WINDOW_WIDTH
+                && height >= MIN_WINDOW_HEIGHT)
                 .then_some(iced::Size::new(width, height))
         })
         .unwrap_or_else(|| iced::Size::new(1180.0, 780.0))

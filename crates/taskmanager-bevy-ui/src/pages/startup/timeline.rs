@@ -25,6 +25,7 @@ use bevy::ui::widget::Text;
 use taskforest_core::core::startup::StartupBootEvidenceSnapshot;
 use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
+use zhuge_ui_core::value::interval_fraction;
 
 use super::phases::{boot_phase_slices, phase_rows_scene, phase_total_ms};
 use crate::glass::{GlassPanelMaterial, card_material};
@@ -254,5 +255,5 @@ pub(crate) fn boot_timeline_scene(
 /// A zero total yields `0.0` for every window: there is nothing to scale by,
 /// and a full-width bar would be a fabricated measurement.
 fn share_of_total(value_ms: u64, total_ms: u64) -> f32 {
-    zhuge_ui_core::value::interval_fraction(value_ms as f32, 0.0, total_ms as f32, 0.0)
+    interval_fraction(value_ms as f32, 0.0, total_ms as f32, 0.0)
 }

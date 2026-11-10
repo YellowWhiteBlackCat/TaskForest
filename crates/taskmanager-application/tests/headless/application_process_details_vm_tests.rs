@@ -670,3 +670,51 @@ fn environment_variable_and_entry_rendering() {
         format!("SECRET_MULTILINE={SENSITIVE_VALUE_MASK}")
     );
 }
+
+/// The USS and huge-page rows are fed by a decimated page-table walk. On a
+/// deferred tick the observation is `Stale` carrying the last measurement, and
+/// the properties row must keep printing it — together with the shared figure
+/// and the ratio derived from the same numbers. Folding a retained measurement
+/// to `Missing` would blank three rows on four of every five ticks.
+#[test]
+fn decimated_memory_rows_print_the_retained_measurement_not_a_blank() {
+    crate::i18n::with_language(crate::i18n::Language::En, || {
+        let mut item = fully_observed_item();
+        let observed = *item.scalar_observations();
+        let fresh = process_details_rows(&item, &UnitPreferences::default());
+        let uss_text = value(&fresh, ProcessDetailsField::Uss).clone();
+        let thp_text = value(&fresh, ProcessDetailsField::AnonHugePages).clone();
+        let shared_text = value(&fresh, ProcessDetailsField::Shared).clone();
+        assert!(!uss_text.is_missing(), "the fixture must measure USS");
+
+        item.apply_scalar_observations(ProcessScalarObservations {
+            memory_uss_bytes: ScalarObservation::stale(
+                40 * 1024 * 1024,
+                41,
+                taskforest_core::FailureKind::TemporarilyUnavailable,
+            ),
+            memory_anon_huge_pages_bytes: ScalarObservation::stale(
+                8 * 1024 * 1024,
+                41,
+                taskforest_core::FailureKind::TemporarilyUnavailable,
+            ),
+            ..observed
+        });
+        let deferred = process_details_rows(&item, &UnitPreferences::default());
+        assert_eq!(
+            value(&deferred, ProcessDetailsField::Uss),
+            &uss_text,
+            "a deferred USS sample must print the retained measurement unchanged"
+        );
+        assert_eq!(
+            value(&deferred, ProcessDetailsField::AnonHugePages),
+            &thp_text,
+            "the huge-page row and its RSS ratio must not flicker between samples"
+        );
+        assert_eq!(
+            value(&deferred, ProcessDetailsField::Shared),
+            &shared_text,
+            "the derived shared figure must come from the same retained USS"
+        );
+    });
+}

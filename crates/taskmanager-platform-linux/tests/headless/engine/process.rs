@@ -476,3 +476,101 @@ fn first_published_refresh_carries_rates_and_keeps_the_fd_full_read() {
         own.scalar_observations().fds.availability()
     );
 }
+
+/// The `smaps_rollup` page-table walk is decimated, so its two counters must
+/// behave exactly like the decimated fd column: fresh on the full-read tick,
+/// `Stale` with the retained value on every deferred tick, never a fabricated
+/// zero, and never a flapping aggregate source. RSS must stay fresh on every
+/// tick — the decimation is allowed to touch only the rollup-derived detail.
+#[test]
+fn smaps_detail_decimation_retains_stale_values_without_flapping_the_source() {
+    use taskforest_core::ScalarAvailability;
+
+    let own_pid = std::process::id();
+    let window = SMAPS_REFRESH_EVERY_N_TICKS;
+    let tick_count = (usize::try_from(window).unwrap_or(1))
+        .saturating_mul(2)
+        .saturating_add(3);
+    let mut manager = ProcessManager::new();
+    let mut uss_source: Vec<SourceOutcome> = Vec::new();
+    let mut thp_source: Vec<SourceOutcome> = Vec::new();
+    let mut own_uss: Vec<ScalarAvailability> = Vec::new();
+    let mut own_uss_values: Vec<Option<u64>> = Vec::new();
+    let mut own_rss_fresh = 0_usize;
+    let mut own_pid_missing = 0_usize;
+
+    for _ in 0..tick_count {
+        let snapshot = manager.refresh();
+        for (provider, sink) in [
+            (PROCESS_MEMORY_USS_PROVIDER, &mut uss_source),
+            (PROCESS_MEMORY_ANON_HUGE_PAGES_PROVIDER, &mut thp_source),
+        ] {
+            sink.push(
+                snapshot
+                    .sources
+                    .iter()
+                    .find(|status| status.provider == provider)
+                    .map(|status| status.outcome)
+                    .unwrap_or(SourceOutcome::Empty),
+            );
+        }
+        match snapshot.items.iter().find(|item| item.pid == own_pid) {
+            Some(item) => {
+                let scalars = item.scalar_observations();
+                own_uss.push(scalars.memory_uss_bytes.availability());
+                own_uss_values.push(scalars.memory_uss_bytes.last_known_value().copied());
+                if scalars.memory_bytes.availability().is_current() {
+                    own_rss_fresh = own_rss_fresh.saturating_add(1);
+                }
+            }
+            None => {
+                own_pid_missing = own_pid_missing.saturating_add(1);
+                own_uss.push(ScalarAvailability::Unknown);
+                own_uss_values.push(None);
+            }
+        }
+    }
+
+    assert_eq!(
+        own_pid_missing, 0,
+        "own pid {own_pid} dropped out of the live /proc scan on {own_pid_missing} ticks; \
+         every retain assertion below would otherwise be vacuous"
+    );
+    assert_eq!(
+        own_rss_fresh, tick_count,
+        "RSS must stay freshly read on every tick; only the rollup-derived detail is decimated"
+    );
+    for (label, outcomes) in [("USS", &uss_source), ("AnonHugePages", &thp_source)] {
+        let empty_ticks: Vec<usize> = outcomes
+            .iter()
+            .enumerate()
+            .filter(|(_, outcome)| matches!(outcome, SourceOutcome::Empty))
+            .map(|(index, _)| index)
+            .collect();
+        assert!(
+            empty_ticks.is_empty(),
+            "{label} source went Empty on ticks {empty_ticks:?} (all outcomes = {outcomes:?}); \
+             a deferred detail tick must keep the aggregate source non-Empty"
+        );
+    }
+    for (tick, availability) in own_uss.iter().enumerate() {
+        let full_read = (tick as u32).rem_euclid(window) == 0;
+        if full_read {
+            assert!(
+                availability.is_current(),
+                "tick {tick} is the full-read tick: own-pid USS must be freshly measured, \
+                 got {availability:?}"
+            );
+        } else {
+            assert!(
+                !availability.is_current(),
+                "deferred tick {tick} must not claim a fresh USS measurement, got {availability:?}"
+            );
+        }
+        assert!(
+            own_uss_values[tick].is_some(),
+            "tick {tick} must carry a measured or retained USS value, never a fabricated zero \
+             (availability {availability:?})"
+        );
+    }
+}

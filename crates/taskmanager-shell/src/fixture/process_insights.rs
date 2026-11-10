@@ -389,7 +389,7 @@ pub fn process_properties_capture_data_ready(shell: &ShellApp, scenario: &str) -
         .all(|samples| samples.iter().filter(|value| value.is_finite()).count() >= 2),
         "process-memory-pss-swap" => {
             process.current_memory_pss_bytes().is_some()
-                && process.current_memory_uss_bytes().is_some()
+                && process.memory_uss_bytes().is_some()
                 && process.current_swap_bytes().is_some()
         }
         _ => {

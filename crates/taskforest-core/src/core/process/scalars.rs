@@ -179,22 +179,33 @@ impl ProcessItem {
             .copied()
     }
 
-    /// Current unique set size (USS), representing private memory unshared with
-    /// any other process.
+    /// Unique set size (USS): private memory unshared with any other process.
+    ///
+    /// This is the value the row displays, which is the **retained** value
+    /// between samples. The Linux source is `/proc/<pid>/smaps_rollup`, a full
+    /// page-table walk measured at ~1.2 ms per process against ~36 µs for
+    /// `status`, so it is sampled at a bounded cadence rather than every tick.
+    /// A `Stale` observation still carries a real measurement; reporting it as
+    /// absent would blank the column on every deferred tick. `None` means no
+    /// measurement has ever succeeded for this identity — never a fabricated
+    /// zero. Freshness is available separately through the observation's own
+    /// availability.
     #[must_use]
-    pub const fn current_memory_uss_bytes(&self) -> Option<u64> {
+    pub const fn memory_uss_bytes(&self) -> Option<u64> {
         self.scalar_observations
             .memory_uss_bytes
-            .current_value()
+            .last_known_value()
             .copied()
     }
 
-    /// Current anonymous transparent huge-page charge, in bytes.
+    /// Anonymous transparent huge-page charge, in bytes. Retained between
+    /// samples for the same reason as [`Self::memory_uss_bytes`]: both counters
+    /// come from the same decimated page-table walk.
     #[must_use]
-    pub const fn current_memory_anon_huge_pages_bytes(&self) -> Option<u64> {
+    pub const fn memory_anon_huge_pages_bytes(&self) -> Option<u64> {
         self.scalar_observations
             .memory_anon_huge_pages_bytes
-            .current_value()
+            .last_known_value()
             .copied()
     }
 

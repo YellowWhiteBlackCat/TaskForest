@@ -18,10 +18,11 @@ use taskforest_core::core::smart::self_test::SmartSelfTestKind;
 use taskforest_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
-    ProcessAffinityReady, ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
+    ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
 };
 use taskmanager_shell::presentation::smart::self_test_intent;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
@@ -590,17 +591,14 @@ impl TuiApp {
         target: FrozenProcessIdentity,
     ) -> Option<PlatformEffect> {
         let logical_cpu_count = self.logical_cpu_count();
-        let current_mask = match self.shell.process_affinity_state() {
+        let current = match self.shell.process_affinity_state() {
             ProcessAffinityState::Ready(ready) if ready.target == target => {
-                Some(ready.cpus.clone())
+                Some((ready.request_id, ready.cpus.clone()))
             }
             _ => None,
         };
-        let state = crate::surface::AffinityModalState::new(
-            target.clone(),
-            current_mask,
-            logical_cpu_count,
-        );
+        let state =
+            crate::surface::AffinityModalState::new(target.clone(), current, logical_cpu_count);
         self.open_local_surface(TuiSurface::ProcessAffinity(state));
         Some(PlatformEffect::ProcessAffinity(ProcessAffinityRequest {
             target,
@@ -611,19 +609,50 @@ impl TuiApp {
     /// when the snapshot's frozen target is the identity captured at open
     /// time. A different process with the same PID is never allowed to
     /// rewrite the visible mask (the Iced editor's same-wave sync rule).
-    pub fn sync_process_affinity_modal(&mut self) {
+    /// The same pass publishes the read OUTCOME: a failed read for this exact
+    /// target carries its shared reason into the header, and a non-failed
+    /// outcome clears it, so the modal can never keep claiming to be
+    /// "collecting" after the shell answered.
+    ///
+    /// Idempotent (the mask is absorbed once per authoritative read, keyed on
+    /// its request id) so the run loop can call it every cycle: a read OUTCOME
+    /// is applied by the effect seam, which is not a batch fold, so a
+    /// fold-only hook would silently never see a rejected read. A *fresh* read
+    /// still rewrites in-progress edits. Returns whether anything the modal
+    /// paints changed.
+    #[must_use]
+    pub fn sync_process_affinity_modal(&mut self) -> bool {
         let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface() else {
-            return;
+            return false;
         };
         let target = state.target.clone();
-        let observed = affinity_last_good(self.shell.process_affinity_state(), &target)
-            .map(|ready| ready.cpus.clone());
-        let Some(cpus) = observed else {
-            return;
-        };
-        if let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface_mut() {
-            state.observe_mask(&cpus);
+        let session = self.shell.process_affinity_state();
+        if session.target() != Some(&target) {
+            return false;
         }
+        let failure = session.failure_for_target(&target);
+        let authoritative = session
+            .last_good_for_target(&target)
+            .map(|ready| (ready.request_id, ready.cpus.clone()));
+        let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface_mut() else {
+            return false;
+        };
+        let mut changed = state.failure != failure;
+        state.observe_failure(failure);
+        if failure.is_some() {
+            // A rejected read means the current mask is unknown: drop the
+            // stale one instead of leaving it editable, and say why.
+            if state.mask_observed || !state.selected_mask.is_empty() {
+                state.unobserve_mask();
+                changed = true;
+            }
+        } else if let Some((request_id, cpus)) = authoritative
+            && state.observed_read != Some(request_id)
+        {
+            state.observe_mask(request_id, &cpus);
+            changed = true;
+        }
+        changed
     }
 
     /// Apply the edited CPU affinity mask, emit the control request, and close
@@ -642,6 +671,17 @@ impl TuiApp {
         };
         let mask_observed = state.mask_observed;
         let cpus = state.selected_mask.clone();
+        if let Some(failure) = state.failure {
+            // A failed read is not "still loading": report the shared reason
+            // and keep the editor open rather than submitting a stale mask.
+            self.report_notice(
+                FeedbackSource::Control,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                control_error_detail(failure),
+            );
+            return None;
+        }
         if !mask_observed {
             self.report_notice(
                 FeedbackSource::Control,
@@ -667,33 +707,6 @@ impl TuiApp {
         };
         self.shell
             .request_process_affinity_control_for(state.target, state.selected_mask)
-    }
-}
-
-/// The last-good affinity snapshot for `target`, mirroring the Iced editor's
-/// read discipline: an exact `Ready` match, or a `Loading`/`Failed` session
-/// that still carries a previous good read for the same frozen identity.
-#[must_use]
-fn affinity_last_good<'a>(
-    state: &'a ProcessAffinityState,
-    target: &FrozenProcessIdentity,
-) -> Option<&'a ProcessAffinityReady> {
-    match state {
-        ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),
-        ProcessAffinityState::Loading {
-            target: loading,
-            last_good: Some(ready),
-            ..
-        } if loading == target => Some(ready),
-        ProcessAffinityState::Failed {
-            target: failed,
-            last_good: Some(ready),
-            ..
-        } if failed == target => Some(ready),
-        ProcessAffinityState::Closed
-        | ProcessAffinityState::Loading { .. }
-        | ProcessAffinityState::Ready(_)
-        | ProcessAffinityState::Failed { .. } => None,
     }
 }
 

@@ -22,6 +22,7 @@ pub(crate) mod easing;
 pub(crate) mod focus_ring;
 pub(crate) mod history_controls;
 pub mod layout;
+pub(crate) mod layout_budget;
 pub mod menu;
 pub(crate) mod scene_paint;
 pub mod scrollbar;

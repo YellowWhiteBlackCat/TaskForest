@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use taskforest_contract::ProviderFailure;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::{DiskMetrics, FailureKind, ScalarObservation, StorageTelemetryObservation};
 use taskmanager_platform_provider::StorageTelemetryProvider;
 
@@ -132,7 +133,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
 
                         let active_pct = if delta_query_time > 0 {
                             ((delta_io_time as f64 / delta_query_time as f64) * 100.0)
-                                .clamp(0.0, 100.0) as f32
+                                .clamped_percent() as f32
                         } else {
                             0.0
                         };

@@ -3,9 +3,10 @@
 use crate::gpui_app::root::prop_row;
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskforest_core::core::metrics::DiskMetrics;
-use taskforest_core::core::percent::percent_text;
-use taskforest_core::core::storage_health::is_nvme_wear_critical;
 use taskmanager_application::i18n;
+use taskmanager_shell::presentation::smart::{
+    endurance_used_readout, smart_temperature_label, spare_pool_readout,
+};
 use taskmanager_shell::presentation::smart_availability_i18n_key;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, with_alpha};
@@ -33,18 +34,17 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
             i18n::t(smart_availability_i18n_key(disk.smart_availability)).to_string(),
         ));
     if let Some(temperature) = disk.smart_temperature_c {
-        let label = if disk.smart_critical_warning == Some(true) {
-            "Temperature \u{26a0}"
-        } else {
-            i18n::t("common.temperature")
-        };
+        let label = smart_temperature_label(
+            i18n::t("common.temperature"),
+            disk.smart_critical_warning == Some(true),
+        );
         let value = match disk.smart_temp_critical_c {
             Some(critical) if critical > 0.0 => {
                 format!("{temperature:.0} \u{b0}C  (critical: {critical:.0} \u{b0}C)")
             }
             _ => format!("{temperature:.0} \u{b0}C"),
         };
-        column = column.child(prop_row(theme, label, value));
+        column = column.child(prop_row(theme, &label, value));
     }
     if let Some(critical) = disk.smart_temp_critical_c
         && disk.smart_temperature_c.is_none()
@@ -65,28 +65,12 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
         }
     }
     if let Some(percent) = disk.smart_percent_used {
-        let value = if is_nvme_wear_critical(percent) {
-            format!(
-                "{} \u{26a0} {}",
-                percent_text(percent),
-                i18n::t("disk.exceeded_rated_life"),
-            )
-        } else {
-            percent_text(percent)
-        };
+        let value =
+            endurance_used_readout(Some(percent), Some(i18n::t("disk.exceeded_rated_life")));
         column = column.child(prop_row(theme, i18n::t("disk.endurance_used"), value));
     }
-    if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_spare_warning_threshold_pct();
-        let value = if disk.smart_spare_pool_needs_warning() {
-            format!(
-                "{}  ⚠ (warning ≤ {})",
-                percent_text(spare),
-                percent_text(threshold)
-            )
-        } else {
-            percent_text(spare)
-        };
+    if disk.smart_available_spare_pct.is_some() {
+        let value = spare_pool_readout(disk, Some(i18n::t("disk.spare_warning_clause")));
         column = column.child(prop_row(theme, i18n::t("disk.available_spare"), value));
     }
     if let Some(hours) = disk.smart_power_on_hours {

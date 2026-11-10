@@ -146,7 +146,7 @@ pub enum ProcessDetailsField {
     Uss,
     /// Derived shared physical memory (`RSS - USS`): the resident pages this
     /// process does not hold privately. The derivation is owned by
-    /// [`taskforest_core::core::process::ProcessItem::current_memory_shared_bytes`],
+    /// [`taskforest_core::core::process::ProcessItem::memory_shared_bytes`],
     /// so it keeps the shared honest-absence semantics when either RSS or USS
     /// was not observed.
     Shared,
@@ -391,22 +391,22 @@ pub fn process_details_rows_with_local_time(
         ProcessDetailsRowVm {
             field: ProcessDetailsField::Uss,
             value: text(
-                item.current_memory_uss_bytes()
+                item.memory_uss_bytes()
                     .map(|bytes| format_memory(bytes, units)),
             ),
         },
         ProcessDetailsRowVm {
             field: ProcessDetailsField::Shared,
             value: text(
-                item.current_memory_shared_bytes()
+                item.memory_shared_bytes()
                     .map(|bytes| format_memory(bytes, units)),
             ),
         },
         ProcessDetailsRowVm {
             field: ProcessDetailsField::AnonHugePages,
-            value: text(item.current_memory_anon_huge_pages_bytes().map(|bytes| {
+            value: text(item.memory_anon_huge_pages_bytes().map(|bytes| {
                 let value = format_memory(bytes, units);
-                item.current_memory_anon_huge_pages_ratio()
+                item.memory_anon_huge_pages_ratio()
                     .map_or(value.clone(), |ratio| {
                         format!("{value} ({} RSS)", percent_text(ratio))
                     })

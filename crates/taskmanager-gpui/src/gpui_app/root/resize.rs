@@ -6,6 +6,7 @@
 use gpui::{Context, Pixels, px};
 use taskmanager_shell::SortCol;
 use taskmanager_ui::data::table::clamp_column_width;
+use taskmanager_ui_contract::presentation::vocabulary::PERFORMANCE_SIDEBAR_MAX_WIDTH;
 use taskmanager_ui_contract::{COLUMN_WIDTH_MAX, COLUMN_WIDTH_MIN};
 
 use crate::gpui_app::processes_view::rows::default_width;
@@ -72,7 +73,7 @@ pub(crate) const PROC_COL_MIN_WIDTH: f32 = COLUMN_WIDTH_MIN;
 pub(crate) const SIDEBAR_MIN_WIDTH: f32 = 200.0;
 /// Ceiling for the devices-sidebar width: the widest before it starves the
 /// content pane. Shared between the drag clamp and the config-load clamp.
-pub(crate) const SIDEBAR_MAX_WIDTH: f32 = 460.0;
+pub(crate) const SIDEBAR_MAX_WIDTH: f32 = PERFORMANCE_SIDEBAR_MAX_WIDTH;
 /// Ceiling for a processes-column width, in device pixels (matches the shared
 /// table crate's `resize_cols` ceiling). Shared between the drag clamp and the
 /// config-load clamp so an absurd hand-edited width clamps down rather than

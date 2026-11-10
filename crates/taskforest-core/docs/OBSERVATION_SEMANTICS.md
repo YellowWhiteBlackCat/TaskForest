@@ -28,3 +28,15 @@ process-class group aggregates whose totals never collapse unavailable members
 into a fabricated value. `src/core/process/identity.rs` owns the validated
 `ProcessLiveKey` used to distinguish a provider-issued process incarnation
 from a reused PID.
+
+## Retained display values
+
+A provider may sample an expensive source at a bounded cadence. Between samples
+the observation is `Stale` and still carries the last real measurement. An
+accessor named for the value a row displays (`memory_uss_bytes`,
+`memory_anon_huge_pages_bytes`, and the shared/proportional/ratio/breakdown
+figures derived from them) reads that retained value, so a decimated column and
+everything computed from it stay put instead of blanking on deferred ticks.
+Accessors prefixed `current_` read only a fresh measurement. `None` from either
+kind means no measurement exists — never a fabricated zero — and freshness
+remains readable from the observation's own availability.

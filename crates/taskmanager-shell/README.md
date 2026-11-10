@@ -62,8 +62,11 @@ src/saved_views.rs  system_timeline.rs   saved view definitions and system timel
 src/presentation.rs                 renderer-neutral presentation helpers
 src/presentation/history_replay.rs  shared metric/device/core replay headings
 ├── cpu.rs  telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
-├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs  smart.rs
+├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs
+│                     constants.rs → MISSING_VALUE + ALERT_MARKER（告警标记的文本形式，唯一拼写）
+│                     smart.rs → SMART 读数装配（耐久 / 备用块 / 温度标签，四端共用，前端只调不写）
 ├── percent.rs           the absence-aware percent readouts (the shared dash)
+├── memory.rs            the shared used-rate visibility floor
 ├── chart_slots.rs       the sample-window → pixel-slot grid (one owner for the charts)
 ├── smart_tool.rs        the shared SMART remediation projection (probe + install hint)
 ├── storage_health.rs    the partition ↔ filesystem health projection

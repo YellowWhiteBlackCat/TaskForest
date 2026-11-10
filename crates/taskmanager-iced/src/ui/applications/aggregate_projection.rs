@@ -8,9 +8,10 @@ use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::ScalarAvailability;
 use taskforest_core::core::percent::precise_percent_text;
 use taskforest_core::core::process::aggregate::AggregateMetric;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ProcessRowAggregate;
-use taskmanager_shell::presentation::{control_error_detail, optional_bytes, optional_duration};
+use taskmanager_shell::presentation::{optional_bytes, optional_duration};
 
 /// Renderer text for one typed aggregate cell. `is_current_zero` keeps the
 /// gray-zero preference tied to a real current measurement; stale historical

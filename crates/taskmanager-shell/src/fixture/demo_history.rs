@@ -7,6 +7,7 @@
 //! sparklines, headline curves and history readouts comparable evidence.
 
 use taskforest_core::core::metrics::{CpuMetrics, ScalarObservation, ScalarObservationGroup};
+use taskforest_core::core::percent::ClampedPercent;
 
 /// Number of adjacent frames after the one honest `demo_app()` snapshot.
 pub(super) const DEMO_HISTORY_FRAMES: u64 = 24;
@@ -24,7 +25,7 @@ pub(super) fn demo_cpu_frame(seed: &CpuMetrics, timestamp_ms: u64, offset: u64) 
     let mut observations = seed.scalar_observations().clone();
     observations.global_usage_pct = ScalarObservation::available(usage, timestamp_ms);
     let core_values = (0..seed.current_core_usage_len())
-        .map(|index| (usage + (index as f32 * 4.0) - (offset % 3) as f32 * 2.0).clamp(0.0, 100.0))
+        .map(|index| (usage + (index as f32 * 4.0) - (offset % 3) as f32 * 2.0).clamped_percent())
         .collect();
     observations.core_usage_group = ScalarObservationGroup::available(core_values, timestamp_ms);
     let mut frame = CpuMetrics::from_observations(observations);

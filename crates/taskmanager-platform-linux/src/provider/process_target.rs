@@ -1,7 +1,7 @@
 //! Shared Linux policy for revalidating a frozen process target before use.
 
 use taskforest_contract::ProviderFailure;
-use taskforest_core::FailureKind;
+use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::FrozenProcessIdentity;
 use taskforest_core::core::source::{SourceOutcome, SourceStatus};
 
@@ -53,23 +53,9 @@ fn snapshot_failure(sources: &[SourceStatus]) -> ProviderFailure {
             SourceOutcome::Partial(failure) | SourceOutcome::Unavailable(failure) => Some(failure),
             SourceOutcome::Available | SourceOutcome::Empty => None,
         })
-        .max_by_key(|failure| failure_priority(*failure))
+        .reduce(FailureKind::stronger)
         .map(ProviderFailure::from_kind)
         .unwrap_or(ProviderFailure::ProviderFault)
-}
-
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged => 2,
-        FailureKind::Rejected => 1,
-    }
 }
 
 #[cfg(test)]

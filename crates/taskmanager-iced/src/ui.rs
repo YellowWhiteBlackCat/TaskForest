@@ -30,7 +30,7 @@ use taskmanager_shell::FeedbackTone;
 use taskmanager_theme::Theme;
 
 mod about;
-mod affinity;
+pub(crate) mod affinity;
 mod alerts;
 pub(crate) mod app_history_view;
 pub(crate) mod applications;

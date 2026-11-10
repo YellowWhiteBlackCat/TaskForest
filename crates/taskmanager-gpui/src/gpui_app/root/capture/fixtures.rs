@@ -12,6 +12,7 @@ use taskforest_core::core::{
     ScalarObservation, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorReading, SensorScale,
 };
+use taskmanager_shell::fixture::health::seed_wear_critical_disk;
 
 fn clear_smart_values(disk: &mut DiskMetrics) {
     disk.smart_temperature_c = None;
@@ -215,6 +216,13 @@ pub(super) fn prepare_permission_disk(snapshot: &mut SystemSnapshot) {
     disk.smart_state = DeviceState::healthy(now.saturating_sub(5_000))
         .transition(DeviceStatus::PermissionDenied, now);
     clear_smart_values(disk);
+}
+
+pub(super) fn prepare_wear_critical_disk(snapshot: &mut SystemSnapshot) {
+    // The disk whose endurance reached its rated life: the critical marker
+    // rides every surface that paints the endurance, and this is the disk
+    // that proves it.
+    seed_wear_critical_disk(snapshot);
 }
 
 pub(super) fn prepare_partition_disk(snapshot: &mut SystemSnapshot) {

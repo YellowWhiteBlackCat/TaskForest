@@ -14,7 +14,9 @@ use taskforest_core::core::alerts::{
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::smart::self_test_intent;
+use taskmanager_shell::presentation::smart::{
+    endurance_used_readout, self_test_intent, smart_temperature_label, spare_pool_readout,
+};
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_theme::{Theme, tokens};
 
@@ -26,7 +28,6 @@ use taskforest_core::core::SmartSelfTestKind;
 use taskforest_core::core::SmartSelfTestPhase;
 use taskforest_core::core::metrics::DiskMetrics;
 use taskforest_core::core::percent::percent_text;
-use taskforest_core::core::storage_health::is_nvme_wear_critical;
 
 pub(crate) mod alerts;
 pub(crate) use alerts::*;
@@ -182,11 +183,10 @@ fn smart_rows(disk: &DiskMetrics) -> Vec<(String, String)> {
         t(device_status_i18n_key(effective_smart_status(disk))).to_owned(),
     )];
     if let Some(temperature) = disk.smart_temperature_c {
-        let label = if disk.smart_critical_warning == Some(true) {
-            format!("{} ⚠", t("common.temperature"))
-        } else {
-            t("common.temperature").to_owned()
-        };
+        let label = smart_temperature_label(
+            t("common.temperature"),
+            disk.smart_critical_warning == Some(true),
+        );
         let value = match disk.smart_temp_critical_c {
             Some(critical) if critical > 0.0 => {
                 format!("{temperature:.0} °C (critical: {critical:.0} °C)")
@@ -201,29 +201,14 @@ fn smart_rows(disk: &DiskMetrics) -> Vec<(String, String)> {
         ));
     }
     if let Some(percent) = disk.smart_percent_used {
-        let value = if is_nvme_wear_critical(percent) {
-            format!(
-                "{} ⚠ {}",
-                percent_text(percent),
-                t("disk.exceeded_rated_life")
-            )
-        } else {
-            percent_text(percent)
-        };
+        let value = endurance_used_readout(Some(percent), Some(t("disk.exceeded_rated_life")));
         rows.push((t("disk.endurance_used").to_owned(), value));
     }
-    if let Some(spare) = disk.smart_available_spare_pct {
-        let threshold = disk.smart_spare_warning_threshold_pct();
-        let value = if disk.smart_spare_pool_needs_warning() {
-            format!(
-                "{} ⚠ (warning ≤ {})",
-                percent_text(spare),
-                percent_text(threshold)
-            )
-        } else {
-            percent_text(spare)
-        };
-        rows.push((t("disk.available_spare").to_owned(), value));
+    if disk.smart_available_spare_pct.is_some() {
+        rows.push((
+            t("disk.available_spare").to_owned(),
+            spare_pool_readout(disk, Some(t("disk.spare_warning_clause"))),
+        ));
     }
     if let Some(hours) = disk.smart_power_on_hours {
         rows.push((

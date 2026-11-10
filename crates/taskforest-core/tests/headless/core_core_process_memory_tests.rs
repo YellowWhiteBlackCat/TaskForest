@@ -1,4 +1,5 @@
 use super::*;
+use crate::FailureKind;
 use crate::core::metrics::ScalarObservation;
 use crate::core::process::ProcessScalarObservations;
 
@@ -85,12 +86,12 @@ fn process_item_memory_accessors_and_breakdown() {
     let mut process = ProcessItem::new(1234, "test_proc");
     assert!(!process.has_memory_pss());
     assert!(!process.has_memory_uss());
-    assert_eq!(process.current_memory_shared_bytes(), None);
-    assert_eq!(process.current_memory_proportional_shared_bytes(), None);
-    assert_eq!(process.current_memory_uss_ratio(), None);
+    assert_eq!(process.memory_shared_bytes(), None);
+    assert_eq!(process.memory_proportional_shared_bytes(), None);
+    assert_eq!(process.memory_uss_ratio(), None);
     assert_eq!(process.current_memory_pss_ratio(), None);
 
-    let empty_breakdown = process.current_memory_breakdown();
+    let empty_breakdown = process.memory_breakdown();
     assert_eq!(empty_breakdown.rss_bytes, None);
     assert_eq!(empty_breakdown.pss_bytes, None);
     assert_eq!(empty_breakdown.uss_bytes, None);
@@ -110,25 +111,22 @@ fn process_item_memory_accessors_and_breakdown() {
     assert!(process.has_memory_uss());
     assert_eq!(process.current_memory_bytes(), Some(100 * 1024 * 1024));
     assert_eq!(process.current_memory_pss_bytes(), Some(70 * 1024 * 1024));
-    assert_eq!(process.current_memory_uss_bytes(), Some(50 * 1024 * 1024));
+    assert_eq!(process.memory_uss_bytes(), Some(50 * 1024 * 1024));
     assert_eq!(process.current_swap_bytes(), Some(10 * 1024 * 1024));
 
+    assert_eq!(process.memory_shared_bytes(), Some(50 * 1024 * 1024));
     assert_eq!(
-        process.current_memory_shared_bytes(),
-        Some(50 * 1024 * 1024)
-    );
-    assert_eq!(
-        process.current_memory_proportional_shared_bytes(),
+        process.memory_proportional_shared_bytes(),
         Some(20 * 1024 * 1024)
     );
 
-    let uss_ratio = process.current_memory_uss_ratio().expect("uss ratio");
+    let uss_ratio = process.memory_uss_ratio().expect("uss ratio");
     assert!((uss_ratio - 0.5).abs() < 1e-4);
 
     let pss_ratio = process.current_memory_pss_ratio().expect("pss ratio");
     assert!((pss_ratio - 0.7).abs() < 1e-4);
 
-    let breakdown = process.current_memory_breakdown();
+    let breakdown = process.memory_breakdown();
     assert_eq!(breakdown.rss_bytes, Some(100 * 1024 * 1024));
     assert_eq!(breakdown.pss_bytes, Some(70 * 1024 * 1024));
     assert_eq!(breakdown.uss_bytes, Some(50 * 1024 * 1024));
@@ -199,4 +197,73 @@ fn process_sort_key_memory_pss_and_uss_ordering() {
     assert_eq!(items[0].pid, 1); // 80 MiB
     assert_eq!(items[1].pid, 2); // 30 MiB
     assert_eq!(items[2].pid, 3); // None
+}
+
+/// USS and the huge-page charge come from a decimated page-table walk, so
+/// between samples the row carries a `Stale` observation. Every accessor and
+/// every derived figure must read that retained measurement — the value beside
+/// it on screen — instead of reporting an absence that would blank the row.
+#[test]
+fn decimated_memory_counters_keep_their_retained_value_and_derived_facts() {
+    let mut process = ProcessItem::new(7, "decimated");
+    let mib = 1024 * 1024;
+    process.apply_scalar_observations(ProcessScalarObservations {
+        memory_bytes: ScalarObservation::available(100 * mib, 1_000),
+        memory_pss_bytes: ScalarObservation::available(70 * mib, 1_000),
+        memory_uss_bytes: ScalarObservation::stale(
+            50 * mib,
+            900,
+            FailureKind::TemporarilyUnavailable,
+        ),
+        memory_anon_huge_pages_bytes: ScalarObservation::stale(
+            8 * mib,
+            900,
+            FailureKind::TemporarilyUnavailable,
+        ),
+        ..Default::default()
+    });
+
+    assert_eq!(process.memory_uss_bytes(), Some(50 * mib));
+    assert_eq!(process.memory_anon_huge_pages_bytes(), Some(8 * mib));
+    assert!(process.has_memory_uss());
+    assert!(process.has_memory_anon_huge_pages());
+    assert_eq!(process.memory_shared_bytes(), Some(50 * mib));
+    assert_eq!(process.memory_proportional_shared_bytes(), Some(20 * mib));
+    let uss_ratio = process
+        .memory_uss_ratio()
+        .expect("retained USS yields a ratio");
+    assert!((uss_ratio - 0.5).abs() < 1e-4);
+    let thp_ratio = process
+        .memory_anon_huge_pages_ratio()
+        .expect("retained huge pages yield a ratio");
+    assert!((thp_ratio - 8.0).abs() < 1e-3);
+    let breakdown = process.memory_breakdown();
+    assert_eq!(breakdown.uss_bytes, Some(50 * mib));
+    assert_eq!(breakdown.shared_bytes, Some(50 * mib));
+    // RSS and PSS are read every tick and must stay fresh-only: a stale RSS is
+    // not a current resident-set measurement.
+    assert_eq!(process.current_memory_bytes(), Some(100 * mib));
+    assert_eq!(process.current_memory_pss_bytes(), Some(70 * mib));
+}
+
+/// A counter that has never been measured is an absence, not a retained zero.
+/// Decimation must not turn "no sample yet" into a fabricated value.
+#[test]
+fn never_measured_decimated_counters_stay_absent() {
+    let mut process = ProcessItem::new(8, "cold");
+    process.apply_scalar_observations(ProcessScalarObservations {
+        memory_bytes: ScalarObservation::available(100 * 1024 * 1024, 1_000),
+        memory_uss_bytes: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+        memory_anon_huge_pages_bytes: ScalarObservation::unavailable(
+            FailureKind::TemporarilyUnavailable,
+        ),
+        ..Default::default()
+    });
+    assert_eq!(process.memory_uss_bytes(), None);
+    assert_eq!(process.memory_anon_huge_pages_bytes(), None);
+    assert!(!process.has_memory_uss());
+    assert_eq!(process.memory_shared_bytes(), None);
+    assert_eq!(process.memory_proportional_shared_bytes(), None);
+    assert_eq!(process.memory_uss_ratio(), None);
+    assert_eq!(process.memory_anon_huge_pages_ratio(), None);
 }

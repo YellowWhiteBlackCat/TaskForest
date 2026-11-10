@@ -403,11 +403,11 @@ pub(super) fn snap_package_from_path(path: &str) -> Option<String> {
     valid_revision.then(|| first.to_ascii_lowercase())
 }
 
-pub(super) fn snap_package_from_argv(argv: &[std::borrow::Cow<'_, str>]) -> Option<String> {
+pub(super) fn snap_package_from_argv(argv: &[String]) -> Option<String> {
     argv.windows(3).find_map(|window| {
-        let command = Path::new(window[0].as_ref()).file_name()?.to_str()?;
-        (command.eq_ignore_ascii_case("snap") && window[1].as_ref() == "run")
-            .then(|| snap_package_key(window[2].as_ref()))
+        let command = Path::new(window[0].as_str()).file_name()?.to_str()?;
+        (command.eq_ignore_ascii_case("snap") && window[1] == "run")
+            .then(|| snap_package_key(window[2].as_str()))
             .flatten()
     })
 }

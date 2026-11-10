@@ -61,6 +61,18 @@ pub fn system_daemon_history_dir() -> PathBuf {
 /// so a value is established before any deferral.
 pub(crate) const FD_COUNT_REFRESH_EVERY_N_TICKS: u32 = 5;
 
+/// Number of collector ticks between `/proc/<pid>/smaps_rollup` samples.
+///
+/// The rollup makes the kernel walk every page table of the target process:
+/// measured at ~1.2 ms per process against ~36 µs for `/proc/<pid>/status`, it
+/// dominated the whole process-refresh cost while serving only the USS and
+/// transparent-huge-page detail counters. RSS components, hybrid PSS and
+/// VmSwap come from `status` and stay fresh every tick; only those two
+/// rollup-derived counters are decimated. Intermediate ticks bridge the prior
+/// value as `Stale` through `retain_previous`, and a pid seen for the first
+/// time is sampled immediately, so no row ever shows a fabricated zero.
+pub(crate) const SMAPS_REFRESH_EVERY_N_TICKS: u32 = 5;
+
 #[cfg(test)]
 #[path = "../tests/headless/linux_config_tests.rs"]
 mod tests;

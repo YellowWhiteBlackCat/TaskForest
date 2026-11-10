@@ -4,6 +4,7 @@ use crate::gpui_app::formatting::{self, missing_value};
 use taskforest_core::core::metrics::MemoryMetrics;
 use taskforest_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_application::i18n;
+use taskmanager_shell::presentation::memory_usage_rate_is_visible;
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::memory_details::{
@@ -137,7 +138,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: UnitPreferences) 
     }
     if let Some(rate) = memory
         .current_used_rate_mib_per_sec()
-        .filter(|rate| rate.abs() >= 0.05)
+        .filter(|rate| memory_usage_rate_is_visible(*rate))
     {
         rows.push(StatRow::text(
             i18n::t("mem.usage_rate"),

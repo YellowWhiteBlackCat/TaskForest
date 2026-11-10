@@ -9,6 +9,7 @@ use taskmanager_application::i18n::t;
 
 use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
 use taskforest_core::core::alerts::AlertSeverity;
+use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_shell::{FeedbackSource, FeedbackTone};
 
 pub(super) fn render(
@@ -49,17 +50,23 @@ pub(super) fn render(
             Style::new().fg(theme.color(Color::Black)).bg(color),
         )
     });
+    // The tone table owns which marker a tone wears and in which ink; the
+    // space between the marker and the sentence is composed here so the
+    // marker itself stays one spelling, not a spelling with punctuation.
     let (marker, feedback_color) =
         app.shell
             .feedback_presentation()
-            .map_or(("", theme.color(Color::White)), |feedback| {
-                match feedback.tone() {
-                    FeedbackTone::Neutral => ("", theme.color(Color::White)),
-                    FeedbackTone::Positive => ("\u{2713} ", theme.good),
-                    FeedbackTone::Caution => ("\u{26a0} ", theme.warn),
-                    FeedbackTone::Danger => ("\u{26a0} ", theme.danger),
-                }
-            });
+            .map_or(
+                (None, theme.color(Color::White)),
+                |feedback| match feedback.tone() {
+                    FeedbackTone::Neutral => (None, theme.color(Color::White)),
+                    FeedbackTone::Positive => (Some("\u{2713}"), theme.good),
+                    FeedbackTone::Caution => (Some(ALERT_MARKER), theme.warn),
+                    FeedbackTone::Danger => (Some(ALERT_MARKER), theme.danger),
+                },
+            );
+    let marker = marker.map(|marker| format!("{marker} "));
+    let marker = marker.as_deref().unwrap_or("");
     let feedback_width = usize::from(area.width.saturating_sub(30)).max(12);
     let feedback = if app
         .shell

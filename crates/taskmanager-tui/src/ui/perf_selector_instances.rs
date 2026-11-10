@@ -6,6 +6,7 @@
 use super::*;
 use taskforest_core::core::metrics::GpuMetrics;
 use taskforest_core::core::metrics::SystemSnapshot;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::percent_text;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskforest_core::core::units::format_quantity_with;
@@ -351,7 +352,7 @@ fn gpu_selector_caption(gpu: &GpuMetrics, use_bytes: bool, use_base2: bool) -> S
     if let (Some(used), Some(total)) = (vram_used, vram_total)
         && total > 0
     {
-        let pct = (used as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
+        let pct = (used as f64 / total as f64 * 100.0).clamped_percent();
         parts.push(format!("VRAM {}", percent_text(pct)));
     }
     if let Some(temp) = gpu.current_temperature_c() {

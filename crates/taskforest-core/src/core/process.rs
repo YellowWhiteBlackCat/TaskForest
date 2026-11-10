@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use super::percent::{ClampedPercent, MAX_PERCENT};
+
 pub mod aggregate;
 mod anomaly;
 mod application;
@@ -286,46 +288,56 @@ impl ProcessItem {
         self.current_memory_pss_bytes().is_some()
     }
 
-    /// Return whether Unique Set Size (USS) is currently available for this process.
+    /// Return whether a measured Unique Set Size (USS) is available for this
+    /// process, including one retained between decimated samples.
     #[must_use]
     pub fn has_memory_uss(&self) -> bool {
-        self.current_memory_uss_bytes().is_some()
+        self.memory_uss_bytes().is_some()
     }
 
-    /// Return whether the current transparent huge-page charge is available.
+    /// Return whether a measured transparent huge-page charge is available,
+    /// including one retained between decimated samples.
     #[must_use]
     pub fn has_memory_anon_huge_pages(&self) -> bool {
-        self.current_memory_anon_huge_pages_bytes().is_some()
+        self.memory_anon_huge_pages_bytes().is_some()
     }
 
-    /// Return the observed anonymous huge-page charge as a percentage of RSS.
-    /// The ratio is only available when both counters are current and RSS is
-    /// non-zero; a missing denominator never becomes a made-up percentage.
+    /// Anonymous huge-page charge as a percentage of RSS, from the two values a
+    /// properties row actually displays.
+    ///
+    /// The huge-page counter is sampled at a bounded cadence because its
+    /// `/proc` source walks every page table of the target, so between samples
+    /// it is `Stale` carrying the last measured value. The ratio reads that
+    /// retained numerator against the current RSS instead of disappearing on
+    /// every deferred tick, which would flicker the row's suffix while the byte
+    /// value beside it stayed put. A missing numerator or a zero denominator
+    /// still yields `None`; the percent domain is clamped by its owner.
     #[must_use]
-    pub fn current_memory_anon_huge_pages_ratio(&self) -> Option<f32> {
-        match (
-            self.current_memory_anon_huge_pages_bytes(),
-            self.current_memory_bytes(),
-        ) {
-            (Some(huge_pages), Some(rss)) if rss > 0 => {
-                Some((huge_pages as f64 / rss as f64 * 100.0).min(100.0) as f32)
-            }
-            _ => None,
+    pub fn memory_anon_huge_pages_ratio(&self) -> Option<f32> {
+        let huge_pages = self.memory_anon_huge_pages_bytes()?;
+        let rss = self.current_memory_bytes()?;
+        if rss == 0 {
+            return None;
         }
+        let ratio = (huge_pages as f64 / rss as f64 * f64::from(MAX_PERCENT)) as f32;
+        Some(ratio.clamped_percent())
     }
 
     /// Return the current comprehensive memory breakdown for this process.
     ///
-    /// Presents a unified snapshot of Resident Set Size (RSS), Proportional Set
-    /// Size (PSS), Unique Set Size (USS), derived shared physical memory, and swap.
-    /// Unmeasured or unavailable metrics remain `None` to preserve typed
-    /// availability honesty without fabricated zeroes.
+    /// Presents the row's memory breakdown: Resident Set Size (RSS),
+    /// Proportional Set Size (PSS), Unique Set Size (USS), derived shared
+    /// physical memory, and swap. RSS, PSS and swap are read every tick; USS is
+    /// the retained value of a decimated sample, so every derived figure here
+    /// is computed from the same numbers the row displays. Unmeasured metrics
+    /// remain `None` to preserve typed availability honesty without fabricated
+    /// zeroes.
     #[must_use]
-    pub fn current_memory_breakdown(&self) -> ProcessMemoryBreakdown {
+    pub fn memory_breakdown(&self) -> ProcessMemoryBreakdown {
         ProcessMemoryBreakdown::new(
             self.current_memory_bytes(),
             self.current_memory_pss_bytes(),
-            self.current_memory_uss_bytes(),
+            self.memory_uss_bytes(),
             self.current_swap_bytes(),
         )
     }
@@ -336,13 +348,13 @@ impl ProcessItem {
     /// shared with other processes (e.g., dynamically linked shared libraries,
     /// shared memory mappings).
     ///
-    /// Returns `Some(rss.saturating_sub(uss))` only when both RSS
-    /// ([`Self::current_memory_bytes`]) and USS ([`Self::current_memory_uss_bytes`])
-    /// observations are currently available. Returns `None` if either observation
-    /// is missing or unavailable.
+    /// Returns `Some(rss.saturating_sub(uss))` only when a current RSS
+    /// ([`Self::current_memory_bytes`]) and a measured USS
+    /// ([`Self::memory_uss_bytes`], retained between decimated samples) are both
+    /// available. Returns `None` if either is missing.
     #[must_use]
-    pub fn current_memory_shared_bytes(&self) -> Option<u64> {
-        match (self.current_memory_bytes(), self.current_memory_uss_bytes()) {
+    pub fn memory_shared_bytes(&self) -> Option<u64> {
+        match (self.current_memory_bytes(), self.memory_uss_bytes()) {
             (Some(rss), Some(uss)) => Some(rss.saturating_sub(uss)),
             _ => None,
         }
@@ -354,16 +366,13 @@ impl ProcessItem {
     /// `PSS - USS` therefore quantifies the proportional burden of shared pages
     /// attributed to this process.
     ///
-    /// Returns `Some(pss.saturating_sub(uss))` only when both PSS
-    /// ([`Self::current_memory_pss_bytes`]) and USS ([`Self::current_memory_uss_bytes`])
-    /// observations are currently available. Returns `None` if either observation
-    /// is missing or unavailable.
+    /// Returns `Some(pss.saturating_sub(uss))` only when a current PSS
+    /// ([`Self::current_memory_pss_bytes`]) and a measured USS
+    /// ([`Self::memory_uss_bytes`], retained between decimated samples) are both
+    /// available. Returns `None` if either is missing.
     #[must_use]
-    pub fn current_memory_proportional_shared_bytes(&self) -> Option<u64> {
-        match (
-            self.current_memory_pss_bytes(),
-            self.current_memory_uss_bytes(),
-        ) {
+    pub fn memory_proportional_shared_bytes(&self) -> Option<u64> {
+        match (self.current_memory_pss_bytes(), self.memory_uss_bytes()) {
             (Some(pss), Some(uss)) => Some(pss.saturating_sub(uss)),
             _ => None,
         }
@@ -376,10 +385,12 @@ impl ProcessItem {
     /// the process memory is almost entirely private/unshared; a lower ratio
     /// indicates heavy reliance on shared libraries or memory segments.
     ///
-    /// Returns `None` if either RSS or USS is unavailable, or if RSS is 0.
+    /// Returns `None` if RSS is unavailable, if no USS has been measured, or if
+    /// RSS is 0. USS is the retained value of a decimated sample, so the ratio
+    /// stays put beside the byte value it describes instead of flickering.
     #[must_use]
-    pub fn current_memory_uss_ratio(&self) -> Option<f32> {
-        match (self.current_memory_bytes(), self.current_memory_uss_bytes()) {
+    pub fn memory_uss_ratio(&self) -> Option<f32> {
+        match (self.current_memory_bytes(), self.memory_uss_bytes()) {
             (Some(rss), Some(uss)) if rss > 0 => {
                 let ratio = uss as f32 / rss as f32;
                 Some(ratio.clamp(0.0, 1.0))
@@ -744,9 +755,7 @@ pub fn compare_process_items(
         ProcessSortKey::MemoryPss => left
             .current_memory_pss_bytes()
             .cmp(&right.current_memory_pss_bytes()),
-        ProcessSortKey::MemoryUss => left
-            .current_memory_uss_bytes()
-            .cmp(&right.current_memory_uss_bytes()),
+        ProcessSortKey::MemoryUss => left.memory_uss_bytes().cmp(&right.memory_uss_bytes()),
         ProcessSortKey::DiskRead => left
             .current_disk_read_bytes_per_sec()
             .cmp(&right.current_disk_read_bytes_per_sec()),

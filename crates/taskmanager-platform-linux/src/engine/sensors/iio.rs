@@ -107,7 +107,7 @@ pub(super) fn collect_iio_source_from(
         let (device_identity, identity_is_stable) =
             sensor_device_identity_with_quality(&directory, &name);
         if !identity_is_stable {
-            enumeration_failure = Some(stronger_failure(
+            enumeration_failure = Some(FailureKind::strongest(
                 enumeration_failure,
                 FailureKind::Unsupported,
             ));
@@ -179,7 +179,7 @@ pub(super) fn collect_iio_source_from(
         .iter()
         .filter_map(|reading| reading.measurement_observation().failure())
         .chain(enumeration_failure)
-        .max_by_key(|failure| failure_priority(*failure));
+        .reduce(FailureKind::stronger);
     let reading_outcome = match (successful_readings, readings.len(), reading_failure) {
         (0, _, Some(failure)) => SourceOutcome::Unavailable(failure),
         (successful, _, Some(failure)) if successful > 0 => SourceOutcome::Partial(failure),

@@ -111,6 +111,13 @@ impl ProcessAffinitySession {
         self.state = ProcessAffinityState::Closed;
     }
 
+    /// Place one session state verbatim. Fixture support: the state *is* the
+    /// fact, so a fixture that wants a failed read must be able to place one
+    /// without replaying a fabricated attempt through the correlation lane.
+    pub fn seed_state(&mut self, state: ProcessAffinityState) {
+        self.state = state;
+    }
+
     #[must_use]
     pub fn begin_attempt(&mut self, target: FrozenProcessIdentity) -> RequestAttemptId {
         let attempt = RequestAttemptId::next();
@@ -210,18 +217,64 @@ impl ProcessAffinitySession {
     }
 
     fn last_good_for(&self, target: &FrozenProcessIdentity) -> Option<&ProcessAffinityReady> {
-        match &self.state {
-            ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),
-            ProcessAffinityState::Loading {
+        self.state.last_good_for_target(target)
+    }
+}
+
+impl ProcessAffinityState {
+    /// The frozen identity this session's latest outcome is about, if any.
+    /// Frontends compare it against the identity they captured at open time so
+    /// a stale outcome for another process never paints on an open editor.
+    #[must_use]
+    pub fn target(&self) -> Option<&FrozenProcessIdentity> {
+        match self {
+            Self::Ready(ready) => Some(&ready.target),
+            Self::Loading { target, .. } | Self::Failed { target, .. } => Some(target),
+            Self::Closed => None,
+        }
+    }
+
+    /// The last authoritative affinity read for `target`: an exact `Ready`
+    /// match, or a `Loading`/`Failed` session that still carries a previous
+    /// good read for the same frozen identity.
+    ///
+    /// This is the one authority for "which mask may an editor show": the
+    /// comparison is on the frozen identity, never the pid, so a recycled pid
+    /// cannot retarget an open editor. Frontends seed their visible mask from
+    /// this and never from a fabricated default.
+    #[must_use]
+    pub fn last_good_for_target(
+        &self,
+        target: &FrozenProcessIdentity,
+    ) -> Option<&ProcessAffinityReady> {
+        match self {
+            Self::Ready(ready) if &ready.target == target => Some(ready),
+            Self::Loading {
                 target: current,
                 last_good,
                 ..
             }
-            | ProcessAffinityState::Failed {
+            | Self::Failed {
                 target: current,
                 last_good,
                 ..
             } if current == target => last_good.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// The shared reason the latest read for `target` failed, if it did. The
+    /// reason is the typed [`FailureKind`]; its words come from the
+    /// presentation owner, so no frontend spells it or `Debug`-formats it.
+    /// A failure recorded for a different target is not this editor's failure.
+    #[must_use]
+    pub fn failure_for_target(&self, target: &FrozenProcessIdentity) -> Option<FailureKind> {
+        match self {
+            Self::Failed {
+                target: current,
+                failure,
+                ..
+            } if current == target => Some(*failure),
             _ => None,
         }
     }

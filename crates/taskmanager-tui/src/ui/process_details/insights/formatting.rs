@@ -7,7 +7,9 @@ use taskforest_core::core::process_telemetry::{ProcessGpuDevice, ProcessGpuEngin
 use taskmanager_application::ProjectedProcessResources;
 use taskmanager_application::i18n::t;
 pub(crate) use taskmanager_shell::presentation::format_open_file_row;
-use taskmanager_shell::presentation::{bytes, format_open_files_saturation, missing_value};
+use taskmanager_shell::presentation::{
+    ALERT_MARKER, bytes, format_open_files_saturation, missing_value,
+};
 pub(crate) use taskmanager_shell::presentation::{format_engine_cycles, format_engine_time};
 
 use crate::TuiTheme;
@@ -80,13 +82,14 @@ pub(crate) fn is_dangerous_capability(cap: &str) -> bool {
 }
 
 /// Format one capability entry as a styled terminal line. Dangerous capabilities are highlighted
-/// with a visible warning marker `[!] ⚠` in the theme's warning color with bold styling.
+/// with a visible warning marker — the shared alert marker behind `[!] ` — in the theme's warning
+/// color with bold styling.
 pub(crate) fn format_capability_line(cap: &str, theme: TuiTheme) -> ratatui::text::Line<'static> {
     if is_dangerous_capability(cap) {
         ratatui::text::Line::from(vec![
             Span::raw("    "),
             Span::styled(
-                "[!] \u{26a0} ",
+                format!("[!] {ALERT_MARKER} "),
                 Style::new().fg(theme.warn).add_modifier(Modifier::BOLD),
             ),
             Span::styled(

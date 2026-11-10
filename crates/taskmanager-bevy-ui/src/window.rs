@@ -57,6 +57,7 @@ use zhuge_ui_kit_bevy::frame_timing::install_bevy_frame_timing;
 mod backdrop_capture;
 pub(crate) use backdrop_capture::BackdropCaptureTarget;
 mod capture_marker;
+mod capture_marker_cores;
 mod capture_marker_interactive;
 mod capture_state;
 mod frame_capture;
@@ -85,6 +86,9 @@ use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
 use crate::widgets::chart::ChartPointer;
 use crate::widgets::controls::{ControlVisual, control_background};
+use crate::widgets::layout_budget::{
+    PerformanceFrameBudget, sync_performance_frame_budget, sync_performance_frame_resolution,
+};
 use taskforest_contract::InstanceRole;
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::DiagnosticBundleSession;
@@ -381,14 +385,16 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<HistoryProjectionResource>();
         app.init_resource::<RemSize>();
         app.init_resource::<crate::widgets::switch::SwitchMemory>();
-        app.init_resource::<PerformanceLayoutState>()
+        app.init_resource::<PerformanceFrameBudget>()
+            .init_resource::<PerformanceLayoutState>()
             .add_systems(
                 PostUpdate,
                 (
                     sync_rem_size,
                     sync_node_em_size,
+                    sync_performance_frame_resolution,
+                    sync_performance_frame_budget,
                     sync_performance_layout,
-                    crate::pages::performance::scene::sync_memory_legend_layout,
                     sync_control_visuals,
                     crate::widgets::table::paint_zero_values,
                 )

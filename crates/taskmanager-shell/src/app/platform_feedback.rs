@@ -3,9 +3,10 @@
 use super::*;
 use crate::presentation::process_batch_action_label;
 use taskforest_contract::RequestId;
+use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::history::HistoryRecordSink;
 use taskforest_core::core::process::ProcessBatchResult;
-use taskmanager_application::i18n::t;
+use taskmanager_application::i18n::{self, t};
 use taskmanager_application::{
     PersistentApplicationHistoryRecorder, ProcessEvent, RefreshRequest, RequestAttemptId,
 };
@@ -13,6 +14,34 @@ use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
 impl ShellApp {
+    /// Publish one control outcome through the single typed feedback slot.
+    /// The owner in `taskmanager-application::i18n` composes the sentence, so
+    /// every control family (session/startup/service) and every frontend reads
+    /// the same copy for the same typed result.
+    pub(crate) fn report_control_outcome(
+        &mut self,
+        action: &str,
+        target: &str,
+        accepted: bool,
+        result: Result<(), FailureKind>,
+    ) {
+        let succeeded = result.is_ok();
+        self.report_notice(
+            FeedbackSource::Control,
+            if succeeded {
+                FeedbackSeverity::Success
+            } else {
+                FeedbackSeverity::Error
+            },
+            if succeeded {
+                FeedbackLifecycle::SHORT
+            } else {
+                FeedbackLifecycle::UntilReplaced
+            },
+            i18n::control_outcome_text(action, target, accepted, result),
+        );
+    }
+
     /// Attach or detach the process-owned durable-history sink. The shell
     /// keeps the live graph store intact when the preference changes; only
     /// the optional persistence mirror is swapped.
@@ -158,7 +187,8 @@ impl ShellApp {
             );
         }
         if let Some(feedback) = output.process_feedback.as_ref() {
-            let (text, succeeded) = process_control_notice_text(feedback);
+            let (text, succeeded) =
+                process_control_notice_text(&feedback.kind, feedback.target.pid, feedback.result);
             let severity = if succeeded {
                 FeedbackSeverity::Success
             } else {
@@ -192,65 +222,31 @@ impl ShellApp {
             if outcome.result.is_ok() {
                 self.data.session_refresh_request = Some(RefreshRequest::Sessions);
             }
-            let (severity, lifecycle, text) = match &outcome.result {
-                Ok(()) => (
-                    FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
-                    format!(
-                        "Session {} {:?} request accepted",
-                        outcome.identity.session_id, outcome.action
-                    ),
-                ),
-                Err(error) => (
-                    FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
-                    format!(
-                        "Session {} {:?} failed: {error:?}",
-                        outcome.identity.session_id, outcome.action
-                    ),
-                ),
-            };
-            self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
+            self.report_control_outcome(
+                i18n::session_control_action_label(outcome.action),
+                outcome.identity.session_id.as_str(),
+                true,
+                outcome.result,
+            );
         }
         for outcome in &output.startup_control_outcomes {
             if outcome.result.is_ok() {
                 self.data.startup_refresh_request = Some(RefreshRequest::Startup);
             }
-            let intent = if outcome.enabled { "enable" } else { "disable" };
-            let (severity, lifecycle, text) = match &outcome.result {
-                Ok(()) => (
-                    FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
-                    format!("Startup {} {intent} completed", outcome.target_name),
-                ),
-                Err(error) => (
-                    FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
-                    format!("Startup {} {intent} failed: {error:?}", outcome.target_name),
-                ),
-            };
-            self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
+            self.report_control_outcome(
+                i18n::startup_action_label(outcome.enabled),
+                &outcome.target_name,
+                false,
+                outcome.result,
+            );
         }
         for outcome in &output.service_control_outcomes {
-            let (severity, lifecycle, text) = match &outcome.result {
-                Ok(()) => (
-                    FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
-                    format!(
-                        "Service {} {:?} completed",
-                        outcome.service_id, outcome.action
-                    ),
-                ),
-                Err(error) => (
-                    FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
-                    format!(
-                        "Service {} {:?} failed: {error:?}",
-                        outcome.service_id, outcome.action
-                    ),
-                ),
-            };
-            self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
+            self.report_control_outcome(
+                i18n::service_action_label(outcome.action),
+                outcome.service_id.as_str(),
+                false,
+                outcome.result,
+            );
         }
         if output.changes.snapshot_recorded
             && let Some(snapshot) = self.data.snapshot.as_ref()
@@ -307,23 +303,35 @@ impl ShellApp {
     }
 }
 
-/// Renderer-neutral message projection for a correlated process-control
-/// completion. Direct and composed frontend tracks consume the same mapping.
+/// Renderer-neutral message projection for one process-control outcome.
+///
+/// The correlated completion path (a request the platform accepted) and the
+/// submission path (a request rejected before it was accepted) both consume
+/// this one mapping: the action label comes from the neutral
+/// [`ProcessControlKind`], the reason from
+/// `taskmanager_application::i18n::control_error_detail`,
+/// and the template from the shared catalog. A frontend never holds its own
+/// action vocabulary or failure copy for this surface, so one submission can
+/// never be described two ways.
 #[must_use]
-pub fn process_control_notice_text(feedback: &ProcessControlFeedback) -> (String, bool) {
-    let action = process_control_action_label(&feedback.kind);
-    match feedback.result {
+pub fn process_control_notice_text(
+    kind: &ProcessControlKind,
+    pid: u32,
+    result: Result<(), FailureKind>,
+) -> (String, bool) {
+    let action = process_control_action_label(kind);
+    match result {
         Ok(()) => (
             t("feedback.process_action_succeeded")
                 .replace("{action}", &action)
-                .replace("{pid}", &feedback.target.pid.to_string()),
+                .replace("{pid}", &pid.to_string()),
             true,
         ),
-        Err(kind) => (
+        Err(failure) => (
             t("feedback.process_action_failed")
                 .replace("{action}", &action)
-                .replace("{pid}", &feedback.target.pid.to_string())
-                .replace("{reason}", crate::presentation::control_error_detail(kind)),
+                .replace("{pid}", &pid.to_string())
+                .replace("{reason}", i18n::control_error_detail(failure)),
             false,
         ),
     }
@@ -345,9 +353,7 @@ fn process_batch_notice_text(result: &ProcessBatchResult) -> (String, bool) {
         .find(|(_, outcome)| !matches!(outcome, ProcessBatchTargetResult::Applied))
     {
         let reason = match outcome {
-            ProcessBatchTargetResult::Failed(kind) => {
-                crate::presentation::control_error_detail(*kind)
-            }
+            ProcessBatchTargetResult::Failed(kind) => i18n::control_error_detail(*kind),
             ProcessBatchTargetResult::IdentityUnavailable
             | ProcessBatchTargetResult::IdentityChanged => t("feedback.target_changed"),
             ProcessBatchTargetResult::Applied => t("feedback.unknown_error"),

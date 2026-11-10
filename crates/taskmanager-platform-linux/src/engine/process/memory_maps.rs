@@ -15,7 +15,8 @@ use std::sync::Arc;
 use taskforest_core::{FailureKind, SourceOutcome};
 
 use super::procfs::{
-    ProcMemoryObservations, ProcStatusMemoryFields, read_proc_memory_observations, read_proc_stat,
+    MemorySample, ProcMemoryObservations, ProcStatusMemoryFields, read_proc_memory_observations,
+    read_proc_stat,
 };
 use super::tree::io_failure;
 
@@ -131,17 +132,28 @@ impl MemoryMaps {
     /// mapping sample proves the same provider-native start token. Status and
     /// stat are read again here to narrow the PID-reuse window around the
     /// enrichment; a race is reported as `IdentityChanged`, never as zero.
-    pub(super) fn observe(&self, pid: u32, expected_start_token: u64) -> ProcessMemoryObservation {
-        let (pss, swap, uss, anon_huge_pages) = match read_proc_memory_observations(pid) {
+    /// Identity is confirmed **once**, after every read for this row: the
+    /// projection below is pure computation, so a second stat read between the
+    /// projection and publication would only re-measure the same window.
+    /// `sample` selects whether the expensive page-table walk behind the USS
+    /// and huge-page counters runs on this tick.
+    pub(super) fn observe(
+        &self,
+        pid: u32,
+        expected_start_token: u64,
+        sample: MemorySample,
+    ) -> ProcessMemoryObservation {
+        let (pss, swap, uss, anon_huge_pages) = match read_proc_memory_observations(pid, sample) {
             Ok(ProcMemoryObservations {
                 pss_fields,
                 swap_bytes,
                 uss_bytes,
                 anon_huge_pages_bytes,
             }) => {
-                let pss =
-                    pss_fields.and_then(|status| self.pss_for(pid, expected_start_token, status));
                 let identity = self.validate_identity(pid, expected_start_token);
+                let pss = identity.and_then(|()| {
+                    pss_fields.and_then(|status| self.pss_for(pid, expected_start_token, status))
+                });
                 let uss = identity.and(uss_bytes);
                 let anon_huge_pages = identity.and(anon_huge_pages_bytes);
                 (pss, swap_bytes, uss, anon_huge_pages)
@@ -180,9 +192,6 @@ impl MemoryMaps {
             .ok_or(FailureKind::TemporarilyUnavailable)?;
         let cached_start_token = cached.start_token?;
         if cached_start_token != expected_start_token {
-            return Err(FailureKind::IdentityChanged);
-        }
-        if read_proc_stat(pid)?.start_ticks != expected_start_token {
             return Err(FailureKind::IdentityChanged);
         }
         let mappings = cached.mappings.as_ref().map_err(|failure| *failure)?;

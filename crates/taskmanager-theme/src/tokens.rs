@@ -80,7 +80,12 @@ spacing_consts! {
     SPACE_12 => 12.0;
     SPACE_14 => 14.0;
     SPACE_16 => 16.0;
+    SPACE_18 => 18.0;
+    SPACE_20 => 20.0;
     SPACE_24 => 24.0;
+    SPACE_48 => 48.0;
+    SPACE_13 => 13.0;
+    SPACE_NEGATIVE_8 => -8.0;
 }
 
 macro_rules! font_consts {

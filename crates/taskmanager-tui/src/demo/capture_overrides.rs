@@ -364,6 +364,7 @@ pub(crate) fn apply_capture_scene_override(app: &mut TuiApp, scene: &str) {
         }
         "smart-missing-tool"
         | "smart-permission"
+        | "smart-wear-critical"
         | "partition-disk-usage"
         | "partition-live-usage" => {
             app.shell.application.active_page = AppPage::Performance;

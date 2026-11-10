@@ -524,6 +524,7 @@
   "disk.revision": "固件版本",
   "disk.endurance_used": "已用寿命",
   "disk.available_spare": "可用备用空间",
+  "disk.spare_warning_clause": "（警告 ≤ {threshold}）",
   "disk.unsafe_shutdowns": "异常断电次数",
   "disk.temperature_sensor": "温度传感器",
   "disk.backing_physical": "物理块设备",

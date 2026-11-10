@@ -176,6 +176,49 @@ run_py() {
     timeout --kill-after=10s "${PY_TIMEOUT:-300}" python3 "$@"
 }
 
+private_census_ready() {
+    local needed="$1"
+    local tools="$repo/.private/tools"
+    local siblings
+    siblings="$(cd "$repo/.." && pwd)"
+    local required
+    for required in \
+        "$tools/rust_scan.py" \
+        "$tools/duplicate_funnel_core.py" \
+        "$siblings/music-frog/crates" \
+        "$siblings/libs/zhuge-ui-kit/crates" \
+        $needed; do
+        if [[ ! -e "$required" ]]; then
+            private_census_skip_reason="private census input absent ($required)"
+            return 1
+        fi
+    done
+    private_census_skip_reason=""
+    return 0
+}
+
+run_private_census_stage() {
+    local name="$1"
+    shift
+    local needed="$1"
+    shift
+    local ready=0 reason=""
+    if private_census_ready "$needed"; then
+        ready=1
+    else
+        reason="$private_census_skip_reason"
+    fi
+    if [[ "${TM_PRIVATE_CENSUS_GATE:-auto}" == "1" && "$ready" != "1" ]]; then
+        echo "$name forced but $reason" >&2
+        run_stage "$name" quick false
+    elif [[ "$ready" == "1" && "${TM_PRIVATE_CENSUS_GATE:-auto}" != "0" ]]; then
+        run_stage "$name" quick run_py "$@"
+    else
+        echo "SKIP $name (${reason:-TM_PRIVATE_CENSUS_GATE=0})"
+        record "$name" quick SKIP 0
+    fi
+}
+
 only="${ONLY_STAGE:-}"
 
 maybe() {
@@ -547,6 +590,39 @@ fi
 if maybe percent-readout-owner; then
     run_stage percent-readout-owner quick run_py scripts/quality/test_percent_readout_owner.py
 fi
+if maybe failure-severity-owner; then
+    run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
+fi
+if maybe threshold-band-mirror; then
+    # A band that only SOME shapes spend (the 720x480 window floor: the GPUI
+    # and Iced windows clamp to it, the terminal owns its viewport, Bevy takes
+    # the compositor's size) has exactly one lawful address -- the threshold
+    # registry, whose Absent/Own machinery is the only place that can say who
+    # spends it. A copy in the shared vocabulary is a second authority: R136
+    # found one that nothing read while the registry's own row was dead.
+    run_stage threshold-band-mirror quick run_py scripts/quality/test_threshold_band_mirror.py
+fi
+if maybe alert-marker-owner; then
+    # One codepoint was written nine times across four frontends, and three
+    # of those sites also re-composed the same SMART readout around it -- one
+    # through a second percent helper, two with the English word "warning"
+    # inside source instead of the catalog. The marker's text form and the
+    # three readouts that wear it each have one owner now; a frontend that
+    # spells the glyph, or a catalog that stores it, owns a second address.
+    run_stage alert-marker-owner quick run_py scripts/quality/test_alert_marker_owner.py
+fi
+if maybe control-failure-copy-owner; then
+    # GPUI held two second authorities for one control failure: a
+    # `control_error_detail` table identical to the owner, and a
+    # `typed_failure_reason` table that disagreed with it on six of the nine
+    # `FailureKind` variants -- four of them by hardcoding English detail
+    # strings in source. The same file re-composed the notice template and
+    # carried a frontend-local action vocabulary with three never-constructed
+    # variants. One owner now composes the notice keyed on the neutral kind;
+    # a frontend that re-spells the template, the reason, or the vocabulary
+    # owns a copy that can drift.
+    run_stage control-failure-copy-owner quick run_py scripts/quality/test_control_failure_copy_owner.py
+fi
 if maybe wired-tests; then
     run_stage wired-tests quick run_py scripts/quality/test_wired_tests.py
 fi
@@ -681,6 +757,20 @@ fi
 if maybe soak-stability; then
     run_stage soak-stability quick run_py scripts/quality/soak_stability_guard.py
 fi
+if maybe semver-scratch-self; then
+    # A blocking gate silently becoming SKIP is the failure this stage exists
+    # to catch: the quick tier cannot afford the double build, but it can and
+    # must prove the scratch-selection order that keeps the standard-tier
+    # semver gate from disappearing on a quota-capped /tmp.
+    run_stage semver-scratch-self quick bash scripts/quality/semver_scratch.sh --self-test
+fi
+if maybe semver-major-bump-self; then
+    # A major version bump makes cargo-semver-checks skip every lint. The
+    # quick tier cannot rebuild the workspace, but it can prove the classifier
+    # that lets the standard-tier gate separate a planned breaking release
+    # from an unplanned minor/patch API break.
+    run_stage semver-major-bump-self quick bash scripts/quality/semver-api-gate.sh --self-test
+fi
 if maybe capture-isolation-self; then
     run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"
 fi
@@ -722,7 +812,32 @@ if maybe capture-isolation; then
         fi
     fi
     if [[ "$capture_isolation_gate" == "1" || ( "$capture_isolation_gate" == "auto" && "$capture_isolation_host_ready" == "1" ) ]]; then
-        run_stage capture-isolation quick timeout --kill-after=10s 240s python3 scripts/test_capture_isolation.py --repo-root "$repo"
+        # The A/B pair itself is about a minute on a warm tree, but it starts
+        # with one serial capture build, so the stage budget covers a cold
+        # compile as well. Exit 3 is the script's "prerequisite disappeared
+        # mid-flight" answer (a target directory that cannot build inside the
+        # budget); it records SKIP, exactly as the preflight does — a host
+        # condition must never be filed as a code failure.
+        capture_isolation_started="$(date +%s)"
+        capture_isolation_rc=0
+        timeout --kill-after=10s "${CAPTURE_ISOLATION_TIMEOUT:-600}" python3 scripts/test_capture_isolation.py --repo-root "$repo" || capture_isolation_rc=$?
+        capture_isolation_elapsed="$(( $(date +%s) - capture_isolation_started ))"
+        if [[ "$capture_isolation_rc" -eq 0 ]]; then
+            record capture-isolation quick PASS "$capture_isolation_elapsed"
+            echo "PASS capture-isolation"
+        elif [[ "$capture_isolation_rc" -eq 3 ]]; then
+            record capture-isolation quick SKIP 0
+            echo "SKIP capture-isolation (capture build prewarm unavailable this run)"
+        else
+            record capture-isolation quick FAIL "$capture_isolation_elapsed"
+            echo "FAIL capture-isolation"
+            failures=$((failures + 1))
+            if [[ "$fail_fast" == "1" ]]; then
+                echo "local-gates: fail-fast after capture-isolation (rc=$capture_isolation_rc); use --keep-going for a diagnostic batch" >&2
+                exit "$capture_isolation_rc"
+            fi
+        fi
+        stages_run=$((stages_run + 1))
     else
         reason="TM_CAPTURE_ISOLATION_GATE=$capture_isolation_gate"
         if [[ "$capture_isolation_gate" == "auto" ]]; then
@@ -819,6 +934,56 @@ fi
 if maybe blueprint-scope; then
     # The committed 225-slot disposition table: 75 adopted, 150 unsupported.
     run_stage blueprint-scope quick run_py scripts/quality/blueprint_scope_guard.py
+fi
+if maybe funnel-adjudication-self; then
+    # R58's live near/exact/kit-covered ruler: a code change that creates a
+    # new normalized duplicate shape must fail here rather than hiding in a
+    # historical evidence snapshot. The tool and the two sibling product trees
+    # are private host material; a clean CI clone has none of them, so the
+    # stage must be explicitly SKIPped there instead of reporting a false
+    # FAIL (or, worse, the probe passing on empty roots).
+    run_private_census_stage funnel-adjudication-self \
+        "$repo/.private/tools/r58_funnel_adjudication.py $repo/.private/tools/cross_product_near_duplicate_funnel.py" \
+        "$repo/.private/tools/r58_funnel_adjudication.py" --self-test
+fi
+if maybe numeric-fact-census; then
+    # The cross-product float-fact census owns the "shared spelling, no
+    # declaration" gate: every TF/MF/KIT candidate needs a written class,
+    # reason, and adjudication receipt. Run live, not against a snapshot.
+    run_private_census_stage numeric-fact-census \
+        "$repo/.private/tools/cross_product_numeric_fact_census.py" \
+        "$repo/.private/tools/cross_product_numeric_fact_census.py"
+fi
+if maybe frontend-duplicate-adjudication; then
+    # The four-frontend duplicate ruler must read the live funnel, not R89d's
+    # static snapshot: an old hit disappearing from the tree is not a new
+    # debt, and a genuinely new hit must be ruled before it lands.
+    run_private_census_stage frontend-duplicate-adjudication \
+        "$repo/.private/tools/frontend_duplicate_adjudication.py $repo/.private/tools/frontend_duplicate_funnel.py $repo/.private/evidence/frontend-duplicate-families.json" \
+        "$repo/.private/tools/frontend_duplicate_adjudication.py"
+fi
+if maybe owner-import-shape; then
+    # A qualified shared-kit path in executable code is a second owner
+    # address. The public inline-path guard now owns the same rule; this
+    # private cross-product ruler proves both products stay clean.
+    run_private_census_stage owner-import-shape \
+        "$repo/.private/tools/owner_import_shape_guard.py" \
+        "$repo/.private/tools/owner_import_shape_guard.py"
+fi
+if maybe owner-family-call-sites; then
+    # R71's reviewed baseline: adding, moving or deleting an easing/curve/
+    # pixel/status owner call site reopens the KEEP/PUSH decision.
+    run_private_census_stage owner-family-call-sites \
+        "$repo/.private/tools/owner_family_call_site_guard.py $repo/.private/evidence/owner-family-call-sites.json" \
+        "$repo/.private/tools/owner_family_call_site_guard.py"
+fi
+if maybe background-compositor-guard; then
+    # A private GUI launcher must never hand a bare Wayland socket to a
+    # product: the nested Niri compositor has to resolve to an absolute
+    # private display before any window can open.
+    run_private_census_stage background-compositor-guard \
+        "$repo/.private/tools/background_compositor.py $repo/.private/tools/background_compositor_guard.py $repo/.private/tools/sync_frame_capture_runner.py $repo/.private/tools/enterprise_soak_runner.py" \
+        "$repo/.private/tools/background_compositor_guard.py" --self-test
 fi
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 

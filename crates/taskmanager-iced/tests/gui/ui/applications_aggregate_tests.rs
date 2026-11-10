@@ -7,9 +7,9 @@ use taskforest_core::core::process::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
 };
 use taskforest_core::core::time::LocalTimeRulesObservation;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ProcessRowAggregate;
-use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_test_support::{ProcessItemFixtureBuilder, pin_english};
 

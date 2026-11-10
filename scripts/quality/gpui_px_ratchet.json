@@ -1,7 +1,7 @@
 {
   "version": 1,
   "gate": {
-    "sha256": "3627b51410009263bfb80067aefa6a1234423a894fae64a33237f8fda832995d"
+    "sha256": "cb4d2685e3cba23dbb5f2d47af19f8b6711765384d707bdca8297e6ee38b654f"
   },
   "entries": [
     {
@@ -31,13 +31,6 @@
       "count": 1,
       "category": "icon-size",
       "reason": "图标/指示点尺寸：size(px(12.0))（组件几何）"
-    },
-    {
-      "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
-      "value": "13.0",
-      "count": 1,
-      "category": "spacing-debt",
-      "reason": "组件内间距 px(13.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
     },
     {
       "path": "crates/taskmanager-gpui/src/gpui_app/chrome.rs",
@@ -517,13 +510,6 @@
     },
     {
       "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
-      "value": "48.0",
-      "count": 1,
-      "category": "spacing-debt",
-      "reason": "组件内间距 px(48.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
-    },
-    {
-      "path": "crates/taskmanager-gpui/src/gpui_app/root/render/transients.rs",
       "value": "6.0",
       "count": 1,
       "category": "surface-geometry",
@@ -556,13 +542,6 @@
       "count": 1,
       "category": "surface-geometry",
       "reason": "布局几何：1180.0（面契约，见调用点）"
-    },
-    {
-      "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
-      "value": "18.0",
-      "count": 1,
-      "category": "spacing-debt",
-      "reason": "组件内间距 px(18.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
     },
     {
       "path": "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs",
@@ -661,13 +640,6 @@
       "count": 1,
       "category": "surface-geometry",
       "reason": "表面几何：430.0（模态/面板/网格宽度或上限）"
-    },
-    {
-      "path": "crates/taskmanager-gpui/src/gpui_app/settings_view.rs",
-      "value": "20.0",
-      "count": 1,
-      "category": "spacing-debt",
-      "reason": "组件内间距 px(20.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
     },
     {
       "path": "crates/taskmanager-gpui/src/gpui_app/settings_view/appearance.rs",
@@ -1011,13 +983,6 @@
       "count": 1,
       "category": "control-geometry",
       "reason": "控件几何：高 26.0（按钮/行/输入高度契约）"
-    },
-    {
-      "path": "crates/taskmanager-ui/src/inputs/slider.rs",
-      "value": "-8.0",
-      "count": 1,
-      "category": "spacing-debt",
-      "reason": "组件内间距 px(-8.0)：阶梯外值，迁移时需扩展 tokens 阶梯或取整"
     },
     {
       "path": "crates/taskmanager-ui/src/inputs/slider.rs",

@@ -6,7 +6,6 @@
 //! the per-file source budget without changing their public addresses.
 
 use taskforest_core::core::device_state::DeviceStatus;
-use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::{DiskMetrics, SmartAvailability};
 use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bindings, i18n};
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
@@ -216,26 +215,6 @@ pub fn device_action_i18n_key(status: DeviceStatus) -> &'static str {
         DeviceStatus::Stale => "device.action_stale",
         DeviceStatus::Unsupported => "device.action_unsupported",
         DeviceStatus::Healthy => "device.healthy",
-    }
-}
-
-/// The localized failure detail for one typed control failure (single source
-/// for the `feedback.*` copy table; mirrors gpui's `control_error_detail` so
-/// every frontend renders the same actionable reason). `RequiresEscalation`
-/// folds into the denial copy — the escalation prompt itself is the action.
-#[must_use]
-pub fn control_error_detail(kind: FailureKind) -> &'static str {
-    match kind {
-        FailureKind::Unsupported => i18n::t("feedback.unsupported"),
-        FailureKind::TemporarilyUnavailable => i18n::t("feedback.provider_unavailable"),
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            i18n::t("feedback.permission_denied")
-        }
-        FailureKind::MissingDependency => i18n::t("feedback.provider_unavailable"),
-        FailureKind::TimedOut => i18n::t("feedback.timed_out"),
-        FailureKind::Rejected => i18n::t("feedback.request_rejected"),
-        FailureKind::IdentityChanged => i18n::t("feedback.target_changed"),
-        FailureKind::ProviderFault => i18n::t("feedback.provider_failed"),
     }
 }
 

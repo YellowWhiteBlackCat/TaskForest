@@ -28,6 +28,7 @@ pub mod graph_window;
 pub mod health_review;
 mod help;
 pub mod history_replay;
+pub mod memory;
 mod network;
 mod percent;
 pub mod privilege_center;
@@ -44,7 +45,7 @@ mod telemetry;
 pub mod trend;
 
 pub use chart_slots::ChartSlots;
-pub use constants::MISSING_VALUE;
+pub use constants::{ALERT_MARKER, MISSING_VALUE};
 pub use cpu::*;
 pub use device_caption::{append_status_badge, battery_caption, fan_caption};
 pub use gpu_engine_rows::{format_engine_cycles, format_engine_time};
@@ -52,12 +53,14 @@ pub use graph_readout::*;
 pub use graph_window::*;
 pub use help::*;
 pub use history_replay::format_peak;
+pub use memory::{MEMORY_USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC, memory_usage_rate_is_visible};
 pub use network::*;
 pub use percent::{observed_percentage, observed_precise_percentage, scalar_text};
 pub use process::*;
 pub use startup::{startup_impact_text, startup_source_text};
 pub use storage::*;
 use taskforest_core::core::metrics::ResourcePressure;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::percent::precise_percent_text;
 use taskmanager_application::i18n;
 use taskmanager_application::process_details_vm::format_local_timestamp_seconds;
@@ -468,7 +471,7 @@ pub fn cpu_clock_readout(mhz: u64) -> String {
 /// two surfaces can never disagree about the same radio.
 #[must_use]
 pub fn wifi_signal_quality_percent(dbm: i32) -> f32 {
-    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
+    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamped_percent()
 }
 
 /// [`wifi_signal_quality_percent`] over an optional dBm observation: a

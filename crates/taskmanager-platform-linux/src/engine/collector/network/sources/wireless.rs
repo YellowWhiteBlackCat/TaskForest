@@ -9,7 +9,7 @@ use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::source::SourceOutcome;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
-use super::{SourceObservation, command_spawn_failure, io_failure, select_failure};
+use super::{SourceObservation, command_spawn_failure, io_failure};
 
 const IW_LINK_TIMEOUT: Duration = Duration::from_secs(2);
 const IW_INFO_TIMEOUT: Duration = Duration::from_secs(2);
@@ -111,7 +111,7 @@ pub(crate) fn summarize_iw_results(
         match &result {
             IwLinkResult::Associated { .. } | IwLinkResult::NotAssociated => success_count += 1,
             IwLinkResult::Failed(candidate) => {
-                failure = Some(select_failure(failure, *candidate));
+                failure = Some(FailureKind::strongest(failure, *candidate));
             }
         }
         observations.insert(interface, result);

@@ -151,6 +151,142 @@ fn self_fd_count() -> Option<usize> {
     None
 }
 
+/// Open descriptors whose target is a `/proc/<pid>/…` path belonging to some
+/// **other** process.
+///
+/// A collector that caches one handle per observed process makes this number
+/// track the host's process population, which is a resource decision, not a
+/// leak that drift can find: the count is already at its ceiling on the very
+/// first settled tick, so first-vs-last comparison sees a flat line. Sampling
+/// it separately is what lets the gate assert an absolute bound instead.
+#[cfg(target_os = "linux")]
+fn retained_procfs_handles() -> Option<usize> {
+    let own = std::process::id();
+    let directory = std::fs::read_dir("/proc/self/fd").ok()?;
+    let mut held = 0_usize;
+    for entry in directory.flatten() {
+        let Ok(target) = std::fs::read_link(entry.path()) else {
+            continue;
+        };
+        let target = target.to_string_lossy();
+        let Some(rest) = target.strip_prefix("/proc/") else {
+            continue;
+        };
+        let pid = rest.split('/').next().unwrap_or_default();
+        match pid.parse::<u32>() {
+            Ok(pid) if pid != own => held += 1,
+            _ => {}
+        }
+    }
+    Some(held)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn retained_procfs_handles() -> Option<usize> {
+    None
+}
+
+/// The soft `Max open files` limit this process currently holds, as published
+/// by the kernel (`"unlimited"` is a legal value, so the token is compared
+/// rather than parsed).
+///
+/// A dependency can raise the soft limit to the hard one and keep half of the
+/// new budget for itself. The application is unprivileged by default and never
+/// renegotiates its own resource limits, so a collector that moves this number
+/// is taking an unobservable process-global action, not reporting telemetry.
+#[cfg(target_os = "linux")]
+fn max_open_files_soft_limit() -> Option<String> {
+    let limits = std::fs::read_to_string("/proc/self/limits").ok()?;
+    let row = limits.lines().find(|line| {
+        let mut cells = line.split_whitespace();
+        cells.next() == Some("Max") && cells.next() == Some("open")
+    })?;
+    // Cells: "Max" "open" "files" <soft> <hard> <units>.
+    Some(row.split_whitespace().nth(3)?.to_owned())
+}
+
+/// How many descriptors the collector may hold for reasons that are not a
+/// per-process handle: the port's own pipes, the `/proc` reads in flight, and
+/// the harness. Measured on a host with ~700 processes, the fixed cost of the
+/// whole product is four.
+const RETAINED_HANDLE_CEILING: usize = 8;
+
+/// The same resident-memory shape the shipped soak-stability owner judges:
+/// a delayed one-time working set may settle into a plateau, but a series
+/// still setting new maxima, swinging beyond the tail's noise band, or
+/// drifting over its own horizon is a leak.
+const RSS_TAIL_MIN_SAMPLES: usize = 10;
+const RSS_TAIL_DIVISOR: usize = 3;
+const RSS_TAIL_RANGE_PCT: f64 = 12.0;
+const RSS_TAIL_DRIFT_PCT: f64 = 25.0;
+const RSS_GROWTH_PCT: f64 = 25.0;
+
+fn rss_tail_is_plateau(settled: &[u64]) -> bool {
+    if settled.len() < 3 {
+        return false;
+    }
+    let tail_size = (settled.len() / RSS_TAIL_DIVISOR)
+        .max(RSS_TAIL_MIN_SAMPLES)
+        .min(settled.len());
+    let tail = &settled[settled.len() - tail_size..];
+    let prefix = &settled[..settled.len() - tail_size];
+    let mut sorted = tail.to_vec();
+    sorted.sort_unstable();
+    let median = sorted[sorted.len() / 2] as f64;
+    if median == 0.0 {
+        return false;
+    }
+    let range_pct = (*tail.iter().max().expect("tail") - *tail.iter().min().expect("tail")) as f64
+        / median
+        * 100.0;
+    let x_mean = (tail.len() - 1) as f64 / 2.0;
+    let y_mean = tail.iter().map(|value| *value as f64).sum::<f64>() / tail.len() as f64;
+    let denominator = (0..tail.len())
+        .map(|index| (index as f64 - x_mean).powi(2))
+        .sum::<f64>();
+    let slope = (0..tail.len())
+        .map(|index| (index as f64 - x_mean) * (tail[index] as f64 - y_mean))
+        .sum::<f64>()
+        / denominator;
+    let drift_pct = slope * (tail.len() - 1) as f64 / median * 100.0;
+    let mut high = tail[0];
+    for value in prefix.iter().copied().chain(tail.iter().copied()) {
+        high = high.max(value);
+    }
+    let prior_high = prefix
+        .iter()
+        .copied()
+        .chain(std::iter::once(tail[0]))
+        .max()
+        .unwrap_or(tail[0]);
+    let mut observed_high = prior_high;
+    let mut new_maxima = 0_usize;
+    for (index, value) in tail.iter().copied().enumerate() {
+        if index > 0 && value > observed_high {
+            new_maxima += 1;
+        }
+        observed_high = observed_high.max(value);
+    }
+    new_maxima == 0
+        && range_pct <= RSS_TAIL_RANGE_PCT
+        && drift_pct.abs() <= RSS_TAIL_DRIFT_PCT
+        && high <= (prior_high as f64 * 1.01) as u64
+}
+
+#[test]
+fn rss_shape_owner_accepts_a_settled_working_set_but_rejects_a_live_leak() {
+    let mut settled = vec![12_000];
+    settled.extend((1..25).map(|index| 12_000 + index * 1_000));
+    settled.extend([
+        35_000, 34_200, 34_800, 34_400, 34_600, 34_500, 34_300, 34_700, 34_400, 34_600,
+    ]);
+    assert!(rss_tail_is_plateau(&settled));
+
+    let mut leaking = vec![12_000];
+    leaking.extend((1..40).map(|index| 12_000 + index * 1_000));
+    assert!(!rss_tail_is_plateau(&leaking));
+}
+
 /// Arm A — the bounded history ring must evict, not grow.
 ///
 /// A soak run appends far more samples than any ring's capacity. If eviction
@@ -222,6 +358,8 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
     let mut rows_seen = 0_usize;
     let mut fd_samples: Vec<usize> = Vec::new();
     let mut rss_samples: Vec<u64> = Vec::new();
+    let mut retained_samples: Vec<usize> = Vec::new();
+    let mut rows_samples: Vec<usize> = Vec::new();
 
     let started = Instant::now();
     for revision in 1..=ticks {
@@ -248,7 +386,9 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
             .unwrap_or_else(|err| {
                 panic!("the event port must stay live on tick {revision}: {err:?}")
             });
-        rows_seen += collect_process_rows(&drain).len();
+        let rows = collect_process_rows(&drain).len();
+        rows_seen += rows;
+        rows_samples.push(rows);
 
         // Let the tick settle before sampling and before the next submission,
         // so no tick is measured while another refresh is still running.
@@ -270,17 +410,33 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
         if let Some(rss) = self_rss_kib() {
             rss_samples.push(rss);
         }
+        if let Some(retained) = retained_procfs_handles() {
+            retained_samples.push(retained);
+        }
     }
     let elapsed = started.elapsed();
-    if let (Some(first_fd), Some(last_fd), Some(first_rss), Some(last_rss)) = (
+    if let (
+        Some(first_fd),
+        Some(last_fd),
+        Some(first_rss),
+        Some(last_rss),
+        Some(first_retained),
+        Some(last_retained),
+    ) = (
         fd_samples.first().copied(),
         fd_samples.last().copied(),
         rss_samples.first().copied(),
         rss_samples.last().copied(),
+        retained_samples.first().copied(),
+        retained_samples.last().copied(),
     ) {
         eprintln!(
             "soak report: {ticks} process ticks × {tick:?} in {elapsed:?}, \
-             rows={rows_seen}, descriptors {first_fd}->{last_fd}, RSS {first_rss}->{last_rss} KiB"
+             last-tick rows={}..{}, descriptors {first_fd}->{last_fd}, \
+             retained /proc handles {first_retained}->{last_retained}, \
+             RSS {first_rss}->{last_rss} KiB",
+            rows_samples.first().copied().unwrap_or_default(),
+            rows_samples.last().copied().unwrap_or_default(),
         );
     } else {
         eprintln!("soak report: {ticks} process ticks × {tick:?} in {elapsed:?}, rows={rows_seen}");
@@ -321,10 +477,43 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
         let baseline = stable[0];
         let last = stable[stable.len() - 1];
         let peak = *stable.iter().max().expect("checked length");
+        // Drift alone cannot see a handle that is acquired once per process and
+        // held forever: that ceiling is already reached on the first settled
+        // tick, so the line is flat. The absolute bounds below are the teeth;
+        // this assertion still owns the monotonic per-tick leak.
         assert!(
             last <= baseline + 4,
             "descriptor count climbed from {baseline} to {last} over {ticks} settled ticks \
-             (peak {peak}) — a per-tick descriptor leak"
+             (peak {peak}) while the inventory observed {}..{} processes per tick — \
+             a per-tick descriptor leak",
+            rows_samples.iter().min().copied().unwrap_or_default(),
+            rows_samples.iter().max().copied().unwrap_or_default(),
+        );
+    }
+    // The absolute handle bound. Reported against the observed row count so a
+    // regression reads as "one descriptor per process", not as unexplained
+    // growth, and so a host with more processes can never excuse a larger
+    // ceiling.
+    if !retained_samples.is_empty() {
+        let peak_retained = *retained_samples.iter().max().expect("checked non-empty");
+        let peak_rows = rows_samples.iter().max().copied().unwrap_or_default();
+        assert!(
+            peak_retained <= RETAINED_HANDLE_CEILING,
+            "process collection held {peak_retained} descriptors into other processes' /proc \
+             entries while observing up to {peak_rows} processes (ceiling \
+             {RETAINED_HANDLE_CEILING}) — the collector retains one handle per process instead \
+             of opening and closing per read"
+        );
+    }
+    if fd_samples.len() >= 3 && !retained_samples.is_empty() {
+        // A flat total with a rising retained count would hide the structural
+        // cost inside the drift budget, so the retained series must be flat too.
+        let first_retained = retained_samples[0];
+        let last_retained = retained_samples[retained_samples.len() - 1];
+        assert_eq!(
+            first_retained, last_retained,
+            "retained cross-process /proc handles moved from {first_retained} to \
+             {last_retained} across {ticks} settled ticks"
         );
     }
     if rss_samples.len() >= 3 {
@@ -339,9 +528,9 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
             (final_rss as f64 - baseline as f64) / baseline as f64 * 100.0
         };
         assert!(
-            growth_pct <= 25.0,
+            growth_pct <= RSS_GROWTH_PCT || rss_tail_is_plateau(stable),
             "resident memory grew {growth_pct:.1}% ({baseline} KiB -> {final_rss} KiB) over \
-             {ticks} ticks, exceeding the soak stability threshold"
+             {ticks} ticks without a settled tail, exceeding the soak stability threshold"
         );
     }
 
@@ -350,6 +539,12 @@ fn high_frequency_soak_keeps_descriptors_and_memory_stable() {
     if self_fd_count().is_none() {
         eprintln!(
             "soak: /proc is unavailable on this host; descriptor and RSS drift were not sampled"
+        );
+    }
+    if retained_samples.is_empty() {
+        eprintln!(
+            "soak: /proc/self/fd is unavailable on this host; the per-process handle bound was \
+             not sampled and is recorded as a gap, not a pass"
         );
     }
 }
@@ -437,5 +632,59 @@ fn repeated_glyph_materialization_retains_no_allocation() {
         growth <= GROWTH_LIMIT,
         "repeated glyph/asset materialization retained {growth} B across {PASSES} passes, \
          exceeding the {GROWTH_LIMIT} B ceiling — an unbounded materialization cache is suspected"
+    );
+}
+
+/// Arm D — the structural handle bound, measured against the host's process
+/// population rather than against time.
+///
+/// The soak's drift assertions compare the first and last settled tick. A
+/// collector that keeps one open `/proc/<pid>/stat` handle per observed process
+/// is already at its ceiling on the first settled tick, so drift reads that
+/// ceiling as a flat, healthy line: on a host with ~700 processes the run
+/// reported `descriptors 727->751` and the structural cost of 736 parked
+/// descriptors was invisible. This arm states the invariant absolutely: the
+/// number of descriptors the product holds is a fixed cost, and the product
+/// never renegotiates its own resource limits to make room for a cache.
+#[cfg(target_os = "linux")]
+#[test]
+fn process_collection_holds_no_per_process_handles_and_never_moves_the_budget() {
+    // Read the limit before any collection exists, so a dependency that raises
+    // the soft limit on first use cannot be measured against its own change.
+    let limit_before = max_open_files_soft_limit().expect("/proc/self/limits must be readable");
+    let mut client =
+        PlatformClient::new(NativePlatformRuntime::spawn().expect("native runtime must compose"));
+
+    let mut peak_retained = 0_usize;
+    let mut peak_rows = 0_usize;
+    let mut settled_ticks = 0_usize;
+    for revision in 1..=6_u64 {
+        let _ = client.request_refresh(RefreshRequest::Processes, revision);
+        let drain = drain_until_process_rows(&mut client, DRAIN_DEADLINE, DRAIN_POLL)
+            .expect("the event port must stay live");
+        peak_rows = peak_rows.max(collect_process_rows(&drain).len());
+        drain_until_quiet(&mut client, SOAK_SETTLE, SOAK_SETTLE_DEADLINE, DRAIN_POLL)
+            .expect("the event port must stay live");
+        peak_retained =
+            peak_retained.max(retained_procfs_handles().expect("/proc/self/fd must be readable"));
+        settled_ticks += 1;
+    }
+
+    assert_eq!(
+        settled_ticks, 6,
+        "the arm must observe a settled sample per tick"
+    );
+    assert!(
+        peak_rows > 20,
+        "the sample must cover enough processes for the bound to mean anything (observed          {peak_rows})"
+    );
+    assert!(
+        peak_retained <= RETAINED_HANDLE_CEILING,
+        "after {settled_ticks} settled ticks over up to {peak_rows} observed processes, the          product still held {peak_retained} descriptors pointing into other processes' /proc          entries (ceiling {RETAINED_HANDLE_CEILING}) — the descriptor table tracks the host's          process population instead of the product's own fixed cost"
+    );
+    let limit_after = max_open_files_soft_limit().expect("/proc/self/limits must be readable");
+    assert_eq!(
+        limit_after, limit_before,
+        "process collection moved the process's soft `Max open files` limit from          {limit_before} to {limit_after}; an unprivileged monitor never widens its own          resource limits as a side effect of reading telemetry"
     );
 }

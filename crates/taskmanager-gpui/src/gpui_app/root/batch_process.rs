@@ -54,10 +54,7 @@ fn result_summary(result: &ProcessBatchResult) -> String {
     }
 
     uniform_failure.map_or(summary.clone(), |failure| {
-        format!(
-            "{summary}: {}",
-            i18n::t(process_batch_failure_feedback_key(failure))
-        )
+        format!("{summary}: {}", i18n::control_error_detail(failure))
     })
 }
 
@@ -77,23 +74,6 @@ fn result_counts(result: &ProcessBatchResult) -> (usize, usize, usize) {
         .count();
     let failed = result.targets.len().saturating_sub(applied + skipped);
     (applied, skipped, failed)
-}
-
-const fn process_batch_failure_feedback_key(failure: FailureKind) -> &'static str {
-    match failure {
-        // RequiresEscalation is an escalatable denial; fold into the denial key.
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            "feedback.permission_denied"
-        }
-        FailureKind::IdentityChanged => "feedback.process_gone",
-        FailureKind::Unsupported => "feedback.unsupported",
-        FailureKind::MissingDependency | FailureKind::TemporarilyUnavailable => {
-            "health.failure_provider_unavailable"
-        }
-        FailureKind::TimedOut => "feedback.timed_out",
-        FailureKind::Rejected => "feedback.request_rejected",
-        FailureKind::ProviderFault => "feedback.provider_failed",
-    }
 }
 
 /// Consume a completed worker result into bounded audit history and return the

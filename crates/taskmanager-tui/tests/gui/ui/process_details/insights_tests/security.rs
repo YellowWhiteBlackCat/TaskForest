@@ -27,7 +27,7 @@ fn insights_lines_renders_cpu_affinity_when_observed() {
     };
     seed_projection_fact(
         &mut app.shell,
-        ProjectionSeedFact::ProcessAffinity(Some(ready)),
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityState::Ready(ready))),
     );
 
     let text = render_text(insights_lines(
@@ -42,6 +42,53 @@ fn insights_lines_renders_cpu_affinity_when_observed() {
     assert!(
         text.contains("CPUs 0, 1, 2, 3") || text.contains("4 /") || text.contains("All"),
         "must render CPUs list: {text}"
+    );
+}
+
+/// A failed affinity read is a fact about this process, not a missing one: the
+/// row stays and carries the owner's localized reason — never a `Debug` dump
+/// of the typed failure, and never silently dropped (it was `_ => {}` before).
+#[test]
+fn insights_lines_renders_the_shared_reason_for_a_failed_affinity_read() {
+    use taskmanager_application::i18n::control_error_detail;
+    use taskmanager_application::{ProcessAffinityState, RequestCorrelation};
+
+    let _guard = en();
+    let target = FrozenProcessIdentity::from_authoritative_parts(304, "aff-failed", 1000, 1000)
+        .expect("valid target");
+    let revision = ProcessInsightsRevision::new(1);
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target.clone(), revision);
+    let projection = tracker.snapshot().expect("snapshot exists");
+
+    let mut app = crate::demo_app();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessAffinity(Some(ProcessAffinityState::Failed {
+            correlation: RequestCorrelation::Request(RequestId::MIN),
+            target,
+            failure: FailureKind::PermissionDenied,
+            last_good: None,
+        })),
+    );
+
+    let text = render_text(insights_lines(
+        &app,
+        TuiTheme::default(),
+        fixture_identity(&app, 304),
+    ));
+    let reason = control_error_detail(FailureKind::PermissionDenied);
+    assert!(
+        text.contains(reason),
+        "the affinity row must carry the shared reason, got:\n{text}"
+    );
+    assert!(
+        !text.contains("PermissionDenied"),
+        "never a Debug dump of the typed failure:\n{text}"
     );
 }
 

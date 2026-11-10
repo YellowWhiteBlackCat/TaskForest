@@ -2,6 +2,7 @@
 
 use taskforest_core::core::metrics::MemoryMetrics;
 use taskmanager_application::i18n::t;
+use taskmanager_shell::presentation::memory_usage_rate_is_visible;
 use taskmanager_shell::viewmodel::StatRow;
 
 use crate::ui::format::memory_text_pref;
@@ -113,7 +114,7 @@ pub(crate) fn memory_stats_rows(
     }
     if let Some(rate) = observed
         .used_rate_mib_per_sec
-        .filter(|rate| rate.abs() >= 0.05)
+        .filter(|rate| memory_usage_rate_is_visible(*rate))
     {
         stats.push(StatRow::text(
             t("mem.usage_rate"),

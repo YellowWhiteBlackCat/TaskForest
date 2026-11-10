@@ -102,15 +102,28 @@ const LARGE_WALL_LIMIT: Duration = Duration::from_secs(8);
 /// the host domain reads `/proc/{pid}/stat`, `/proc/{pid}/status`, and
 /// `/proc/{pid}/io` for each process; this gates the combined parser cost.
 ///
-/// **Host-class assumption:** as above — debug build on a modern x86_64 laptop
-/// or CI runner. The three parsers are O(fields) per process, so 10k processes
-/// × 3 parsers should sit well under this even unoptimized; observed steady-
-/// state is ~50-85ms uninstrumented. The Coverage job runs the same parse under
-/// llvm-cov instrumentation, which adds enough overhead to push it to ~240ms,
-/// so 400ms absorbs instrumentation + a ~1.6x scheduler-jitter swing while a
-/// dominant quadratic rewrite (~50x) would land around 2.5s and still blow this.
+/// The ceiling is **process CPU time**, not wall clock. A wall-clock ceiling on
+/// a pure-CPU path asserts how fast the host scheduled this thread, which is a
+/// host fact the repository forbids tests from depending on: the same
+/// unmodified binary measured 63ms on a quiet host and 986ms while a 72-hour
+/// soak, a compositor and four concurrent `rustc` jobs shared the machine — a
+/// 15x swing with zero code movement, so the gate was a false-FAIL generator.
+/// The paired A/B that proved the parser itself did not change (HEAD's algorithm
+/// vs the current one, same process, alternating rounds) landed at ratio 1.006.
+///
+/// At 100 Hz ticks this keeps the intended discrimination: steady state is a
+/// handful of ticks, llvm-cov instrumentation adds a few more, and a dominant
+/// quadratic rewrite (~50x) lands far above the ceiling. Wall clock is still
+/// reported, and a separate loose wall bound keeps catching a path that hangs
+/// without consuming CPU (a spin on a lock, a syscall the gate did not expect).
 #[cfg(target_os = "linux")]
-const PROC_PARSE_LIMIT: Duration = Duration::from_millis(400);
+const PROC_PARSE_CPU_TICK_LIMIT: u64 = 40;
+
+/// The loose catastrophic wall bound for the same measurement: far above any
+/// scheduler jitter a loaded developer host produces, still orders of magnitude
+/// below a hang.
+#[cfg(target_os = "linux")]
+const PROC_PARSE_WALL_LIMIT: Duration = Duration::from_millis(4_000);
 
 /// Eight-way heap-shaped parent links keep recursion shallow while exercising
 /// every parent/child lookup. Reverse input order ensures algorithms cannot rely
@@ -303,21 +316,32 @@ fn proc_parse_of_ten_thousand_synthetic_ticks_stays_under_budget() {
     }
 
     let started = Instant::now();
+    let cpu_before = self_cpu_ticks();
     for i in 0..LARGE_WORKLOAD {
         let _ = parse_proc_stat(&stat_texts[i]);
         let _ = parse_proc_status_memory(&status_texts[i]);
         let _ = parse_proc_io(&io_texts[i]);
     }
+    let cpu_ticks = self_cpu_ticks().saturating_sub(cpu_before);
     let elapsed = started.elapsed();
     eprintln!(
-        "per-tick /proc parse over {LARGE_WORKLOAD} processes (stat+status+io each): {elapsed:?} (limit {PROC_PARSE_LIMIT:?})"
+        "per-tick /proc parse over {LARGE_WORKLOAD} processes (stat+status+io each): \
+         wall {elapsed:?} (limit {PROC_PARSE_WALL_LIMIT:?}), \
+         process CPU {cpu_ticks} ticks (limit {PROC_PARSE_CPU_TICK_LIMIT})"
     );
 
     assert!(
-        elapsed <= PROC_PARSE_LIMIT,
-        "per-tick /proc parse over {LARGE_WORKLOAD} synthetic processes took {elapsed:?}, \
-         exceeding the {PROC_PARSE_LIMIT:?} ceiling. Assumption: a modern x86_64 developer \
-         laptop or CI runner in debug mode."
+        cpu_ticks <= PROC_PARSE_CPU_TICK_LIMIT,
+        "per-tick /proc parse over {LARGE_WORKLOAD} synthetic processes consumed {cpu_ticks} \
+         process-CPU ticks (limit {PROC_PARSE_CPU_TICK_LIMIT}), wall {elapsed:?}. This is work, \
+         not scheduling: another host process cannot move it. A parser rewrite that scans the \
+         field list per wanted field is the regression this catches."
+    );
+    assert!(
+        elapsed <= PROC_PARSE_WALL_LIMIT,
+        "per-tick /proc parse over {LARGE_WORKLOAD} synthetic processes took {elapsed:?} wall \
+         while consuming only {cpu_ticks} CPU ticks (wall limit {PROC_PARSE_WALL_LIMIT:?}) — the \
+         loop waited on something other than its own parsing"
     );
 }
 

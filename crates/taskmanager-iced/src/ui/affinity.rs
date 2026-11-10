@@ -13,6 +13,8 @@ use taskmanager_theme::{Theme, tokens};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::styled_scrollable;
 use crate::{IcedApp, focus, theme};
+use taskforest_core::core::failure::FailureKind;
+use taskmanager_application::i18n::control_error_detail;
 use taskmanager_shell::presentation::missing_value;
 
 /// Render the process-affinity editor from the frozen identity and the latest
@@ -59,16 +61,12 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
         ProcessAffinityState::Failed { failure, .. } => Some(*failure),
         _ => None,
     };
-    let status = if let Some(failure) = failure {
-        format!("Current affinity unavailable: {failure:?}")
-    } else if app.process_presentation.affinity_cpus.is_none() {
-        t("common.collecting_telemetry").to_owned()
-    } else {
-        format!(
-            "{selected_count} / {logical_cpu_count} {}",
-            t("proc.logical_cpus")
-        )
-    };
+    let status = affinity_status_text(
+        failure,
+        app.process_presentation.affinity_cpus.is_some(),
+        selected_count,
+        logical_cpu_count,
+    );
 
     let mask_str = if let Some(cpus) = app.process_presentation.affinity_cpus.as_ref() {
         let mut mask: u128 = 0;
@@ -221,4 +219,29 @@ fn affinity_grid<'a>(
     }
 
     column(rows).spacing(4).width(Length::Fill).into()
+}
+
+/// The editor's one status line.
+///
+/// A failed read reads the owner's localized reason — never a `Debug` dump of
+/// the typed failure and never a frontend-spelled sentence (the TUI's own
+/// G-04b rule, now bound by all four frontends). Before any read lands (or when
+/// none of this target's reads ever succeeded) the line says so instead of
+/// inventing a mask; only an observed mask is summarized.
+pub(crate) fn affinity_status_text(
+    failure: Option<FailureKind>,
+    observed: bool,
+    selected_count: usize,
+    logical_cpu_count: usize,
+) -> String {
+    if let Some(failure) = failure {
+        return control_error_detail(failure).to_owned();
+    }
+    if !observed {
+        return t("common.collecting_telemetry").to_owned();
+    }
+    format!(
+        "{selected_count} / {logical_cpu_count} {}",
+        t("proc.logical_cpus")
+    )
 }

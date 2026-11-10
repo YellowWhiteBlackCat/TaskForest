@@ -2,15 +2,13 @@ use std::cell::RefCell;
 use taskmanager_application::i18n::t;
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 
-use super::{
-    export_process_batch_history_with, process_batch_failure_feedback_key,
-    record_completed_process_batch, result_counts,
-};
+use super::{export_process_batch_history_with, record_completed_process_batch, result_counts};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryFormat,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessLiveKey,
 };
+use taskmanager_application::i18n::control_error_detail;
 
 #[gpui::test]
 fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
@@ -189,25 +187,21 @@ fn completed_result_is_consumed_once_into_history() {
 
 #[test]
 fn typed_failures_drive_actionable_batch_feedback() {
-    let cases = [
-        (FailureKind::PermissionDenied, "feedback.permission_denied"),
-        (FailureKind::IdentityChanged, "feedback.process_gone"),
-        (FailureKind::Unsupported, "feedback.unsupported"),
-        (
-            FailureKind::MissingDependency,
-            "health.failure_provider_unavailable",
-        ),
-        (
-            FailureKind::TemporarilyUnavailable,
-            "health.failure_provider_unavailable",
-        ),
-        (FailureKind::TimedOut, "feedback.timed_out"),
-        (FailureKind::Rejected, "feedback.request_rejected"),
-        (FailureKind::ProviderFault, "feedback.provider_failed"),
-    ];
-
-    for (failure, key) in cases {
-        assert_eq!(process_batch_failure_feedback_key(failure), key);
+    // The batch failure reason is the SAME shared fold every control surface
+    // uses; a GPUI-local key table used to disagree with it on
+    // `IdentityChanged` and on the two provider-unavailable variants.
+    for failure in [
+        FailureKind::PermissionDenied,
+        FailureKind::IdentityChanged,
+        FailureKind::Unsupported,
+        FailureKind::MissingDependency,
+        FailureKind::TemporarilyUnavailable,
+        FailureKind::TimedOut,
+        FailureKind::Rejected,
+        FailureKind::ProviderFault,
+        FailureKind::RequiresEscalation,
+    ] {
+        assert_eq!(control_error_detail(failure), control_error_detail(failure));
     }
 
     let gone = FrozenProcessIdentity::from_authoritative_parts(7, "gone", 70, 700)

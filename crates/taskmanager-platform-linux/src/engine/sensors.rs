@@ -140,7 +140,7 @@ fn collect_sensor_center_source_from(
         let (device_identity, identity_is_stable) =
             sensor_device_identity_with_quality(&directory, &chip);
         if !identity_is_stable {
-            enumeration_failure = Some(stronger_failure(
+            enumeration_failure = Some(FailureKind::strongest(
                 enumeration_failure,
                 FailureKind::Unsupported,
             ));
@@ -213,7 +213,7 @@ fn collect_sensor_center_source_from(
         .iter()
         .filter_map(|reading| reading.measurement_observation().failure())
         .chain(enumeration_failure)
-        .max_by_key(|failure| failure_priority(*failure));
+        .reduce(FailureKind::stronger);
     let reading_outcome = match (successful_readings, readings.len(), reading_failure) {
         (0, _, Some(failure)) => SourceOutcome::Unavailable(failure),
         (successful, _, Some(failure)) if successful > 0 => SourceOutcome::Partial(failure),
@@ -256,29 +256,9 @@ fn collect_sensor_center_source_from(
     )
 }
 
-const fn failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        FailureKind::RequiresEscalation => 9,
-        FailureKind::PermissionDenied => 8,
-        FailureKind::MissingDependency => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::ProviderFault => 5,
-        FailureKind::TemporarilyUnavailable => 4,
-        FailureKind::Unsupported => 3,
-        FailureKind::IdentityChanged | FailureKind::Rejected => 1,
-    }
-}
-
 fn record_enumeration_failure(failure: &mut Option<FailureKind>, error: &std::io::Error) {
     let observed = sensor_io_failure(error);
-    *failure = Some(stronger_failure(*failure, observed));
-}
-
-const fn stronger_failure(current: Option<FailureKind>, candidate: FailureKind) -> FailureKind {
-    match current {
-        Some(current) if failure_priority(current) >= failure_priority(candidate) => current,
-        Some(_) | None => candidate,
-    }
+    *failure = Some(FailureKind::strongest(*failure, observed));
 }
 
 fn sensor_device_identity(directory: &Path, chip: &str) -> String {

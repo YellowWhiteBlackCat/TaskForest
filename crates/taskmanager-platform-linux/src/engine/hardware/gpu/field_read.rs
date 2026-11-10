@@ -40,32 +40,9 @@ pub(super) fn preferred_gpu_failure(
     candidate: Option<FailureKind>,
 ) -> Option<FailureKind> {
     match (current, candidate) {
-        (Some(current), Some(candidate)) => Some(
-            if gpu_failure_priority(candidate) > gpu_failure_priority(current) {
-                candidate
-            } else {
-                current
-            },
-        ),
+        (Some(current), Some(candidate)) => Some(current.stronger(candidate)),
         (current @ Some(_), None) | (None, current @ Some(_)) => current,
         (None, None) => None,
-    }
-}
-
-const fn gpu_failure_priority(failure: FailureKind) -> u8 {
-    match failure {
-        // Escalation-aware denial is the most actionable kind (the UI can offer
-        // one specific prompt), so it wins a merge against a generic denial or a
-        // transient sibling failure.
-        FailureKind::RequiresEscalation => 10,
-        FailureKind::PermissionDenied => 9,
-        FailureKind::IdentityChanged => 8,
-        FailureKind::ProviderFault => 7,
-        FailureKind::TimedOut => 6,
-        FailureKind::TemporarilyUnavailable => 5,
-        FailureKind::MissingDependency => 4,
-        FailureKind::Rejected => 3,
-        FailureKind::Unsupported => 1,
     }
 }
 

@@ -26,6 +26,7 @@ use std::path::Path;
 
 use taskforest_core::core::device_state::{DeviceState, DeviceStatus};
 use taskforest_core::core::metrics::ScalarObservation;
+use taskforest_core::core::percent::ClampedPercent;
 use taskforest_core::core::{
     FailureKind, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessIdentity,
 };
@@ -317,7 +318,7 @@ impl ProcessGpuEngineRateTracker {
         };
         *baseline = (current_ns, now_ms);
         let elapsed_ns = elapsed_ms as f64 * 1_000_000.0;
-        let percentage = (delta_ns as f64 / elapsed_ns * 100.0).clamp(0.0, 100.0) as f32;
+        let percentage = (delta_ns as f64 / elapsed_ns * 100.0).clamped_percent() as f32;
         if percentage.is_finite() && percentage >= 0.0 {
             ScalarObservation::available(percentage, now_ms)
         } else {

@@ -1,6 +1,6 @@
 # 跨前端 UI 场景平权审计总纲
 
-前端平权的判定标准是能力与场景的 1:1 全射。GPUI 作为基准发布表面，其拥有的全部 58 个专用交互场景均属于产品必须作答的业务契约。任何一端缺失对应入口或像素实证，都属于未平权状态：owner 已登记的存异标 `AcceptedDifference`，场景子句被明确拒绝的标 `Partial` / `Unsupported`，其余标 `Pending`。
+前端平权的判定标准是能力与场景的 1:1 全射。GPUI 作为基准发布表面，其拥有的全部 59 个专用交互场景均属于产品必须作答的业务契约。任何一端缺失对应入口或像素实证，都属于未平权状态：owner 已登记的存异标 `AcceptedDifference`，场景子句被明确拒绝的标 `Partial` / `Unsupported`，其余标 `Pending`。
 
 本表只判定 **场景级语义**：入口、状态机、行为测试、截图矩阵与当前截图。组件级差异（Tooltip、TextInput、ModalOverlay 等）由 `crates/taskmanager-ui-contract/src/capabilities.rs` 与四端 `src/capabilities.rs` 的声明拥有；产品意图级差异由四端 `src/functional.rs` 的 CORE-04 声明拥有。本表只在场景主路径受这些差异影响时引用 owner 声明，不复制第二套词汇。
 
@@ -42,6 +42,7 @@
 | 存储与硬件诊断 | `storage-health` | 文件系统健康、只读与错误状态及 SMART 自检报告 | Aligned | Aligned | Aligned | — |
 | | `smart-missing-tool` | 缺失 smartctl 时的引导提示 | Aligned | Aligned | Aligned | — |
 | | `smart-permission` | SMART 特权提权失败/引导态 | Aligned | Aligned | Aligned | — |
+| | `smart-wear-critical` | 磁盘 SMART 耐久度超限的警示标记 | Aligned | Aligned | Aligned | — |
 | | `partition-disk-usage` | 分区挂载点与磁盘空间图 | Aligned | Aligned | Aligned | — |
 | | `partition-live-usage` | 磁盘动态吞吐与 IOPS 视图 | Aligned | Aligned | Aligned | — |
 | | `device-hotplug` | 设备热插拔事件触发与重排 | Aligned | Aligned | Aligned | — |
@@ -104,6 +105,6 @@
 
 ## 平权推进与收敛机制
 
-1. **绝对基准**：本表 58 个场景 Token 属于硬性全集，任何针对 GPUI 场景的扩充必须同步在此登记。
+1. **绝对基准**：本表 59 个场景 Token 属于硬性全集，任何针对 GPUI 场景的扩充必须同步在此登记。
 2. **状态推进**：每一端新增场景时，必须同时满足代码状态机接线、单测断言、场景矩阵收录、真实 Wayland 截图生成四项，才允许将状态升级为 `Aligned`；`AcceptedDifference` 必须引用 owner 声明，`Partial` / `Unsupported` 必须引用拒绝理由，`Pending` 不计入完成。
-3. **闭环守护**：`scripts/quality/visual_capture_coverage.py` 校验本表 Token、状态词汇、runner 覆盖与截图矩阵行（`Unsupported`/`Pending` 不要求截图行）；`scripts/parity/scene_registry.tsv` 为 58 个场景各绑定四端证据（当前 219 个行为测试锚点，TUI `sidebar-hidden` 与 `tooltip-overlay` 为显式缺席），`scene_registry_guard.py` 对 live nextest discovery 与截图矩阵校验集合、顺序与悬空锚点；`parity-evidence` 再校验四端交互矩阵 197 个锚点与 8/8 需求覆盖。逐场景行为锚点的语义贴合仍由 owner 审查，门禁负责存在性、归属与悬空校验。
+3. **闭环守护**：`scripts/quality/visual_capture_coverage.py` 校验本表 Token、状态词汇、runner 覆盖与截图矩阵行（`Unsupported`/`Pending` 不要求截图行）；`scripts/parity/scene_registry.tsv` 为 59 个场景各绑定四端证据（当前 228 个行为测试锚点与 6 个截图锚点，TUI `sidebar-hidden` 与 `tooltip-overlay` 为显式缺席），`scene_registry_guard.py` 对 live nextest discovery 与截图矩阵校验集合、顺序与悬空锚点；`parity-evidence` 再校验四端交互矩阵 197 个锚点与 8/8 需求覆盖。逐场景行为锚点的语义贴合仍由 owner 审查，门禁负责存在性、归属与悬空校验。

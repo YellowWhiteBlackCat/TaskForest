@@ -523,6 +523,7 @@
   "disk.revision": "Revision",
   "disk.endurance_used": "Endurance used",
   "disk.available_spare": "Available spare",
+  "disk.spare_warning_clause": "(warning ≤ {threshold})",
   "disk.unsafe_shutdowns": "Unsafe shutdowns",
   "disk.temperature_sensor": "Temperature sensor",
   "disk.backing_physical": "physical",

@@ -4,6 +4,7 @@
 //! [`super::sections`] — no telemetry access happens here.
 
 use gpui::{Div, ParentElement, Styled, div, px, relative};
+use taskforest_core::core::percent::ClampedPercent;
 use taskmanager_ui::icons_binding;
 use taskmanager_ui::theme_binding::absolute;
 use taskmanager_ui::theme_binding::definite_length;
@@ -226,7 +227,7 @@ fn spec_row(theme: &Theme, label: &str, value: &str) -> Div {
 fn meter_bar(theme: &Theme, m: &SystemMeter, meter_fill: Color) -> Div {
     let pct = m
         .pct
-        .map(|value| value.clamp(0.0, 100.0) / 100.0)
+        .map(|value| value.clamped_percent() / 100.0)
         .unwrap_or(0.0);
     let mut track = div()
         .h(px(6.0))

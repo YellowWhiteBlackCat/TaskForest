@@ -22,6 +22,32 @@ fn click(app: &mut App, runtime: &'static SharedRuntime, action: SavedViewAction
         app.update();
     }
 }
+
+/// Run frames until the shell carries a feedback notice whose text contains
+/// `needle`, and report whether it ever did.
+///
+/// A save's typed outcome reaches the shell through the coordinator thread and
+/// then the app's drain, so it lands on a LATER frame than the click that
+/// caused it. A fixed frame count therefore asserts host speed rather than
+/// product behavior: under load the publication simply has not been drained
+/// yet, and the notice — `UntilReplaced`, never a timer — is still absent.
+/// The wait is bounded, so a real regression still fails, and the bound is a
+/// frame budget, not a sleep, so the fast path costs nothing extra.
+fn settle_feedback_notice(app: &mut App, needle: &str) -> bool {
+    for _ in 0..600 {
+        if app
+            .world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some_and(|feedback| feedback.text().contains(needle))
+        {
+            return true;
+        }
+        app.update();
+    }
+    false
+}
 #[test]
 fn saved_views_native_controls_persist_and_restart_rehydrates_shared_config() {
     let path = test_path("saved-views");
@@ -100,12 +126,11 @@ fn saved_views_failed_native_config_save_keeps_canonical_rows_and_reports_failur
             .iter()
             .all(|row| !row.is_user_saved())
     );
-    let track = app.world().non_send::<FrontendTrack>();
     assert!(
-        track
-            .shell
-            .feedback_notice()
-            .is_some_and(|feedback| feedback.text().contains("SaveFailed"))
+        settle_feedback_notice(&mut app, "SaveFailed"),
+        "the failed native save must reach the shell's feedback notice; the \
+         publication stayed undrained after the frame budget, so either the \
+         save never reported or the drain dropped its outcome"
     );
     drop(app);
     drop(coordinator);
