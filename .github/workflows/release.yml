@@ -97,10 +97,6 @@ jobs:
       # `cargo metadata --locked` fails the moment the committed Cargo.lock
       # does not satisfy the manifest, proving the tag builds reproducibly.
       - uses: dtolnay/rust-toolchain@1.99.1
-      - name: Fetch private shared UI kit dependency
-        env:
-          SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
-        run: bash scripts/quality/shared-ui-git-credentials.sh fetch
       - run: cargo metadata --locked --format-version 1 >/dev/null
       # Every host-installed path must stay allowlisted before a release
       # ships new package layouts (same guard as the CI blocking gate).
@@ -125,6 +121,5 @@ jobs:
       release_tag: ${{ needs.precheck.outputs.tag }}
       prerelease: ${{ needs.precheck.outputs.prerelease == 'true' }}
     secrets:
-      SHARED_UI_KIT_READ_KEY: ${{ secrets.SHARED_UI_KIT_READ_KEY }}
       WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
       WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
