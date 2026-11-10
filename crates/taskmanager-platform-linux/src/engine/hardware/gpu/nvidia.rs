@@ -2,6 +2,7 @@
 //! `LINUX-NVIDIA-02` covers field-isolated fan and typed throttle reads.
 
 use super::*;
+#[cfg(feature = "nvidia")]
 use taskforest_core::core::percent::ClampedPercent;
 
 #[cfg(feature = "nvidia")]
