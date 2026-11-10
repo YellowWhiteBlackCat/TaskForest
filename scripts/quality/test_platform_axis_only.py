@@ -3,9 +3,9 @@
 """ADR-051: conditional compilation is a platform-axis mechanism only.
 
 No workspace manifest may declare a frontend-selecting ``ui-*`` feature, and
-no production Rust source may gate code on one. The check walks the three
-workspaces that share the UI kit contract; ignored build trees, private
-material and generated caches are outside the census.
+no production Rust source may gate code on one. The check walks the two owned
+workspaces; ignored build trees, private material and generated caches are
+outside the census.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from pathlib import Path
 RUSTDEV = Path(__file__).resolve().parents[3]
 REPOS = (
     RUSTDEV / "taskmanager",
-    RUSTDEV / "music-frog",
     RUSTDEV / "libs" / "zhuge-ui-kit",
 )
 IGNORED = {".git", ".private", "target", "node_modules", "dist", "build"}
@@ -54,7 +53,7 @@ def findings(root: Path) -> list[str]:
 
 
 class PlatformAxisOnlyTests(unittest.TestCase):
-    def test_three_workspaces_have_no_frontend_features_or_cfgs(self):
+    def test_owned_workspaces_have_no_frontend_features_or_cfgs(self):
         for root in REPOS:
             with self.subTest(repo=root.name):
                 self.assertEqual(findings(root), [])

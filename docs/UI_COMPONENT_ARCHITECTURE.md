@@ -2,7 +2,7 @@
 
 TaskForest 拥有皮肤、文案、图标、列定义、业务投影与命令映射；GPUI 组件归 `taskmanager-ui`。
 Bevy/Iced 基础组件与纯文本、窗口算法和中立 surface 值统一归共享仓库 `libs/zhuge-ui-kit`（`zhuge-ui-kit-bevy`、`zhuge-ui-kit-iced`、`zhuge-ui-core`、`zhuge-ui-tokens`），直接导入 owner，不留转发或重复实现。
-共享依赖由根 Cargo.toml 固定 Git rev，本地用 patch 联调；各产品保留独立锁文件、平台 feature 和原生 widget 状态，共享包只提供通用行为、token 与纯算法。
+共享依赖由根 Cargo.toml 声明 crates.io 精确版本，并由 Cargo.lock 绑定 registry checksum；本地联调覆盖不得提交成发布状态。共享包只提供通用行为、token 与纯算法。
 
 ## 边界
 
