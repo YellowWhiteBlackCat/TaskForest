@@ -6,23 +6,24 @@ use taskmanager_application::i18n::set_language;
 #[test]
 fn priority_choice_maps_to_typed_priority_tiers_and_localizes() {
     use taskforest_core::core::process::ProcessBatchAction;
-    // The typed tier carries the semantics (the adapter owns the
-    // native-primitive mapping); the presets must match GPUI's action bar
-    // so identically-labeled buttons never diverge.
-    let expected = [
-        (PriorityChoice::High, PriorityTier::High),
-        (PriorityChoice::Normal, PriorityTier::Normal),
-        (PriorityChoice::Low, PriorityTier::Low),
-    ];
-    for (choice, tier) in expected {
-        assert_eq!(choice.action(), ProcessBatchAction::SetPriority(tier));
+    // The core owns the ORDER and the batch action; the shell owns the
+    // wording fold. The local option is only the toolkit adapter that
+    // carries the core tier, so no frontend spells a tier set of its own.
+    let options = PriorityOption::all();
+    assert_eq!(options.len(), PriorityTier::ALL.len());
+    for (option, tier) in options.iter().zip(PriorityTier::ALL) {
+        assert_eq!(option.tier, tier);
+        assert_eq!(option.action(), ProcessBatchAction::SetPriority(tier));
     }
-    assert_eq!(PriorityChoice::ALL.len(), expected.len());
-    // The pick_list labels resolve through the shared catalog.
+    // The pick_list labels resolve through the shell's one wording fold.
     set_language(Language::En);
-    assert_eq!(PriorityChoice::High.to_string(), "High");
-    assert_eq!(PriorityChoice::Normal.to_string(), "Normal");
-    assert_eq!(PriorityChoice::Low.to_string(), "Low");
+    for (option, tier) in options.iter().zip(PriorityTier::ALL) {
+        assert_eq!(option.to_string(), priority_tier_label(tier));
+    }
+    assert_eq!(
+        options[0].to_string(),
+        priority_tier_label(PriorityTier::High)
+    );
 }
 
 #[test]

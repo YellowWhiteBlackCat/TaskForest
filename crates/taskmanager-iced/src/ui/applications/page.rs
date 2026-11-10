@@ -224,162 +224,193 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         Message::ApplicationsScrolled,
     );
 
-    let action_bar: Element<'_, Message, Theme, Renderer> =
-        if let Some(intent) = shell.pending_batch() {
-            tables::confirm_batch_bar(theme_snapshot, intent)
-        } else if let Some(target) = shell.pending_end() {
-            tables::confirm_bar(theme_snapshot, target)
+    let action_bar: Element<'_, Message, Theme, Renderer> = if let Some(intent) =
+        shell.pending_batch()
+    {
+        tables::confirm_batch_bar(theme_snapshot, intent)
+    } else if let Some(target) = shell.pending_end() {
+        tables::confirm_bar(theme_snapshot, target)
+    } else {
+        let control = shell.process_control_availability();
+        let tree_selected = matches!(control.scope(), Some(ProcessControlScope::Tree));
+        let selected_target_count = control.target_count();
+        // The "End task" action wears the destructive accent only when the
+        // selection holds a process in the platform's "not responding"
+        // state (the core's uninterruptible wait): that is the case where
+        // the user has to reach for the destructive path.
+        let end_task_destructive = emphasis::selection_is_not_responding(shell);
+        let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
+        if !tree_selected {
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::EndTask,
+                t("proc.end_task"),
+                Message::RequestEndTask,
+                end_task_destructive,
+                control.is_ready(),
+            ));
+        }
+        actions.push(focus::button_enabled(
+            theme_snapshot,
+            FocusTarget::KillProcess,
+            t("proc.kill"),
+            Message::RequestProcessBatch(ProcessBatchAction::Kill),
+            true,
+            control.is_ready(),
+        ));
+        if !tree_selected {
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::OpenProcessLocation,
+                t("proc.open_location"),
+                Message::OpenProcessLocation,
+                false,
+                control.is_single_process(),
+            ));
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::SearchProcessOnline,
+                t("proc.search_online"),
+                Message::SearchProcessOnline,
+                false,
+                control.is_single_process(),
+            ));
+        }
+        actions.push(focus::button_enabled(
+            theme_snapshot,
+            FocusTarget::SuspendProcess,
+            t("proc.suspend"),
+            Message::RequestProcessBatch(ProcessBatchAction::Suspend),
+            false,
+            control.is_ready(),
+        ));
+        actions.push(focus::button_enabled(
+            theme_snapshot,
+            FocusTarget::ResumeProcess,
+            t("proc.resume"),
+            Message::RequestProcessBatch(ProcessBatchAction::Resume),
+            false,
+            control.is_ready(),
+        ));
+        if !tree_selected {
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::ProcessAffinityOpen,
+                t("proc.affinity"),
+                Message::OpenProcessAffinity,
+                false,
+                control.is_single_process(),
+            ));
+        }
+        actions.push(focus::button_enabled(
+            theme_snapshot,
+            FocusTarget::ProcessEfficiencyMode,
+            t("proc.efficiency_mode"),
+            Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
+            false,
+            control.is_ready(),
+        ));
+        let columns_trigger = focus::button(
+            theme_snapshot,
+            FocusTarget::ProcessColumnsTrigger,
+            t("proc.choose_columns"),
+            Message::OpenProcessColumnsMenu,
+            false,
+        );
+        // The column chooser floats on its trigger: anchored below the
+        // button and dismissed by an outside press, instead of shoving
+        // the page column down while it is open.
+        actions.push(if app.process_columns_menu_open() {
+            crate::ui::components::Popover::new(
+                columns_trigger,
+                super::column_menu::render(app, theme_snapshot),
+                Message::CloseProcessColumnsMenu,
+            )
+            .into()
         } else {
-            let control = shell.process_control_availability();
-            let tree_selected = matches!(control.scope(), Some(ProcessControlScope::Tree));
-            let selected_target_count = control.target_count();
-            // The "End task" action wears the destructive accent only when the
-            // selection holds a process in the platform's "not responding"
-            // state (the core's uninterruptible wait): that is the case where
-            // the user has to reach for the destructive path.
-            let end_task_destructive = emphasis::selection_is_not_responding(shell);
-            let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
-            if !tree_selected {
-                actions.push(focus::button_enabled(
-                    theme_snapshot,
-                    FocusTarget::EndTask,
-                    t("proc.end_task"),
-                    Message::RequestEndTask,
-                    end_task_destructive,
-                    control.is_ready(),
-                ));
-            }
-            actions.push(focus::button_enabled(
+            columns_trigger
+        });
+        actions.push(focus::ghost_button(
+            theme_snapshot,
+            FocusTarget::RunTaskOpen,
+            t("proc.run_new_task"),
+            Message::OpenRunTask,
+        ));
+        let priority_picker: Element<'_, Message, Theme, Renderer> = if control.is_ready() {
+            // The shared select owns the trigger paint (the ONE glass
+            // material), the `ControlRole::Input` geometry and the
+            // keyboard stop; this adapter only supplies the typed
+            // options and the typed batch message.
+            crate::ui::components::select(
                 theme_snapshot,
-                FocusTarget::KillProcess,
-                t("proc.kill"),
-                Message::RequestProcessBatch(ProcessBatchAction::Kill),
-                true,
-                control.is_ready(),
-            ));
-            if !tree_selected {
-                actions.push(focus::button_enabled(
-                    theme_snapshot,
-                    FocusTarget::OpenProcessLocation,
-                    t("proc.open_location"),
-                    Message::OpenProcessLocation,
-                    false,
-                    control.is_single_process(),
-                ));
-                actions.push(focus::button_enabled(
-                    theme_snapshot,
-                    FocusTarget::SearchProcessOnline,
-                    t("proc.search_online"),
-                    Message::SearchProcessOnline,
-                    false,
-                    control.is_single_process(),
-                ));
-            }
-            actions.push(focus::button_enabled(
-                theme_snapshot,
-                FocusTarget::SuspendProcess,
-                t("proc.suspend"),
-                Message::RequestProcessBatch(ProcessBatchAction::Suspend),
-                false,
-                control.is_ready(),
-            ));
-            actions.push(focus::button_enabled(
-                theme_snapshot,
-                FocusTarget::ResumeProcess,
-                t("proc.resume"),
-                Message::RequestProcessBatch(ProcessBatchAction::Resume),
-                false,
-                control.is_ready(),
-            ));
-            if !tree_selected {
-                actions.push(focus::button_enabled(
-                    theme_snapshot,
-                    FocusTarget::ProcessAffinityOpen,
-                    t("proc.affinity"),
-                    Message::OpenProcessAffinity,
-                    false,
-                    control.is_single_process(),
-                ));
-            }
-            actions.push(focus::button_enabled(
-                theme_snapshot,
-                FocusTarget::ProcessEfficiencyMode,
-                t("proc.efficiency_mode"),
-                Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
-                false,
-                control.is_ready(),
-            ));
-            let columns_trigger = focus::button(
-                theme_snapshot,
-                FocusTarget::ProcessColumnsTrigger,
-                t("proc.choose_columns"),
-                Message::OpenProcessColumnsMenu,
-                false,
-            );
-            // The column chooser floats on its trigger: anchored below the
-            // button and dismissed by an outside press, instead of shoving
-            // the page column down while it is open.
-            actions.push(if app.process_columns_menu_open() {
-                crate::ui::components::Popover::new(
-                    columns_trigger,
-                    super::column_menu::render(app, theme_snapshot),
-                    Message::CloseProcessColumnsMenu,
-                )
-                .into()
-            } else {
-                columns_trigger
-            });
-            actions.push(focus::ghost_button(
-                theme_snapshot,
-                FocusTarget::RunTaskOpen,
-                t("proc.run_new_task"),
-                Message::OpenRunTask,
-            ));
-            let priority_picker: Element<'_, Message, Theme, Renderer> = if control.is_ready() {
-                // The shared select owns the trigger paint (the ONE glass
-                // material), the `ControlRole::Input` geometry and the
-                // keyboard stop; this adapter only supplies the typed
-                // options and the typed batch message.
-                crate::ui::components::select(
-                    theme_snapshot,
-                    FocusTarget::ProcessPrioritySelect,
-                    &PriorityChoice::ALL[..],
-                    None::<&PriorityChoice>,
-                    t("proc.choose_priority"),
-                    |choice: &PriorityChoice| Message::RequestProcessBatch(choice.action()),
-                )
-            } else {
-                text(t("proc.choose_priority")).into()
-            };
-            actions.push(
-                iced::widget::container(
-                    row![
-                        text(t("proc.priority"))
-                            .size(f32::from(FONT_CAPTION))
-                            .color(theme::muted_text_color(theme_snapshot)),
-                        priority_picker,
-                    ]
-                    .spacing(4)
-                    .align_y(Alignment::Center),
-                )
-                .width(Length::Fixed(priority_group_width(theme_snapshot)))
-                .into(),
-            );
-            actions.push(
-                iced::widget::container(
-                    text(selection_hint(selected_target_count))
-                        .wrapping(iced::widget::text::Wrapping::None),
-                )
-                .width(Length::Shrink)
-                .into(),
-            );
-            // The full action vocabulary is one bounded horizontal group.
-            // A plain Fill row squeezed the last groups into half-painted
-            // fragments at the right edge; the shared strip keeps every
-            // control's intrinsic width and gives the overflow its own
-            // scroll owner without spending another table row.
-            crate::ui::components::bounded_toolbar(theme_snapshot, actions)
+                FocusTarget::ProcessPrioritySelect,
+                &PRIORITY_OPTIONS[..],
+                None::<&PriorityOption>,
+                t("proc.choose_priority"),
+                |choice: &PriorityOption| Message::RequestProcessBatch(choice.action()),
+            )
+        } else {
+            text(t("proc.choose_priority")).into()
         };
+        let priority_group: Element<'_, Message, Theme, Renderer> = iced::widget::container(
+            row![
+                text(t("proc.priority"))
+                    .size(f32::from(FONT_CAPTION))
+                    .color(theme::muted_text_color(theme_snapshot)),
+                priority_picker,
+            ]
+            .spacing(4)
+            .align_y(Alignment::Center),
+        )
+        .width(Length::Fixed(priority_group_width(theme_snapshot)))
+        .into();
+        let hint: Element<'_, Message, Theme, Renderer> = iced::widget::container(
+            text(selection_hint(selected_target_count))
+                .wrapping(iced::widget::text::Wrapping::None),
+        )
+        .width(Length::Shrink)
+        .into();
+        // The action strip shows COMPLETE groups only. The priority preset
+        // and the selection hint live in the anchored overflow menu, so
+        // the right edge never paints half a group (the GPUI action bar
+        // keeps the same vocabulary in its anchored overflow menu).
+        let overflow_trigger = focus::ghost_button(
+            theme_snapshot,
+            FocusTarget::ProcessActionsTrigger,
+            t("common.actions"),
+            Message::OpenProcessActionsMenu,
+        );
+        let overflow_panel = column![
+            text(t("common.actions"))
+                .size(f32::from(FONT_13))
+                .color(theme::muted_text_color(theme_snapshot)),
+            priority_group,
+            hint,
+        ]
+        .spacing(6);
+        let overflow: Element<'_, Message, Theme, Renderer> = if app.process_actions_menu_open() {
+            let panel: Element<'_, Message, Theme, Renderer> =
+                iced::widget::container(overflow_panel)
+                    .style(move |_| theme::panel_style(theme_snapshot))
+                    .padding(8)
+                    .into();
+            crate::ui::components::Popover::new(
+                overflow_trigger,
+                panel,
+                Message::CloseProcessActionsMenu,
+            )
+            .into()
+        } else {
+            overflow_trigger
+        };
+        actions.push(overflow);
+        // The full action vocabulary is one bounded horizontal group.
+        // A plain Fill row squeezed the last groups into half-painted
+        // fragments at the right edge; the shared strip keeps every
+        // control's intrinsic width and gives the overflow its own
+        // scroll owner without spending another table row.
+        crate::ui::components::bounded_toolbar(theme_snapshot, actions)
+    };
 
     let view_selector = process_view_selector(theme_snapshot);
     let status_selector =

@@ -3,7 +3,7 @@
 //! views cannot mutate it independently or turn it into a second settings
 //! authority.
 
-use super::DeviceKind;
+use taskforest_core::core::config::{DeviceVisibilityKey, DeviceVisibilityPreferences};
 use taskmanager_theme::FontAvailability;
 
 /// Renderer-ready values resolved from one persisted `Config` snapshot.
@@ -37,16 +37,7 @@ pub struct PresentationPreferences {
     /// Network graphs scale to the observed peak vs the link speed.
     pub network_dynamic_scaling: bool,
     /// Per-family Performance-page device visibility (GPUI Settings devices).
-    pub show_cpu: bool,
-    pub show_memory: bool,
-    pub show_disks: bool,
-    pub show_network: bool,
-    pub show_network_wired: bool,
-    pub show_network_wireless: bool,
-    pub show_network_vpn: bool,
-    pub show_network_virtual: bool,
-    pub show_network_other: bool,
-    pub show_gpus: bool,
+    pub devices: DeviceVisibilityPreferences,
     /// Resolved text-rendering token; Iced currently supports platform default
     /// only, so legacy subpixel/grayscale values normalize to empty.
     pub text_rendering: String,
@@ -87,16 +78,7 @@ impl Default for PresentationPreferences {
             refresh_ms: 1000,
             graph_data_points: 60,
             network_dynamic_scaling: true,
-            show_cpu: true,
-            show_memory: true,
-            show_disks: true,
-            show_network: true,
-            show_network_wired: true,
-            show_network_wireless: true,
-            show_network_vpn: true,
-            show_network_virtual: true,
-            show_network_other: true,
-            show_gpus: true,
+            devices: DeviceVisibilityPreferences::default(),
             text_rendering: String::new(),
             motion: "normal".to_string(),
             startup_page: String::new(),
@@ -121,21 +103,10 @@ impl PresentationPreferences {
 
 impl PresentationPreferences {
     /// The current visibility of one device family. Iterating
-    /// [`DeviceKind::ALL`] with this
+    /// [`DeviceVisibilityKey::ALL`] with this
     /// accessor covers every persisted field).
     #[must_use]
-    pub fn device_visible(&self, kind: DeviceKind) -> bool {
-        match kind {
-            DeviceKind::Cpu => self.show_cpu,
-            DeviceKind::Memory => self.show_memory,
-            DeviceKind::Disks => self.show_disks,
-            DeviceKind::Network => self.show_network,
-            DeviceKind::NetworkWired => self.show_network_wired,
-            DeviceKind::NetworkWireless => self.show_network_wireless,
-            DeviceKind::NetworkVpn => self.show_network_vpn,
-            DeviceKind::NetworkVirtual => self.show_network_virtual,
-            DeviceKind::NetworkOther => self.show_network_other,
-            DeviceKind::Gpus => self.show_gpus,
-        }
+    pub fn device_visible(&self, kind: DeviceVisibilityKey) -> bool {
+        self.devices.visible(kind)
     }
 }

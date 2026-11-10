@@ -8,7 +8,7 @@
 //! parity). No secondary compact-flag derivation remains.
 
 use iced::Element;
-use iced::widget::{Space, column, container, row, scrollable, text};
+use iced::widget::{Space, column, container, row, text};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 use zhuge_ui_core::virtual_list::VirtualWindow;
@@ -23,6 +23,7 @@ use super::{
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
 use iced::Length;
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
@@ -217,9 +218,15 @@ pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
     let prefs = app.preferences();
     match app.perf_device() {
         PerfDevice::Cpu | PerfDevice::Memory => false,
-        PerfDevice::Disk(index) => prefs.show_disks && index >= snapshot.disks.len(),
-        PerfDevice::Network(index) => prefs.show_network && index >= snapshot.networks.len(),
-        PerfDevice::Gpu(index) => prefs.show_gpus && index >= snapshot.gpu.len(),
+        PerfDevice::Disk(index) => {
+            prefs.devices.visible(DeviceVisibilityKey::Disks) && index >= snapshot.disks.len()
+        }
+        PerfDevice::Network(index) => {
+            prefs.devices.visible(DeviceVisibilityKey::Network) && index >= snapshot.networks.len()
+        }
+        PerfDevice::Gpu(index) => {
+            prefs.devices.visible(DeviceVisibilityKey::Gpus) && index >= snapshot.gpu.len()
+        }
         PerfDevice::Battery(index) => projection
             .power_supplies
             .as_ref()
@@ -316,16 +323,16 @@ fn performance_sidebar<'a>(
                     })
                     .collect()
             });
-            scrollable(body)
-                .id(app.performance_rail_scroll_id())
-                .direction(iced::widget::scrollable::Direction::Horizontal(
-                    theme::scrollbar(),
-                ))
-                .style(theme::scrollbar_style)
-                .height(iced::Length::Fixed(44.0))
-                .width(iced::Length::Fill)
-                .on_scroll(Message::PerformanceRailScrolled)
-                .into()
+            crate::ui::components::scrollable(
+                body,
+                crate::ui::components::ScrollAxis::Horizontal,
+                crate::ui::components::ScrollScale::Standard,
+            )
+            .id(app.performance_rail_scroll_id())
+            .height(iced::Length::Fixed(44.0))
+            .width(iced::Length::Fill)
+            .on_scroll(Message::PerformanceRailScrolled)
+            .into()
         }
         DeviceNavigationPresentation::Sidebar => {
             let (scroll_y, viewport_height) = app.performance_rail_vertical_scroll();
@@ -338,18 +345,12 @@ fn performance_sidebar<'a>(
             );
             // The wide rail scrolls vertically so lower devices stay reachable;
             // only the card window's captions/history facts enter the element tree.
-            scrollable(perf_rail::device_cards(
-                app,
-                theme_snapshot,
-                &devices,
-                selected,
-                window,
-            ))
+            crate::ui::components::scrollable(
+                perf_rail::device_cards(app, theme_snapshot, &devices, selected, window),
+                crate::ui::components::ScrollAxis::Vertical,
+                crate::ui::components::ScrollScale::Compact,
+            )
             .id(app.performance_rail_scroll_id())
-            .direction(iced::widget::scrollable::Direction::Vertical(
-                theme::compact_scrollbar(),
-            ))
-            .style(theme::compact_scrollbar_style)
             .height(iced::Length::Fill)
             .width(iced::Length::Fill)
             .on_scroll(Message::PerformanceRailScrolled)

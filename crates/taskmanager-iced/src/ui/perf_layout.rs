@@ -9,7 +9,7 @@
 //! ONE shared dash in a dim style — the same fold all frontend renderers read.
 
 use iced::alignment::Horizontal;
-use iced::widget::{Id, column, container, row, scrollable, text};
+use iced::widget::{Id, column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::viewmodel::StatRow;
@@ -319,14 +319,14 @@ fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
         .width(Length::Fill)
         .padding(iced::Padding::ZERO.right(8.0));
     let mut rail = container(
-        scrollable(body)
+        crate::ui::components::scrollable(
+            body,
+            crate::ui::components::ScrollAxis::Vertical,
+            crate::ui::components::ScrollScale::Compact,
+        )
             .id(Id::new(PERFORMANCE_STATS_RAIL_SCROLL_ID))
             .width(content_width)
-            .height(Length::Fill)
-            .direction(iced::widget::scrollable::Direction::Vertical(
-                theme::compact_scrollbar(),
-            ))
-            .style(theme::compact_scrollbar_style),
+            .height(Length::Fill),
     )
     .width(content_width)
     .height(Length::Fill)

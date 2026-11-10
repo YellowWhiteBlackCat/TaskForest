@@ -5,6 +5,7 @@
 
 use super::*;
 use std::time::Duration;
+use taskforest_core::core::config::DeviceVisibilityPreferences;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_theme::{
@@ -61,18 +62,14 @@ impl IcedApp {
                 self.shell.set_history_capacity(points);
             }
             SettingsChange::NetworkDynamicScaling(on) => config.network_dynamic_scaling = on,
-            SettingsChange::ShowDevice(kind, visible) => match kind {
-                DeviceKind::Cpu => config.show_cpu = visible,
-                DeviceKind::Memory => config.show_memory = visible,
-                DeviceKind::Disks => config.show_disks = visible,
-                DeviceKind::Network => config.show_network = visible,
-                DeviceKind::NetworkWired => config.show_network_wired = visible,
-                DeviceKind::NetworkWireless => config.show_network_wireless = visible,
-                DeviceKind::NetworkVpn => config.show_network_vpn = visible,
-                DeviceKind::NetworkVirtual => config.show_network_virtual = visible,
-                DeviceKind::NetworkOther => config.show_network_other = visible,
-                DeviceKind::Gpus => config.show_gpus = visible,
-            },
+            // The device-category switches are written through the owner that
+            // owns the set, so the config schema and the rendered toggles
+            // cannot drift from the ten categories the product offers.
+            SettingsChange::ShowDevice(kind, visible) => {
+                let mut devices = DeviceVisibilityPreferences::from_config(&config);
+                devices.set_visible(kind, visible);
+                devices.apply_to(&mut config);
+            }
             // Iced does not expose a portable text-raster mode API. Keep
             // legacy messages fail-closed at platform default rather than
             // persisting a token that cannot affect rendering.
@@ -131,16 +128,7 @@ impl IcedApp {
             refresh_ms: config.refresh_ms,
             graph_data_points: usize::try_from(config.graph_data_points).unwrap_or(60),
             network_dynamic_scaling: config.network_dynamic_scaling,
-            show_cpu: config.show_cpu,
-            show_memory: config.show_memory,
-            show_disks: config.show_disks,
-            show_network: config.show_network,
-            show_network_wired: config.show_network_wired,
-            show_network_wireless: config.show_network_wireless,
-            show_network_vpn: config.show_network_vpn,
-            show_network_virtual: config.show_network_virtual,
-            show_network_other: config.show_network_other,
-            show_gpus: config.show_gpus,
+            devices: DeviceVisibilityPreferences::from_config(config),
             text_rendering: String::new(),
             motion: config.motion.clone(),
             startup_page: config.startup_page.clone(),

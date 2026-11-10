@@ -30,7 +30,8 @@ fn visibility_test_app(label: &str) -> (crate::IcedApp, std::path::PathBuf) {
 
 #[test]
 fn device_visibility_preferences_filter_the_selector_rail() {
-    use crate::app::{DeviceKind, Message, SettingsChange};
+    use crate::app::{Message, SettingsChange};
+    use taskforest_core::core::config::DeviceVisibilityKey;
     let (mut app, dir) = visibility_test_app("visibility-rail");
 
     // Everything visible by default: CPU + Memory + the dynamic families.
@@ -43,7 +44,7 @@ fn device_visibility_preferences_filter_the_selector_rail() {
 
     // Hiding a family removes its entries from the rail…
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::Gpus,
+        DeviceVisibilityKey::Gpus,
         false,
     )));
     let without_gpu = available_perf_devices(&app);
@@ -51,7 +52,7 @@ fn device_visibility_preferences_filter_the_selector_rail() {
     assert!(without_gpu.contains(&PerfDevice::Disk(0)));
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::Cpu,
+        DeviceVisibilityKey::Cpu,
         false,
     )));
     let without_cpu = available_perf_devices(&app);
@@ -62,7 +63,7 @@ fn device_visibility_preferences_filter_the_selector_rail() {
     // visible device on the next frame.
     let _ = app.update(Message::SelectPerfDevice(PerfDevice::Gpu(0)));
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::Gpus,
+        DeviceVisibilityKey::Gpus,
         false,
     )));
     // CPU was hidden in the step above, so the first still-visible device is
@@ -79,7 +80,8 @@ fn device_visibility_preferences_filter_the_selector_rail() {
 
 #[test]
 fn network_subcategory_toggles_filter_by_adapter_type() {
-    use crate::app::{DeviceKind, Message, SettingsChange};
+    use crate::app::{Message, SettingsChange};
+    use taskforest_core::core::config::DeviceVisibilityKey;
     use taskforest_core::core::metrics::NetworkAdapterType;
     let (mut app, dir) = visibility_test_app("visibility-network");
 
@@ -128,7 +130,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
 
     // Hiding VPNs removes tun0 but keeps the wired demo NIC and loopback.
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::NetworkVpn,
+        DeviceVisibilityKey::NetworkVpn,
         false,
     )));
     let filtered = available_perf_devices(&app);
@@ -141,7 +143,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
 
     // Hiding Other removes loopback; the wired NIC remains.
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::NetworkOther,
+        DeviceVisibilityKey::NetworkOther,
         false,
     )));
     let filtered = available_perf_devices(&app);
@@ -150,7 +152,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
 
     // Hiding the whole Network family empties the rail of NICs entirely.
     let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
-        DeviceKind::Network,
+        DeviceVisibilityKey::Network,
         false,
     )));
     let filtered = available_perf_devices(&app);

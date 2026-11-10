@@ -6,6 +6,7 @@
 //! quiet-hours token, and the shortcut legend derives from the Iced binding
 //! declaration rather than a copied key table.
 
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::i18n::Language;
 use taskmanager_shell::command_help;
 use taskmanager_theme::tokens::{MotionPolicy, RowDensity, UiSize};
@@ -169,9 +170,9 @@ fn control_changes_round_trip_through_preferences() {
 
     apply(
         &mut app,
-        SettingsChange::ShowDevice(DeviceKind::Gpus, false),
+        SettingsChange::ShowDevice(DeviceVisibilityKey::Gpus, false),
     );
-    assert!(!app.preferences().device_visible(DeviceKind::Gpus));
+    assert!(!app.preferences().device_visible(DeviceVisibilityKey::Gpus));
     apply(&mut app, SettingsChange::NetworkDynamicScaling(false));
     assert!(!app.preferences().network_dynamic_scaling);
     apply(&mut app, SettingsChange::GrayZeroValues(true));

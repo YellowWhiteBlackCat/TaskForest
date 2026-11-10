@@ -417,11 +417,7 @@ fn state_panel_style(theme: &Theme, tone: iced::Color) -> container::Style {
 pub(crate) fn styled_scrollable<'a, Message: 'a>(
     content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
 ) -> iced::widget::Scrollable<'a, Message, iced::Theme, iced::Renderer> {
-    iced::widget::scrollable(content)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            theme::scrollbar(),
-        ))
-        .style(theme::scrollbar_style)
+    scrollable(content, ScrollAxis::Vertical, ScrollScale::Standard)
 }
 
 /// A compact product-styled scrollable for nested cards or tight viewports.
@@ -429,11 +425,49 @@ pub(crate) fn styled_scrollable<'a, Message: 'a>(
 pub(crate) fn styled_compact_scrollable<'a, Message: 'a>(
     content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
 ) -> iced::widget::Scrollable<'a, Message, iced::Theme, iced::Renderer> {
+    scrollable(content, ScrollAxis::Vertical, ScrollScale::Compact)
+}
+
+/// Which bounded viewport owns the overflow. A page declares ONE owner for
+/// its axis; nested owners are only legal when their bounds are independent
+/// (the Performance rail and detail viewport, for example).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ScrollAxis {
+    Vertical,
+    Horizontal,
+}
+
+/// The shared scrollbar geometry class. The compact class lives in tight
+/// nested cards; the standard class owns full-page and chrome strips.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ScrollScale {
+    Standard,
+    Compact,
+}
+
+/// The single Iced scrollable constructor. Direction, scrollbar geometry and
+/// the glass rail style are one decision here, so a page cannot keep a native
+/// scrollbar while its sibling wears the product's capsule glass rail.
+#[must_use]
+pub(crate) fn scrollable<'a, Message: 'a>(
+    content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
+    axis: ScrollAxis,
+    scale: ScrollScale,
+) -> iced::widget::Scrollable<'a, Message, iced::Theme, iced::Renderer> {
+    let (bar, style): (
+        iced::widget::scrollable::Scrollbar,
+        fn(&iced::Theme, iced::widget::scrollable::Status) -> iced::widget::scrollable::Style,
+    ) = match scale {
+        ScrollScale::Standard => (theme::scrollbar(), theme::scrollbar_style),
+        ScrollScale::Compact => (theme::compact_scrollbar(), theme::compact_scrollbar_style),
+    };
+    let direction = match axis {
+        ScrollAxis::Vertical => iced::widget::scrollable::Direction::Vertical(bar),
+        ScrollAxis::Horizontal => iced::widget::scrollable::Direction::Horizontal(bar),
+    };
     iced::widget::scrollable(content)
-        .direction(iced::widget::scrollable::Direction::Vertical(
-            theme::compact_scrollbar(),
-        ))
-        .style(theme::compact_scrollbar_style)
+        .direction(direction)
+        .style(style)
 }
 
 #[cfg(test)]

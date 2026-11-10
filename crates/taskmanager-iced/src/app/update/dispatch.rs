@@ -79,6 +79,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::ProcessMenuAction(_)
         | Message::OpenProcessColumnsMenu
         | Message::CloseProcessColumnsMenu
+        | Message::OpenProcessActionsMenu
+        | Message::CloseProcessActionsMenu
         | Message::ToggleProcessColumn(_)
         | Message::ResetProcessColumns
         | Message::EnvironmentFilterChanged(_)

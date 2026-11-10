@@ -13,6 +13,16 @@ impl IcedApp {
         }
     }
 
+    pub(super) fn open_process_actions_menu(&mut self) {
+        self.open_context_menu(ContextMenu::ProcessActions);
+    }
+
+    pub(super) fn close_process_actions_menu(&mut self) {
+        if self.context_menu_kind() == Some(ContextMenuKind::ProcessActions) {
+            self.dismiss_context_menu();
+        }
+    }
+
     pub(super) fn toggle_process_column(&mut self, column: SortCol) {
         // Hideability is contract truth (PROCESS_COLUMNS): the identity
         // column is not hideable, so its toggle is a no-op. This is a

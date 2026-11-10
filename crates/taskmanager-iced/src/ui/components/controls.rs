@@ -10,14 +10,19 @@
 
 mod activation;
 mod layout;
+mod material;
 #[path = "controls/spinner.rs"]
 mod spinner_module;
-mod state;
+pub(crate) mod state;
 mod strip;
 mod text;
 
 pub(crate) use activation::{check_box, glass_button, icon_button, pill};
 pub(crate) use layout::{label, section_header, toolbar};
+pub(crate) use material::{
+    focusable_control_button_intrinsic, focusable_control_button_owned,
+    focusable_icon_label_button_intrinsic,
+};
 pub(crate) use spinner_module::spinner;
 pub(crate) use state::ButtonTone;
 pub(crate) use strip::bounded_toolbar;

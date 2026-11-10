@@ -415,41 +415,6 @@ pub fn row_style(theme: &Theme, selected: bool, zebra: bool) -> container::Style
     }
 }
 
-/// Accent-filled action button (primary actions, destructive variants).
-#[must_use]
-pub fn button_style(theme: &Theme, destructive: bool) -> button::Style {
-    button_style_status(theme, destructive, button::Status::Active)
-}
-
-/// The primary button's accent-gradient background: the shared
-/// `gradient_from`→`gradient_to` token pair as a 180° (top→bottom) linear
-/// gradient — the same Mission-Center primary-button wash the GPUI component
-/// layer renders. Iced paints quad gradients natively on BOTH renderers (the
-/// wgpu instance pipeline; tiny-skia converts to a real linear gradient), so
-/// this needs no self-drawn approximation. Pointer states blend BOTH stops
-/// exactly as the solid fill blended, keeping every state token-derived
-/// (ADR-017: no color literals).
-#[must_use]
-pub fn accent_gradient(theme: &Theme, status: button::Status) -> iced::Background {
-    let palette = theme.palette();
-    let (from, to) = match status {
-        button::Status::Hovered => (
-            mix(palette.gradient_from, palette.hover, 0.28),
-            mix(palette.gradient_to, palette.hover, 0.28),
-        ),
-        button::Status::Pressed => (
-            mix(palette.gradient_from, Color::BLACK, 0.22),
-            mix(palette.gradient_to, Color::BLACK, 0.22),
-        ),
-        _ => (palette.gradient_from, palette.gradient_to),
-    };
-    iced::Background::Gradient(iced::Gradient::Linear(
-        iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
-            .add_stop(0.0, color(from))
-            .add_stop(1.0, color(to)),
-    ))
-}
-
 /// The focus-ring stroke width (2px, inside the shared 1.5–2px focus-ring
 /// contract the GPUI component layer draws).
 pub const FOCUS_RING_WIDTH: f32 = 2.0;
@@ -475,64 +440,6 @@ pub fn focus_ring_color(theme: &Theme, destructive: bool) -> iced::Color {
     };
     ring.a = if theme.focus_visible() { 1.0 } else { 0.0 };
     ring
-}
-
-/// Accent-filled action button with pointer-state variants. The primary
-/// (non-destructive) variant wears the accent gradient; the destructive
-/// variant keeps the solid danger fill so irreversible actions read flat,
-/// never decorative.
-#[must_use]
-pub fn button_style_status(
-    theme: &Theme,
-    destructive: bool,
-    status: button::Status,
-) -> button::Style {
-    let palette = theme.palette();
-    let background = if destructive {
-        let fill = match status {
-            button::Status::Hovered => mix(palette.danger, palette.hover, 0.28),
-            button::Status::Pressed => mix(palette.danger, Color::BLACK, 0.22),
-            _ => palette.danger,
-        };
-        iced::Background::Color(color(fill))
-    } else {
-        accent_gradient(theme, status)
-    };
-    button::Style {
-        background: Some(background),
-        text_color: color(theme.accent_text),
-        border: iced::Border {
-            color: iced::Color::TRANSPARENT,
-            width: 0.0,
-            radius: scaled_radius(theme, palette.control_radius).into(),
-        },
-        ..button::Style::default()
-    }
-}
-
-/// Quiet surface button (toolbar / secondary actions): transparent fill, the
-/// skin's border, and a token hover/pressed fill. The text color stays the
-/// skin foreground so these read as secondary next to accent-filled actions.
-#[must_use]
-pub fn ghost_button_style(theme: &Theme, status: button::Status) -> button::Style {
-    let palette = theme.palette();
-    let background = match status {
-        button::Status::Hovered => Some(color(palette.hover).into()),
-        button::Status::Pressed => {
-            Some(color(mix(palette.hover, palette.window_backdrop, 0.45)).into())
-        }
-        _ => None,
-    };
-    button::Style {
-        background,
-        text_color: color(palette.fg),
-        border: iced::Border {
-            color: color(palette.border),
-            width: 1.0,
-            radius: scaled_radius(theme, palette.control_radius).into(),
-        },
-        ..button::Style::default()
-    }
 }
 
 /// Performance device-rail card surface: transparent at idle, the token hover
@@ -673,53 +580,59 @@ pub fn table_column_spacing() -> f32 {
     f32::from(tokens::SPACE_8)
 }
 
-/// Standard scrollbar for full-page and inventory views (BEVY/GPUI parity):
-/// 6.0px width, 2.0px margin from outer edge, 2.0px spacing.
-/// Floating, capsule-proportioned layout affordance.
+/// Scrollbar geometry classes. The numbers are layout tokens, not a second
+/// design palette: `SPACE_6`/`SPACE_2` are the standard capsule and
+/// `SPACE_4`/`SPACE_1` are the compact nested-card capsule.
 #[must_use]
 pub fn scrollbar() -> scrollable::Scrollbar {
     scrollable::Scrollbar::new()
-        .width(6.0)
-        .scroller_width(6.0)
-        .margin(2.0)
-        .spacing(2.0)
+        .width(f32::from(tokens::SPACE_6))
+        .scroller_width(f32::from(tokens::SPACE_6))
+        .margin(f32::from(tokens::SPACE_2))
+        .spacing(f32::from(tokens::SPACE_2))
 }
 
-/// Compact scrollbar for nested cards (Performance panels, small embedded lists):
-/// 4.0px width, 1.0px margin, 1.0px spacing.
 #[must_use]
 pub fn compact_scrollbar() -> scrollable::Scrollbar {
     scrollable::Scrollbar::new()
-        .width(4.0)
-        .scroller_width(4.0)
-        .margin(1.0)
-        .spacing(1.0)
+        .width(f32::from(tokens::SPACE_4))
+        .scroller_width(f32::from(tokens::SPACE_4))
+        .margin(f32::from(tokens::SPACE_1))
+        .spacing(f32::from(tokens::SPACE_1))
 }
 
-/// Product-owned scrollable style: translucent floating track + capsule thumb.
-/// Fully token-derived, matching the Bevy UI and GPUI component layers.
+/// Product-owned scrollable style: the shared Card glass edge and shadow
+/// projection, with the glass rail fill and capsule thumb. The rail reads the
+/// Iced theme's semantic text color (the same conversion `iced_theme` owns),
+/// so light, dark and high-contrast skins keep one material.
 #[must_use]
 pub fn scrollbar_style(theme: &iced::Theme, status: scrollable::Status) -> scrollable::Style {
-    build_scrollbar_style(theme, status, 3.0, 0.08, 0.38)
+    build_scrollbar_style(theme, status, 3.0)
 }
 
-/// Compact scrollable style with tighter capsule radii for dense card viewports.
 #[must_use]
 pub fn compact_scrollbar_style(
     theme: &iced::Theme,
     status: scrollable::Status,
 ) -> scrollable::Style {
-    build_scrollbar_style(theme, status, 2.0, 0.08, 0.38)
+    build_scrollbar_style(theme, status, 2.0)
 }
 
 fn build_scrollbar_style(
     theme: &iced::Theme,
     status: scrollable::Status,
     radius: f32,
-    rail_alpha: f32,
-    thumb_alpha: f32,
 ) -> scrollable::Style {
-    let palette = theme.palette();
+    let ink = theme.palette().text;
+    // The live Iced theme is itself the product's token conversion (see
+    // `iced_theme`); its extended palette is derived from those semantic
+    // tokens, so the glass edge follows light/dark/high-contrast without a
+    // second color table. The alpha weights are the rail's presentation
+    // bindings, not a design-token fork.
+    let edge = theme.extended_palette().background.neutral.color;
+    let edge_width = f32::from(tokens::SPACE_1);
+    let rail_alpha = 0.08;
+    let thumb_alpha = 0.38;
     let (is_v_disabled, is_h_disabled, is_v_interacted, is_h_interacted) = match status {
         scrollable::Status::Active {
             is_vertical_scrollbar_disabled,
@@ -754,27 +667,10 @@ fn build_scrollbar_style(
         ),
     };
 
-    let v_thumb_alpha = if is_v_interacted {
-        (thumb_alpha * 1.5).min(0.75)
-    } else {
-        thumb_alpha
-    };
-    let v_rail_alpha = if is_v_interacted {
-        (rail_alpha * 1.6).min(0.20)
-    } else {
-        rail_alpha
-    };
-
-    let h_thumb_alpha = if is_h_interacted {
-        (thumb_alpha * 1.5).min(0.75)
-    } else {
-        thumb_alpha
-    };
-    let h_rail_alpha = if is_h_interacted {
-        (rail_alpha * 1.6).min(0.20)
-    } else {
-        rail_alpha
-    };
+    let v_thumb_alpha = interacted_alpha(is_v_interacted, thumb_alpha);
+    let v_rail_alpha = interacted_alpha(is_v_interacted, rail_alpha);
+    let h_thumb_alpha = interacted_alpha(is_h_interacted, thumb_alpha);
+    let h_rail_alpha = interacted_alpha(is_h_interacted, rail_alpha);
 
     let v_rail = scrollable::Rail {
         background: if is_v_disabled {
@@ -782,12 +678,13 @@ fn build_scrollbar_style(
         } else {
             Some(iced::Background::Color(iced::Color {
                 a: v_rail_alpha,
-                ..palette.text
+                ..ink
             }))
         },
         border: iced::Border {
+            color: edge,
+            width: edge_width,
             radius: radius.into(),
-            ..iced::Border::default()
         },
         scroller: scrollable::Scroller {
             background: if is_v_disabled {
@@ -795,12 +692,13 @@ fn build_scrollbar_style(
             } else {
                 iced::Background::Color(iced::Color {
                     a: v_thumb_alpha,
-                    ..palette.text
+                    ..ink
                 })
             },
             border: iced::Border {
+                color: edge,
+                width: edge_width,
                 radius: radius.into(),
-                ..iced::Border::default()
             },
         },
     };
@@ -811,12 +709,13 @@ fn build_scrollbar_style(
         } else {
             Some(iced::Background::Color(iced::Color {
                 a: h_rail_alpha,
-                ..palette.text
+                ..ink
             }))
         },
         border: iced::Border {
+            color: edge,
+            width: edge_width,
             radius: radius.into(),
-            ..iced::Border::default()
         },
         scroller: scrollable::Scroller {
             background: if is_h_disabled {
@@ -824,12 +723,13 @@ fn build_scrollbar_style(
             } else {
                 iced::Background::Color(iced::Color {
                     a: h_thumb_alpha,
-                    ..palette.text
+                    ..ink
                 })
             },
             border: iced::Border {
+                color: edge,
+                width: edge_width,
                 radius: radius.into(),
-                ..iced::Border::default()
             },
         },
     };
@@ -840,6 +740,14 @@ fn build_scrollbar_style(
         horizontal_rail: h_rail,
         gap: None,
         auto_scroll: scrollable::default(theme, status).auto_scroll,
+    }
+}
+
+fn interacted_alpha(interacted: bool, rest: f32) -> f32 {
+    if interacted {
+        (rest * 1.6).min(0.75)
+    } else {
+        rest
     }
 }
 

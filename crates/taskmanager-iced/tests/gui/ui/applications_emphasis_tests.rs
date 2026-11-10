@@ -4,11 +4,11 @@
 //! "not responding" state.
 
 use super::*;
-use iced::widget::button;
 use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::fixture::{ProjectionSeedFact, demo_app, seed_projection_fact};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_theme::Theme;
+use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 /// A process in the platform's typed "not responding" state (the core's
 /// uninterruptible wait) and a healthy one.
@@ -95,7 +95,12 @@ fn the_destructive_emphasis_paints_the_theme_danger_token() {
     let danger = crate::theme_binding::color(theme.palette().danger);
     let accent = crate::theme_binding::color(theme.palette().accent);
 
-    let destructive = crate::theme::button_style_status(&theme, true, button::Status::Active);
+    let destructive = crate::ui::components::controls::state::button_style(
+        &theme,
+        ControlRole::Button,
+        crate::ui::components::ButtonTone::Danger,
+        crate::ui::components::controls::state::ControlPaintState::Active,
+    );
     let Some(iced::Background::Color(destructive_fill)) = destructive.background else {
         panic!("the destructive button paints a solid fill");
     };
@@ -108,8 +113,17 @@ fn the_destructive_emphasis_paints_the_theme_danger_token() {
         "the destructive fill must not be the ordinary accent"
     );
 
-    let ordinary = crate::theme::button_style_status(&theme, false, button::Status::Active);
-    let Some(iced::Background::Gradient(_)) = ordinary.background else {
-        panic!("the ordinary button paints the accent gradient");
+    let ordinary = crate::ui::components::controls::state::button_style(
+        &theme,
+        ControlRole::Button,
+        crate::ui::components::ButtonTone::Primary,
+        crate::ui::components::controls::state::ControlPaintState::Active,
+    );
+    let Some(iced::Background::Color(ordinary_fill)) = ordinary.background else {
+        panic!("the ordinary button paints the accent fill");
     };
+    assert_eq!(
+        ordinary_fill, accent,
+        "the ordinary button wears the theme's accent ink"
+    );
 }

@@ -133,6 +133,7 @@ pub(crate) enum ContextMenuKind {
     Service,
     Startup,
     ProcessColumns,
+    ProcessActions,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,6 +154,9 @@ pub(crate) enum ContextMenu {
         entry: StartupEntry,
     },
     ProcessColumns,
+    /// The Applications action-bar overflow: the actions that do not fit as
+    /// complete groups on the action strip.
+    ProcessActions,
 }
 
 impl ContextMenu {
@@ -163,6 +167,7 @@ impl ContextMenu {
             Self::Service { .. } => ContextMenuKind::Service,
             Self::Startup { .. } => ContextMenuKind::Startup,
             Self::ProcessColumns => ContextMenuKind::ProcessColumns,
+            Self::ProcessActions => ContextMenuKind::ProcessActions,
         }
     }
 }
@@ -386,6 +391,10 @@ impl IcedApp {
 
     pub(crate) fn process_columns_menu_open(&self) -> bool {
         matches!(self.context_menu(), Some(ContextMenu::ProcessColumns))
+    }
+
+    pub(crate) fn process_actions_menu_open(&self) -> bool {
+        matches!(self.context_menu(), Some(ContextMenu::ProcessActions))
     }
 
     pub(super) fn open_local_surface(&mut self, surface: LocalSurface) {

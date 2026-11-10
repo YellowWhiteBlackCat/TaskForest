@@ -9,11 +9,13 @@ use super::*;
 use crate::app::IcedApp;
 use crate::text_metrics::measured_text_width;
 use iced::advanced::layout::{Layout, Limits, Node};
+use iced::advanced::overlay::Nested;
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Id, Operation, Tree};
-use iced::{Element, Rectangle, Size};
+use iced::{Element, Rectangle, Size, Vector};
 use taskmanager_assets::embedded_fonts;
+use taskmanager_shell::presentation::priority_tier_label;
 use taskmanager_theme::tokens::{FONT_CAPTION, SPACE_8};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -84,19 +86,46 @@ fn priority_select_bounds(page: &PageWidgets) -> Rectangle {
     *bounds
 }
 
-fn render_page(size: Size) -> PageWidgets {
-    let app = IcedApp::demo();
+/// One Applications page: the base tree and the mounted overlay tree.
+///
+/// The priority preset lives in the anchored Actions overflow panel, so the
+/// select is mounted in the OVERLAY layer — the same layer the column
+/// chooser and every other anchored panel uses. Measuring only the base
+/// tree would prove the panel is absent, not that the control is broken.
+struct PageTrees {
+    base: PageWidgets,
+    overlay: PageWidgets,
+}
+
+fn render_page(size: Size) -> PageTrees {
+    let mut app = IcedApp::demo();
+    // The priority preset lives in the anchored Actions overflow panel in
+    // the current action-bar layout; open that typed surface so the test
+    // measures the mounted select instead of a stale toolbar position.
+    let _ = app.update(Message::OpenProcessActionsMenu);
+    let renderer = renderer();
     let mut element: TestElement<'_> = applications_page(&app);
     let mut tree = Tree::new(&element);
-    let node: Node =
-        element
-            .as_widget_mut()
-            .layout(&mut tree, &renderer(), &Limits::new(Size::ZERO, size));
-    let mut operation = PageWidgets::default();
+    let node: Node = element
+        .as_widget_mut()
+        .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+    let mut base = PageWidgets::default();
     element
         .as_widget_mut()
-        .operate(&mut tree, Layout::new(&node), &renderer(), &mut operation);
-    operation
+        .operate(&mut tree, Layout::new(&node), &renderer, &mut base);
+    let mut overlay = PageWidgets::default();
+    if let Some(mounted) = element.as_widget_mut().overlay(
+        &mut tree,
+        Layout::new(&node),
+        &renderer,
+        &Rectangle::with_size(size),
+        Vector::ZERO,
+    ) {
+        let mut nested = Nested::new(mounted);
+        let overlay_node = nested.layout(&renderer, size);
+        nested.operate(Layout::new(&overlay_node), &renderer, &mut overlay);
+    }
+    PageTrees { base, overlay }
 }
 
 /// The priority preset rides the shared select: the page registers the
@@ -107,10 +136,10 @@ fn the_priority_preset_rides_the_shared_select_component() {
     let page = render_page(Size::new(1180.0, 780.0));
 
     assert!(
-        page.focus_ids.contains(&priority_id()),
+        page.overlay.focus_ids.contains(&priority_id()),
         "the priority preset must be a real focus stop on the shared select"
     );
-    let bounds = priority_select_bounds(&page);
+    let bounds = priority_select_bounds(&page.overlay);
     let theme = Theme::build(
         Skin::Gnome,
         LightDark::Dark,
@@ -123,11 +152,11 @@ fn the_priority_preset_rides_the_shared_select_component() {
         "the shared select must own a real, visible rectangle: {bounds:?}"
     );
     assert!(
-        page.scroll_viewports
+        page.base.scroll_viewports
             .iter()
             .any(|(viewport, _)| viewport.height >= extent - 0.001),
         "the action strip must own the shared ControlRole extent: {extent} vs {:?}",
-        page.scroll_viewports
+        page.base.scroll_viewports
     );
     let priority_group_width = priority_group_width(&theme);
     assert!(
@@ -135,15 +164,16 @@ fn the_priority_preset_rides_the_shared_select_component() {
         "the priority trigger must keep its measured caption+placeholder slot: {bounds:?} vs {priority_group_width}"
     );
     assert!(
-        page.scroll_viewports
+        page.base.scroll_viewports
             .iter()
             .any(|(viewport, content)| content.width > viewport.width
                 && content.width >= bounds.x + bounds.width - viewport.x),
         "the full action vocabulary must own a real horizontal scroll viewport: {:?}",
-        page.scroll_viewports
+        page.base.scroll_viewports
     );
 
     let rendered: Vec<&str> = page
+        .overlay
         .text
         .iter()
         .map(|(fragment, _)| fragment.as_str())
@@ -152,26 +182,31 @@ fn the_priority_preset_rides_the_shared_select_component() {
         rendered
             .iter()
             .any(|fragment| fragment.contains("Priority")),
-        "the action bar must show the localized priority caption: {rendered:?}"
+        "the overflow panel must show the localized priority caption: {rendered:?}"
     );
     assert!(
         rendered
             .iter()
             .any(|fragment| fragment.contains("Delete confirms")),
-        "the shared action hint must remain visible: {rendered:?}"
+        "the shared action hint must remain visible in the panel: {rendered:?}"
     );
 
     // The options carry the shared priority-tier vocabulary, so the same
     // labels the GPUI action menu publishes are the ones Iced offers.
-    let labels: Vec<String> = PriorityChoice::ALL
-        .iter()
-        .map(|choice| choice.to_string())
-        .collect();
-    assert_eq!(labels.len(), PriorityChoice::ALL.len());
+    let options = PriorityOption::all();
+    let labels: Vec<String> = options.iter().map(|option| option.to_string()).collect();
+    assert_eq!(labels.len(), options.len());
     assert!(
         labels.iter().all(|label| !label.is_empty()),
         "every priority option must resolve a shared label: {labels:?}"
     );
+    for (option, label) in options.iter().zip(labels.iter()) {
+        assert_eq!(
+            *label,
+            priority_tier_label(option.tier),
+            "each option label resolves through the shell's one wording fold"
+        );
+    }
 }
 
 /// The compact frame keeps the same shared focus stop: the control stays
@@ -180,20 +215,20 @@ fn the_priority_preset_rides_the_shared_select_component() {
 fn the_priority_preset_stays_reachable_in_the_compact_frame() {
     let page = render_page(Size::new(720.0, 480.0));
     assert!(
-        page.focus_ids.contains(&priority_id()),
+        page.overlay.focus_ids.contains(&priority_id()),
         "the compact frame must keep the shared priority focus stop"
     );
-    let bounds = priority_select_bounds(&page);
+    let bounds = priority_select_bounds(&page.overlay);
     assert!(
         bounds.width > 0.0 && bounds.height > 0.0,
         "the compact frame must keep the shared select measurable: {bounds:?}"
     );
     assert!(
-        page.scroll_viewports
+        page.base.scroll_viewports
             .iter()
             .any(|(viewport, content)| content.width > viewport.width),
         "the compact frame must keep the action strip horizontally scrollable: {:?}",
-        page.scroll_viewports
+        page.base.scroll_viewports
     );
 }
 

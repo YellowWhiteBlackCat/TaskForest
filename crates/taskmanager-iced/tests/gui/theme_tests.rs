@@ -89,27 +89,6 @@ fn color_conversion_is_channel_exact() {
 }
 
 #[test]
-fn panel_and_button_styles_read_theme_tokens() {
-    let theme = Theme::dark();
-    let panel = panel_style(&theme);
-    assert_eq!(panel.background, Some(glass_fill(&theme, GlassTier::Card)));
-    assert_eq!(panel.border.color, color(theme.glass_card().edge));
-    // The primary button wears the shared accent-gradient token pair (the
-    // same wash the GPUI component layer renders); the destructive variant
-    // keeps the flat danger fill.
-    let primary = button_style(&theme, false);
-    assert_eq!(
-        primary.background,
-        Some(accent_gradient(&theme, button::Status::Active))
-    );
-    let destructive = button_style(&theme, true);
-    assert_eq!(
-        destructive.background,
-        Some(color(theme.palette().danger).into())
-    );
-}
-
-#[test]
 fn performance_rail_and_controls_scale_the_theme_radii() {
     for skin in Skin::ALL {
         let theme = Theme::build(
@@ -130,10 +109,15 @@ fn performance_rail_and_controls_scale_the_theme_radii() {
         assert_eq!(chart.border, rail.border);
         assert!((progress_style(&theme).border.radius.top_left - control).abs() < 1e-4);
         assert!(
-            (ghost_button_style(&theme, button::Status::Active)
-                .border
-                .radius
-                .top_left
+            (crate::ui::components::controls::state::button_style(
+                &theme,
+                ControlRole::Button,
+                crate::ui::components::ButtonTone::Secondary,
+                crate::ui::components::controls::state::ControlPaintState::Active,
+            )
+            .border
+            .radius
+            .top_left
                 - control)
                 .abs()
                 < 1e-4
@@ -159,62 +143,6 @@ fn navigation_chrome_uses_the_sidebar_glass_tier() {
                 .with_alpha(combined_shadow_alpha(theme.glass_chrome().shadow.a, 0.45,))
         )
     );
-}
-
-#[test]
-fn button_states_stay_token_derived() {
-    let theme = Theme::dark();
-    let palette = theme.palette();
-    let hovered = button_style_status(&theme, false, button::Status::Hovered);
-    let pressed = button_style_status(&theme, false, button::Status::Pressed);
-    let active = button_style_status(&theme, false, button::Status::Active);
-
-    // The active gradient is the 180° (top→bottom) sweep of the two shared
-    // accent-gradient tokens — verified stop by stop, not by calling back
-    // into the same builder.
-    let iced::Background::Gradient(iced::Gradient::Linear(active_linear)) =
-        active.background.expect("primary button has a background")
-    else {
-        panic!("primary button background must be the accent gradient");
-    };
-    assert_eq!(active_linear.angle, iced::Radians(std::f32::consts::PI));
-    let active_stops: Vec<(f32, iced::Color)> = active_linear
-        .stops
-        .iter()
-        .flatten()
-        .map(|stop| (stop.offset, stop.color))
-        .collect();
-    assert_eq!(
-        active_stops,
-        vec![
-            (0.0, color(palette.gradient_from)),
-            (1.0, color(palette.gradient_to)),
-        ],
-        "gradient stops come from the shared token pair"
-    );
-
-    // Pointer states blend BOTH stops with the same token mixes the solid
-    // fill used (ADR-017: token-derived, never literals).
-    let expected_hover = iced::Background::Gradient(iced::Gradient::Linear(
-        iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
-            .add_stop(0.0, color(mix(palette.gradient_from, palette.hover, 0.28)))
-            .add_stop(1.0, color(mix(palette.gradient_to, palette.hover, 0.28))),
-    ));
-    assert_eq!(hovered.background, Some(expected_hover));
-    let expected_pressed = iced::Background::Gradient(iced::Gradient::Linear(
-        iced::gradient::Linear::new(iced::Radians(std::f32::consts::PI))
-            .add_stop(0.0, color(mix(palette.gradient_from, Color::BLACK, 0.22)))
-            .add_stop(1.0, color(mix(palette.gradient_to, Color::BLACK, 0.22))),
-    ));
-    assert_eq!(pressed.background, Some(expected_pressed));
-
-    let ghost = ghost_button_style(&theme, button::Status::Active);
-    assert_eq!(ghost.background, None);
-    assert_eq!(ghost.text_color, color(palette.fg));
-    let ghost_hovered = ghost_button_style(&theme, button::Status::Hovered);
-    assert_eq!(ghost_hovered.background, Some(color(palette.hover).into()));
-    // The ghost border is the skin border token, never a literal.
-    assert_eq!(ghost.border.color, color(palette.border));
 }
 
 #[test]

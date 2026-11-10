@@ -1,13 +1,18 @@
 //! Frontend-local settings types: the persisted-token mutation enum, the
-//! color-scheme choice, the device-visibility toggle vocabulary, and the
-//! re-exports of the shared process-details section vocabulary. These are
-//! renderer-local vocabulary the shared shell never sees (ADR-027),
-//! extracted from [`super`] so the state module stays under the repository's
-//! source-size budget.
+//! color-scheme choice, and the re-exports of the shared process-details
+//! section vocabulary. These are renderer-local vocabulary the shared shell
+//! never sees (ADR-027), extracted from [`super`] so the state module stays
+//! under the repository's source-size budget.
+//!
+//! The device-visibility toggle vocabulary is NOT local: the ten category
+//! switches are a product fact owned by
+//! `taskforest_core::core::config::DeviceVisibilityKey`, so this crate
+//! spends that owner instead of declaring its own list.
 
 use taskmanager_theme::tokens::{MotionPolicy, UiSize};
 use taskmanager_theme::{FontChoice, ModePreference, Skin};
 
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::i18n::Language;
 
 /// One settings mutation: the persisted token change plus the resolved theme
@@ -46,7 +51,7 @@ pub enum SettingsChange {
     NetworkDynamicScaling(bool),
     /// Show or hide one Performance-page device family (persisted, GPUI
     /// parity). Hiding a device removes it from the device rail.
-    ShowDevice(DeviceKind, bool),
+    ShowDevice(DeviceVisibilityKey, bool),
     /// Text-rendering token; only the empty platform-default token is currently
     /// supported by the Iced renderer.
     TextRendering(&'static str),
@@ -68,56 +73,4 @@ pub enum SettingsChange {
     /// Quiet-hours end hour (0..=23); equal start/end = no quiet hours.
     QuietHoursEnd(u8),
     Language(Language),
-}
-
-/// One Performance-page device family toggle (GPUI Settings `devices` group).
-/// The network sub-classes resolve onto `NetworkMetrics::adapter_type`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeviceKind {
-    Cpu,
-    Memory,
-    Disks,
-    Network,
-    NetworkWired,
-    NetworkWireless,
-    NetworkVpn,
-    NetworkVirtual,
-    NetworkOther,
-    Gpus,
-}
-
-impl DeviceKind {
-    /// Every device toggle, in Settings row order (the anti-报菜名 rule: the
-    /// settings view, the config projection and the tests iterate this list).
-    pub const ALL: [Self; 10] = [
-        Self::Cpu,
-        Self::Memory,
-        Self::Disks,
-        Self::Network,
-        Self::NetworkWired,
-        Self::NetworkWireless,
-        Self::NetworkVpn,
-        Self::NetworkVirtual,
-        Self::NetworkOther,
-        Self::Gpus,
-    ];
-
-    /// Stable non-localized identifier for the settings chooser section
-    /// (`FocusTarget::SettingsChoice`), mirroring the GPUI switch ids
-    /// (`device-cpu`, `network-wired`, …).
-    #[must_use]
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::Cpu => "device-cpu",
-            Self::Memory => "device-memory",
-            Self::Disks => "device-disks",
-            Self::Network => "device-network",
-            Self::NetworkWired => "network-wired",
-            Self::NetworkWireless => "network-wireless",
-            Self::NetworkVpn => "network-vpn",
-            Self::NetworkVirtual => "network-virtual",
-            Self::NetworkOther => "network-other",
-            Self::Gpus => "device-gpus",
-        }
-    }
 }

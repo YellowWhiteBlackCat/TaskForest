@@ -602,6 +602,9 @@ fi
 if maybe quantity-family-owner; then
     run_stage quantity-family-owner quick run_py scripts/quality/test_quantity_family_owner.py
 fi
+if maybe device-visibility-owner; then
+    run_stage device-visibility-owner quick run_py scripts/quality/test_device_visibility_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

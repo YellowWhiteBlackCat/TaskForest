@@ -9,6 +9,7 @@ use iced::advanced::widget::operation::{Focusable, Operation, TextInput};
 use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, NativeCode, Physical};
 use iced::{Element, Event, Point, Rectangle, Size, Vector, mouse};
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::AppPage;
 use taskmanager_assets::embedded_fonts;
 
@@ -496,7 +497,7 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
         &mut tree,
         &node,
         &renderer,
-        target(DeviceKind::Cpu.key()),
+        target(DeviceVisibilityKey::Cpu.stable_id()),
     );
     let pointer_messages = click_messages(
         &mut element,
@@ -509,21 +510,21 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
     assert!(
         pointer_messages.iter().any(|message| matches!(
             message,
-            Message::SettingsChanged(SettingsChange::ShowDevice(DeviceKind::Cpu, false))
+            Message::SettingsChanged(SettingsChange::ShowDevice(DeviceVisibilityKey::Cpu, false))
         )),
         "pointer activation emits the CPU visibility preference change"
     );
     drop(element);
     apply(&mut app, pointer_messages);
     assert!(
-        !app.preferences().device_visible(DeviceKind::Cpu),
+        !app.preferences().device_visible(DeviceVisibilityKey::Cpu),
         "the IcedApp consumer hides CPU after the pointer action"
     );
 
     let mut element = system_group(app.theme(), app.preferences());
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, viewport);
-    let id = target(DeviceKind::Cpu.key());
+    let id = target(DeviceVisibilityKey::Cpu.stable_id());
     assert!(focus(&mut element, &mut tree, &node, &renderer, id));
     let keyboard_messages = dispatch(
         &mut element,
@@ -537,14 +538,14 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
     assert!(
         keyboard_messages.iter().any(|message| matches!(
             message,
-            Message::SettingsChanged(SettingsChange::ShowDevice(DeviceKind::Cpu, true))
+            Message::SettingsChanged(SettingsChange::ShowDevice(DeviceVisibilityKey::Cpu, true))
         )),
         "Space activation emits the inverse CPU visibility preference"
     );
     drop(element);
     apply(&mut app, keyboard_messages);
     assert!(
-        app.preferences().device_visible(DeviceKind::Cpu),
+        app.preferences().device_visible(DeviceVisibilityKey::Cpu),
         "the IcedApp consumer restores CPU after Space activation"
     );
 

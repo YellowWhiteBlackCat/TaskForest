@@ -14,6 +14,7 @@ use super::focus_state::service_control_focus_target;
 use super::*;
 use crate::test_support::temp_dir;
 use taskforest_core::core::config::Config;
+use taskforest_core::core::config::{DeviceVisibilityKey, DeviceVisibilityPreferences};
 use taskforest_core::core::metrics::CpuMetrics;
 use taskforest_core::core::metrics::CpuScalarObservations;
 use taskforest_core::core::metrics::ScalarObservation;
@@ -510,7 +511,7 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
 
     // Every device-family toggle round-trips (the anti-报菜名 rule: the
     // iteration and the mirror accessor must agree on all ten families).
-    for kind in DeviceKind::ALL {
+    for kind in DeviceVisibilityKey::ALL {
         let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
             kind, false,
         )));
@@ -520,7 +521,7 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
             "{kind:?} must be hidden"
         );
     }
-    for kind in DeviceKind::ALL {
+    for kind in DeviceVisibilityKey::ALL {
         let _ = app.update(Message::SettingsChanged(SettingsChange::ShowDevice(
             kind, true,
         )));
@@ -539,26 +540,19 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
     assert_eq!(reloaded.preferences().graph_data_points, 10);
     assert!(!reloaded.network_dynamic_scaling());
     assert!(reloaded.network_use_bytes());
-    assert!(reloaded.preferences().device_visible(DeviceKind::Gpus));
+    assert!(
+        reloaded
+            .preferences()
+            .device_visible(DeviceVisibilityKey::Gpus)
+    );
 
     drop(reloaded);
     drop(app);
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-fn config_device_visible(config: &Config, kind: DeviceKind) -> bool {
-    match kind {
-        DeviceKind::Cpu => config.show_cpu,
-        DeviceKind::Memory => config.show_memory,
-        DeviceKind::Disks => config.show_disks,
-        DeviceKind::Network => config.show_network,
-        DeviceKind::NetworkWired => config.show_network_wired,
-        DeviceKind::NetworkWireless => config.show_network_wireless,
-        DeviceKind::NetworkVpn => config.show_network_vpn,
-        DeviceKind::NetworkVirtual => config.show_network_virtual,
-        DeviceKind::NetworkOther => config.show_network_other,
-        DeviceKind::Gpus => config.show_gpus,
-    }
+fn config_device_visible(config: &Config, kind: DeviceVisibilityKey) -> bool {
+    DeviceVisibilityPreferences::from_config(config).visible(kind)
 }
 
 #[test]

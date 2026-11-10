@@ -95,6 +95,8 @@ impl IcedApp {
             }
             Message::OpenProcessColumnsMenu => self.open_process_columns_menu(),
             Message::CloseProcessColumnsMenu => self.close_process_columns_menu(),
+            Message::OpenProcessActionsMenu => self.open_process_actions_menu(),
+            Message::CloseProcessActionsMenu => self.close_process_actions_menu(),
             Message::ToggleProcessColumn(column) => self.toggle_process_column(column),
             Message::ResetProcessColumns => self.reset_process_columns(),
             _ => return UpdateDispatch::none(),

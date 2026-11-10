@@ -114,7 +114,7 @@ pub use motion::{ModalAppear, PageNav, WarmupSpin};
 pub use preferences::PresentationPreferences;
 pub use process_menu::ProcessMenuAction;
 pub use service_details::ServiceDetailsSnapshot;
-pub use settings_types::{DeviceKind, SettingsChange};
+pub use settings_types::SettingsChange;
 // Session-local process-table column sizing (drag overrides + the open drag
 // session), reduced by `update::columns`.
 pub(crate) use surface::{
@@ -195,6 +195,10 @@ pub enum Message {
     OpenProcessColumnsMenu,
     /// Close the Applications column-visibility menu.
     CloseProcessColumnsMenu,
+    /// Open the Applications action-bar overflow menu.
+    OpenProcessActionsMenu,
+    /// Close the Applications action-bar overflow menu.
+    CloseProcessActionsMenu,
     /// Toggle one hideable Applications column.
     ToggleProcessColumn(SortCol),
     /// Reset Applications table columns to the default layout: every hideable

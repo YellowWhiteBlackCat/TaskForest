@@ -18,8 +18,9 @@ use iced::widget::{column, text};
 use iced::{Element, Length};
 use taskmanager_theme::{FontAvailability, FontChoice, FontRole, Theme, tokens};
 
-use crate::app::{DeviceKind, FocusTarget, Message, PresentationPreferences, SettingsChange};
+use crate::app::{FocusTarget, Message, PresentationPreferences, SettingsChange};
 use crate::ui::components::{ButtonTone, glass_button, styled_scrollable};
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::i18n::Language;
 
 use super::components::IcedElement;
@@ -350,33 +351,17 @@ fn family_select<'a>(
     )
 }
 
-/// The shared i18n key of one device-visibility row label.
-fn device_label_key(kind: DeviceKind) -> &'static str {
-    match kind {
-        DeviceKind::Cpu => "settings.show_cpu",
-        DeviceKind::Memory => "settings.show_memory",
-        DeviceKind::Disks => "settings.show_disks",
-        DeviceKind::Network => "settings.show_network",
-        DeviceKind::NetworkWired => "settings.show_network_wired",
-        DeviceKind::NetworkWireless => "settings.show_network_wireless",
-        DeviceKind::NetworkVpn => "settings.show_network_vpn",
-        DeviceKind::NetworkVirtual => "settings.show_network_virtual",
-        DeviceKind::NetworkOther => "settings.show_network_other",
-        DeviceKind::Gpus => "settings.show_gpus",
-    }
-}
-
 /// System: device visibility switches, refresh slider, graph options,
 /// zero-value graying, continuous history.
 fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) -> IcedElement<'a> {
     let mut rows: Vec<IcedElement<'a>> = Vec::new();
     rows.push(label(theme_snapshot, t("settings.devices"), true));
-    for kind in DeviceKind::ALL {
+    for kind in DeviceVisibilityKey::ALL {
         rows.push(setting_row(
-            t(device_label_key(kind)),
+            t(kind.i18n_key()),
             switch(
                 *theme_snapshot,
-                target(kind.key()),
+                target(kind.stable_id()),
                 prefs.device_visible(kind),
                 false,
                 move |on| Message::SettingsChanged(SettingsChange::ShowDevice(kind, on)),

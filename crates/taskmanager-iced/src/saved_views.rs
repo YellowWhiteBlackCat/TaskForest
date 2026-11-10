@@ -2,6 +2,7 @@
 
 use crate::app::{FocusTarget, Message};
 use crate::focus;
+use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 use iced::widget::{container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
@@ -101,14 +102,13 @@ pub fn presets_ribbon<'a>(
         // ribbon first and only then captures it, so the horizontal ribbon
         // still scrolls while the table underneath never sees the wheel
         // (ICED-051).
-        let strip =
-            iced::widget::scrollable(row(items).spacing(6).align_y(iced::Alignment::Center))
-                .direction(iced::widget::scrollable::Direction::Horizontal(
-                    crate::theme::scrollbar(),
-                ))
-                .style(crate::theme::scrollbar_style)
-                .height(Length::Fixed(32.0))
-                .width(Length::Fill);
+        let strip = scrollable(
+            row(items).spacing(6).align_y(iced::Alignment::Center),
+            ScrollAxis::Horizontal,
+            ScrollScale::Standard,
+        )
+        .height(Length::Fixed(32.0))
+        .width(Length::Fill);
         crate::ui::saved_views::wheel_guard(strip.into())
     } else {
         container(row(items).spacing(6).align_y(iced::Alignment::Center))

@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::app::{InputScope, Message, SettingsChange};
-use taskforest_core::core::config::Config;
+use taskforest_core::core::config::{Config, DeviceVisibilityKey};
 use taskmanager_application::ConfigStore;
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -32,7 +32,7 @@ fn sidebar_editor_edits_devices_and_rejects_controls_after_removal_or_close() {
             .visible
     );
     app.apply_settings_change(SettingsChange::ShowDevice(
-        crate::app::DeviceKind::Disks,
+        DeviceVisibilityKey::Disks,
         false,
     ));
     let _ = app.update(Message::SetSidebarDeviceVisibility {

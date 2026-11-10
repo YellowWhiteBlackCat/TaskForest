@@ -2,10 +2,14 @@
 //! their unit tests — extracted from [`super`] so `applications.rs` stays under
 //! the source-size budget. Both items are re-exported so the page builder keeps
 //! calling them unqualified.
+//!
+//! The priority vocabulary has one owner: `taskforest_core::core::process`
+//! owns the offered tier set and its order, and
+//! `taskmanager_shell::presentation` owns the tier→label fold. The local
+//! option type carries the core tier; it declares no tier of its own.
 
 use super::*;
-use taskforest_core::core::process::PriorityTier;
-use taskforest_core::core::process::ProcessBatchAction;
+use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_shell::presentation::priority_tier_label;
 use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION, SPACE_8};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -23,41 +27,52 @@ pub(super) fn priority_group_width(theme_snapshot: &Theme) -> f32 {
     caption + placeholder + padding * 2.0 + f32::from(SPACE_8)
 }
 
-/// The three nice-level presets the Applications action bar offers (mirrors the
-/// GPUI batch `SetPriority` high/normal/low projection). A small `Display` +
-/// `Clone` enum so the iced [`pick_list`](iced::widget::pick_list) can render
-/// and dispatch it without a per-option `FocusTarget`.
+/// The priority options the Applications action bar offers.
+///
+/// `taskforest_core::core::process::PriorityTier` owns the offered set and
+/// its order; `taskmanager_shell::presentation::priority_tier_label` owns the
+/// one wording fold. This type is only the thin toolkit adapter the shared
+/// [`pick_list`](iced::widget::pick_list) needs to render a row and dispatch a
+/// choice. It carries the core tier as its payload — it is NOT a second
+/// priority vocabulary — so no frontend can spell a tier set, a label or an
+/// action of its own.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum PriorityChoice {
-    High,
-    Normal,
-    Low,
+pub(super) struct PriorityOption {
+    /// The core tier this option carries. Public to the page module so a
+    /// behavior test can pin the carried tier without a second accessor.
+    pub(super) tier: PriorityTier,
 }
 
-impl PriorityChoice {
-    pub(super) const ALL: [Self; 3] = [Self::High, Self::Normal, Self::Low];
+/// The one static pick-list option set. It is derived from the core's own
+/// `PriorityTier::ALL` through a const fold, so the view tree can borrow a
+/// stable slice without restating the offered ladder or allocating per frame.
+pub(super) const PRIORITY_OPTIONS: [PriorityOption; 3] = PriorityOption::all();
 
-    pub(super) fn action(self) -> ProcessBatchAction {
-        match self {
-            // The typed tier carries the semantics; the platform adapter owns
-            // the tier→native-primitive mapping (mirrors GPUI's action bar
-            // exactly so identical labels never diverge).
-            Self::High => ProcessBatchAction::SetPriority(PriorityTier::High),
-            Self::Normal => ProcessBatchAction::SetPriority(PriorityTier::Normal),
-            Self::Low => ProcessBatchAction::SetPriority(PriorityTier::Low),
+impl PriorityOption {
+    /// The options the core owner publishes, in the core's order.
+    pub(super) const fn all() -> [Self; 3] {
+        let mut options = [Self { tier: PriorityTier::Normal }; 3];
+        let mut index = 0;
+        while index < PriorityTier::ALL.len() {
+            options[index] = Self {
+                tier: PriorityTier::ALL[index],
+            };
+            index += 1;
         }
+        options
+    }
+
+    /// The typed batch action this option publishes.
+    pub(super) const fn action(self) -> ProcessBatchAction {
+        ProcessBatchAction::SetPriority(self.tier)
     }
 }
 
-impl std::fmt::Display for PriorityChoice {
+impl std::fmt::Display for PriorityOption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // The shell owns the tier→label fold (§8.1 同一律).
-        let tier = match self {
-            Self::High => PriorityTier::High,
-            Self::Normal => PriorityTier::Normal,
-            Self::Low => PriorityTier::Low,
-        };
-        write!(f, "{}", priority_tier_label(tier))
+        // The shell owns the tier→label fold; no tier spelling is written
+        // here.
+        write!(f, "{}", priority_tier_label(self.tier))
     }
 }
 

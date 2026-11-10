@@ -6,14 +6,15 @@
 //! resolved through `taskmanager-application::i18n` by the caller.
 
 use iced::advanced::text::IntoFragment;
-use iced::widget::{button, checkbox, container, text};
+use iced::widget::{checkbox, container};
 use iced::{Background, Length};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
-use super::state::{ButtonTone, ControlPaintState, button_style};
+use super::material::{control_button, focusable_control_button};
+use super::state::{ButtonTone, ControlPaintState};
 use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
 use crate::theme;
@@ -30,33 +31,14 @@ pub(crate) fn glass_button<'a>(
     tone: ButtonTone,
     enabled: bool,
 ) -> IcedElement<'a> {
-    let padding = theme::control_padding_x(theme_snapshot, ControlRole::Button);
-    let height = theme::control_extent(theme_snapshot, ControlRole::Button);
-    let mut inner = button(text(label).size(f32::from(tokens::FONT_13)))
-        .padding([0.0, padding])
-        .height(Length::Fixed(height))
-        .style(move |_, status| {
-            button_style(
-                theme_snapshot,
-                ControlRole::Button,
-                tone,
-                ControlPaintState::from_button(status),
-            )
-        });
-    if enabled {
-        inner = inner.on_press(on_press.clone());
-    }
-    FocusableButton::new(
-        focus_id(target),
-        inner.into(),
-        on_press,
+    focusable_control_button(
+        theme_snapshot,
         target,
-        theme::focus_ring_color(theme_snapshot, tone == ButtonTone::Danger),
-        theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
-        false,
+        label,
+        on_press,
+        tone,
+        enabled,
     )
-    .with_enabled(enabled)
-    .into()
 }
 
 /// An icon-only action. The shared `label` is exposed through the same
@@ -74,27 +56,21 @@ pub(crate) fn icon_button<'a>(
 ) -> IcedElement<'a> {
     let extent = theme::control_extent(theme_snapshot, ControlRole::IconButton);
     let glyph = crate::icons::icon(theme_snapshot, icon_id, f32::from(tokens::ICON_INLINE));
-    let mut inner = button(
+    let inner = control_button(
+        *theme_snapshot,
         container(glyph)
             .width(Length::Fixed(extent))
             .height(Length::Fixed(extent))
             .center_x(Length::Fixed(extent))
-            .center_y(Length::Fixed(extent)),
+            .center_y(Length::Fixed(extent))
+            .into(),
+        ControlRole::IconButton,
+        ButtonTone::Secondary,
+        enabled.then_some(on_press.clone()),
     )
     .padding(0.0)
     .width(Length::Fixed(extent))
-    .height(Length::Fixed(extent))
-    .style(move |_, status| {
-        button_style(
-            theme_snapshot,
-            ControlRole::IconButton,
-            ButtonTone::Secondary,
-            ControlPaintState::from_button(status),
-        )
-    });
-    if enabled {
-        inner = inner.on_press(on_press.clone());
-    }
+    .height(Length::Fixed(extent));
     let activation: IcedElement<'a> = FocusableButton::new(
         focus_id(target),
         inner.into(),

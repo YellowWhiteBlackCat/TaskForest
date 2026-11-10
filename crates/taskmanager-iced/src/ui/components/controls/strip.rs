@@ -8,12 +8,12 @@
 //! vertical space and the right edge never shows a half group.
 
 use iced::Length;
-use iced::widget::scrollable::Direction;
-use iced::widget::{row, scrollable};
+use iced::widget::row;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
+use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 use crate::ui::components::IcedElement;
 
 /// One bounded horizontal viewport around complete action groups.
@@ -34,9 +34,7 @@ pub(crate) fn bounded_toolbar<'a>(
         .spacing(f32::from(tokens::SPACE_8))
         .align_y(iced::Alignment::Center)
         .width(Length::Shrink);
-    scrollable(band)
-        .direction(Direction::Horizontal(crate::theme::scrollbar()))
-        .style(crate::theme::scrollbar_style)
+    scrollable(band, ScrollAxis::Horizontal, ScrollScale::Standard)
         .height(Length::Fixed(extent))
         .width(Length::Fill)
         .into()

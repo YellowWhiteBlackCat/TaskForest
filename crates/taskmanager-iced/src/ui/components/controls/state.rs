@@ -111,10 +111,15 @@ pub(crate) fn button_style(
             .text_color
             .unwrap_or_else(|| crate::theme_binding::color(palette.fg)),
     };
+    let mut border = glass.border;
+    // The control family's corner radius is the CONTROL radius tier (the
+    // same one the GPUI button/input primitives paint), not the panel tier
+    // the shared card glass carries.
+    border.radius = theme::scaled_radius(theme, palette.control_radius).into();
     button::Style {
         background: Some(background),
         text_color,
-        border: glass.border,
+        border,
         shadow: glass.shadow,
         snap: true,
     }

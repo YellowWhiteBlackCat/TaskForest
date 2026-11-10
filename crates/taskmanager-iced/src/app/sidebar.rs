@@ -1,10 +1,10 @@
 //! Concrete device preferences over the shared configuration authority.
 
 use super::{IcedApp, LocalSurfaceKind, PerfDevice};
-use taskforest_core::core::config::sidebar::{
-    move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override,
+use taskforest_core::core::config::{
+    DeviceVisibilityKey, DeviceVisibilityPreferences,
+    sidebar::{move_sidebar_order, ordered_indices, set_sidebar_override, visible_with_override},
 };
-use taskforest_core::core::metrics::NetworkAdapterType;
 use taskforest_core::core::sensors::SensorQuantity;
 use taskmanager_application::i18n::t;
 
@@ -19,6 +19,7 @@ pub(crate) struct SidebarEntry {
 impl IcedApp {
     pub(crate) fn sidebar_entries(&self) -> Vec<SidebarEntry> {
         let config = self.configuration.draft();
+        let devices = DeviceVisibilityPreferences::from_config(config);
         let mut entries = Vec::new();
         let mut add = |key: String, device, label, category| {
             entries.push(SidebarEntry {
@@ -32,13 +33,13 @@ impl IcedApp {
             "cpu".into(),
             PerfDevice::Cpu,
             t("common.cpu").into(),
-            config.show_cpu,
+            devices.visible(DeviceVisibilityKey::Cpu),
         );
         add(
             "memory".into(),
             PerfDevice::Memory,
             t("common.memory").into(),
-            config.show_memory,
+            devices.visible(DeviceVisibilityKey::Memory),
         );
         let projection = self.shell.projection();
         if let Some(snapshot) = &projection.snapshot {
@@ -47,20 +48,11 @@ impl IcedApp {
                     format!("disk:{}", disk.device_id),
                     PerfDevice::Disk(index),
                     disk.name.clone(),
-                    config.show_disks,
+                    devices.visible(DeviceVisibilityKey::Disks),
                 );
             }
             for (index, network) in snapshot.networks.iter().enumerate() {
-                let category = config.show_network
-                    && match network.adapter_type() {
-                        NetworkAdapterType::Ethernet => config.show_network_wired,
-                        NetworkAdapterType::WiFi => config.show_network_wireless,
-                        NetworkAdapterType::Vpn => config.show_network_vpn,
-                        NetworkAdapterType::Virtual => config.show_network_virtual,
-                        NetworkAdapterType::Unknown
-                        | NetworkAdapterType::Loopback
-                        | NetworkAdapterType::Other => config.show_network_other,
-                    };
+                let category = devices.network_visible(network.adapter_type());
                 add(
                     format!("network:{}", network.device_id),
                     PerfDevice::Network(index),
@@ -73,7 +65,7 @@ impl IcedApp {
                     format!("gpu:{}", gpu.device_id),
                     PerfDevice::Gpu(index),
                     gpu.marketing_name.as_ref().unwrap_or(&gpu.brand).clone(),
-                    config.show_gpus,
+                    devices.visible(DeviceVisibilityKey::Gpus),
                 );
             }
         }

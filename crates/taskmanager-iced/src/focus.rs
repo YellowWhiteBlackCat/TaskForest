@@ -8,7 +8,6 @@
 
 use iced::Element;
 use taskmanager_application::i18n::t;
-use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::{FocusTarget, Message};
@@ -52,6 +51,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::SearchClose => "iced-search-close".to_owned(),
         FocusTarget::ProcessColumnsTrigger => "iced-process-columns-trigger".to_owned(),
         FocusTarget::ProcessPrioritySelect => "iced-process-priority-select".to_owned(),
+        FocusTarget::ProcessActionsTrigger => "iced-process-actions-trigger".to_owned(),
         FocusTarget::ProcessColumnToggle(column) => {
             format!("iced-process-column-toggle-{}", column.label())
         }
@@ -284,27 +284,25 @@ pub(crate) fn button_enabled<'a>(
     destructive: bool,
     enabled: bool,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let mut inner = iced::widget::button(label)
-        .style(move |_theme, status| {
-            crate::theme::button_style_status(theme_snapshot, destructive, status)
-        })
-        .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)]);
-    if enabled {
-        inner = inner.on_press(on_press.clone());
-    }
-    FocusableButton::new(
-        focus_id(target),
-        inner.into(),
-        on_press,
+    crate::ui::components::focusable_control_button_intrinsic(
+        theme_snapshot,
         target,
-        // The focused shell draws the shared ring token (see
-        // `theme::focus_ring_color` for the focus-visible parity gap).
-        crate::theme::focus_ring_color(theme_snapshot, destructive),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        label,
+        on_press,
+        tone_for(destructive),
+        enabled,
     )
-    .with_enabled(enabled)
-    .into()
+}
+
+/// The destructive/ordinary pair maps onto the shared control family's tone
+/// vocabulary: a destructive action wears the danger ink, an ordinary action
+/// the primary ink. Both paint the ONE shared glass material.
+fn tone_for(destructive: bool) -> crate::ui::components::ButtonTone {
+    if destructive {
+        crate::ui::components::ButtonTone::Danger
+    } else {
+        crate::ui::components::ButtonTone::Primary
+    }
 }
 
 /// A focusable button with a runtime label (settings pills, row actions).
@@ -315,23 +313,14 @@ pub(crate) fn dynamic_button<'a>(
     on_press: Message,
     destructive: bool,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(iced::widget::text(label))
-            .style(move |_theme, status| {
-                crate::theme::button_style_status(theme_snapshot, destructive, status)
-            })
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            // Inner button owns the pointer path (see `button` for why).
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
+    crate::ui::components::focusable_control_button_intrinsic(
+        theme_snapshot,
         target,
-        crate::theme::focus_ring_color(theme_snapshot, destructive),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        label,
+        on_press,
+        tone_for(destructive),
+        true,
     )
-    .into()
 }
 
 /// Owned-theme variant for row widgets retained inside `iced::lazy` bodies.
@@ -345,22 +334,14 @@ pub(crate) fn dynamic_button_owned(
     on_press: Message,
     destructive: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(iced::widget::text(label))
-            .style(move |_theme, status| {
-                crate::theme::button_style_status(&theme_snapshot, destructive, status)
-            })
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
+    crate::ui::components::focusable_control_button_owned(
+        theme_snapshot,
         target,
-        crate::theme::focus_ring_color(&theme_snapshot, destructive),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        label,
+        on_press,
+        tone_for(destructive),
+        true,
     )
-    .into()
 }
 
 /// A quiet focusable toolbar/secondary button (ghost surface style).
@@ -370,21 +351,14 @@ pub(crate) fn ghost_button<'a>(
     label: &'static str,
     on_press: Message,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(iced::widget::text(label))
-            .style(move |_theme, status| crate::theme::ghost_button_style(theme_snapshot, status))
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            // Inner button owns the pointer path (see `button` for why).
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
+    crate::ui::components::focusable_control_button_intrinsic(
+        theme_snapshot,
         target,
-        crate::theme::focus_ring_color(theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        label,
+        on_press,
+        crate::ui::components::ButtonTone::Secondary,
+        true,
     )
-    .into()
 }
 
 /// A quiet toolbar button with a semantic SVG icon. The icon is rendered by
@@ -397,25 +371,15 @@ pub(crate) fn ghost_button_with_icon<'a>(
     label: &'static str,
     on_press: Message,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let content = iced::widget::row![
-        crate::icons::icon(theme_snapshot, icon_id, 14.0),
-        iced::widget::text(label),
-    ]
-    .spacing(f32::from(tokens::SPACE_4));
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(content)
-            .style(move |_theme, status| crate::theme::ghost_button_style(theme_snapshot, status))
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
+    crate::ui::components::focusable_icon_label_button_intrinsic(
+        theme_snapshot,
         target,
-        crate::theme::focus_ring_color(theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        icon_id,
+        label,
+        on_press,
+        crate::ui::components::ButtonTone::Secondary,
+        true,
     )
-    .into()
 }
 
 /// Owned-theme variant used by viewport-lazy Performance rail cards. The
@@ -454,27 +418,12 @@ pub(crate) fn choice_pill<'a>(
     selected: bool,
     on_press: Message,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(iced::widget::text(label))
-            .style(move |_theme, status| {
-                if selected {
-                    crate::theme::button_style_status(theme_snapshot, false, status)
-                } else {
-                    crate::theme::ghost_button_style(theme_snapshot, status)
-                }
-            })
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            // Inner button owns the pointer path (see `button` for why).
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
-        target,
-        crate::theme::focus_ring_color(theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
-    )
-    .into()
+    let tone = if selected {
+        crate::ui::components::ButtonTone::Primary
+    } else {
+        crate::ui::components::ButtonTone::Secondary
+    };
+    crate::ui::components::focusable_control_button_intrinsic(theme_snapshot, target, label, on_press, tone, true)
 }
 
 /// A selection pill with a semantic SVG icon, used by the page navigation
@@ -488,31 +437,20 @@ pub(crate) fn choice_pill_with_icon<'a>(
     selected: bool,
     on_press: Message,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let content = iced::widget::row![
-        crate::icons::icon(theme_snapshot, icon_id, 14.0),
-        iced::widget::text(label),
-    ]
-    .spacing(f32::from(tokens::SPACE_4));
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(content)
-            .style(move |_theme, status| {
-                if selected {
-                    crate::theme::button_style_status(theme_snapshot, false, status)
-                } else {
-                    crate::theme::ghost_button_style(theme_snapshot, status)
-                }
-            })
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
+    let tone = if selected {
+        crate::ui::components::ButtonTone::Primary
+    } else {
+        crate::ui::components::ButtonTone::Secondary
+    };
+    crate::ui::components::focusable_icon_label_button_intrinsic(
+        theme_snapshot,
         target,
-        crate::theme::focus_ring_color(theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        icon_id,
+        label,
+        on_press,
+        tone,
+        true,
     )
-    .into()
 }
 
 /// Build a keyboard-reachable table row that additionally opens a row context
@@ -592,19 +530,12 @@ fn selectable_row_base<'a>(
 pub(crate) fn modal_close<'a>(
     theme_snapshot: &'a Theme,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        MODAL_CLOSE_ID,
-        iced::widget::button(t("common.close"))
-            .style(move |_theme, _status| crate::theme::button_style(theme_snapshot, false))
-            .padding(f32::from(tokens::SPACE_8))
-            // Inner button owns the pointer path (see `button` for why).
-            .on_press(Message::DismissOverlay)
-            .into(),
-        Message::DismissOverlay,
+    crate::ui::components::focusable_control_button_intrinsic(
+        theme_snapshot,
         FocusTarget::ModalClose,
-        crate::theme::focus_ring_color(theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
+        t("common.close"),
+        Message::DismissOverlay,
+        crate::ui::components::ButtonTone::Secondary,
+        true,
     )
-    .into()
 }
