@@ -13896,8 +13896,9 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-core"
-version = "0.1.18"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e0d7fa8e47ba8e97a364d735a314f1c2fb7569c9a25ae4239cb35de2ec3c3b5"
 dependencies = [
  "serde",
  "serde_json",
@@ -13906,8 +13907,9 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-kit-bevy"
-version = "0.4.1"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "082bae2b903917e62166082cc26cda429d957884103275c72dfb43db16a8cd24"
 dependencies = [
  "bevy",
  "parley",
@@ -13916,8 +13918,9 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-kit-iced"
-version = "0.2.0"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "953bc3af2fc3c6e9d6b16673e13ca14b116b433f9b87ce7fff30d83b6c20c4c8"
 dependencies = [
  "iced_core",
  "iced_widget",
@@ -13927,8 +13930,9 @@ dependencies = [
 
 [[package]]
 name = "zhuge-ui-tokens"
-version = "0.1.1"
-source = "git+https://github.com/YellowWhiteBlackCat/zhuge-ui-kit.git?rev=3afbacee62cb7a6039aea6d95c27e3964d495441#3afbacee62cb7a6039aea6d95c27e3964d495441"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e765c587752a596061f51370e6545c8e8729382668f05d3de2e562ea51b87385"
 
 [[package]]
 name = "zlib-rs"
@@ -14022,19 +14026,3 @@ dependencies = [
  "syn 3.0.9",
  "winnow 1.0.4",
 ]
-
-[[patch.unused]]
-name = "zhuge-ui-core"
-version = "0.1.18"
-
-[[patch.unused]]
-name = "zhuge-ui-kit-bevy"
-version = "0.4.1"
-
-[[patch.unused]]
-name = "zhuge-ui-kit-iced"
-version = "0.2.0"
-
-[[patch.unused]]
-name = "zhuge-ui-tokens"
-version = "0.1.1"

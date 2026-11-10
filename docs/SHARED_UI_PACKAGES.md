@@ -9,10 +9,10 @@
 | `zhuge-ui-kit-iced` | Iced surface、badge、富文本、虚拟列表 body |
 | `zhuge-ui-kit-bevy` | Bevy BSN surface（card/stat row）、官方 headless button 基础场景，以及回收池的槽位回收律（`sync_virtual_slots` + `VirtualScrollSlot` 收据守卫） |
 
-共享包源码托管于私有仓库 `YellowWhiteBlackCat/zhuge-ui-kit` 单 workspace，四个包独立发版。
-产品根 Cargo.toml 统一在 `[workspace.dependencies]` 声明同一个完整 Git `rev` 与兼容版本范围；
-子 crate 通过 `workspace = true` 继承。产品各自提交 Cargo.lock，锁文件必须解析到该 Git 源，
-保留独立依赖锁定与升级周期。只有共享包发布窗口真正发布新 crates.io 版本后，才能改回 registry 声明。
+共享包发布于 crates.io（源码托管于 `YellowWhiteBlackCat/zhuge-ui-kit` 单 workspace），四个包独立发版。
+根 Cargo.toml 统一在 `[workspace.dependencies]` 声明精确发布版本；子 crate 通过 `workspace = true` 继承。
+产品提交 Cargo.lock，锁文件必须解析到 crates.io 源并带 registry checksum。
+本地联调不得把 `[patch.crates-io]` 或 Git rev 锁文件提交成发布状态。
 
 ## 产品开发流程
 
@@ -47,11 +47,10 @@
 公开类型、工具包版本、MSRV、feature、平台支持以及布局/焦点/滚动变化均需兼容性评估。
 共享包发布要求由其仓库的 `docs/EVOLUTION.md` 持有；产品升级前阅读迁移说明。
 
-本地联调使用共享仓库的 `scripts/local_patch.py enable/disable/status` 或本地 Cargo `[patch]`，
-只修改本机开发配置，不提交产品 path 覆盖。
+本地联调使用共享仓库的 `scripts/local_patch.py enable/disable/status` 或本机 Cargo `[patch]`，
+只修改开发机配置，不提交产品 path 覆盖。
 提交前关闭 patch，使用 `--locked` 检查；构建与捕获证据必须与锁文件版本一致。
-`test_shared_kit_git_pin.py` 与 `test_release_pin_parity.py` 机械拒绝 registry 声明、
-混合 rev、本机 path 锁文件与两产品 rev 分裂。
+`test_release_pin_parity.py` 机械拒绝非 crates.io 源、缺失 checksum 与版本漂移。
 包版本升级由各产品按需决定，不迫使所有产品同步升级。
 
 验证要覆盖受影响构建、行为/几何测试、仓库门禁和真实界面。

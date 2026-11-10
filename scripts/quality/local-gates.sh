@@ -581,16 +581,6 @@ fi
 if maybe release-pin-parity; then
     run_stage release-pin-parity quick run_py scripts/quality/test_release_pin_parity.py
 fi
-if maybe shared-kit-git-pin-self; then
-    run_stage shared-kit-git-pin-self quick run_py scripts/quality/test_shared_kit_git_pin.py --self-test
-fi
-if maybe shared-kit-git-pin; then
-    # The Git rev itself needs a single-product executor: parity proves both
-    # products agree, this gate proves the manifest and committed lock are
-    # self-consistent even when the sibling product is absent (a clean CI
-    # clone, for example).
-    run_stage shared-kit-git-pin quick run_py scripts/quality/test_shared_kit_git_pin.py
-fi
 if maybe semantic-tree-owner; then
     run_stage semantic-tree-owner quick run_py scripts/quality/test_semantic_tree_owner.py
 fi

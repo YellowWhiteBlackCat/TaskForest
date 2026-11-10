@@ -2,7 +2,7 @@
   "version": 1,
   "gate": {
     "source": "zhuge-ui-kit:crates/zhuge-ui-kit-bevy/tools/check_bevy_ui.py",
-    "sha256": "b868708b5312cecf61b4faed4df91b9cdf1dc4c352d4f0ba329f84f31197bcf6"
+    "sha256": "2f035562002c01f8f00cb1841687e04a55e3f6e021d289d82bbed9053256af21"
   },
   "entries": {}
 }
