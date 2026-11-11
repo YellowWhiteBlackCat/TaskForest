@@ -16,6 +16,7 @@ use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visib
 use taskmanager_shell::{ProcessControlScope, SortDir};
 use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
@@ -408,7 +409,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         // fragments at the right edge; the shared strip keeps every
         // control's intrinsic width and gives the overflow its own
         // scroll owner without spending another table row.
-        crate::ui::components::bounded_toolbar(theme_snapshot, actions)
+        crate::ui::components::bounded_toolbar(theme_snapshot, ControlRole::Input, actions)
     };
 
     let view_selector = process_view_selector(theme_snapshot);

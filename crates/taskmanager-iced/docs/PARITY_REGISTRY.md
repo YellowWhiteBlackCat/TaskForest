@@ -49,12 +49,14 @@ uses the shared select. These are
 PRESENTATION executions of the shared tokens, not new semantics: the
 two registered divergences above keep their reasons unchanged.
 
-The Applications action bar is a bounded horizontal scroll owner
-(`controls/strip.rs::bounded_toolbar`): complete action groups keep their
-intrinsic width, the priority select keeps its measured `ControlRole::Input`
-slot, and the lower process table never loses a vertical row to a wrapped
-toolbar. GPUI keeps the same vocabulary in an anchored overflow menu; this
-is a toolkit presentation execution, not a new capability.
+The bounded horizontal action strip (`controls/strip.rs::bounded_toolbar`)
+keeps complete groups at intrinsic width and uses the caller's declared
+control role for its viewport height, without adding internal control
+padding. The Applications action bar declares `ControlRole::Input` for its
+priority select, while button-only navigation declares its button role. The
+lower process table never loses a vertical row to a wrapped toolbar. GPUI
+keeps the same vocabulary in an anchored overflow menu; this is a toolkit
+presentation execution, not a new capability.
 
 <!-- iced-capability-divergences: tooltip, text-selection -->
 

@@ -5,8 +5,8 @@ use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::{Focusable, Operation};
 use iced::advanced::widget::{Id, Tree};
 use iced::{Element, Rectangle, Size};
-use taskmanager_assets::embedded_fonts;
 use taskmanager_application::AppPage;
+use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -166,8 +166,8 @@ fn the_root_toast_sits_below_navigation_and_stays_inside_the_viewport() {
             .expect("the page navigation tab is rendered");
         let navigation_toggle = focus_bounds(&probe, FocusTarget::NavigationToggle)
             .expect("the navigation toolbar is rendered");
-        let settings =
-            focus_bounds(&probe, FocusTarget::SettingsTrigger).expect("toolbar actions are rendered");
+        let settings = focus_bounds(&probe, FocusTarget::SettingsTrigger)
+            .expect("toolbar actions are rendered");
         let toast_text = probe
             .text
             .iter()
@@ -197,6 +197,29 @@ fn the_root_toast_sits_below_navigation_and_stays_inside_the_viewport() {
                 viewport.width,
                 viewport.height
             );
+        }
+        if viewport.width == 720.0 {
+            for target in [
+                FocusTarget::NavigationToggle,
+                FocusTarget::SettingsTrigger,
+                FocusTarget::ContainersTrigger,
+                FocusTarget::HealthTrigger,
+                FocusTarget::WindowCapture,
+                FocusTarget::Export,
+                FocusTarget::AboutTrigger,
+            ] {
+                let bounds =
+                    focus_bounds(&probe, target).expect("every compact toolbar action is mounted");
+                assert!(
+                    bounds.x >= 0.0
+                        && bounds.y >= 0.0
+                        && bounds.x + bounds.width <= viewport.width
+                        && bounds.y + bounds.height <= viewport.height,
+                    "compact toolbar action {target:?} must stay inside the {}x{} frame: {bounds:?}",
+                    viewport.width,
+                    viewport.height
+                );
+            }
         }
     }
 }

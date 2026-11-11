@@ -18,18 +18,15 @@ use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 
 /// One bounded horizontal viewport around complete action groups.
 ///
-/// The height is the shared control extent, not an action-local number: the
-/// strip spends the same `ControlRole::Button` measurement the buttons spend.
+/// The caller declares the tallest control role in the strip. Its shared
+/// extent bounds the viewport; role padding stays inside the controls.
 #[must_use]
 pub(crate) fn bounded_toolbar<'a>(
     theme_snapshot: &'a Theme,
+    extent_role: ControlRole,
     children: Vec<IcedElement<'a>>,
 ) -> IcedElement<'a> {
-    // The strip may carry Button and Input roles. Spend the shared Button
-    // extent plus the Input role's vertical padding so a select's focus
-    // shell is never clipped by a button-height viewport.
-    let extent = crate::theme::control_extent(theme_snapshot, ControlRole::Button)
-        + crate::theme::control_padding_y(theme_snapshot, ControlRole::Input);
+    let extent = crate::theme::control_extent(theme_snapshot, extent_role);
     let band = row(children)
         .spacing(f32::from(tokens::SPACE_8))
         .align_y(iced::Alignment::Center)

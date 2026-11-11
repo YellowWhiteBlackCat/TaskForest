@@ -113,7 +113,7 @@ pub fn view(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Ren
 }
 
 /// The observed root: page scaffold, overlays, and warm-up body for one render.
-fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+pub(crate) fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
 
@@ -201,6 +201,18 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     .spacing(8)
     .padding(6);
 
+    let body = if let Some(notice) = toast_notice(app) {
+        let body_width =
+            (app.page_viewport_size().width - components::PAGE_SCAFFOLD_INSET * 2.0).max(0.0);
+        let toast_layer = components::toast(theme_snapshot, notice, body_width);
+        stack![body, toast_layer]
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .into()
+    } else {
+        body
+    };
+
     let base: Element<'_, Message, iced::Theme, iced::Renderer> = match nav {
         navigation::NavigationChrome::Horizontal(nav) => {
             components::page_scaffold(nav, body, footer.into())
@@ -208,16 +220,6 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
         navigation::NavigationChrome::Vertical { rail, toolbar } => {
             components::page_scaffold_with_rail(rail, toolbar, body, footer.into())
         }
-    };
-
-    let base = if let Some(notice) = toast_notice(app) {
-        let toast_layer = components::toast(theme_snapshot, notice, app.viewport_size().width);
-        stack![base, toast_layer]
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .into()
-    } else {
-        base
     };
 
     if !collecting {

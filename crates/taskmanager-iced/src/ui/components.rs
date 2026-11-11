@@ -42,6 +42,8 @@ pub(crate) use tooltip::{Tooltip, TooltipTrigger};
 
 pub(crate) type IcedElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
+pub(crate) const PAGE_SCAFFOLD_INSET: f32 = 10.0;
+
 /// The ordinary full-width page shell used by the root view.
 #[must_use]
 pub(crate) fn page_scaffold<'a>(
@@ -54,7 +56,7 @@ pub(crate) fn page_scaffold<'a>(
         // safety band: the last row keeps that distance from the edge in
         // every viewport (ICED-053).
         .spacing(BOTTOM_SAFETY_BAND)
-        .padding(10)
+        .padding(PAGE_SCAFFOLD_INSET)
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -82,7 +84,7 @@ pub(crate) fn page_scaffold_with_rail<'a>(
     // The gap between the page content and the bottom bar IS the bottom
     // safety band (ICED-053).
     .spacing(BOTTOM_SAFETY_BAND)
-    .padding(10)
+    .padding(PAGE_SCAFFOLD_INSET)
     .width(Length::Fill)
     .height(Length::Fill)
     .into()

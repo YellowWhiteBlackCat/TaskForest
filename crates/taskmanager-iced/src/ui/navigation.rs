@@ -1,5 +1,5 @@
 //! Native navigation chrome; the rail owns one bounded scroll region.
-use super::components::IcedElement;
+use super::components::{IcedElement, bounded_toolbar, icon_button};
 use super::{
     alerts, current_window_capture_btn, page_icon, responsive::chrome_presentation_for_width,
 };
@@ -12,9 +12,10 @@ use iced::Element;
 use iced::widget::{column, container, row};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{PageHelp, page_help};
-use taskmanager_theme::tokens;
+use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
+use taskmanager_ui_contract::presentation::sizes::ControlRole;
 pub(super) enum NavigationChrome<'a> {
     Horizontal(IcedElement<'a>),
     Vertical {
@@ -57,16 +58,19 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // The alerts page rides the same tab strip as the shared pages (an
     // Iced-local route outside the `AppPage` set).
     page_tabs.push(alerts::page_tab_pill(app));
+    let compact_toolbar = app.compact_layout();
     let toolbar_items: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = vec![
-        focus::ghost_button_with_icon(
+        toolbar_action(
             theme_snapshot,
+            compact_toolbar,
             FocusTarget::NavigationToggle,
             IconId::Sidebar,
             t("navigation.toggle"),
             Message::ToggleNavigation,
         ),
-        focus::ghost_button_with_icon(
+        toolbar_action(
             theme_snapshot,
+            compact_toolbar,
             FocusTarget::SettingsTrigger,
             IconId::Settings,
             t("chrome.settings"),
@@ -78,23 +82,37 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
             t("containers.title"),
             Message::OpenContainers,
         ),
-        focus::ghost_button_with_icon(
+        toolbar_action(
             theme_snapshot,
+            compact_toolbar,
             FocusTarget::HealthTrigger,
             IconId::Health,
             t("health.title"),
             Message::OpenHealth,
         ),
-        current_window_capture_btn(theme_snapshot),
-        focus::ghost_button_with_icon(
+        if compact_toolbar {
+            icon_button(
+                theme_snapshot,
+                FocusTarget::WindowCapture,
+                IconId::Export,
+                t("window_capture.capture"),
+                Message::RequestCurrentWindowCapture,
+                true,
+            )
+        } else {
+            current_window_capture_btn(theme_snapshot)
+        },
+        toolbar_action(
             theme_snapshot,
+            compact_toolbar,
             FocusTarget::Export,
             IconId::Export,
             t("common.export"),
             Message::ExportSnapshot,
         ),
-        focus::ghost_button_with_icon(
+        toolbar_action(
             theme_snapshot,
+            compact_toolbar,
             FocusTarget::AboutTrigger,
             IconId::System,
             t("about.title"),
@@ -109,28 +127,17 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // chrome presentation (responsive.rs), not a local literal.
     let chrome = chrome_presentation_for_width(app.viewport_width());
     let wrapped_chrome = app.compact_layout() || chrome.is_wrapped();
-    let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if app.compact_layout() {
-        scrollable(
-            row(toolbar_items).spacing(4),
-            ScrollAxis::Horizontal,
-            ScrollScale::Standard,
-        )
-        .height(iced::Length::Fixed(36.0))
-        .width(iced::Length::Fill)
-        .into()
-    } else if wrapped_chrome {
+    let toolbar_extent_role = if compact_toolbar {
+        ControlRole::IconButton
+    } else {
+        ControlRole::Button
+    };
+    let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if wrapped_chrome {
         // Keep the action band to one bounded row. A wrapped action grid made
         // the 1180px capture spend a third row on About, pushing the actual
         // page body below the fold. Horizontal scrolling preserves every
         // action without changing the page's vertical budget.
-        scrollable(
-            row(toolbar_items).spacing(4),
-            ScrollAxis::Horizontal,
-            ScrollScale::Standard,
-        )
-        .height(iced::Length::Fixed(36.0))
-        .width(iced::Length::Fill)
-        .into()
+        bounded_toolbar(theme_snapshot, toolbar_extent_role, toolbar_items)
     } else {
         row(toolbar_items).spacing(4).into()
     };
@@ -183,4 +190,19 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
         .width(iced::Length::Fill)
         .into();
     NavigationChrome::Horizontal(nav)
+}
+
+fn toolbar_action<'a>(
+    theme_snapshot: &'a Theme,
+    compact: bool,
+    target: FocusTarget,
+    icon: IconId,
+    label: &'static str,
+    message: Message,
+) -> IcedElement<'a> {
+    if compact {
+        icon_button(theme_snapshot, target, icon, label, message, true)
+    } else {
+        focus::ghost_button_with_icon(theme_snapshot, target, icon, label, message)
+    }
 }

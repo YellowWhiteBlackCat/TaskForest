@@ -605,9 +605,15 @@ fn a_bounded_toolbar_keeps_complete_action_groups_and_one_scroll_owner() {
         )
     })
     .collect();
-    let mut element: TestElement<'_> = crate::ui::components::bounded_toolbar(&theme, actions);
+    let mut element: TestElement<'_> =
+        crate::ui::components::bounded_toolbar(&theme, ControlRole::Button, actions);
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, size);
+    assert_eq!(
+        node.bounds().height,
+        crate::theme::control_extent(&theme, ControlRole::Button),
+        "a button-only strip uses the shared Button extent without Input padding"
+    );
     let mut operation = StripBounds::default();
     element
         .as_widget_mut()
@@ -637,4 +643,25 @@ fn a_bounded_toolbar_keeps_complete_action_groups_and_one_scroll_owner() {
         "the later action groups must live inside the horizontal content, not be shrunk: {:?}",
         operation.focus
     );
+}
+
+#[test]
+fn a_bounded_toolbar_spends_only_its_declared_control_extent() {
+    let theme = theme();
+    let renderer = renderer();
+    for role in [
+        ControlRole::Button,
+        ControlRole::IconButton,
+        ControlRole::Input,
+    ] {
+        let mut element: TestElement<'_> =
+            crate::ui::components::bounded_toolbar(&theme, role, Vec::new());
+        let mut tree = Tree::new(&element);
+        let node = layout(&mut element, &mut tree, &renderer, Size::new(320.0, 80.0));
+        assert_eq!(
+            node.bounds().height,
+            crate::theme::control_extent(&theme, role),
+            "the {role:?} strip must not add internal control padding to its slot"
+        );
+    }
 }

@@ -27,10 +27,11 @@ native selection and renderer caches; all shared types use their defining module
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
   controls that route keyboard access through the focus shell.
 - `controls/strip.rs` owns the bounded horizontal action strip: all action
-  groups keep their measured width, the scroll viewport spends the shared
-  `ControlRole` extent, and the Applications action bar consumes it in both
-  compact and desktop frames. This is the one declared scroll owner for the
-  lower action band; the process table keeps its own two-axis viewport.
+  groups keep their measured width, and the caller declares the tallest
+  `ControlRole` whose shared extent sizes the viewport. Control padding stays
+  inside each control, so button-only navigation does not add input padding
+  to the page's vertical budget. Navigation and the Applications action bar
+  use the same owner; the process table keeps its own two-axis viewport.
 - `src/theme.rs::control_glass` is the ONE control-surface seam: the shared
   Card glass gradient, its specular edge, and the single-quad projection of
   the theme's two-layer glass shadow (the same projection the floating
