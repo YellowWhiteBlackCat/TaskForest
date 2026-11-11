@@ -12,13 +12,12 @@ use taskforest_core::core::services::ServiceItem;
 use taskforest_core::core::session::SessionItem;
 use taskforest_core::core::startup::StartupEntry;
 
-use taskmanager_shell::{InfoSortCol, SortDir};
+use taskmanager_shell::{InfoSortCol, SortDir, StartupStatusFilter};
 
 use super::tooltip::ProcessHistories;
 use crate::gpui_app::app_history_view::AppHistoryRow;
 use crate::gpui_app::processes_view::rows::ProjectionCache;
 use crate::gpui_app::services_view::ServiceFilter;
-use crate::gpui_app::startup_view::StartupFilter;
 use taskforest_core::core::process::ProcessItem;
 use taskforest_core::core::process::ProcessLiveKey;
 
@@ -32,7 +31,7 @@ struct ServicesEntry {
 
 struct StartupEntryCache {
     generation: u64,
-    filter: StartupFilter,
+    filter: StartupStatusFilter,
     query: String,
     sort: Option<(InfoSortCol, SortDir)>,
     rows: Rc<Vec<StartupEntry>>,
@@ -114,7 +113,7 @@ impl GpuiProjectionCaches {
     pub(super) fn startup(
         &self,
         generation: u64,
-        filter: StartupFilter,
+        filter: StartupStatusFilter,
         query: String,
         sort: Option<(InfoSortCol, SortDir)>,
         build: impl FnOnce() -> Vec<StartupEntry>,

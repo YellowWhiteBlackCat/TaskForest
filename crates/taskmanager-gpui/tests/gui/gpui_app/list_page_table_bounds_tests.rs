@@ -10,6 +10,7 @@ use taskforest_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,
 };
+use taskmanager_shell::StartupStatusFilter;
 use taskmanager_theme::Theme;
 
 const VIEWPORTS: [(f32, f32); 5] = [
@@ -282,6 +283,38 @@ async fn startup_command_column_fits_the_measured_compact_content_slot(cx: &mut 
         command_cell.right() <= command_bounds.right() + px(0.5)
             && command_text.right() <= command_cell.right() + px(0.5),
         "720x480 Startup command text must truncate within its allocated column: text={command_text:?}, cell={command_cell:?}, column={command_bounds:?}"
+    );
+}
+
+#[gpui::test]
+async fn startup_filter_clicks_drive_the_shell_owned_projection(cx: &mut TestAppContext) {
+    let window = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
+    cx.simulate_window_resize(window.into(), size(px(720.0), px(480.0)));
+    let view = window.entity(cx).expect("RootView entity");
+    view.update(cx, |view, cx| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Startup;
+        view.replace_startup_for_test(vec![startup_entry(0), startup_entry(1)], Vec::new());
+        cx.notify();
+    });
+    draw(cx, window);
+
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    let pills = visual
+        .debug_bounds("tm-filter-pill-row")
+        .expect("Startup must render the shared status filter row");
+    let enabled_pill = gpui::point(pills.center().x, pills.center().y);
+    visual.simulate_mouse_move(enabled_pill, None::<MouseButton>, Modifiers::none());
+    visual.simulate_click(enabled_pill, Modifiers::none());
+    draw(cx, window);
+
+    let selected = view.read_with(cx, |view, _| view.startup_state.filter);
+    assert_eq!(selected, StartupStatusFilter::Enabled);
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    assert!(visual.debug_bounds("tm-startup-row:0").is_some());
+    assert!(
+        visual.debug_bounds("tm-startup-row:1").is_none(),
+        "the shell-owned enabled predicate must filter the visible projection"
     );
 }
 

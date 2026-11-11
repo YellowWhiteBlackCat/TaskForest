@@ -15,7 +15,7 @@
 //!     [`ActionFeedback::from_result`] constructor + accessors), previously
 //!     duplicated as private structs in both views.
 //!   * [`FilterSpec`] — the `Copy` contract a status-filter enum (services'
-//!     `ServiceFilter`, startup's `StartupFilter`) implements so the generic
+//!     `ServiceFilter`, startup's `StartupStatusFilter`) implements so the generic
 //!     [`filter_pill_row`] / `filter_pill` helpers can render it.
 //!   * [`filter_pill_row`] / `filter_pill` — the status-filter pill cluster,
 //!     generic over `F: FilterSpec`.
@@ -313,7 +313,7 @@ fn format_action_feedback(
 
 /// `Copy` contract a status-filter enum implements so the generic
 /// [`filter_pill_row`] / `filter_pill` helpers can render it. Implemented by
-/// `services_view::ServiceFilter` and `startup_view::StartupFilter`.
+/// `services_view::ServiceFilter` and `StartupStatusFilter`.
 ///
 /// * `label` — the human-facing pill text ("All" / "Active" / ...).
 /// * `id` — a stable `&'static str` discriminator ALSO used as the

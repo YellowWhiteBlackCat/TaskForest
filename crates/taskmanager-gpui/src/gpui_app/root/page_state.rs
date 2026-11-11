@@ -6,8 +6,9 @@ use taskmanager_shell::SortCol;
 use gpui::{App, FocusHandle, Pixels};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::process_category_projection::default_category_expansions;
+use taskmanager_shell::StartupStatusFilter;
 
-use crate::gpui_app::{processes_view, services_view, startup_view};
+use crate::gpui_app::{processes_view, services_view};
 
 /// Services page state: the status filter. The search query is shell-owned
 /// (`DirectTrackState.services`, matched by the shared service predicate).
@@ -27,14 +28,14 @@ impl Default for ServicesState {
 /// Startup page state: status filter and search query.
 #[derive(Clone)]
 pub struct StartupState {
-    pub filter: startup_view::StartupFilter,
+    pub filter: StartupStatusFilter,
     pub query: String,
 }
 
 impl Default for StartupState {
     fn default() -> Self {
         Self {
-            filter: startup_view::StartupFilter::All,
+            filter: StartupStatusFilter::All,
             query: String::new(),
         }
     }

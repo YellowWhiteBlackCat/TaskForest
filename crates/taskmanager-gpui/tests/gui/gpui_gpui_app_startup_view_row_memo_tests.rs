@@ -9,6 +9,7 @@ use taskforest_core::core::SourceStatus;
 use taskforest_core::core::startup::StartupEntry;
 use taskforest_core::core::startup::StartupImpactEvidence;
 use taskmanager_application::i18n;
+use taskmanager_shell::StartupStatusFilter;
 use taskmanager_shell::{InfoSortCol, InfoTable, SortDir};
 use taskmanager_theme::Theme;
 use taskmanager_ui::data::table::SortState;
@@ -30,6 +31,34 @@ fn entry(name: &str, enabled: bool) -> StartupEntry {
         impact: StartupImpact::Low,
         impact_evidence: StartupImpactEvidence::Measured { duration_ms: 10 },
     }
+}
+
+#[test]
+fn startup_projection_applies_the_shell_owned_status_filter() {
+    let entries = [entry("Agent", true), entry("Sync", false)];
+    let queries = ["", "agent"];
+
+    assert_eq!(
+        filter_startup(&entries, StartupStatusFilter::All, queries[0])
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Agent", "Sync"]
+    );
+    assert_eq!(
+        filter_startup(&entries, StartupStatusFilter::Enabled, queries[1])
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Agent"]
+    );
+    assert_eq!(
+        filter_startup(&entries, StartupStatusFilter::Disabled, queries[0])
+            .iter()
+            .map(|row| row.name.as_str())
+            .collect::<Vec<_>>(),
+        ["Sync"]
+    );
 }
 
 #[gpui::test]

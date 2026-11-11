@@ -18,6 +18,8 @@
 use std::rc::Rc;
 use taskforest_core::core::BootTimeline;
 use taskmanager_shell::InfoTable;
+use taskmanager_shell::StartupStatusFilter;
+use taskmanager_shell::matches_startup_status;
 use taskmanager_shell::matches_startup_text;
 use taskmanager_shell::order_startup_rows;
 use taskmanager_ui::theme_binding::definite_length;
@@ -62,50 +64,19 @@ pub use layout::{StartupPageBudget, TimelinePresentation};
 mod source_notice;
 use source_notice::startup_source_detail;
 
-// ── module-local UI state (filter + search) ──────────────────────────────────
-
-/// Status filter for the Startup list. `All` matches every entry; the other variants
-/// match the corresponding enabled state.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum StartupFilter {
-    All,
-    Enabled,
-    Disabled,
-}
-
-impl StartupFilter {
-    fn matches(self, enabled: bool) -> bool {
-        match self {
-            StartupFilter::All => true,
-            StartupFilter::Enabled => enabled,
-            StartupFilter::Disabled => !enabled,
-        }
-    }
-
-    const ALL: [StartupFilter; 3] = [
-        StartupFilter::All,
-        StartupFilter::Enabled,
-        StartupFilter::Disabled,
-    ];
-}
-
-/// `FilterSpec` impl so [`list_view::filter_pill_row`] can render the Startup
+/// `FilterSpec` impl so [`list_view::filter_pill_row`] can render the shell-owned
 /// status-filter pills generically. `id` is also the `Hover::Static`
 /// discriminator so the active/hover overlay resolves correctly.
-impl FilterSpec for StartupFilter {
+impl FilterSpec for StartupStatusFilter {
     fn label(self) -> &'static str {
-        match self {
-            StartupFilter::All => i18n::t("common.all"),
-            StartupFilter::Enabled => i18n::t("common.enabled"),
-            StartupFilter::Disabled => i18n::t("common.disabled"),
-        }
+        StartupStatusFilter::label(self)
     }
 
     fn id(self) -> &'static str {
         match self {
-            StartupFilter::All => "startup-filter-all",
-            StartupFilter::Enabled => "startup-filter-enabled",
-            StartupFilter::Disabled => "startup-filter-disabled",
+            StartupStatusFilter::All => "startup-filter-all",
+            StartupStatusFilter::Enabled => "startup-filter-enabled",
+            StartupStatusFilter::Disabled => "startup-filter-disabled",
         }
     }
 
@@ -114,14 +85,14 @@ impl FilterSpec for StartupFilter {
     /// id, so forcing one would be misleading.
     fn icon(self) -> Option<IconId> {
         match self {
-            StartupFilter::All => None,
-            StartupFilter::Enabled => Some(IconId::CircleCheck),
-            StartupFilter::Disabled => Some(IconId::CircleX),
+            StartupStatusFilter::All => None,
+            StartupStatusFilter::Enabled => Some(IconId::CircleCheck),
+            StartupStatusFilter::Disabled => Some(IconId::CircleX),
         }
     }
 }
 
-/// Pure filter: by enabled state (`StartupFilter`) AND by case-insensitive substring of
+/// Pure filter: by enabled state (`StartupStatusFilter`) AND by case-insensitive substring of
 /// name OR exec. Public so it can be unit-tested like `services_view::filter_services`.
 /// The Startup-page row memo inputs: the filter+sort projection is a pure
 /// function of (list generation, filter, query, inventory sort). The sort key
@@ -133,7 +104,7 @@ impl FilterSpec for StartupFilter {
 /// semantics `ShellApp::sorted_startup_entries` gives the shell track).
 pub fn sorted_startup(
     entries: &[StartupEntry],
-    filter: StartupFilter,
+    filter: StartupStatusFilter,
     query: &str,
     sort: Option<(InfoSortCol, SortDir)>,
 ) -> Vec<StartupEntry> {
@@ -144,12 +115,15 @@ pub fn sorted_startup(
 
 pub fn filter_startup(
     entries: &[StartupEntry],
-    filter: StartupFilter,
+    filter: StartupStatusFilter,
     query: &str,
 ) -> Vec<StartupEntry> {
     entries
         .iter()
-        .filter(|e| filter.matches(e.enabled) && matches_startup_text(&e.name, &e.exec, query))
+        .filter(|e| {
+            matches_startup_status(e.enabled, filter)
+                && matches_startup_text(&e.name, &e.exec, query)
+        })
         .cloned()
         .collect()
 }
@@ -510,7 +484,7 @@ pub struct StartupViewProps<'a> {
     pub sources: &'a [SourceStatus],
     pub selected: Option<&'a StartupEntryId>,
     pub hovered: Option<Hover>,
-    pub filter: StartupFilter,
+    pub filter: StartupStatusFilter,
     pub query: &'a str,
     /// Memoized filter+sort projection (see `RootView::startup_rows`);
     /// `filter`/`query` stay for the controls row, the table body reads this.
@@ -705,7 +679,7 @@ pub fn render_startup(
 /// into) is wired here.
 fn controls_row(
     theme: &Theme,
-    filter: StartupFilter,
+    filter: StartupStatusFilter,
     hovered: Option<&Hover>,
     search_entity: &Entity<TextInputState>,
     entity: &Entity<RootView>,
@@ -715,7 +689,7 @@ fn controls_row(
     // filter writes into — is wired here.
     list_view::controls_band(
         theme,
-        &StartupFilter::ALL,
+        &StartupStatusFilter::ALL,
         filter,
         hovered,
         entity,
