@@ -179,14 +179,15 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let open_menu_session = app
                 .user_menu_session()
                 .map(|session| session.id.to_string());
+            let query = shell.query.trim();
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
                 generation: projection_generation,
                 table: InfoTable::Users,
                 sort: shell.sessions_sort,
-                query: "",
+                query,
                 status_filter: None,
-                search_active: false,
+                search_active: !query.is_empty(),
                 selected,
                 row_count: rows.len(),
                 compact,
@@ -194,6 +195,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             });
             let body_rows = Rc::clone(&rows);
             let body_open_menu = open_menu_session.clone();
+            let body_query = query.to_owned();
             let columns = users_columns();
             let row_style = UserRowStyle {
                 table_theme,
@@ -207,16 +209,25 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                 // window direct while its row menu is open so the focus
                 // request can reach the menu's actual action target.
                 virtual_table_body(window, Length::Fill, move |start, end| {
-                    user_rows_in_window(body_rows, body_open_menu, start..end, selected, row_style)
+                    user_rows_in_window(
+                        body_rows,
+                        body_open_menu,
+                        &body_query,
+                        start..end,
+                        selected,
+                        row_style,
+                    )
                 })
             } else {
                 iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
                     let rows = Rc::clone(&body_rows);
                     let open_menu_session = body_open_menu.clone();
+                    let query = body_query.clone();
                     virtual_table_body(window, Length::Fill, move |start, end| {
                         user_rows_in_window(
                             rows,
                             open_menu_session,
+                            &query,
                             start..end,
                             selected,
                             row_style,
@@ -275,6 +286,7 @@ struct UserRowStyle {
 fn user_rows_in_window(
     rows: Rc<Vec<UserRow>>,
     open_menu_session: Option<String>,
+    query: &str,
     window: std::ops::Range<usize>,
     selected: usize,
     style: UserRowStyle,
@@ -303,7 +315,13 @@ fn user_rows_in_window(
             };
             let row = row![
                 text(session.id.to_string()).width(columns.session.length()),
-                text(session.user.clone()).width(columns.name.length()),
+                crate::ui::components::highlight::cell(
+                    &table_theme,
+                    session.user.as_str(),
+                    query,
+                    !query.trim().is_empty(),
+                    columns.name.length(),
+                ),
                 text(optional_text(session.seat.as_deref())).width(columns.seat.length()),
                 text(optional_text(session.tty.as_deref())).width(columns.tty.length()),
                 family_cell,

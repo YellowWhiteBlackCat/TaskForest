@@ -174,6 +174,8 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         app.shell.application.active_page = page;
         if page == AppPage::System {
             seed_capture_npu_fixture(app);
+        } else if page == AppPage::Users {
+            app.shell.query = "dev".into();
         }
     } else if let Some(device) = capture_device_from_name(target) {
         if matches!(device, PerfDevice::Npu(_)) {

@@ -76,30 +76,40 @@ fn user_projection_distinguishes_loading_empty_and_missing_fields() {
     assert_eq!(session_family_label(rows[0].family), "Not observed");
 }
 
-/// The Users page owns no filter of its own: a Processes-page query never
-/// shrinks the session list, so the name cells render plain — highlighting
-/// by `shell.query` (the old wiring) would tint rows that search never
-/// kept on this page.
 #[test]
-fn user_rows_have_no_page_filter_so_names_stay_plain_under_a_shared_search() {
+fn user_rows_stay_complete_and_name_cells_highlight_the_shared_query() {
     let mut shell = demo_app();
-    shell.query = "root".into();
+    shell.query = "DEV".into();
     shell.open_search();
 
     let rows = user_rows(&shell);
     assert_eq!(
         rows.len(),
         2,
-        "every demo session stays visible: no page filter consumes shell.query"
+        "the Users page highlights the shared query without filtering sessions"
     );
     assert!(
-        rows.iter().all(|row| row.user != "root"),
-        "the shared query matches no session user, yet nothing is dropped"
+        rows.iter().any(|row| row.user == "devuser"),
+        "the matching session remains in the canonical row set"
+    );
+    assert_eq!(
+        crate::ui::components::highlight::cell_runs("devuser", shell.query.as_str())
+            .into_iter()
+            .map(|run| (run.text, run.highlighted))
+            .collect::<Vec<_>>(),
+        vec![("dev".to_owned(), true), ("user".to_owned(), false)],
+        "the Users name cell uses the shared ASCII case-insensitive highlight ranges"
+    );
+    shell.query = "no-such-user".into();
+    assert_eq!(
+        user_rows(&shell).len(),
+        2,
+        "a nonmatching shared query still leaves the Users inventory unfiltered"
     );
 
-    // The page composes with the leftover shared search active.
+    // The shared query remains a highlight-only concern on this page.
     let mut app = crate::IcedApp::demo();
-    app.shell.query = "root".into();
+    app.shell.query = "DEV".into();
     app.shell.open_search();
     let _ = render(&app);
 }
