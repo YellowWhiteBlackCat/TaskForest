@@ -87,7 +87,6 @@ pub(super) fn cpu_headline_label_value(
 }
 
 pub(super) const HEADLINE_CHART_FLOOR: f32 = 240.0;
-pub(super) const HEADLINE_CHART_PRESENCE: f32 = 300.0;
 
 pub(super) fn gauge(
     title: &'static str,

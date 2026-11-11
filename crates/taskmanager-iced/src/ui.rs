@@ -11,7 +11,7 @@
 //! - `app_history_view`: the App-history page.
 
 use iced::Element;
-use iced::widget::{column, container, row, stack, text};
+use iced::widget::{column, container, row, text};
 // Shared locale catalog (the process-wide resolver). Every iced surface — the
 // shared pages and the iced-owned modal chrome (settings / about / health /
 // containers) — resolves copy through this one `t`; the frontend owns no
@@ -204,11 +204,7 @@ pub(crate) fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Them
     let body = if let Some(notice) = toast_notice(app) {
         let body_width =
             (app.page_viewport_size().width - components::PAGE_SCAFFOLD_INSET * 2.0).max(0.0);
-        let toast_layer = components::toast(theme_snapshot, notice, body_width);
-        stack![body, toast_layer]
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fill)
-            .into()
+        components::toast_body(theme_snapshot, notice, body_width, body)
     } else {
         body
     };

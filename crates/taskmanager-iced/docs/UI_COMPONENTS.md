@@ -23,7 +23,9 @@ native selection and renderer caches; all shared types use their defining module
   follows the shell's `FeedbackLifecycle`.
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
-  snapshot, unavailable progress never renders as a measured zero);
+  snapshot, unavailable progress never renders as a measured zero); tooltip
+  wrappers inspect descendant focus state and the keyboard-visible modality
+  so focusable hints open without requiring pointer hover;
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
   controls that route keyboard access through the focus shell.
 - `controls/strip.rs` owns the bounded horizontal action strip: all action

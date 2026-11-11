@@ -37,8 +37,8 @@ pub(crate) use inputs::*;
 pub(crate) use popover::Popover;
 pub(crate) use primitives::*;
 pub(crate) use selectable_text::SelectableText;
-pub(crate) use toast::toast;
-pub(crate) use tooltip::{Tooltip, TooltipTrigger};
+pub(crate) use toast::toast_body;
+pub(crate) use tooltip::Tooltip;
 
 pub(crate) type IcedElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 

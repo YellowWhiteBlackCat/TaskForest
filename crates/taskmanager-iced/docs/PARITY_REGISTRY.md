@@ -3,18 +3,26 @@
 Component/surface capability parity is MACHINE-CHECKED (CORE-08):
 `src/capabilities.rs` declares every ui-contract registry capability with an
 explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
-`Unsupported`. The registered divergences are Tooltip and TextSelection:
+`Unsupported`. The only remaining Iced divergence is TextSelection:
 
-- Tooltip: the focused Performance rail readout opens on keyboard focus and
-  dismisses on pointer click/Escape; footer and row hint badges remain
-  hover-only because their triggers are not focusable.
 - TextSelection: pointer/word/block selection, multi-line spans, Ctrl/Cmd-C,
   and Ctrl/Cmd-A on the readout that owns the window selection are ported; an
   unowned readout keeps Ctrl-A on the shared row-summary command because
   readouts are not keyboard-focusable.
 
 Scrollbar is declared `Native` via iced's scrollable; every other capability is
-`Ported`. A silent omission or unexplained difference fails the crate gate.
+`Ported`. The audit compared GPUI and Iced frontend guides, this registry, and
+`ComponentCapability::ALL`: the shared 19-entry behavior inventory has no
+missing Iced capability. Buttons, icon buttons, pills, labels, spinners and
+progress are renderer components rather than extra capability entries;
+Iced's multiline Run Task editor is a local extension over the shared
+single-line TextInput contract.
+
+Tooltip now follows keyboard-visible focus on any focusable descendant by
+reading the real Iced focus operation state. Non-focusable footer badges and
+row-detail hints remain hover-only because they have no keyboard focus target.
+This closes the tooltip gap without adding a second shared semantic or
+inventing renderer-neutral state.
 
 Toast is a real non-modal Card-glass card over the root view: the shared shell
 `FeedbackPresentation` owns the copy, tone and lifetime, while Iced owns only
@@ -58,7 +66,7 @@ lower process table never loses a vertical row to a wrapped toolbar. GPUI
 keeps the same vocabulary in an anchored overflow menu; this is a toolkit
 presentation execution, not a new capability.
 
-<!-- iced-capability-divergences: tooltip, text-selection -->
+<!-- iced-capability-divergences: text-selection -->
 
 Below is the complementary PAGE-LEVEL registry: Performance-page skin
 divergences hanging on a shared semantic with a real Iced-vs-GPUI architecture

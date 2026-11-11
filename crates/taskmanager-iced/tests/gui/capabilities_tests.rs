@@ -22,11 +22,9 @@ fn declaration_is_total_and_every_difference_is_registered() {
     assert!(findings.is_empty(), "{findings:?}");
 }
 
-/// The registered divergences are exactly the known architecture drivers —
-/// this pins the set so a new divergence cannot appear silently. Text
-/// selection keeps its registered keyboard-focus boundary, and Tooltip records
-/// the native Iced hover-only trigger and dismissal boundary. Toast is now a
-/// non-modal floating card over the same shared shell feedback notice.
+/// The registered divergence is the known architecture driver — this pins
+/// the set so a new divergence cannot appear silently. Text selection keeps
+/// its registered keyboard-focus boundary; tooltip focus parity is ported.
 #[test]
 fn the_registered_divergences_are_exactly_the_known_drivers() {
     let declaration = capability_declaration();
@@ -36,7 +34,7 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(divergent, ["tooltip", "text-selection"]);
+    assert_eq!(divergent, ["text-selection"]);
 }
 
 /// The prose registry is a human-readable projection of the declaration; this
@@ -83,20 +81,14 @@ fn dropdown_menu_is_ported_and_forwards_the_outside_press() {
 }
 
 #[test]
-fn tooltip_divergence_records_the_remaining_hint_badge_boundary() {
+fn tooltip_is_ported_with_keyboard_focus_for_focusable_triggers() {
     let declaration = capability_declaration();
     let tooltip = declaration
         .entries
         .iter()
         .find(|entry| entry.capability == ComponentCapability::Tooltip)
         .expect("Tooltip capability is registered");
-    assert!(matches!(
-        tooltip.support,
-        CapabilitySupport::Divergent { reason }
-            if reason == "the focused Performance rail readout opens on keyboard focus and \
-                          dismisses on pointer click/Escape; footer and row hint badges remain \
-                          hover-only because their triggers are not focusable"
-    ));
+    assert!(matches!(tooltip.support, CapabilitySupport::Ported));
 }
 
 #[test]
@@ -133,7 +125,7 @@ fn every_capability_is_classified_correctly() {
                     "Scrollbar must be Native via iced scrollable"
                 );
             }
-            ComponentCapability::Tooltip | ComponentCapability::TextSelection => {
+            ComponentCapability::TextSelection => {
                 assert!(
                     matches!(entry.support, CapabilitySupport::Divergent { reason } if !reason.is_empty()),
                     "{capability:?} must be Divergent with a non-empty reason"

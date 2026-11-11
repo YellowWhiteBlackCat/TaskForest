@@ -37,7 +37,7 @@ pub(crate) fn toast<'a>(
     let message = text(notice.text().to_owned())
         .size(f32::from(tokens::FONT_12))
         .width(Length::Fill)
-        .wrapping(iced::widget::text::Wrapping::None);
+        .wrapping(iced::widget::text::Wrapping::Glyph);
     let dismiss = content_button(ContentButtonOptions {
         content: text(t("common.close"))
             .size(f32::from(tokens::FONT_11))
@@ -84,6 +84,25 @@ pub(crate) fn toast<'a>(
             bottom: 0.0,
             left: f32::from(tokens::SPACE_16),
         })
+        .into()
+}
+
+/// Reserve the toast's own top slot before the page body.
+///
+/// Non-modal feedback must not block or cover interactive page controls. The
+/// body receives the frame's remaining vertical extent below the notice, so
+/// search/filter/action rows stay reachable while the shell owns the toast
+/// fact and dismissal.
+#[must_use]
+pub(crate) fn toast_body<'a>(
+    theme_snapshot: &'a Theme,
+    notice: FeedbackPresentation<'a>,
+    viewport_width: f32,
+    body: IcedElement<'a>,
+) -> IcedElement<'a> {
+    iced::widget::column![toast(theme_snapshot, notice, viewport_width), body]
+        .width(Length::Fill)
+        .height(Length::Fill)
         .into()
 }
 

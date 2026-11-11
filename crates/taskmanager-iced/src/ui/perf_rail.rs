@@ -415,10 +415,6 @@ pub(crate) fn device_cards<'a>(
     let rows = app.performance_rail_rows(devices, window);
     let key = rail_widget_key(app, theme_snapshot, devices, selected, window);
     let table_theme = *theme_snapshot;
-    let focused_device = app.input.focused_control.and_then(|target| match target {
-        FocusTarget::PerfDeviceTab(device) => Some(device),
-        _ => None,
-    });
     iced::widget::lazy(key, move |_| {
         let rows = Rc::clone(&rows);
         virtual_table_body(window, Length::Fill, move |start, end| {
@@ -427,9 +423,8 @@ pub(crate) fn device_cards<'a>(
                 .iter()
                 .map(|rail_row| {
                     let is_selected = rail_row.device == selected;
-                    let is_focused = focused_device == Some(rail_row.device);
                     virtual_table_row(
-                        device_card(rail_row.clone(), table_theme, is_selected, is_focused),
+                        device_card(rail_row.clone(), table_theme, is_selected),
                         RAIL_CARD_HEIGHT,
                     )
                 })
@@ -523,7 +518,6 @@ fn device_card(
     row: RailRow,
     theme_snapshot: Theme,
     selected: bool,
-    is_focused: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let tooltip_lines = rail_tooltip_lines(&row);
     let RailRow {
@@ -653,12 +647,9 @@ fn device_card(
     .padding([6, 8])
     .style(move |_| theme::panel_style(&tooltip_surface))
     .into();
-    let trigger = if is_focused {
-        crate::ui::components::TooltipTrigger::Focus
-    } else {
-        crate::ui::components::TooltipTrigger::Hover
-    };
-    crate::ui::components::Tooltip::new(card, tooltip_content, trigger).into()
+    crate::ui::components::Tooltip::new(card, tooltip_content)
+        .with_focus_visible(theme_snapshot.focus_visible())
+        .into()
 }
 
 /// The rail sparkline: one polyline, no caption (the card's text column owns

@@ -6,7 +6,8 @@ use crate::app::{Message, PerfDevice};
 use iced::advanced::Shell;
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::renderer::Headless;
-use iced::advanced::widget::Tree;
+use iced::advanced::widget::operation::{Focusable, Operation};
+use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, Physical};
 use iced::{Element, Event, Point, Rectangle, Size, Vector, mouse};
 use std::rc::Rc;
@@ -69,6 +70,41 @@ fn tooltip_is_open(
         .is_some()
 }
 
+struct FocusById {
+    target: Id,
+    matched: bool,
+}
+
+impl Operation<()> for FocusById {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
+        visit(self);
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
+        if id == Some(&self.target) {
+            state.focus();
+            self.matched = true;
+        }
+    }
+}
+
+fn focus_card(
+    card: &mut Element<'static, Message, iced::Theme, iced::Renderer>,
+    tree: &mut Tree,
+    node: &Node,
+    renderer: &iced::Renderer,
+) -> bool {
+    let mut operation = FocusById {
+        target: Id::from(crate::focus::focus_id(
+            crate::app::FocusTarget::PerfDeviceTab(PerfDevice::Cpu),
+        )),
+        matched: false,
+    };
+    card.as_widget_mut()
+        .operate(tree, Layout::new(node), renderer, &mut operation);
+    operation.matched
+}
+
 fn key_pressed(named: Named, code: Code) -> Event {
     let key = Key::Named(named);
     Event::Keyboard(iced::keyboard::Event::KeyPressed {
@@ -107,7 +143,7 @@ fn theme() -> Theme {
 
 #[test]
 fn mounted_rail_tooltip_opens_on_hover_and_dismisses_on_click_or_escape() {
-    let mut card = device_card(rail_row(), theme(), false, false);
+    let mut card = device_card(rail_row(), theme(), false);
     let renderer = renderer();
     let viewport = Rectangle::new(Point::new(0.0, 0.0), Size::new(480.0, 160.0));
     let mut tree = Tree::new(&card);
@@ -230,7 +266,8 @@ fn mounted_rail_tooltip_opens_on_hover_and_dismisses_on_click_or_escape() {
 
 #[test]
 fn focused_rail_tooltip_opens_on_focus_and_escape_dismisses() {
-    let mut card = device_card(rail_row(), theme(), false, true);
+    let focused_theme = theme().with_focus_visible(true);
+    let mut card = device_card(rail_row(), focused_theme, false);
     let renderer = renderer();
     let viewport = Rectangle::new(Point::new(0.0, 0.0), Size::new(480.0, 160.0));
     let mut tree = Tree::new(&card);
@@ -246,8 +283,16 @@ fn focused_rail_tooltip_opens_on_focus_and_escape_dismisses() {
     );
 
     assert!(
+        !tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
+        "a keyboard-capable hint starts hidden until its trigger receives focus"
+    );
+    assert!(
+        focus_card(&mut card, &mut tree, &node, &renderer),
+        "the rail card exposes a real focus stop"
+    );
+    assert!(
         tooltip_is_open(&mut card, &mut tree, &node, &renderer, &viewport),
-        "a focused card opens the tooltip"
+        "keyboard-visible focus on the real card trigger opens the tooltip"
     );
 
     dispatch(
@@ -278,13 +323,19 @@ fn focused_rail_tooltip_opens_on_focus_and_escape_dismisses() {
         "hover does not reopen a tooltip dismissed while focused"
     );
 
-    let mut fresh = device_card(rail_row(), theme(), false, true);
+    let mut fresh = device_card(rail_row(), focused_theme, false);
     let mut fresh_tree = Tree::new(&fresh);
     let fresh_node = fresh.as_widget_mut().layout(
         &mut fresh_tree,
         &renderer,
         &Limits::new(Size::ZERO, viewport.size()),
     );
+    assert!(focus_card(
+        &mut fresh,
+        &mut fresh_tree,
+        &fresh_node,
+        &renderer
+    ));
     assert!(
         tooltip_is_open(
             &mut fresh,

@@ -109,10 +109,10 @@ fn cpu_detail(
         budget.chart_inventory.includes_extended_charts() && budget.vertical.carries_core_stack();
     let chart_extent = extent.for_primary_chart(per_core_composes);
     let chart_height = if per_core_composes {
-        // GPUI's CPU page pins the headline tier to a fixed height so the
-        // per-core matrix composes INSIDE the first viewport (ICED-024-7/8);
-        // a Fill height would push the core grid below the fold forever.
-        Length::Fixed(cpu::HEADLINE_CHART_PRESENCE)
+        // Keep the whole first per-core row visible beside the headline.
+        // The shared chart floor is the lowest headline size this frame may
+        // spend; expanding to a fixed presence height starves the matrix.
+        Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
     } else if extent == perf_layout::DetailExtent::Fill {
         // Fixed-viewport frames hand the headline chart the column's
         // remaining height — it grows like GPUI's flex-1 headline tier.

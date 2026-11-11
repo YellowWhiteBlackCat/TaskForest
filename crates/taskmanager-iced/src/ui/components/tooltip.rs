@@ -4,6 +4,7 @@
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::overlay;
+use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{self, Operation, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::keyboard::key::Named;
@@ -25,24 +26,32 @@ struct State {
     capture_marker_emitted: bool,
 }
 
-/// What opens this tooltip: a pointer hover, or hover plus keyboard focus.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum TooltipTrigger {
-    Hover,
-    Focus,
+#[derive(Default)]
+struct FocusedDescendant {
+    focused: bool,
 }
 
-impl TooltipTrigger {
-    const fn follows_focus(self) -> bool {
-        matches!(self, Self::Focus)
+impl Operation<()> for FocusedDescendant {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
+        visit(self);
+    }
+
+    fn focusable(
+        &mut self,
+        _id: Option<&widget::Id>,
+        _bounds: Rectangle,
+        state: &mut dyn Focusable,
+    ) {
+        self.focused |= state.is_focused();
     }
 }
 
-/// Wraps one trigger/content element and one read-only tooltip surface.
+/// Wraps one content element and its read-only tooltip surface. Pointer hover
+/// and keyboard-visible focus on a real descendant both open the hint.
 pub(crate) struct Tooltip<'a> {
     content: Element<'a, Message, iced::Theme, iced::Renderer>,
     tooltip: Element<'a, Message, iced::Theme, iced::Renderer>,
-    trigger: TooltipTrigger,
+    focus_visible: bool,
     gap: f32,
     capture_open_marker: Option<PathBuf>,
 }
@@ -51,15 +60,19 @@ impl<'a> Tooltip<'a> {
     pub(crate) fn new(
         content: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
         tooltip: impl Into<Element<'a, Message, iced::Theme, iced::Renderer>>,
-        trigger: TooltipTrigger,
     ) -> Self {
         Self {
             content: content.into(),
             tooltip: tooltip.into(),
-            trigger,
+            focus_visible: false,
             gap: f32::from(tokens::SPACE_4),
             capture_open_marker: None,
         }
+    }
+
+    pub(crate) fn with_focus_visible(mut self, focus_visible: bool) -> Self {
+        self.focus_visible = focus_visible;
+        self
     }
 
     /// Keep this tooltip open and emit one mounted-surface marker for real
@@ -75,15 +88,16 @@ fn sync_focus(state: &mut State, focus_open: bool) {
         return;
     }
     state.was_focused = focus_open;
-    state.pointer_suppressed = false;
-    state.focus_dismissed = false;
-    state.open = if focus_open {
-        true
+    if focus_open {
+        state.pointer_suppressed = false;
+        state.focus_dismissed = false;
+        state.open = true;
     } else if tooltip_dismisses(OverlayDismissCause::FocusLoss) {
-        false
-    } else {
-        state.open
-    };
+        if !state.pointer_suppressed {
+            state.focus_dismissed = false;
+        }
+        state.open = false;
+    }
 }
 
 impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
@@ -93,8 +107,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
 
     fn state(&self) -> widget::tree::State {
         widget::tree::State::new(State {
-            open: self.trigger.follows_focus() || self.capture_open_marker.is_some(),
-            was_focused: self.trigger.follows_focus(),
+            open: self.capture_open_marker.is_some(),
             ..State::default()
         })
     }
@@ -106,10 +119,6 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
     fn diff(&self, tree: &mut Tree) {
         tree.diff_children(&[&self.content, &self.tooltip]);
         let capture_open = self.capture_open_marker.is_some();
-        sync_focus(
-            tree.state.downcast_mut::<State>(),
-            self.trigger.follows_focus(),
-        );
         if capture_open {
             tree.state.downcast_mut::<State>().open = true;
         }
@@ -141,26 +150,27 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
+        let focused =
+            focused_descendant(&mut self.content, &mut tree.children[0], layout, renderer);
         let state = tree.state.downcast_mut::<State>();
-        sync_focus(state, self.trigger.follows_focus());
+        sync_focus(state, self.focus_visible && focused);
         match event {
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let over = cursor.is_over(layout.bounds());
                 if over {
                     if !state.hovering {
                         state.hovering = true;
-                        if !state.pointer_suppressed
-                            && (!self.trigger.follows_focus() || !state.focus_dismissed)
-                        {
+                        if !state.pointer_suppressed && !state.focus_dismissed {
                             state.open = true;
                         }
                     }
                 } else if state.hovering {
                     state.hovering = false;
                     state.pointer_suppressed = false;
-                    if !self.trigger.follows_focus()
-                        && tooltip_dismisses(OverlayDismissCause::PointerExit)
-                    {
+                    if !state.was_focused {
+                        state.focus_dismissed = false;
+                    }
+                    if !state.was_focused && tooltip_dismisses(OverlayDismissCause::PointerExit) {
                         state.open = false;
                     }
                 }
@@ -169,7 +179,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
                 if tooltip_dismisses(OverlayDismissCause::PointerPress) {
                     state.open = false;
                     state.pointer_suppressed = true;
-                    state.focus_dismissed = self.trigger.follows_focus();
+                    state.focus_dismissed = state.was_focused;
                 }
             }
             Event::Keyboard(keyboard::Event::KeyPressed {
@@ -178,7 +188,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
             }) if tooltip_dismisses(OverlayDismissCause::Escape) => {
                 state.open = false;
                 state.pointer_suppressed = true;
-                state.focus_dismissed = self.trigger.follows_focus();
+                state.focus_dismissed = state.was_focused;
             }
             _ => {}
         }
@@ -214,6 +224,12 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
         viewport: &Rectangle,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        let focused =
+            focused_descendant(&mut self.content, &mut tree.children[0], layout, renderer);
+        sync_focus(
+            tree.state.downcast_mut::<State>(),
+            self.focus_visible && focused,
+        );
         let (open, capture_marker) = {
             let state = tree.state.downcast_mut::<State>();
             let marker = (state.open && !state.capture_marker_emitted)
@@ -281,6 +297,19 @@ impl<'a> From<Tooltip<'a>> for Element<'a, Message, iced::Theme, iced::Renderer>
     fn from(tooltip: Tooltip<'a>) -> Self {
         Self::new(tooltip)
     }
+}
+
+fn focused_descendant(
+    content: &mut Element<'_, Message, iced::Theme, iced::Renderer>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &iced::Renderer,
+) -> bool {
+    let mut focused = FocusedDescendant::default();
+    content
+        .as_widget_mut()
+        .operate(tree, layout, renderer, &mut focused);
+    focused.focused
 }
 
 struct TooltipOverlay<'a, 'b> {

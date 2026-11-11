@@ -60,7 +60,7 @@ fn editor_paint_state(status: text_editor::Status) -> ControlPaintState {
 #[derive(Default)]
 struct StripBounds {
     focus: Vec<(Id, Rectangle)>,
-    scroll: Vec<(Rectangle, Rectangle)>,
+    scroll: Vec<(Option<Id>, Rectangle, Rectangle)>,
 }
 
 impl iced::advanced::widget::Operation<()> for StripBounds {
@@ -81,13 +81,13 @@ impl iced::advanced::widget::Operation<()> for StripBounds {
 
     fn scrollable(
         &mut self,
-        _id: Option<&Id>,
+        id: Option<&Id>,
         bounds: Rectangle,
         content: Rectangle,
         _translation: iced::Vector,
         _state: &mut dyn Scrollable,
     ) {
-        self.scroll.push((bounds, content));
+        self.scroll.push((id.cloned(), bounds, content));
     }
 }
 
@@ -538,6 +538,213 @@ fn a_disabled_shared_button_publishes_nothing_and_keeps_the_shared_extent() {
     );
 }
 
+#[test]
+fn focusable_tooltips_follow_keyboard_focus_and_pointer_hover() {
+    let renderer = renderer();
+    let size = Size::new(180.0, 80.0);
+    let viewport = Rectangle::with_size(size);
+    let target = FocusTarget::SettingsTrigger;
+    let keyboard_theme = theme();
+    let mut keyboard_hint: TestElement<'_> = icon_button(
+        &keyboard_theme,
+        target,
+        IconId::Settings,
+        "Settings",
+        Message::OpenSettings,
+        true,
+    );
+    let mut keyboard_tree = Tree::new(&keyboard_hint);
+    let keyboard_node = layout(&mut keyboard_hint, &mut keyboard_tree, &renderer, size);
+    assert!(
+        keyboard_hint
+            .as_widget_mut()
+            .overlay(
+                &mut keyboard_tree,
+                Layout::new(&keyboard_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "the hint starts hidden"
+    );
+    assert!(focus(
+        &mut keyboard_hint,
+        &mut keyboard_tree,
+        &keyboard_node,
+        &renderer,
+        Id::from(focus_id(target)),
+    ));
+    assert!(
+        keyboard_hint
+            .as_widget_mut()
+            .overlay(
+                &mut keyboard_tree,
+                Layout::new(&keyboard_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_some(),
+        "keyboard-visible focus on a descendant opens its hint"
+    );
+    dispatch(
+        &mut keyboard_hint,
+        &mut keyboard_tree,
+        &keyboard_node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Escape, Code::Escape),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        keyboard_hint
+            .as_widget_mut()
+            .overlay(
+                &mut keyboard_tree,
+                Layout::new(&keyboard_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "Escape dismisses a focus-opened hint"
+    );
+    dispatch(
+        &mut keyboard_hint,
+        &mut keyboard_tree,
+        &keyboard_node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved {
+            position: keyboard_node.bounds().center(),
+        }),
+        mouse::Cursor::Available(keyboard_node.bounds().center()),
+    );
+    assert!(
+        keyboard_hint
+            .as_widget_mut()
+            .overlay(
+                &mut keyboard_tree,
+                Layout::new(&keyboard_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "hover does not reopen a focus hint dismissed with Escape"
+    );
+
+    let pointer_theme = keyboard_theme.with_focus_visible(false);
+    let mut pointer_hint: TestElement<'_> = icon_button(
+        &pointer_theme,
+        target,
+        IconId::Settings,
+        "Settings",
+        Message::OpenSettings,
+        true,
+    );
+    let mut pointer_tree = Tree::new(&pointer_hint);
+    let pointer_node = layout(&mut pointer_hint, &mut pointer_tree, &renderer, size);
+    assert!(focus(
+        &mut pointer_hint,
+        &mut pointer_tree,
+        &pointer_node,
+        &renderer,
+        Id::from(focus_id(target)),
+    ));
+    assert!(
+        pointer_hint
+            .as_widget_mut()
+            .overlay(
+                &mut pointer_tree,
+                Layout::new(&pointer_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "pointer or programmatic focus alone does not open a keyboard hint"
+    );
+    let pointer = pointer_node.bounds().center();
+    dispatch(
+        &mut pointer_hint,
+        &mut pointer_tree,
+        &pointer_node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+        mouse::Cursor::Available(pointer),
+    );
+    assert!(
+        pointer_hint
+            .as_widget_mut()
+            .overlay(
+                &mut pointer_tree,
+                Layout::new(&pointer_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "pointer press suppresses the hover hint on the focused control"
+    );
+    dispatch(
+        &mut pointer_hint,
+        &mut pointer_tree,
+        &pointer_node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        mouse::Cursor::Available(pointer),
+    );
+    assert!(
+        pointer_hint
+            .as_widget_mut()
+            .overlay(
+                &mut pointer_tree,
+                Layout::new(&pointer_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_none(),
+        "the dismissed hint stays closed until the pointer leaves"
+    );
+    let outside = Point::new(pointer.x + 200.0, pointer.y);
+    dispatch(
+        &mut pointer_hint,
+        &mut pointer_tree,
+        &pointer_node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved { position: outside }),
+        mouse::Cursor::Available(outside),
+    );
+    dispatch(
+        &mut pointer_hint,
+        &mut pointer_tree,
+        &pointer_node,
+        &renderer,
+        &viewport,
+        Event::Mouse(mouse::Event::CursorMoved { position: pointer }),
+        mouse::Cursor::Available(pointer),
+    );
+    assert!(
+        pointer_hint
+            .as_widget_mut()
+            .overlay(
+                &mut pointer_tree,
+                Layout::new(&pointer_node),
+                &renderer,
+                &viewport,
+                iced::Vector::ZERO,
+            )
+            .is_some(),
+        "pointer hover still opens the hint"
+    );
+}
+
 /// The shared progress bar keeps the shared bar height and clamps its ratio;
 /// unavailable data stays the unknown grammar instead of a fabricated zero.
 #[test]
@@ -619,10 +826,11 @@ fn a_bounded_toolbar_keeps_complete_action_groups_and_one_scroll_owner() {
         .as_widget_mut()
         .operate(&mut tree, Layout::new(&node), &renderer, &mut operation);
 
-    let (viewport, content) = operation
+    assert_eq!(operation.scroll.len(), 1);
+    let (_, viewport, content) = operation
         .scroll
         .first()
-        .copied()
+        .map(|(id, viewport, content)| (id.clone(), *viewport, *content))
         .expect("the toolbar must register one horizontal scroll owner");
     assert!(viewport.width <= size.width + 0.001);
     assert!(content.width > viewport.width);
@@ -643,6 +851,54 @@ fn a_bounded_toolbar_keeps_complete_action_groups_and_one_scroll_owner() {
         "the later action groups must live inside the horizontal content, not be shrunk: {:?}",
         operation.focus
     );
+}
+
+#[test]
+fn a_bounded_toolbar_exposes_one_typed_scroll_owner_per_role() {
+    let theme = theme();
+    let renderer = renderer();
+    let size = Size::new(320.0, 80.0);
+    for role in [
+        ControlRole::Button,
+        ControlRole::IconButton,
+        ControlRole::Input,
+    ] {
+        let actions: Vec<TestElement<'_>> = (0..24)
+            .map(|index| {
+                glass_button(
+                    &theme,
+                    FocusTarget::TableRow {
+                        page: AppPage::Applications,
+                        index,
+                    },
+                    format!("Action {index}"),
+                    Message::Tick,
+                    ButtonTone::Secondary,
+                    true,
+                )
+            })
+            .collect();
+        let mut element: TestElement<'_> =
+            crate::ui::components::bounded_toolbar(&theme, role, actions);
+        let mut tree = Tree::new(&element);
+        let node = layout(&mut element, &mut tree, &renderer, size);
+        let mut operation = StripBounds::default();
+        element
+            .as_widget_mut()
+            .operate(&mut tree, Layout::new(&node), &renderer, &mut operation);
+        assert_eq!(operation.scroll.len(), 1);
+        let (_, viewport, content) = operation
+            .scroll
+            .first()
+            .map(|(id, viewport, content)| (id.clone(), *viewport, *content))
+            .expect("the bounded toolbar registers its typed scroll owner");
+        assert_eq!(
+            node.bounds().height,
+            crate::theme::control_extent(&theme, role)
+        );
+        assert!(viewport.width <= size.width + 0.001);
+        assert!(content.width > viewport.width);
+    }
 }
 
 #[test]

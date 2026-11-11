@@ -21,7 +21,7 @@ use taskmanager_theme::{Color, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 
 use super::IcedElement;
-use super::{Tooltip, TooltipTrigger};
+use super::Tooltip;
 use crate::theme;
 use zhuge_ui_kit_iced::meter::{MeterGeometry, meter_bar};
 use zhuge_ui_kit_iced::surface::{self, BadgeGeometry, StatePanelGeometry};
@@ -189,7 +189,9 @@ pub(crate) fn tooltip<'a>(
     tip: &'a str,
 ) -> IcedElement<'a> {
     let hint: IcedElement<'a> = tooltip_surface(theme, text(tip));
-    Tooltip::new(content, hint, TooltipTrigger::Hover).into()
+    Tooltip::new(content, hint)
+        .with_focus_visible(theme.focus_visible())
+        .into()
 }
 
 /// The tooltip's own surface: the shared Card glass panel (the tier the GPUI
@@ -233,6 +235,7 @@ fn tooltip_owned_with_capture(
 ) -> IcedElement<'static> {
     let tip_fg = crate::theme_binding::color(theme.palette().fg);
     let surface = theme;
+    let focus_visible = surface.focus_visible();
     let hint: IcedElement<'static> = container(
         text(tip)
             .size(f32::from(tokens::FONT_11))
@@ -244,11 +247,14 @@ fn tooltip_owned_with_capture(
     .style(move |_| theme::panel_style(&surface))
     .into();
     if let Some(marker) = marker {
-        Tooltip::new(content, hint, TooltipTrigger::Hover)
+        Tooltip::new(content, hint)
+            .with_focus_visible(focus_visible)
             .open_for_capture(marker)
             .into()
     } else {
-        Tooltip::new(content, hint, TooltipTrigger::Hover).into()
+        Tooltip::new(content, hint)
+            .with_focus_visible(focus_visible)
+            .into()
     }
 }
 

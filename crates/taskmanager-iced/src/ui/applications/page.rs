@@ -239,84 +239,115 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         // state (the core's uninterruptible wait): that is the case where
         // the user has to reach for the destructive path.
         let end_task_destructive = emphasis::selection_is_not_responding(shell);
+        let compact_actions = app.compact_layout();
+        let process_action = |target,
+                              icon: IconId,
+                              label: &'static str,
+                              message,
+                              destructive: bool,
+                              enabled: bool| {
+            if compact_actions && !destructive {
+                crate::ui::components::icon_button(
+                    theme_snapshot,
+                    target,
+                    icon,
+                    label,
+                    message,
+                    enabled,
+                )
+            } else {
+                focus::button_enabled(theme_snapshot, target, label, message, destructive, enabled)
+            }
+        };
         let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
         if !tree_selected {
-            actions.push(focus::button_enabled(
-                theme_snapshot,
+            actions.push(process_action(
                 FocusTarget::EndTask,
+                IconId::Close,
                 t("proc.end_task"),
                 Message::RequestEndTask,
                 end_task_destructive,
                 control.is_ready(),
             ));
         }
-        actions.push(focus::button_enabled(
-            theme_snapshot,
+        actions.push(process_action(
             FocusTarget::KillProcess,
+            IconId::EndTask,
             t("proc.kill"),
             Message::RequestProcessBatch(ProcessBatchAction::Kill),
             true,
             control.is_ready(),
         ));
         if !tree_selected {
-            actions.push(focus::button_enabled(
-                theme_snapshot,
+            actions.push(process_action(
                 FocusTarget::OpenProcessLocation,
+                IconId::Properties,
                 t("proc.open_location"),
                 Message::OpenProcessLocation,
                 false,
                 control.is_single_process(),
             ));
-            actions.push(focus::button_enabled(
-                theme_snapshot,
+            actions.push(process_action(
                 FocusTarget::SearchProcessOnline,
+                IconId::Search,
                 t("proc.search_online"),
                 Message::SearchProcessOnline,
                 false,
                 control.is_single_process(),
             ));
         }
-        actions.push(focus::button_enabled(
-            theme_snapshot,
+        actions.push(process_action(
             FocusTarget::SuspendProcess,
+            IconId::Pause,
             t("proc.suspend"),
             Message::RequestProcessBatch(ProcessBatchAction::Suspend),
             false,
             control.is_ready(),
         ));
-        actions.push(focus::button_enabled(
-            theme_snapshot,
+        actions.push(process_action(
             FocusTarget::ResumeProcess,
+            IconId::Refresh,
             t("proc.resume"),
             Message::RequestProcessBatch(ProcessBatchAction::Resume),
             false,
             control.is_ready(),
         ));
         if !tree_selected {
-            actions.push(focus::button_enabled(
-                theme_snapshot,
+            actions.push(process_action(
                 FocusTarget::ProcessAffinityOpen,
+                IconId::Settings,
                 t("proc.affinity"),
                 Message::OpenProcessAffinity,
                 false,
                 control.is_single_process(),
             ));
         }
-        actions.push(focus::button_enabled(
-            theme_snapshot,
+        actions.push(process_action(
             FocusTarget::ProcessEfficiencyMode,
+            IconId::Process,
             t("proc.efficiency_mode"),
             Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
             false,
             control.is_ready(),
         ));
-        let columns_trigger = focus::button(
-            theme_snapshot,
-            FocusTarget::ProcessColumnsTrigger,
-            t("proc.choose_columns"),
-            Message::OpenProcessColumnsMenu,
-            false,
-        );
+        let columns_trigger = if compact_actions {
+            crate::ui::components::icon_button(
+                theme_snapshot,
+                FocusTarget::ProcessColumnsTrigger,
+                IconId::More,
+                t("proc.choose_columns"),
+                Message::OpenProcessColumnsMenu,
+                true,
+            )
+        } else {
+            focus::button(
+                theme_snapshot,
+                FocusTarget::ProcessColumnsTrigger,
+                t("proc.choose_columns"),
+                Message::OpenProcessColumnsMenu,
+                false,
+            )
+        };
         // The column chooser floats on its trigger: anchored below the
         // button and dismissed by an outside press, instead of shoving
         // the page column down while it is open.
@@ -374,12 +405,23 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         // and the selection hint live in the anchored overflow menu, so
         // the right edge never paints half a group (the GPUI action bar
         // keeps the same vocabulary in its anchored overflow menu).
-        let overflow_trigger = focus::ghost_button(
-            theme_snapshot,
-            FocusTarget::ProcessActionsTrigger,
-            t("common.actions"),
-            Message::OpenProcessActionsMenu,
-        );
+        let overflow_trigger = if compact_actions {
+            crate::ui::components::icon_button(
+                theme_snapshot,
+                FocusTarget::ProcessActionsTrigger,
+                IconId::More,
+                t("common.actions"),
+                Message::OpenProcessActionsMenu,
+                true,
+            )
+        } else {
+            focus::ghost_button(
+                theme_snapshot,
+                FocusTarget::ProcessActionsTrigger,
+                t("common.actions"),
+                Message::OpenProcessActionsMenu,
+            )
+        };
         let overflow_panel = column![
             text(t("common.actions"))
                 .size(f32::from(FONT_13))

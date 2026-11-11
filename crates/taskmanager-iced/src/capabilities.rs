@@ -33,18 +33,10 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         // overlay policy forwards the outside press to the background target,
         // matching the GPUI reference.
         (DropdownMenu, Ported),
-        // Behavior anchors: ui::perf_rail::tests::tooltip_behavior_tests::
-        // mounted_rail_tooltip_opens_on_hover_and_dismisses_on_click_or_escape
-        // and focused_rail_tooltip_opens_on_focus_and_escape_dismisses drive
-        // the focused rail readout through Iced widget events.
-        (
-            Tooltip,
-            Divergent {
-                reason: "the focused Performance rail readout opens on keyboard focus and \
-                         dismisses on pointer click/Escape; footer and row hint badges remain \
-                         hover-only because their triggers are not focusable",
-            },
-        ),
+        // `components::Tooltip` inspects real descendant focus state and the
+        // shared keyboard-visible modality bit. Focusable hints therefore open
+        // on keyboard focus; non-focusable badges and row readouts stay hover-only.
+        (Tooltip, Ported),
         // The shared shell feedback notice owns one transient fact. Iced now
         // paints it as a non-modal floating Card-glass toast with an optional
         // keyboard-reachable dismiss action; the footer keeps the same text as
