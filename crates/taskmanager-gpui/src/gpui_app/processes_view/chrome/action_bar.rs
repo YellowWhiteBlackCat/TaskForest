@@ -14,7 +14,6 @@ use gpui::{
     AnyElement, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div,
 };
-use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::root::{Hover, RootView};
@@ -22,10 +21,11 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens::{self, UiSize};
-use taskmanager_theme::{GlassTier, Length, Theme};
+use taskmanager_theme::{Length, Theme};
 
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
+use super::glass_page_header_surface;
 use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
 use taskmanager_shell::presentation::{priority_tier_label, priority_tier_tooltip_key};
 use taskmanager_shell::{ProcessControlAvailability, ProcessControlScope, SortCol};
@@ -446,10 +446,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
 /// hairline edge and its two-layer shadow come from the shared surface
 /// primitive, so the strip cannot drift into a second glass recipe.
 fn glass_action_bar(theme: &Theme, vertical_padding: Length, content: impl IntoElement) -> Div {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
-        .radius(tokens::card_radius(theme))
-        .padding(vertical_padding)
+    glass_page_header_surface(theme, vertical_padding)
         .render()
         .flex()
         .flex_col()

@@ -5,6 +5,9 @@ Apps exposes category/application totals and real parent/child rows. Totals
 have no representative PID: batch verbs freeze their live subtree;
 single-process Properties and affinity remain unavailable on aggregate rows.
 Selection follows the rendered semantic order for both pointer and keyboard.
+Apps control bands spend one shared inset `GlassSurfaceRole::PageHeader`: the
+Card-tier fill, hairline and radius remain, while the standalone action strip
+and wide unified control band no longer stack a floating elevation shadow.
 
 Small/Standard/Large sets GPUI rem to 14/16/18px and shared control metrics;
 row density remains independent. The process header and virtualized body share

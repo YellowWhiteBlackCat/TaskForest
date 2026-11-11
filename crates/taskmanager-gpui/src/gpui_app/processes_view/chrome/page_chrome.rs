@@ -10,22 +10,21 @@ use taskmanager_ui::theme_binding::rem_length;
 use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div, px};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_ui::inputs::text_input::TextInputState;
-use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::primitives::toolbar::Toolbar;
 
 use super::action_bar::{ProcessActionBarProps, action_bar};
 use super::page_layout::{
     ProcessChromePresentation, ProcessControlPresentation, ProcessOverviewPresentation,
 };
-use super::{hierarchy_summary, status_filter_row};
+use super::{glass_page_header_surface, hierarchy_summary, status_filter_row};
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::i18n;
 use taskmanager_shell::{ProcessControlAvailability, SortCol};
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_theme::tokens::UiSize;
-use taskmanager_theme::{GlassTier, Theme};
 
 pub(super) struct ProcessOverviewProps<'a> {
     pub theme: &'a Theme,
@@ -163,10 +162,7 @@ pub(super) fn process_control_chrome(
     };
 
     match presentation.controls() {
-        ProcessControlPresentation::Unified => CardSurface::new(theme.palette())
-            .glass(GlassTier::Card)
-            .radius(tokens::card_radius(theme))
-            .padding(tokens::SPACE_2)
+        ProcessControlPresentation::Unified => glass_page_header_surface(theme, tokens::SPACE_2)
             .render()
             .flex()
             .items_center()

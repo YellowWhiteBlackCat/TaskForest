@@ -214,3 +214,85 @@ async fn wide_apps_chrome_has_a_bounded_share_and_returns_height_to_the_table(
         );
     }
 }
+
+/// Removing the redundant floating shadow keeps the geometry untouched: the
+/// compact standalone strip and the wide unified control band still admit all
+/// child controls as whole groups inside their bounded page-header surfaces.
+#[gpui::test]
+async fn apps_control_surfaces_keep_every_control_group_inside_both_layout_profiles(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (win, view) = super::wrapped_root(cx);
+    view.update(cx, |view, cx| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.processes_state
+            .expanded_apps
+            .insert("category:uncategorized".to_owned());
+        let _ = view.apply_platform_event_batch(process_batch(48), cx);
+        cx.notify();
+    });
+
+    for (width, height, surface_selector, stacked) in [
+        (720.0_f32, 480.0_f32, "tm-proc-action-surface", true),
+        (720.0_f32, 1000.0_f32, "tm-proc-action-surface", true),
+        (1180.0_f32, 780.0_f32, "tm-proc-action-surface", true),
+        (1600.0_f32, 540.0_f32, "tm-proc-action-surface", true),
+        (1920.0_f32, 540.0_f32, "tm-proc-unified-controls", false),
+        (2048.0_f32, 1080.0_f32, "tm-proc-unified-controls", false),
+    ] {
+        cx.simulate_window_resize(win.into(), size(px(width), px(height)));
+        super::draw(cx, win);
+        let mut vcx = VisualTestContext::from_window(win.into(), cx);
+        let surface = vcx
+            .debug_bounds(surface_selector)
+            .unwrap_or_else(|| panic!("{width}x{height}: {surface_selector} must render"));
+        let body = vcx
+            .debug_bounds("tm-telemetry-ready-body")
+            .expect("the committed application body must render");
+        let table = vcx
+            .debug_bounds("tm-procs-table-scroll")
+            .expect("the Apps table must retain its body slot");
+        if stacked {
+            assert!(
+                vcx.debug_bounds("tm-proc-unified-controls").is_none(),
+                "compact Apps must not paint the wide unified control band"
+            );
+        } else {
+            assert!(
+                vcx.debug_bounds("tm-proc-stacked-controls").is_none(),
+                "wide Apps must not paint the retired stacked control path"
+            );
+        }
+        for selector in [
+            "tm-proc-action-bar",
+            "tm-proc-mode-switcher",
+            "tm-proc-status-filter",
+        ] {
+            let control = vcx
+                .debug_bounds(selector)
+                .unwrap_or_else(|| panic!("{width}x{height}: {selector} must render"));
+            assert!(
+                control.origin.x >= surface.origin.x - px(0.5)
+                    && control.right() <= surface.right() + px(0.5),
+                "{width}x{height}: {selector} leaves the control surface horizontally: control={control:?}, surface={surface:?}"
+            );
+            if !stacked {
+                assert!(
+                    control.origin.y >= surface.origin.y - px(0.5)
+                        && control.bottom() <= surface.bottom() + px(0.5),
+                    "{width}x{height}: {selector} leaves the unified control surface: control={control:?}, surface={surface:?}"
+                );
+            }
+        }
+        assert!(
+            surface.origin.x >= px(0.0) && surface.right() <= px(width),
+            "{width}x{height}: {surface_selector} leaves the viewport right edge: {surface:?}"
+        );
+        assert!(
+            surface.bottom() <= body.bottom() + px(0.5)
+                && surface.bottom() <= table.origin.y + px(0.5),
+            "{width}x{height}: {surface_selector} spends the table body slot: surface={surface:?}, table={table:?}, body={body:?}"
+        );
+    }
+}

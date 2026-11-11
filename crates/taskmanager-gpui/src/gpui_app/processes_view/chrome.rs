@@ -20,7 +20,8 @@ use crate::gpui_app::root::{Hover, RootView};
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
-use taskmanager_theme::{Color, Theme};
+use taskmanager_theme::{Color, GlassSurfaceRole, Length, Theme};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 
 use super::rows::{is_numeric, sort_col_step, sort_id, visible_sort_cols};
 use taskmanager_shell::SortCol;
@@ -44,6 +45,14 @@ pub use render::{ProcessesViewProps, render_processes};
 use resize::{header_col_width, mount_resize_handle};
 use taskmanager_theme::tokens;
 
+/// The Apps control bands are page chrome, not another floating panel. The
+/// shared role owns their Card material and Inset elevation.
+pub(super) fn glass_page_header_surface(theme: &Theme, padding: Length) -> CardSurface {
+    CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::PageHeader)
+        .radius(tokens::card_radius(theme))
+        .padding(padding)
+}
+
 // ── status-filter segmented control ──────────────────────────────────────────
 
 /// Row of status-filter segments (All / Running / Sleeping / Stopped / Zombie /
@@ -56,6 +65,10 @@ mod status_filter;
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_app/processes_view/chrome_page_layout_tests.rs"]
 mod page_layout_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/processes_view/control_surface_tests.rs"]
+mod control_surface_tests;
 
 // ── column-sort header row ─────────────────────────────────────────────────────
 
