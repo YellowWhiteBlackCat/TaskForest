@@ -20,9 +20,10 @@ use taskmanager_ui_contract::IconId;
 use crate::focus::trap_modal;
 use crate::overlays::layer_stack::{LayerBackfill, ModalSpec, PaletteScrim};
 use crate::primitives::button::ButtonVariant;
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use crate::primitives::icon_button::{IconButton, IconButtonState};
 use crate::{BackfillBuilder, ElementBuilder, OptBoolCallback, OptCallback};
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 

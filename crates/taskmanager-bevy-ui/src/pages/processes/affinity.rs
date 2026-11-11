@@ -38,7 +38,7 @@ use crate::widgets::layout::MODAL_PANEL_WIDTH_REM;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_application::ProcessAffinityRequest;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 
 /// The CPU button's width, in rem: the widest button label ("CPU 63") plus
 /// its air, so every core in the grid is the same size.
@@ -279,11 +279,12 @@ pub(crate) fn affinity_modal_scene(
     }) as Box<dyn Scene>;
 
     let radius_rem = palette.panel_radius_rem();
-    let grain =
-        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
-    let modal_fill = palette.glass_modal_fill;
-    let modal_edge = palette.glass_modal_edge;
-    let modal_shadow = palette.glass_shadow(GlassTier::Modal);
+    let role = GlassSurfaceRole::Dialog;
+    let tier = role.tier();
+    let grain = Box::new(noise_overlay_scene(tier, palette, radius_rem)) as Box<dyn Scene>;
+    let modal_fill = palette.glass_fill(tier);
+    let modal_edge = palette.glass_edge(tier);
+    let modal_shadow = crate::glass::surface_shadow(role, palette);
     let panel = Box::new(bsn! {
         Node {
             width: rem(MODAL_PANEL_WIDTH_REM),
@@ -292,13 +293,13 @@ pub(crate) fn affinity_modal_scene(
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_24())),
             border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
-            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
+            border: UiRect::all(Val::Rem(tier.edge_width_rem())),
         }
         BackgroundColor({ modal_fill })
         BorderColor::all(modal_edge)
         BoxShadow({ modal_shadow })
         OpticalGlassCard {
-            tier: GlassTier::Modal,
+            tier: {tier},
             enabled: true,
         }
         Children [

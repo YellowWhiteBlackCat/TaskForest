@@ -14,6 +14,7 @@ use crate::ui::virtual_list::resolve_table_window;
 use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visible};
 use taskmanager_shell::{ProcessControlScope, SortDir};
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -433,7 +434,9 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         let overflow: Element<'_, Message, Theme, Renderer> = if app.process_actions_menu_open() {
             let panel: Element<'_, Message, Theme, Renderer> =
                 iced::widget::container(overflow_panel)
-                    .style(move |_| theme::panel_style(theme_snapshot))
+                    .style(move |_| {
+                        theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Menu)
+                    })
                     .padding(8)
                     .into();
             crate::ui::components::Popover::new(

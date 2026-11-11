@@ -10,7 +10,7 @@
 //! shell decides whether it is earned.
 
 use crate::app::ContentSlot;
-use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, surface_material};
 use crate::icons::icon_scene;
 use crate::palette::{UiPalette, space_8, space_12};
 use crate::scene_attach::attach_child;
@@ -33,7 +33,7 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{FeedbackSeverity, FeedbackSource};
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_ui_contract::IconId;
 
 /// How long the confirmation toast stays on screen.
@@ -155,6 +155,8 @@ pub(crate) fn scene(message: String, palette: &UiPalette) -> Box<dyn Scene> {
     // The toast floats half a control height above the bottom edge: the
     // bottom safety band belongs to the budget, not to a clipping accident.
     let inset = palette.control_height_rem * 0.5;
+    let role = GlassSurfaceRole::Toast;
+    let tier = role.tier();
     let GlassPanelMaterial {
         fill,
         edge,
@@ -162,7 +164,7 @@ pub(crate) fn scene(message: String, palette: &UiPalette) -> Box<dyn Scene> {
         edge_width_rem,
         radius_rem,
         grain,
-    } = card_material(palette);
+    } = surface_material(role, palette);
     Box::new(bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -188,7 +190,7 @@ pub(crate) fn scene(message: String, palette: &UiPalette) -> Box<dyn Scene> {
              BorderColor::all(edge)
              BoxShadow({ shadows })
              OpticalGlassCard {
-                 tier: GlassTier::Card,
+                 tier: {tier},
                  enabled: true,
              }
              Pickable::IGNORE

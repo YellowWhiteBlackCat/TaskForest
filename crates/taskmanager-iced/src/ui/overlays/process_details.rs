@@ -16,7 +16,7 @@ use taskmanager_shell::presentation::process_insight_facet_label;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::MISSING_VALUE;
-use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassSurfaceRole, tokens};
 
 use crate::app::Message;
 use crate::focus;
@@ -443,7 +443,11 @@ fn environment_section<'a>(
         text(heading).size(f32::from(tokens::FONT_13)),
         body,
     ])
-    .style(move |_| crate::theme::card_style(theme_snapshot))
+    .style(move |_| {
+        let mut style = crate::theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Dialog);
+        style.snap = true;
+        style
+    })
     .padding(8)
     .width(Length::Fill)
     .into()

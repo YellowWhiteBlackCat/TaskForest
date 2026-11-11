@@ -16,8 +16,9 @@ use taskmanager_theme::{GlassTier, Theme};
 /// panel can never drift into a private fill/edge/shadow recipe.
 #[test]
 fn the_menu_panel_paints_the_shared_surface_contract() {
-    use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+    use crate::primitives::card_surface::CardSurface;
     use crate::theme_binding::glass_fill;
+    use taskmanager_theme::GlassSurfaceRole;
 
     let theme = Theme::dark();
     let mut panel = super::menu_panel_surface(theme.palette());

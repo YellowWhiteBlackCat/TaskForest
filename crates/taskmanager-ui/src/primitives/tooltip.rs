@@ -9,7 +9,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use crate::ElementBuilder;
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, App, Context, ElementId, FocusHandle, FocusOutEvent, InteractiveElement,
@@ -17,6 +17,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Subscription, Task, Window, anchored, deferred, div, point,
     px,
 };
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{GlassLayer, Palette, Theme};
 

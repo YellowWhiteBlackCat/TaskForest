@@ -15,7 +15,7 @@ use taskmanager_application::{RefreshRequest, SourceNotice, SourceStateKind, mer
 
 use taskmanager_application::i18n::control_error_detail;
 use taskmanager_shell::presentation::ALERT_MARKER;
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use zhuge_ui_kit_iced::surface;
 
@@ -102,8 +102,8 @@ pub(crate) fn card_surface(theme_snapshot: &Theme) -> iced::widget::container::S
 
 /// Inline charts retain the card material without casting overlapping shadows.
 pub(crate) fn chart_surface(theme_snapshot: &Theme) -> container::Style {
-    let mut style = card_surface(theme_snapshot);
-    style.shadow = iced::Shadow::default();
+    let mut style = theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::InlinePlot);
+    style.snap = true;
     style
 }
 

@@ -23,7 +23,7 @@ use taskmanager_shell::presentation::missing_value;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 
 use super::tables::{
     InventoryTableKey, info_header_cell, inventory_row_height, inventory_table_key,
@@ -377,7 +377,7 @@ fn user_menu_panel(
         .spacing(6)
         .padding(8),
     )
-    .style(move |_| theme::panel_style(&theme_snapshot))
+    .style(move |_| theme::glass_surface_style(&theme_snapshot, GlassSurfaceRole::Menu))
     .width(Length::Shrink)
     .into()
 }

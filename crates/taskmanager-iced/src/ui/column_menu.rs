@@ -12,7 +12,7 @@ use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::SortCol;
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 
 use crate::app::{FocusTarget, Message, keyboard_resize_width};
 use crate::{IcedApp, focus, theme};
@@ -85,7 +85,7 @@ pub(super) fn render<'a>(
         menu = menu.push(row(steppers).spacing(6));
     }
     container(menu.spacing(6).padding(8))
-        .style(move |_| theme::panel_style(theme_snapshot))
+        .style(move |_| theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Menu))
         .width(Length::Fill)
         .into()
 }

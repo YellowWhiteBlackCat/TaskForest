@@ -195,8 +195,8 @@ fn tooltip_content_wears_the_card_glass_tier() {
 /// its gradient fill and layered shadow cannot drift into a private recipe.
 #[test]
 fn the_tooltip_paints_the_shared_surface_contract() {
-    use crate::primitives::card_surface::GlassSurfaceRole;
     use crate::theme_binding::{glass_fill, glass_shadow};
+    use taskmanager_theme::GlassSurfaceRole;
 
     let theme = Theme::dark();
     let mut owned = crate::primitives::card_surface::CardSurface::unpadded_for_role(

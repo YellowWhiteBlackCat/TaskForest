@@ -6,7 +6,9 @@
 
 use super::hover::CurveSeries;
 use super::*;
-use crate::glass::{GlassPanelMaterial, OpticalBackdropSource, OpticalGlassCard, card_material};
+use crate::glass::{
+    GlassPanelMaterial, OpticalBackdropSource, OpticalGlassCard, card_material, surface_material,
+};
 use crate::widgets::chart::canvas::{CANVAS_FILL_ALPHA, CanvasFill, CanvasGrid};
 use crate::widgets::chart::{
     ChartCanvas, ChartContent, ChartHoverLabel, ChartPaintState, ChartPointer, ChartStyle,
@@ -18,7 +20,7 @@ use bevy::text::TextColor;
 use taskforest_core::core::percent::percent_text;
 use taskmanager_shell::presentation::GraphSummaryItem;
 use taskmanager_shell::presentation::bytes;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::{GlassSurfaceRole, GlassTier};
 
 /// The value badge's edge inset and padding, matching the GPUI chart.
 const CURVE_BADGE_INSET_PX: f32 = 2.0;
@@ -213,6 +215,7 @@ fn curve_badge_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette) 
 /// as a surface, not as loose text floating over the grid, and it occludes the
 /// plot behind it instead of competing with it.
 fn summary_pill_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette) -> Box<dyn Scene> {
+    let role = GlassSurfaceRole::InlinePlot;
     let GlassPanelMaterial {
         fill,
         edge,
@@ -220,7 +223,7 @@ fn summary_pill_scene(curve: SystemCurve, shell: &ShellApp, palette: &UiPalette)
         edge_width_rem,
         radius_rem: _,
         grain: _,
-    } = card_material(palette);
+    } = surface_material(role, palette);
     let items = [
         GraphSummaryItem::Latest,
         GraphSummaryItem::Average,

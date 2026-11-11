@@ -9,7 +9,7 @@
 use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px, relative};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
-use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
@@ -22,8 +22,8 @@ use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot,
 };
 use taskmanager_application::i18n;
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{GlassSurfaceRole, Theme};
 
 // ── boot timeline waterfall (BN-05) ──────────────────────────────────────────
 //

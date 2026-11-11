@@ -22,9 +22,10 @@ use gpui::{
 use taskmanager_theme::{Palette, Theme};
 use taskmanager_ui_contract::IconId;
 
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use crate::primitives::scrollbar::{SCROLLBAR_WIDTH, Scrollbar, ScrollbarShow};
 use crate::theme_binding::glass_shadow;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::GlassTier;
 
 /// The menu panel's glass role. A menu is a floating card, not a modal or the

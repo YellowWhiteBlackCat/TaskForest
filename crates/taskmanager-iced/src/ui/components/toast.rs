@@ -11,7 +11,7 @@ use iced::widget::{container, row, text};
 use iced::{Alignment, Background, Length, Padding};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::{FeedbackPresentation, FeedbackTone};
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 
 use crate::app::{FocusTarget, Message};
@@ -69,7 +69,11 @@ pub(crate) fn toast<'a>(
             .width(Length::Fill),
     )
     .clip(true)
-    .style(move |_| crate::theme::card_style(theme_snapshot))
+    .style(move |_| {
+        let mut style = crate::theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Toast);
+        style.snap = true;
+        style
+    })
     .padding(Padding::from([
         f32::from(tokens::SPACE_4),
         f32::from(tokens::SPACE_12),

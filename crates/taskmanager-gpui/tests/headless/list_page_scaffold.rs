@@ -2,6 +2,7 @@
 
 use super::*;
 use gpui::{AppContext, Styled, TestAppContext, VisualTestContext, px, size};
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::{GlassTier, Length, Theme, tokens};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::{glass_fill, glass_shadow, rem_length};

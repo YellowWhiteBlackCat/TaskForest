@@ -28,7 +28,7 @@ use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_shell::presentation::service_diagnostics_rows;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 
 use crate::glass::{OpticalGlassCard, noise_overlay_scene};
 
@@ -118,11 +118,12 @@ pub(crate) fn service_details_modal_scene(
     let row_margin_rem = palette.rem_ratio(space_8());
     let footer_margin_rem = palette.rem_ratio(space_8());
     let radius_rem = palette.panel_radius_rem();
-    let shadow = palette.glass_shadow(GlassTier::Modal);
-    let fill = palette.glass_modal_fill;
-    let edge = palette.glass_modal_edge;
-    let grain =
-        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
+    let role = GlassSurfaceRole::Dialog;
+    let tier = role.tier();
+    let shadow = crate::glass::surface_shadow(role, palette);
+    let fill = palette.glass_fill(tier);
+    let edge = palette.glass_edge(tier);
+    let grain = Box::new(noise_overlay_scene(tier, palette, radius_rem)) as Box<dyn Scene>;
     let panel = Box::new(bsn! {
         Node {
             width: rem(SERVICE_DETAILS_PANEL_WIDTH_REM),
@@ -130,14 +131,14 @@ pub(crate) fn service_details_modal_scene(
             flex_direction: FlexDirection::Column,
             row_gap: Val::Rem(modal_gap_rem),
             padding: UiRect::all(Val::Rem(modal_padding_rem)),
-            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
+            border: UiRect::all(Val::Rem(tier.edge_width_rem())),
             border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
         BackgroundColor({ fill })
         BorderColor::all(edge)
         BoxShadow({ shadow })
         OpticalGlassCard {
-            tier: GlassTier::Modal,
+            tier: {tier},
             enabled: true,
         }
         Children [

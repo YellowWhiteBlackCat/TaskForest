@@ -2,7 +2,9 @@ use super::*;
 use crate::theme_binding::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use iced::Font;
 use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{FONT_MISANS_VF, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin};
+use taskmanager_theme::{
+    FONT_MISANS_VF, GlassSurfaceRole, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin,
+};
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 fn combined_shadow_alpha(ink_alpha: f32, opacity: f32) -> f32 {
@@ -134,15 +136,7 @@ fn navigation_chrome_uses_the_sidebar_glass_tier() {
         Some(glass_fill(&theme, GlassTier::Sidebar))
     );
     assert_eq!(chrome.border.color, color(theme.glass_chrome().edge));
-    assert_eq!(
-        chrome.shadow.color,
-        color(
-            theme
-                .glass_chrome()
-                .shadow
-                .with_alpha(combined_shadow_alpha(theme.glass_chrome().shadow.a, 0.45,))
-        )
-    );
+    assert_eq!(chrome.shadow, iced::Shadow::default());
 }
 
 #[test]
@@ -373,6 +367,34 @@ fn glass_styles_paint_the_shared_gradient_stops() {
             .collect();
         let [top, bottom] = theme.glass_gradient(GlassTier::Card);
         assert_eq!(stops, vec![(0.0, color(top)), (1.0, color(bottom))]);
+    }
+}
+
+#[test]
+fn semantic_surface_styles_follow_the_shared_role_mapping() {
+    let theme = Theme::dark();
+    for role in GlassSurfaceRole::ALL {
+        let style = glass_surface_style(&theme, role);
+        let tier = role.tier();
+        assert_eq!(
+            style.background,
+            Some(glass_fill(&theme, tier)),
+            "{role:?} uses its shared glass tier fill"
+        );
+        assert_eq!(
+            style.border,
+            glass_border(&theme, tier),
+            "{role:?} uses its shared glass tier edge"
+        );
+        assert_eq!(
+            style.shadow,
+            if role.elevation().casts_shadow() {
+                glass_shadow(&theme, tier)
+            } else {
+                iced::Shadow::default()
+            },
+            "{role:?} follows the shared floating/inset contract"
+        );
     }
 }
 

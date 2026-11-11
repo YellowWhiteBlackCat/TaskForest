@@ -23,7 +23,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::{ImageNode, NodeImageMode};
 use taskmanager_assets::{GLASS_NOISE_RGBA_SIZE, glass_noise_rgba};
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::{GlassSurfaceRole, GlassTier};
 
 use crate::palette::UiPalette;
 
@@ -120,6 +120,23 @@ pub(crate) fn card_material(palette: &UiPalette) -> GlassPanelMaterial {
     panel_material(GlassTier::Card, palette)
 }
 
+/// Resolve one semantic surface role through the shared theme mapping.
+pub(crate) fn surface_material(role: GlassSurfaceRole, palette: &UiPalette) -> GlassPanelMaterial {
+    let mut material = panel_material(role.tier(), palette);
+    material.shadows = surface_shadow(role, palette);
+    material
+}
+
+/// Resolve the role's shared shadow projection without changing its other
+/// frontend-specific surface colors or geometry.
+pub(crate) fn surface_shadow(role: GlassSurfaceRole, palette: &UiPalette) -> Vec<ShadowStyle> {
+    if role.elevation().casts_shadow() {
+        palette.glass_shadow(role.tier())
+    } else {
+        Vec::new()
+    }
+}
+
 /// One tiled grain overlay, absolutely filling its glass parent.
 pub(crate) fn noise_overlay_scene(
     tier: GlassTier,
@@ -153,6 +170,10 @@ pub(crate) fn noise_overlay_scene(
         ImageNode
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/headless/glass_surface_roles.rs"]
+mod surface_tests;
 
 /// Observer: resolve the shared grain handle and paint it with the tier's
 /// opacity. The image itself is near-white, so multiplying its luminance by

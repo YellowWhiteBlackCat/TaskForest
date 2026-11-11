@@ -40,7 +40,7 @@ use std::marker::PhantomData;
 use taskforest_core::core::hardware::HardwareInfo;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
 use taskmanager_shell::presentation::system_information::{SystemInformationGroup, groups};
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_ui_contract::{OverlayKindOf, OverlaySlot};
 
 /// The modal surface's maximum width, in rem: the widest a shell surface
@@ -389,11 +389,12 @@ pub(crate) fn modal_scene(
     let modal_padding_rem = palette.rem_ratio(space_24());
     let footer_gap_rem = palette.rem_ratio(space_8());
     let radius_rem = palette.panel_radius_rem();
-    let shadow = palette.glass_shadow(GlassTier::Modal);
-    let fill = palette.glass_modal_fill;
-    let edge = palette.glass_modal_edge;
-    let grain =
-        Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius_rem)) as Box<dyn Scene>;
+    let role = GlassSurfaceRole::Dialog;
+    let tier = role.tier();
+    let shadow = crate::glass::surface_shadow(role, palette);
+    let fill = palette.glass_fill(tier);
+    let edge = palette.glass_edge(tier);
+    let grain = Box::new(noise_overlay_scene(tier, palette, radius_rem)) as Box<dyn Scene>;
     bsn! {
         Node { width: percent(100), height: percent(100), position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
@@ -401,12 +402,12 @@ pub(crate) fn modal_scene(
         Children [
             Node { width: percent(90), max_width: rem(WINDOW_SURFACE_MAX_WIDTH_REM), height: percent(90), max_height: percent(90), min_height: Val::Rem(0.0), min_width: Val::Rem(0.0),
                 flex_direction: FlexDirection::Column, row_gap: Val::Rem(modal_gap_rem), padding: UiRect::all(Val::Rem(modal_padding_rem)),
-                border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
+                border: UiRect::all(Val::Rem(tier.edge_width_rem())), border_radius: BorderRadius::all(Val::Rem(radius_rem)) }
             BackgroundColor({ fill })
             BorderColor::all(edge)
             BoxShadow({ shadow })
             OpticalGlassCard {
-                tier: GlassTier::Modal,
+                tier: {tier},
                 enabled: true,
             }
             Children [

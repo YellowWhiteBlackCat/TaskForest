@@ -11,70 +11,9 @@ use gpui::{
     AbsoluteLength, AnyElement, App, DefiniteLength, IntoElement, ParentElement, RenderOnce,
     Styled, Window, div, rems,
 };
-use taskmanager_theme::{Color, GlassTier, Length, Palette, tokens};
-
-/// The glass role a shared overlay surface plays.
-///
-/// Product roles, not a second elevation ladder: each variant resolves to
-/// exactly one [`GlassTier`] and one [`SurfaceElevation`], so a menu, a toast,
-/// a tooltip and a modal cannot each re-derive its own tier/elevation pair.
-/// Floating roles cast the tier's shared two-layer shadow; the inset chart
-/// hint keeps the same material without a second elevation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GlassSurfaceRole {
-    /// Persistent side navigation or titlebar chrome.
-    Chrome,
-    /// A page header that already sits inside the page viewport.
-    PageHeader,
-    /// Anchored popup / context / dropdown menu panel.
-    Menu,
-    /// Transient status receipt card.
-    Toast,
-    /// Hover or keyboard hint card.
-    Tooltip,
-    /// True modal dialog panel.
-    Dialog,
-    /// Inline timeline / plot bar inside an already-elevated card.
-    InlinePlot,
-}
-
-impl GlassSurfaceRole {
-    /// The single glass tier for this role (ADR-061).
-    #[must_use]
-    pub const fn tier(self) -> GlassTier {
-        match self {
-            Self::Chrome => GlassTier::Sidebar,
-            Self::Menu | Self::Toast | Self::Tooltip | Self::PageHeader | Self::InlinePlot => {
-                GlassTier::Card
-            }
-            Self::Dialog => GlassTier::Modal,
-        }
-    }
-
-    /// The single elevation contract for this role.
-    #[must_use]
-    pub const fn elevation(self) -> SurfaceElevation {
-        match self {
-            Self::Menu | Self::Toast | Self::Tooltip | Self::Dialog => SurfaceElevation::Floating,
-            Self::Chrome | Self::PageHeader | Self::InlinePlot => SurfaceElevation::Inset,
-        }
-    }
-}
-
-/// How a glass surface carries elevation.
-///
-/// A surface that floats above its backdrop casts the tier's two-layer soft
-/// shadow. A surface that lives INSIDE another elevated surface paints the
-/// same glass material and the same hairline edge, but no shadow: a second
-/// elevation there would read as a double rim and darken the parent's edge.
-/// Both forms come from this one primitive so no frontend paints its own.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SurfaceElevation {
-    /// The surface floats above its backdrop and casts the tier's shadow.
-    Floating,
-    /// The surface is inset in another surface and casts no shadow.
-    Inset,
-}
+use taskmanager_theme::{
+    Color, GlassSurfaceRole, GlassTier, Length, Palette, SurfaceElevation, tokens,
+};
 
 /// A palette-owned card surface with configurable padding and fill.
 #[derive(IntoElement)]

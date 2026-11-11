@@ -6,13 +6,14 @@ use std::time::Duration;
 
 use crate::OptCallback;
 use crate::icons_binding::icon;
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, FocusHandle, InteractiveElement,
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Task, Window, div, px,
 };
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::{Palette, tokens};
 use taskmanager_ui_contract::IconId;
 use zhuge_ui_tokens::{StatusColors, StatusKind};

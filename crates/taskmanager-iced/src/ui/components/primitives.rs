@@ -17,7 +17,7 @@ use iced::widget::{column, container, row, text};
 use iced::{Alignment, Border, Element, Length};
 use std::path::PathBuf;
 use taskmanager_theme::color::on_accent;
-use taskmanager_theme::{Color, Theme, tokens};
+use taskmanager_theme::{Color, GlassSurfaceRole, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 
 use super::IcedElement;
@@ -200,7 +200,7 @@ fn tooltip_surface<'a>(theme: &'a Theme, body: iced::widget::Text<'a>) -> IcedEl
     let tip_fg = crate::theme_binding::color(theme.palette().fg);
     container(body.size(f32::from(tokens::FONT_11)).color(tip_fg))
         .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
-        .style(move |_| theme::panel_style(theme))
+        .style(move |_| theme::glass_surface_style(theme, GlassSurfaceRole::Tooltip))
         .into()
 }
 

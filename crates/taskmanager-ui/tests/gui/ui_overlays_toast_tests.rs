@@ -1,5 +1,5 @@
 use super::{Toast, ToastEvent, ToastState};
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use crate::theme_binding::{glass_fill, glass_shadow};
 use gpui::{
     AppContext, Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
@@ -8,6 +8,7 @@ use gpui::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::GlassTier;
 use taskmanager_theme::Theme;
 use zhuge_ui_tokens::{StatusColors, StatusKind};

@@ -125,7 +125,8 @@ Bevy/Iced 基础组件与纯文本、窗口算法和中立 surface 值统一归�
   特化要说明数据/交互边界并补窄窗口、焦点和失败态回归；不得用 alias、改名 re-export 或
   forwarding facade 绕过组件边界，跨层类型从 owner crate 显式模块导入。
 - Iced 组件入口是 `components.rs`，控件族拆在 `controls.rs` 与 `controls/`；`focus.rs` 负责
-  可访问激活壳，`theme.rs`/`theme/control_measurement.rs` 负责共享玻璃与
+  可访问激活壳，`taskmanager-theme::surface` 负责语义玻璃 role 到 tier/elevation 的唯一映射，
+  Iced `theme.rs` 负责 toolkit 样式投影，`theme/control_measurement.rs` 负责
   `ControlRole`/`resolve_size` 映射。checkbox、text_input、select、progress 与按钮均有真实生产
   挂载（Users 会话动作、Network 信号条、Applications 优先级均已收敛到共享组件），原生多行
   TextEditor 与参考端一致地无多行文本语义、仅由行为测试覆盖；焦点环遵守共享输入模态策略。

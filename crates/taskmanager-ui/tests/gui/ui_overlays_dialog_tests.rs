@@ -1,8 +1,9 @@
 use super::{Dialog, panel_shadow};
 
-use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::primitives::card_surface::CardSurface;
 use crate::theme_binding::{glass_fill, glass_shadow};
 use gpui::Styled;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::HighContrast;
 use taskmanager_theme::LightDark;
 use taskmanager_theme::ResolvedFonts;

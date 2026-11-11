@@ -42,13 +42,13 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::popover::{Popover, PopoverAlign, PopoverPlacement, PopoverSide};
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_ui_contract::{
     ColumnResizePolicy, IconId, OverlayDismissCause, OverlayDismissContext, OverlayKind,
     PROCESS_COLUMNS, ProcessColumnSpec, dismiss_outcome,
 };
 
-use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, surface_material};
 use crate::input::ShellInteractionApplied;
 use crate::palette::{UiPalette, space_4, space_8, space_16};
 use crate::scene_attach::attach_child;
@@ -287,6 +287,8 @@ pub(crate) fn columns_popover_scene(
         })
         .collect();
     items.push(reset_row_scene(palette));
+    let role = GlassSurfaceRole::Menu;
+    let tier = role.tier();
     let GlassPanelMaterial {
         fill,
         edge,
@@ -294,7 +296,7 @@ pub(crate) fn columns_popover_scene(
         edge_width_rem,
         radius_rem,
         grain,
-    } = card_material(palette);
+    } = surface_material(role, palette);
     bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -311,7 +313,7 @@ pub(crate) fn columns_popover_scene(
         BorderColor::all(edge)
         BoxShadow({ shadows })
         OpticalGlassCard {
-            tier: GlassTier::Card,
+            tier: {tier},
             enabled: true,
         }
         OverrideClip

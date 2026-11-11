@@ -18,8 +18,9 @@ use taskforest_core::core::startup::{
     StartupSource,
 };
 use taskforest_core::core::{DeviceState, StartupBootEvidenceSnapshot, StartupCriticalChainNode};
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::{GlassTier, Theme};
-use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::glass_shadow;
 
 fn boot_evidence() -> StartupBootEvidenceSnapshot {

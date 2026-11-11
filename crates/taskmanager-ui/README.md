@@ -23,17 +23,14 @@ if a registry entry points at a component that does not exist.
 - `overlays/` — layer_stack, dialog, popup, context_menu, dropdown_menu, toast
 - `styled.rs` — palette-driven style helpers (no hand-written colors)
 
-`primitives/card_surface.rs` owns the shared glass material: the theme's
-translucent gradient fill, the hairline edge and the tier's two-layer soft
-shadow. `GlassSurfaceRole` is the one tier/elevation map — `Chrome` (Sidebar
-tier, inset), `Menu` / `Toast` / `Tooltip` / `PageHeader` / `InlinePlot`
-(Card tier) and `Dialog` (Modal tier, floating) — so an overlay or inset page
-header resolves its depth through `CardSurface::for_role` instead of
-hand-assembling fill + edge + shadow. `PageHeader` is inset, so it uses the
-same material without adding a second floating elevation inside the page. The
-focus ring is deliberately NOT part of this ladder: it is a keyboard-focus
-affordance with its own geometry, owned by the GPUI product's
-`elements::focus_ring`.
+`primitives/card_surface.rs` adapts the theme's shared glass roles to GPUI's
+translucent gradient fill, hairline edge and two-layer shadow. The
+toolkit-neutral `GlassSurfaceRole` tier/elevation mapping is owned by
+`taskmanager-theme`; `CardSurface::for_role` applies it without introducing a
+GPUI-only role table. Inset roles retain their material without stacking a
+second floating elevation. The focus ring is deliberately NOT part of this
+ladder: it is a keyboard-focus affordance with its own geometry, owned by the
+GPUI product's `elements::focus_ring`.
 
 ## Boundary
 

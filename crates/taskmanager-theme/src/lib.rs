@@ -19,6 +19,7 @@
 //!   are independent tokens (ADR-017 §3.1 upstream lesson).
 //! - [`optical_glass`] — the toolkit-neutral optical-glass spec, renderer
 //!   capability report, and fail-closed fallback contract (ADR-061).
+//! - [`surface`] — shared semantic glass roles and tier/elevation mapping.
 //! - [`tokens`] — semantic radius/spacing/type tokens.
 //! - [`platform`] — platform rendering compensation policy, projected by
 //!   BOTH toolkit bindings so it can never drift to one frontend (CORE-07).
@@ -39,6 +40,7 @@ pub mod palette;
 pub mod platform;
 pub mod settings;
 pub mod skins;
+pub mod surface;
 pub mod theme;
 pub mod tokens;
 
@@ -59,6 +61,7 @@ pub use settings::{
     SKIN_OVERRIDE_ENV,
 };
 pub use skins::SkinTokens;
+pub use surface::{GlassSurfaceRole, SurfaceElevation};
 pub use theme::{
     EdgeTiling, GlassLayer, GlassShadow, GlassShadowElevation, GlassShadowLayer,
     GlassShadowProjection, GlassTier, HighContrast, LightDark, Material, RadiusScale, Skin, Theme,

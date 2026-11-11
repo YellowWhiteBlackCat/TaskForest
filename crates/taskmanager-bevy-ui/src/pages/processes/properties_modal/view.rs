@@ -29,7 +29,7 @@ use taskmanager_application::{
     ProcessInsightFacet, i18n::t, process_details_vm::ProcessDetailsField,
 };
 use taskmanager_shell::presentation::process_insight_facet_label;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 
 use super::backdrop::backdrop_scene;
 use super::gpu::gpu_panel_scene;
@@ -198,14 +198,16 @@ pub(super) fn properties_modal_scene(
         Button ProcessPropertiesDismissButton ControlVisual(ControlTone::Surface, true) on(on_properties_dismiss_activated)
         Children [ Text({t("common.close").to_owned()}) TextRole(Role::Body) ] }));
     let lane = crate::widgets::scrollbar::rail_lane(UiRect::bottom(px(space_8())));
+    let role = GlassSurfaceRole::Dialog;
+    let tier = role.tier();
     let grain = Box::new(noise_overlay_scene(
-        GlassTier::Modal,
+        tier,
         palette,
         palette.panel_radius_rem(),
     )) as Box<dyn Scene>;
-    let modal_fill = palette.glass_modal_fill;
-    let modal_edge = palette.glass_modal_edge;
-    let modal_shadow = palette.glass_shadow(GlassTier::Modal);
+    let modal_fill = palette.glass_fill(tier);
+    let modal_edge = palette.glass_edge(tier);
+    let modal_shadow = crate::glass::surface_shadow(role, palette);
     bsn! {
         Node { width: percent(100), height: percent(100), position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
@@ -216,12 +218,12 @@ pub(super) fn properties_modal_scene(
                 flex_direction: FlexDirection::Column, row_gap: px(space_8()),
                 padding: UiRect::px(space_12(), space_12(), space_12(), space_16()),
                 border_radius: BorderRadius::all(px(palette.panel_radius_px)),
-                border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())) }
+                border: UiRect::all(Val::Rem(tier.edge_width_rem())) }
             BackgroundColor({ modal_fill }) ProcessPropertiesPanel
             BorderColor::all(modal_edge)
             BoxShadow({ modal_shadow })
             OpticalGlassCard {
-                tier: GlassTier::Modal,
+                tier: {tier},
                 enabled: true,
             }
             Children [

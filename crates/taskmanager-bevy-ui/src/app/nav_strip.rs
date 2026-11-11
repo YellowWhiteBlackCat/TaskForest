@@ -13,7 +13,7 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{ControlOrientation, ScrollArea, TabActivation, TabList};
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_ui_contract::IconId;
 
 use super::{NAV_TABS, Page, nav_strip_ready, nav_tab_scene, nav_trailing_scene};
@@ -29,7 +29,9 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
     let radius_rem = palette.panel_radius_rem();
     let nav_fill = palette.nav_bg;
     let nav_edge = palette.glass_sidebar_edge;
-    let shadow = palette.glass_shadow(GlassTier::Sidebar);
+    let role = GlassSurfaceRole::Chrome;
+    let tier = role.tier();
+    let shadow = crate::glass::surface_shadow(role, palette);
     let tabs: Vec<Box<dyn Scene>> = NAV_TABS
         .iter()
         .map(|&page| Box::new(nav_tab_scene(page, page == route, palette)) as Box<dyn Scene>)
@@ -46,7 +48,7 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
             align_items: AlignItems::Center,
             column_gap: Val::Rem(nav_gap_rem),
             padding: UiRect::all(Val::Rem(nav_padding_rem)),
-            border: UiRect::all(Val::Rem(GlassTier::Sidebar.edge_width_rem())),
+            border: UiRect::all(Val::Rem(tier.edge_width_rem())),
             border_radius: BorderRadius::all(Val::Rem(radius_rem)),
         }
         BackgroundColor({ nav_fill })

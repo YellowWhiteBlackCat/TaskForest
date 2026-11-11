@@ -74,6 +74,11 @@ therefore stays within the theme's single shadow-opacity budget; the tier's
 REM offsets and blur radii remain unchanged. The single-quad projection keeps
 its declared elevation reduction.
 
+`surface::GlassSurfaceRole` is the semantic surface vocabulary shared by all
+frontends. Its tier/elevation mapping is the only role map: renderer adapters
+consume the role, paint that tier, and project a shadow only for `Floating`.
+`Inset` keeps the tier's fill and edge without a second elevation.
+
 ## Optical glass contract
 
 `GlassLayer` remains the painted frosted fallback. `OpticalGlassSpec` is

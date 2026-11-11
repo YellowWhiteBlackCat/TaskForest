@@ -12,7 +12,7 @@ use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskforest_core::core::process::ProcessSignal;
 use taskmanager_application::i18n::t;
-use taskmanager_theme::{Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 
 use crate::app::{FocusTarget, Message, ProcessMenuAction};
 use crate::{focus, theme};
@@ -246,7 +246,7 @@ pub(super) fn panel(
         .spacing(6)
         .padding(8),
     )
-    .style(move |_| theme::panel_style(&theme_snapshot))
+    .style(move |_| theme::glass_surface_style(&theme_snapshot, GlassSurfaceRole::Menu))
     .width(Length::Shrink)
     .into()
 }

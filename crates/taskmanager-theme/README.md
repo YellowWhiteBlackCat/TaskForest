@@ -9,6 +9,8 @@ axis, the only address for a font family name, and the only ladder for a type
 size or weight (ADR-063). `GlassLayer` is the painted frosted fallback; the separate
 `optical_glass` contract owns REM-authored optical intent, explicit renderer
 capabilities and fail-closed fallback decisions.
+The `surface` module owns the semantic glass-surface role to tier/elevation
+mapping consumed by the frontend adapters.
 
 ## Boundary
 
@@ -31,6 +33,7 @@ specified in [`docs/TOKEN_NEUTRALITY.md`](docs/TOKEN_NEUTRALITY.md).
 ```text
 src/tokens.rs  palette.rs  color.rs    neutral layout and color tokens
 src/optical_glass.rs                    optical spec, capability and fallback rules
+src/surface.rs                          shared glass roles and tier/elevation mapping
 src/skins.rs                     skin registry — the single color source (ADR-026)
 src/theme.rs  fonts.rs           theme assembly and fonts
 src/settings.rs                   saved-axis codecs, mode preference, TM_SKIN override

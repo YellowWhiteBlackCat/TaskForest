@@ -62,10 +62,10 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_ui_contract::{OverlayDismissCause, tooltip_dismisses};
 
-use crate::glass::{GlassPanelMaterial, OpticalGlassCard, card_material};
+use crate::glass::{GlassPanelMaterial, OpticalGlassCard, surface_material};
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::scene_attach::attach_child;
 use crate::window::{AppShellRoot, Role, TextRole, WindowPalette};
@@ -246,6 +246,8 @@ pub(crate) fn tooltip_card_scene(
     palette: &UiPalette,
     max_width: Option<f32>,
 ) -> impl Scene + use<> {
+    let role = GlassSurfaceRole::Tooltip;
+    let tier = role.tier();
     let GlassPanelMaterial {
         fill,
         edge,
@@ -253,7 +255,7 @@ pub(crate) fn tooltip_card_scene(
         edge_width_rem,
         radius_rem,
         grain,
-    } = card_material(palette);
+    } = surface_material(role, palette);
     let label = text.to_string();
     let card_max_width = max_width.map_or(Val::Auto, px);
     bsn! {
@@ -278,7 +280,7 @@ pub(crate) fn tooltip_card_scene(
         BorderColor::all(edge)
         BoxShadow({ shadows })
         OpticalGlassCard {
-            tier: GlassTier::Card,
+            tier: {tier},
             enabled: true,
         }
         TooltipOverlay

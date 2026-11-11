@@ -19,7 +19,8 @@ use taskmanager_theme::color::mix;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{
-    Color, GlassShadowLayer, GlassShadowProjection, GlassTier, Length, Theme, tokens,
+    Color, GlassShadowLayer, GlassShadowProjection, GlassSurfaceRole, GlassTier, Length, Theme,
+    tokens,
 };
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
@@ -236,27 +237,35 @@ fn glass_shadow(theme: &Theme, tier: GlassTier) -> iced::Shadow {
     }
 }
 
-/// Panel surface style (dialog/tooltip/card family): the theme's card glass
-/// fill, specular edge, radius, and two-layer shadow. This is the shared
-/// floating-surface contract, not an opaque fallback.
+/// Project one semantic glass role into Iced's container style.
+#[must_use]
+pub fn glass_surface_style(theme: &Theme, role: GlassSurfaceRole) -> container::Style {
+    let palette = theme.palette();
+    let tier = role.tier();
+    container::Style {
+        background: Some(glass_fill(theme, tier)),
+        border: glass_border(theme, tier),
+        shadow: if role.elevation().casts_shadow() {
+            glass_shadow(theme, tier)
+        } else {
+            iced::Shadow::default()
+        },
+        text_color: Some(color(palette.fg)),
+        ..container::Style::default()
+    }
+}
+
+/// Generic floating card-panel style for non-role-specific content.
 #[must_use]
 pub fn panel_style(theme: &Theme) -> container::Style {
     card_glass_style(theme)
 }
 
-/// Persistent navigation chrome: the sidebar glass layer with its own edge
-/// and quieter depth. The toolbar inside the band uses ordinary control
-/// surfaces, so the chrome remains one material layer.
+/// Persistent navigation chrome: the shared Sidebar tier without a second
+/// elevation shadow.
 #[must_use]
 pub fn chrome_style(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    container::Style {
-        background: Some(glass_fill(theme, GlassTier::Sidebar)),
-        border: glass_border(theme, GlassTier::Sidebar),
-        shadow: glass_shadow(theme, GlassTier::Sidebar),
-        text_color: Some(color(palette.fg)),
-        ..container::Style::default()
-    }
+    glass_surface_style(theme, GlassSurfaceRole::Chrome)
 }
 
 /// The modal-scrim fill: the theme's own depth-wash tier so the panel reads
@@ -302,21 +311,13 @@ pub fn elevated_style_with(theme: &Theme, appear: f32) -> container::Style {
     style
 }
 
-/// The Iced modal glass: the neutral modal layer plus the elevated depth.
+/// The Iced Dialog role projected through the neutral Modal tier.
 /// The toolkit has no per-element backdrop blur, so the window-level
 /// appearance plus the translucent fill provide the platform's best frosted
 /// read; the token keeps one authority across renderers.
 #[must_use]
 pub fn elevated_glass_style(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    let fill = glass_fill(theme, GlassTier::Modal);
-    container::Style {
-        background: Some(fill),
-        border: glass_border(theme, GlassTier::Modal),
-        shadow: glass_shadow(theme, GlassTier::Modal),
-        text_color: Some(color(palette.fg)),
-        ..container::Style::default()
-    }
+    glass_surface_style(theme, GlassSurfaceRole::Dialog)
 }
 
 /// Card surface style: [`panel_style`] plus a subtle shadow — the quiet lift

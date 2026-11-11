@@ -28,10 +28,10 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::ScrollArea;
 
-use crate::glass::{OpticalGlassCard, noise_overlay_scene};
+use crate::glass::{OpticalGlassCard, surface_material, surface_shadow};
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 
 /// The menu panel's width, in rem — the type ladder's own step.
 const MENU_WIDTH_REM: f32 = 13.75;
@@ -134,13 +134,9 @@ pub(crate) fn menu_row_background(highlighted: bool, palette: &UiPalette) -> Col
 /// dark one) read as depth. The offsets ride the rem axis, so the depth
 /// scales with the user's reading size.
 ///
-/// GLASS-01: a menu is a floating *card*, not a modal — [`GlassTier`] documents
-/// `Card` as "floating cards, panels, menus, popovers" — so the panel wears the
-/// Card tier. That matches the GPUI menu panel and Iced's `panel_style`; before
-/// this the Bevy menu alone used the stronger Modal layer, which made the same
-/// menu read heavier on Bevy than on the other two frontends.
+/// GLASS-01: the shared menu role resolves to the floating Card tier.
 pub(crate) fn menu_shadow(palette: &UiPalette) -> Vec<ShadowStyle> {
-    palette.glass_shadow(GlassTier::Card)
+    surface_shadow(GlassSurfaceRole::Menu, palette)
 }
 
 /// Full render: panel + title + one row per entry, the cursor row filled by
@@ -158,9 +154,12 @@ pub(crate) fn menu_scene_at(
     let padding = palette.rem_ratio(space_8());
     let rows = menu_rows(spec, state.selection, palette);
     let shadow = menu_shadow(palette);
-    let fill = palette.glass_fill(GlassTier::Card);
-    let edge = palette.glass_edge(GlassTier::Card);
-    let grain = Box::new(noise_overlay_scene(GlassTier::Card, palette, radius)) as Box<dyn Scene>;
+    let role = GlassSurfaceRole::Menu;
+    let tier = role.tier();
+    let material = surface_material(role, palette);
+    let fill = material.fill;
+    let edge = material.edge;
+    let grain = material.grain;
     bsn! {
         Node {
             // The menu's width rides the rem axis, so it re-scales with the
@@ -170,14 +169,14 @@ pub(crate) fn menu_scene_at(
             flex_direction: FlexDirection::Column,
             row_gap: Val::Rem(row_gap),
             padding: UiRect::all(Val::Rem(padding)),
-            border: UiRect::all(Val::Rem(GlassTier::Card.edge_width_rem())),
+            border: UiRect::all(Val::Rem(tier.edge_width_rem())),
             border_radius: BorderRadius::all(Val::Rem(radius)),
         }
         BackgroundColor({ fill })
         BorderColor::all(edge)
         BoxShadow({ shadow })
         OpticalGlassCard {
-            tier: GlassTier::Card,
+            tier: {tier},
             enabled: true,
         }
         Children [

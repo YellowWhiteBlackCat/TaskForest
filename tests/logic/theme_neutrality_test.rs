@@ -41,6 +41,7 @@ const NEUTRAL_MODULES: &[&str] = &[
     "crates/taskmanager-theme/src/platform.rs",
     "crates/taskmanager-theme/src/fonts.rs",
     "crates/taskmanager-theme/src/detection.rs",
+    "crates/taskmanager-theme/src/surface.rs",
 ];
 
 fn repository() -> PathBuf {

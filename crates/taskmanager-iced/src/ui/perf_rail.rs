@@ -33,6 +33,7 @@ use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::power::PowerSupplySnapshot;
 use taskforest_core::core::sensors::{SensorCenterSnapshot, SensorQuantity, SensorReading};
 use taskmanager_application::i18n::t;
+use taskmanager_theme::GlassSurfaceRole;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::{Theme, tokens};
@@ -645,7 +646,7 @@ fn device_card(
         .spacing(2),
     )
     .padding([6, 8])
-    .style(move |_| theme::panel_style(&tooltip_surface))
+    .style(move |_| theme::glass_surface_style(&tooltip_surface, GlassSurfaceRole::Tooltip))
     .into();
     crate::ui::components::Tooltip::new(card, tooltip_content)
         .with_focus_visible(theme_snapshot.focus_visible())

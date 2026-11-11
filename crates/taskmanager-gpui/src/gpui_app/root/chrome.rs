@@ -46,11 +46,12 @@ use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
 use taskmanager_assets::product;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowControls, WindowCorner};
 use taskmanager_ui::brand_logo_image;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
-use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 
 /// The CSD titlebar: drag handle + centered window title + per-platform window
 /// controls. macOS puts traffic-lights on the left; GNOME/KDE/Windows put

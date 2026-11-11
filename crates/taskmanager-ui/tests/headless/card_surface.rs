@@ -14,62 +14,12 @@ fn theme() -> Theme {
     Theme::dark()
 }
 
-/// The overlay roles resolve to distinct product tiers and elevations, so no
-/// frontend keeps a private tier/elevation table.
-#[test]
-fn overlay_roles_resolve_one_tier_and_one_elevation() {
-    assert_eq!(GlassSurfaceRole::Chrome.tier(), GlassTier::Sidebar);
-    assert_eq!(GlassSurfaceRole::PageHeader.tier(), GlassTier::Card);
-    assert_eq!(GlassSurfaceRole::Menu.tier(), GlassTier::Card);
-    assert_eq!(GlassSurfaceRole::Toast.tier(), GlassTier::Card);
-    assert_eq!(GlassSurfaceRole::Tooltip.tier(), GlassTier::Card);
-    assert_eq!(GlassSurfaceRole::Dialog.tier(), GlassTier::Modal);
-    assert_eq!(GlassSurfaceRole::InlinePlot.tier(), GlassTier::Card);
-
-    assert_eq!(
-        GlassSurfaceRole::Chrome.elevation(),
-        SurfaceElevation::Inset
-    );
-    assert_eq!(
-        GlassSurfaceRole::PageHeader.elevation(),
-        SurfaceElevation::Inset
-    );
-    assert_eq!(
-        GlassSurfaceRole::Menu.elevation(),
-        SurfaceElevation::Floating
-    );
-    assert_eq!(
-        GlassSurfaceRole::Toast.elevation(),
-        SurfaceElevation::Floating
-    );
-    assert_eq!(
-        GlassSurfaceRole::Tooltip.elevation(),
-        SurfaceElevation::Floating
-    );
-    assert_eq!(
-        GlassSurfaceRole::Dialog.elevation(),
-        SurfaceElevation::Floating
-    );
-    assert_eq!(
-        GlassSurfaceRole::InlinePlot.elevation(),
-        SurfaceElevation::Inset
-    );
-}
-
 /// Every floating role's shared surface paints its tier's layered shadow;
 /// every inset role paints the same material without a second elevation.
 #[test]
 fn every_overlay_role_uses_the_shared_surface_contract() {
     let theme = theme();
-    for role in [
-        GlassSurfaceRole::Chrome,
-        GlassSurfaceRole::PageHeader,
-        GlassSurfaceRole::Menu,
-        GlassSurfaceRole::Toast,
-        GlassSurfaceRole::Tooltip,
-        GlassSurfaceRole::Dialog,
-        GlassSurfaceRole::InlinePlot,
-    ] {
+    for role in GlassSurfaceRole::ALL {
         let surface = CardSurface::for_role(theme.palette(), role);
         assert_eq!(surface.tier(), Some(role.tier()));
         assert_eq!(surface.elevation(), role.elevation());

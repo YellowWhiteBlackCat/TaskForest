@@ -45,7 +45,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
 use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::presentation::process_batch_action_label;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
@@ -484,16 +484,18 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
     let panel_padding_rem = palette.rem_ratio(space_24());
     let footer_gap_rem = palette.rem_ratio(space_16());
     let footer_margin_rem = palette.rem_ratio(space_8());
-    let shadow = palette.glass_shadow(GlassTier::Modal);
-    let fill = palette.glass_modal_fill;
-    let edge = palette.glass_modal_edge;
+    let role = GlassSurfaceRole::Dialog;
+    let tier = role.tier();
+    let shadow = crate::glass::surface_shadow(role, palette);
+    let fill = palette.glass_fill(tier);
+    let edge = palette.glass_edge(tier);
     // The frozen collateral list rides under the echoed body: the danger
     // confirmation shows WHICH processes the action reaches, in the
     // hierarchy that was frozen at arming time. A plain selection batch has
     // no hierarchy, so the list is absent and the flat echo stays.
     let collateral: Option<Box<dyn Scene>> =
         (!view.collateral.is_empty()).then(|| collateral_list_scene(&view.collateral, palette));
-    let grain = Box::new(noise_overlay_scene(GlassTier::Modal, palette, radius)) as Box<dyn Scene>;
+    let grain = Box::new(noise_overlay_scene(tier, palette, radius)) as Box<dyn Scene>;
     bsn! {
         Node {
             width: rem(MODAL_PANEL_WIDTH_REM),
@@ -501,14 +503,14 @@ fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scen
             flex_direction: FlexDirection::Column,
             row_gap: Val::Rem(panel_gap_rem),
             padding: UiRect::all(Val::Rem(panel_padding_rem)),
-            border: UiRect::all(Val::Rem(GlassTier::Modal.edge_width_rem())),
+            border: UiRect::all(Val::Rem(tier.edge_width_rem())),
             border_radius: BorderRadius::all(Val::Rem(radius)),
         }
         BackgroundColor({ fill })
         BorderColor::all(edge)
         BoxShadow({ shadow })
         OpticalGlassCard {
-            tier: GlassTier::Modal,
+            tier: {tier},
             enabled: true,
         }
         Children [
