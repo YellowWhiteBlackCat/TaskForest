@@ -34,6 +34,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry};
@@ -104,6 +105,7 @@ pub(crate) struct DeviceChart {
     pub max: f32,
     pub grid_color: Color,
     pub smooth: bool,
+    pub sliding: bool,
     /// Hover readout enabled (the main per-device graphs).
     pub hover: bool,
     /// The unit family the hover readout formats its value in — the same
@@ -178,6 +180,8 @@ pub(crate) struct DeviceChartState {
     /// The hovered sample index, updated through `update` on cursor motion
     /// (when hover is enabled).
     pub(crate) hover: HoverState,
+    slide: RefCell<crate::perf_chart::SeriesSlide>,
+    slide_fingerprint: RefCell<u32>,
     data_cache: Cache,
     overlay_cache: Cache,
     data_fingerprint: RefCell<DeviceChartDataFingerprint>,
@@ -199,8 +203,22 @@ impl canvas::Program<Message> for DeviceChart {
         }
         match event {
             canvas::Event::Mouse(mouse::Event::CursorMoved { .. }) => {
+                let phase =
+                    state
+                        .slide
+                        .borrow_mut()
+                        .advance(&self.samples, self.sliding, Instant::now());
                 let next = cursor.position_over(bounds).and_then(|position| {
-                    hovered_index(position.x, bounds.width, self.samples.len())
+                    if let crate::perf_chart::SlidePhase::Sliding { progress } = phase {
+                        state.slide.borrow().index_at_x(
+                            self.samples.len(),
+                            bounds.width,
+                            progress,
+                            position.x,
+                        )
+                    } else {
+                        hovered_index(position.x, bounds.width, self.samples.len())
+                    }
                 });
                 if next != state.hover.index {
                     state.hover.index = next;
@@ -238,6 +256,15 @@ impl canvas::Program<Message> for DeviceChart {
             *state.data_fingerprint.borrow_mut() = data_fp.clone();
             state.data_cache.clear();
         }
+        let phase = state
+            .slide
+            .borrow_mut()
+            .advance(&self.samples, self.sliding, Instant::now());
+        let phase_key = phase.progress().to_bits();
+        if *state.slide_fingerprint.borrow() != phase_key {
+            *state.slide_fingerprint.borrow_mut() = phase_key;
+            state.data_cache.clear();
+        }
         let overlay_fp = DeviceChartOverlayFingerprint {
             hover_index: state.hover.index,
             data: data_fp,
@@ -264,6 +291,7 @@ impl canvas::Program<Message> for DeviceChart {
         let grid_color = self.grid_color;
         let smooth = self.smooth;
         let scale = self.scale;
+        let slide = state.slide.borrow();
         let tick_color = self.readout.fg.scale_alpha(AXIS_TICK_ALPHA);
         let data_geometry = state.data_cache.draw(renderer, bounds.size(), |frame| {
             let size = frame.size();
@@ -283,7 +311,14 @@ impl canvas::Program<Message> for DeviceChart {
                     tick_color,
                 );
             }
-            for points in series_point_runs_in_range(samples, size, min, max) {
+            let runs = if let crate::perf_chart::SlidePhase::Sliding { progress } = phase {
+                slide
+                    .points_in_range(samples.len(), size, min, max, progress)
+                    .unwrap_or_else(|| series_point_runs_in_range(samples, size, min, max))
+            } else {
+                series_point_runs_in_range(samples, size, min, max)
+            };
+            for points in runs {
                 if points.len() < 2 {
                     continue;
                 }
@@ -336,8 +371,14 @@ impl canvas::Program<Message> for DeviceChart {
             // (`ChartSlots::spread`) with the drawn series — the vertical
             // rule, the snap dot, and the readout all land on the sample the
             // cursor is over, never beside it (GPUI hover parity).
-            let slots = ChartSlots::spread(samples.len(), size.width);
-            let x = slots.x(index);
+            let x = match phase {
+                crate::perf_chart::SlidePhase::Sliding { progress } => slide
+                    .sample_position(samples.len(), size.width, progress, index)
+                    .unwrap_or_else(|| ChartSlots::spread(samples.len(), size.width).x(index)),
+                crate::perf_chart::SlidePhase::Settled => {
+                    ChartSlots::spread(samples.len(), size.width).x(index)
+                }
+            };
             let value = samples
                 .get(index)
                 .copied()
@@ -480,6 +521,7 @@ pub(crate) fn primary_graph_height(compact: bool) -> Length {
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct GraphPrefs {
     pub(crate) smooth: bool,
+    pub(crate) sliding: bool,
     pub(crate) max_override: Option<f32>,
     /// Hover readout (reference line + value pill) for the main per-device
     /// graphs; secondary engine/power/temperature graphs keep it off.
@@ -549,6 +591,7 @@ fn device_mini_graph_with_length<S: Into<Rc<[f32]>>>(
             max,
             grid_color,
             smooth: prefs.smooth,
+            sliding: prefs.sliding,
             hover: prefs.hover,
             scale,
             readout,

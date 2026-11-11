@@ -20,6 +20,7 @@ fn hover_chart(hover: bool) -> DeviceChart {
         max: 100.0,
         grid_color: Color::BLACK,
         smooth: false,
+        sliding: false,
         hover,
         scale: DeviceMetricScale::Percent,
         readout: ReadoutColors {
@@ -226,6 +227,7 @@ fn device_mini_graph_factories_compose_with_hover_on_and_off() {
         &theme_snapshot,
         GraphPrefs {
             smooth: false,
+            sliding: false,
             max_override: None,
             hover: true,
         },
@@ -244,6 +246,7 @@ fn device_mini_graph_factories_compose_with_hover_on_and_off() {
         SECONDARY_DEVICE_CHART_HEIGHT,
         GraphPrefs {
             smooth: false,
+            sliding: false,
             max_override: None,
             hover: false,
         },

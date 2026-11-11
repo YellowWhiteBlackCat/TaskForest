@@ -40,6 +40,7 @@ pub(super) fn performance_tab<'a>(
             theme_snapshot,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: false,
                 max_override: None,
                 hover: false,
             },
@@ -52,6 +53,7 @@ pub(super) fn performance_tab<'a>(
             theme_snapshot,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: false,
                 max_override: None,
                 hover: false,
             },
@@ -67,6 +69,7 @@ pub(super) fn performance_tab<'a>(
             theme_snapshot,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: false,
                 max_override: None,
                 hover: false,
             },
@@ -82,6 +85,7 @@ pub(super) fn performance_tab<'a>(
             theme_snapshot,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: false,
                 max_override: None,
                 hover: false,
             },

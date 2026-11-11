@@ -33,7 +33,8 @@ pub struct PresentationPreferences {
     pub refresh_ms: u64,
     /// Performance graph window length.
     pub graph_data_points: usize,
-    /// Catmull-Rom smoothed graph polylines.
+    /// Animate each one-sample graph window shift between collector frames.
+    pub sliding_graphs: bool,
     /// Network graphs scale to the observed peak vs the link speed.
     pub network_dynamic_scaling: bool,
     /// Per-family Performance-page device visibility (GPUI Settings devices).
@@ -77,6 +78,7 @@ impl Default for PresentationPreferences {
             network_use_base2: false,
             refresh_ms: 1000,
             graph_data_points: 60,
+            sliding_graphs: false,
             network_dynamic_scaling: true,
             devices: DeviceVisibilityPreferences::default(),
             text_rendering: String::new(),

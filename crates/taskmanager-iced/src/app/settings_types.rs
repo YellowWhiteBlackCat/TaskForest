@@ -45,7 +45,8 @@ pub enum SettingsChange {
     RefreshInterval(u64),
     /// The Performance graph window length (clamped 10..=600 like GPUI).
     GraphDataPoints(usize),
-    /// `true` = draw graph polylines through a Catmull-Rom spline.
+    /// `true` = ease the one-sample Performance graph window shift.
+    SlidingGraphs(bool),
     /// `true` = network graphs scale to the observed peak; `false` = scale to
     /// the negotiated link speed when one is known.
     NetworkDynamicScaling(bool),

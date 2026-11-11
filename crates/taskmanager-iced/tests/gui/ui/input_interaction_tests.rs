@@ -654,6 +654,70 @@ fn settings_switch_routes_pointer_and_space_and_disabled_is_inert() {
     );
 }
 
+/// The GPUI-parity sliding-graph switch is a live, keyboard-reachable
+/// Settings control: pointer and Space both publish the inverse preference,
+/// and the IcedApp projection commits the new chart-motion gate.
+#[test]
+fn sliding_graph_switch_routes_pointer_and_space_to_the_chart_gate() {
+    let renderer = renderer();
+    let viewport = viewport();
+    let mut app = crate::IcedApp::demo();
+    let section = "sliding-graphs";
+    let mut element = system_group(app.theme(), app.preferences());
+    let mut tree = Tree::new(&element);
+    let node = layout(&mut element, &mut tree, &renderer, viewport);
+    let bounds = focus_bounds(&mut element, &mut tree, &node, &renderer, target(section));
+    assert!(bounds.width > 0.0 && bounds.height > 0.0);
+    let pointer_messages = click_messages(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        center(bounds),
+    );
+    assert!(
+        pointer_messages.iter().any(|message| matches!(
+            message,
+            Message::SettingsChanged(SettingsChange::SlidingGraphs(true))
+        )),
+        "pointer activation enables sliding graphs"
+    );
+    drop(element);
+    apply(&mut app, pointer_messages);
+    assert!(app.preferences().sliding_graphs);
+
+    let mut element = system_group(app.theme(), app.preferences());
+    let mut tree = Tree::new(&element);
+    let node = layout(&mut element, &mut tree, &renderer, viewport);
+    assert!(focus(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        target(section)
+    ));
+    let keyboard_messages = dispatch(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        key_pressed(Named::Space, Code::Space),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        keyboard_messages.iter().any(|message| matches!(
+            message,
+            Message::SettingsChanged(SettingsChange::SlidingGraphs(false))
+        )),
+        "Space activation disables sliding graphs"
+    );
+    drop(element);
+    apply(&mut app, keyboard_messages);
+    assert!(!app.preferences().sliding_graphs);
+}
+
 fn drag_refresh_to(
     app: &mut crate::IcedApp,
     renderer: &iced::Renderer,

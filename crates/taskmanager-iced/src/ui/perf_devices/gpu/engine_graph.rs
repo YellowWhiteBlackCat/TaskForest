@@ -220,6 +220,7 @@ fn gpu_engine_inventory<'a>(
         compact,
         GraphPrefs {
             smooth: true,
+            sliding: app.preferences().sliding_graphs,
             max_override: None,
             hover: true,
         },
@@ -245,6 +246,7 @@ fn gpu_engine_inventory<'a>(
                     ENGINE_DEVICE_CHART_HEIGHT,
                     GraphPrefs {
                         smooth: true,
+                        sliding: app.preferences().sliding_graphs,
                         max_override: None,
                         hover: true,
                     },
@@ -291,6 +293,7 @@ fn gpu_chart_metric_graph<'a>(
         app.cached_gpu_chart_metric_series(&gpu.device_id, gpu.device_generation.get(), metric);
     let prefs = GraphPrefs {
         smooth: true,
+        sliding: app.preferences().sliding_graphs,
         max_override: Some(gpu_chart_metric_max(metric, &samples)),
         hover: true,
     };

@@ -92,13 +92,13 @@ fn slide_reproduces_the_outgoing_frame_at_zero_and_the_incoming_one_at_one() {
     let mut slide = SeriesSlide::default();
     let start = Instant::now();
     assert_eq!(
-        slide.advance(&outgoing, start),
+        slide.advance(&outgoing, true, start),
         SlidePhase::Settled,
         "the first window has no outgoing frame to slide from"
     );
     // The next window restarts the slide.
     assert_eq!(
-        slide.advance(&incoming, start),
+        slide.advance(&incoming, true, start),
         SlidePhase::Sliding { progress: 0.0 }
     );
 
@@ -129,14 +129,79 @@ fn slide_reproduces_the_outgoing_frame_at_zero_and_the_incoming_one_at_one() {
     );
 }
 
+/// The persisted GPUI-parity switch gates the existing slide state: turning
+/// it off settles immediately, and turning it back on never replays an old
+/// outgoing window as a ghost transition.
+#[test]
+fn disabled_slide_settles_and_discards_the_outgoing_window() {
+    let outgoing: Rc<[f32]> = Rc::from([10.0_f32, 20.0, 30.0, 40.0]);
+    let incoming: Rc<[f32]> = Rc::from([20.0_f32, 30.0, 40.0, 50.0]);
+    let newer: Rc<[f32]> = Rc::from([30.0_f32, 40.0, 50.0, 60.0]);
+    let mut slide = SeriesSlide::default();
+    let start = Instant::now();
+    slide.advance(&outgoing, true, start);
+    assert_eq!(
+        slide.advance(&incoming, true, start),
+        SlidePhase::Sliding { progress: 0.0 }
+    );
+    assert_eq!(
+        slide.advance(&incoming, false, start),
+        SlidePhase::Settled,
+        "a disabled preference settles the in-flight slide"
+    );
+    assert_eq!(
+        slide.advance(&newer, false, start),
+        SlidePhase::Settled,
+        "window shifts stay settled while the preference is off"
+    );
+    assert_eq!(
+        slide.advance(&newer, true, start),
+        SlidePhase::Settled,
+        "re-enabling with an unchanged window does not invent an outgoing frame"
+    );
+    assert_eq!(
+        slide.advance(&outgoing, true, start),
+        SlidePhase::Sliding { progress: 0.0 },
+        "the next real window shift slides again"
+    );
+}
+
+#[test]
+fn slide_projects_device_values_through_their_signed_native_range() {
+    let outgoing: Rc<[f32]> = Rc::from([-10.0_f32, 0.0, 10.0]);
+    let incoming: Rc<[f32]> = Rc::from([0.0_f32, 10.0, 20.0]);
+    let mut slide = SeriesSlide::default();
+    let start = Instant::now();
+    slide.advance(&outgoing, true, start);
+    slide.advance(&incoming, true, start);
+    assert_eq!(slide.index_at_x(3, 300.0, 0.0, 150.0), Some(0));
+    assert_eq!(slide.index_at_x(3, 300.0, 1.0, 150.0), Some(1));
+
+    let runs = slide
+        .points_in_range(3, Size::new(300.0, 100.0), -10.0, 20.0, 0.0)
+        .expect("the active slide has a base window");
+    assert_eq!(runs.len(), 1);
+    for (point, expected) in runs[0].iter().zip([100.0, 66.66667, 33.33333, 0.0]) {
+        assert!(
+            (point.y - expected).abs() < 0.01,
+            "expected signed-range y={expected}, got {}",
+            point.y
+        );
+    }
+    assert_eq!(
+        runs[0].iter().map(|point| point.x).collect::<Vec<_>>(),
+        [0.0, 150.0, 300.0, 450.0]
+    );
+}
+
 #[test]
 fn slide_projects_the_base_runs_at_the_interpolated_positions() {
     let outgoing: Rc<[f32]> = Rc::from([10.0_f32, 20.0, 30.0, 40.0]);
     let incoming: Rc<[f32]> = Rc::from([20.0_f32, 30.0, 40.0, 50.0]);
     let mut slide = SeriesSlide::default();
     let start = Instant::now();
-    slide.advance(&outgoing, start);
-    slide.advance(&incoming, start);
+    slide.advance(&outgoing, true, start);
+    slide.advance(&incoming, true, start);
     let size = Size::new(300.0, 100.0);
 
     let runs = slide

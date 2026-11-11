@@ -402,6 +402,21 @@ fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) 
             Some(graph_points_label),
         ),
     ));
+    rows.push(label(
+        theme_snapshot,
+        t("settings.graph_data_points_restart"),
+        true,
+    ));
+    rows.push(setting_row(
+        t("settings.sliding_graphs"),
+        switch(
+            *theme_snapshot,
+            target("sliding-graphs"),
+            prefs.sliding_graphs,
+            false,
+            |on| Message::SettingsChanged(SettingsChange::SlidingGraphs(on)),
+        ),
+    ));
     rows.push(setting_row(
         t("settings.network_dynamic_scaling"),
         switch(

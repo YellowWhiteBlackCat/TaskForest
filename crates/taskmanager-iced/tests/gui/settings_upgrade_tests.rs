@@ -128,12 +128,35 @@ fn slider_grids_keep_legacy_values_exactly_reachable() {
         let steps = ((value - GRAPH_POINTS_MIN) / GRAPH_POINTS_STEP).round();
         assert!(
             (value - GRAPH_POINTS_MIN - steps * GRAPH_POINTS_STEP).abs() < 1e-6,
-            "data points {points} must sit on the 10-point grid"
+            "data points {points} must sit on the one-point grid"
         );
         assert_eq!(graph_points_for_value(value), points);
     }
     assert_eq!(graph_points_for_value(GRAPH_POINTS_MIN), 10);
     assert_eq!(graph_points_for_value(GRAPH_POINTS_MAX), 600);
+    assert_eq!(GRAPH_POINTS_STEP, 1.0, "GPUI's one-point slider grid");
+    assert_eq!(graph_points_for_value(60.4), 60);
+    assert_eq!(graph_points_for_value(60.6), 61);
+}
+
+/// Sliding graphs is a real persisted preference, not a dead settings row:
+/// the control's message reaches the config draft and the live chart gate.
+#[test]
+fn sliding_graphs_preference_round_trips_to_the_chart_gate() {
+    let mut app = crate::IcedApp::demo();
+    assert!(!app.preferences().sliding_graphs);
+    let _ = app.update(Message::SettingsChanged(SettingsChange::SlidingGraphs(
+        true,
+    )));
+    assert!(app.config_draft().sliding_graphs);
+    assert!(app.preferences().sliding_graphs);
+    assert!(app.graph_prefs().sliding);
+    let _ = app.update(Message::SettingsChanged(SettingsChange::SlidingGraphs(
+        false,
+    )));
+    assert!(!app.config_draft().sliding_graphs);
+    assert!(!app.preferences().sliding_graphs);
+    assert!(!app.graph_prefs().sliding);
 }
 
 /// The settings changes every new control publishes apply through the
@@ -167,6 +190,8 @@ fn control_changes_round_trip_through_preferences() {
     assert_eq!(app.preferences().refresh_ms, 2_000);
     apply(&mut app, SettingsChange::GraphDataPoints(300));
     assert_eq!(app.preferences().graph_data_points, 300);
+    apply(&mut app, SettingsChange::SlidingGraphs(true));
+    assert!(app.preferences().sliding_graphs);
 
     apply(
         &mut app,
@@ -259,6 +284,9 @@ fn grouped_modal_renders_from_non_default_preferences() {
     )));
     let _ = app.update(Message::SettingsChanged(SettingsChange::GraphDataPoints(
         600,
+    )));
+    let _ = app.update(Message::SettingsChanged(SettingsChange::SlidingGraphs(
+        true,
     )));
     let _ = app.update(Message::SettingsChanged(SettingsChange::QuietHoursStart(
         22,

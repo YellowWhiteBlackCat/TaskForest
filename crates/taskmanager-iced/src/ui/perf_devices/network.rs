@@ -333,6 +333,7 @@ fn network_block<'a>(
             format_value: network_throughput_formatter(units),
             prefs: device_chart::GraphPrefs {
                 smooth: graph.smooth,
+                sliding: graph.sliding,
                 max_override: graph.max_override,
                 hover: graph.hover,
             },

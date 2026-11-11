@@ -304,6 +304,7 @@ fn memory_detail(
                 },
                 false,
             )
+            .with_sliding(app.preferences().sliding_graphs)
             .with_scale_factor(app.device_pixel_scale()),
         )
         .width(Length::Fill)
@@ -645,6 +646,7 @@ fn cpu_performance_chart(
             },
             true,
         )
+        .with_sliding(app.preferences().sliding_graphs)
         .with_scale_factor(app.device_pixel_scale()),
     )
     .width(Length::Fill)
@@ -678,6 +680,7 @@ fn memory_performance_chart(
             },
             true,
         )
+        .with_sliding(app.preferences().sliding_graphs)
         .with_scale_factor(app.device_pixel_scale()),
     )
     .width(Length::Fill)

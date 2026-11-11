@@ -55,12 +55,11 @@ pub(crate) use geometry::{
     area_path, line_path, scaled_y, scaled_y_in_range, series_point_runs, series_point_runs_for,
     series_point_runs_in_range, series_point_runs_windowed, smooth_area_path, smooth_line_path,
 };
-pub(crate) use motion::{DampedRangeLedger, series_runs};
+pub(crate) use motion::{DampedRangeLedger, SeriesSlide, SlidePhase, series_runs};
 pub(crate) use raster::{
     data_point_badge_bounds, draw_y_axis_ticks, y_axis_scale_ticks, y_axis_tick_values,
 };
 
-use motion::{SeriesSlide, SlidePhase};
 use raster::snap_to_device_grid;
 use taskforest_core::core::percent::percent_text;
 
@@ -128,6 +127,7 @@ pub(crate) struct PerfChart {
     pub grid_color: Color,
     pub readout: ReadoutColors,
     pub smooth: bool,
+    pub sliding: bool,
     /// The render scale the drawn polyline is aligned to: the device grid
     /// the toolkit renders at. The caller supplies the scale it can resolve
     /// (the app's render zoom), so the curve keeps a constant sub-pixel
@@ -160,8 +160,16 @@ impl PerfChart {
             grid_color,
             readout,
             smooth,
+            sliding: false,
             scale_factor: 1.0,
         }
+    }
+
+    /// Apply the persisted one-sample window transition preference.
+    #[must_use]
+    pub(crate) fn with_sliding(mut self, sliding: bool) -> Self {
+        self.sliding = sliding;
+        self
     }
 
     /// The chart's render scale: the device grid the drawn polyline is

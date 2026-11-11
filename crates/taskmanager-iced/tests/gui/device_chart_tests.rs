@@ -222,6 +222,7 @@ fn multi_chart() -> multi::DeviceMultiChart {
         grid_color: Color::BLACK,
         tick_color: Color::WHITE,
         smooth: false,
+        sliding: false,
         hover: true,
         format_value: |value| format!("{value:.0} MB/s"),
         readout: ReadoutColors {
@@ -455,6 +456,7 @@ fn device_multi_graph_factory_composes_the_caption_and_canvas() {
             format_value: |value| format!("{value:.0} MB/s"),
             prefs: GraphPrefs {
                 smooth: true,
+                sliding: false,
                 max_override: None,
                 hover: true,
             },
@@ -502,6 +504,7 @@ fn device_multi_graph_fill_factory_composes_both_height_policies() {
         format_value: |value| format!("{value:.0} MB/s"),
         prefs: GraphPrefs {
             smooth: true,
+            sliding: false,
             max_override: None,
             hover: true,
         },

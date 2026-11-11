@@ -151,6 +151,7 @@ impl IcedApp {
     pub(crate) fn graph_prefs(&self) -> crate::ui::GraphPrefs {
         crate::ui::GraphPrefs {
             smooth: true,
+            sliding: self.preferences().sliding_graphs,
             ..crate::ui::GraphPrefs::default()
         }
     }

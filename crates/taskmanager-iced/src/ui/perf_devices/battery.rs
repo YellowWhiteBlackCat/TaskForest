@@ -197,6 +197,7 @@ fn battery_block<'a>(
         compact,
         device_chart::GraphPrefs {
             smooth,
+            sliding: app.preferences().sliding_graphs,
             max_override: None,
             // Both the charge main graph and the power graph below are
             // hover-interactive (crosshair + readout pill at any height).
@@ -217,6 +218,7 @@ fn battery_block<'a>(
             device_chart::SECONDARY_DEVICE_CHART_HEIGHT,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: app.preferences().sliding_graphs,
                 max_override: None,
                 hover: true,
             },

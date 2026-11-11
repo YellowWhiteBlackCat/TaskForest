@@ -33,7 +33,7 @@ fn settings_keyboard_focus_reveals_the_actual_switch_in_every_allocated_viewport
         (480.0, 960.0),
         (1920.0, 1080.0),
     ] {
-        for section in ["hc", "zero-values"] {
+        for section in ["hc", "zero-values", "sliding-graphs"] {
             let mut app = crate::IcedApp::demo();
             let _ = app.update(Message::OpenSettings);
             let _ = app.update(Message::WindowResized(Size::new(width, height)));

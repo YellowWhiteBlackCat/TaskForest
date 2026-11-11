@@ -77,7 +77,18 @@ impl SeriesSlide {
     /// draw. A new window generation restarts the slide; the same
     /// generation keeps the running slide advancing. The very first window
     /// has no outgoing frame, so it settles immediately.
-    pub(crate) fn advance(&mut self, current: &Rc<[f32]>, now: Instant) -> SlidePhase {
+    pub(crate) fn advance(
+        &mut self,
+        current: &Rc<[f32]>,
+        enabled: bool,
+        now: Instant,
+    ) -> SlidePhase {
+        if !enabled {
+            self.previous = None;
+            self.current = Some(Rc::clone(current));
+            self.started_at = None;
+            return SlidePhase::Settled;
+        }
         let changed = !matches!(&self.current, Some(known) if Rc::ptr_eq(known, current));
         if changed {
             self.previous = self.current.take();
@@ -134,6 +145,24 @@ impl SeriesSlide {
         positions.get(index + offset).copied()
     }
 
+    /// Resolve the current sample whose moving x-position is nearest to the
+    /// cursor, preserving hover alignment while the window is sliding.
+    pub(crate) fn index_at_x(
+        &self,
+        current_len: usize,
+        width: f32,
+        progress: f32,
+        x: f32,
+    ) -> Option<usize> {
+        (0..current_len)
+            .filter_map(|index| {
+                self.sample_position(current_len, width, progress, index)
+                    .map(|position| (index, (position - x).abs()))
+            })
+            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .map(|(index, _)| index)
+    }
+
     /// The slide's projected points: the base window's runs at the
     /// interpolated positions between the outgoing and the incoming frame.
     pub(crate) fn points(
@@ -150,6 +179,46 @@ impl SeriesSlide {
             size,
             progress,
         ))
+    }
+
+    /// The same outgoing-to-incoming slide projected through one chart's
+    /// native value range instead of the percentage-chart default.
+    pub(crate) fn points_in_range(
+        &self,
+        current_len: usize,
+        size: Size,
+        min: f32,
+        max: f32,
+        progress: f32,
+    ) -> Option<Vec<Vec<Point>>> {
+        let base = self.base()?;
+        let previous_len = self.previous_len();
+        let positions = slide_positions(previous_len, current_len, size.width, progress);
+        if positions.is_empty() {
+            return Some(Vec::new());
+        }
+        let height = size.height.max(0.0);
+        let mut runs = Vec::new();
+        let mut current = Vec::new();
+        for (index, value) in base.iter().copied().enumerate() {
+            if !value.is_finite() {
+                if !current.is_empty() {
+                    runs.push(std::mem::take(&mut current));
+                }
+                continue;
+            }
+            let Some(&x) = positions.get(index) else {
+                continue;
+            };
+            current.push(Point::new(
+                x,
+                super::scaled_y_in_range(value, min, max, height),
+            ));
+        }
+        if !current.is_empty() {
+            runs.push(current);
+        }
+        Some(runs)
     }
 }
 

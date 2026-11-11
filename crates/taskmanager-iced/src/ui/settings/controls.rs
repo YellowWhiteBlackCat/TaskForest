@@ -326,9 +326,9 @@ pub(super) fn refresh_label(value: f32) -> String {
 pub(super) const GRAPH_POINTS_MIN: f32 = 10.0;
 /// Data-points slider ceiling (the shared clamp upper bound).
 pub(super) const GRAPH_POINTS_MAX: f32 = 600.0;
-/// Data-points slider step. Every legacy pill value (10 / 60 / 120 / 300 /
-/// 600) is an exact grid point.
-pub(super) const GRAPH_POINTS_STEP: f32 = 10.0;
+/// Data-points slider step (GPUI parity: every integer point is reachable,
+/// including all legacy pill values 10 / 60 / 120 / 300 / 600).
+pub(super) const GRAPH_POINTS_STEP: f32 = 1.0;
 
 pub(super) fn graph_points_range() -> RangeInclusive<f32> {
     GRAPH_POINTS_MIN..=GRAPH_POINTS_MAX

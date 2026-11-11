@@ -74,8 +74,8 @@ impl canvas::Program<Message> for PerfChart {
         let (cpu_phase, memory_phase) = {
             let mut slide = state.slide.borrow_mut();
             (
-                slide.cpu.advance(&self.cpu, now),
-                slide.memory.advance(&self.memory, now),
+                slide.cpu.advance(&self.cpu, self.sliding, now),
+                slide.memory.advance(&self.memory, self.sliding, now),
             )
         };
         // A slide moves the curve on every frame, so the data cache is

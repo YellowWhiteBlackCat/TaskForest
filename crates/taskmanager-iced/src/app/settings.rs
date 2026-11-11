@@ -61,6 +61,7 @@ impl IcedApp {
                 // re-sized at the settings edge, keeping the newest samples.
                 self.shell.set_history_capacity(points);
             }
+            SettingsChange::SlidingGraphs(enabled) => config.sliding_graphs = enabled,
             SettingsChange::NetworkDynamicScaling(on) => config.network_dynamic_scaling = on,
             // The device-category switches are written through the owner that
             // owns the set, so the config schema and the rendered toggles
@@ -127,6 +128,7 @@ impl IcedApp {
             network_use_base2: config.network_use_base2,
             refresh_ms: config.refresh_ms,
             graph_data_points: usize::try_from(config.graph_data_points).unwrap_or(60),
+            sliding_graphs: config.sliding_graphs,
             network_dynamic_scaling: config.network_dynamic_scaling,
             devices: DeviceVisibilityPreferences::from_config(config),
             text_rendering: String::new(),

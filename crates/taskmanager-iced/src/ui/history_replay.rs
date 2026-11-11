@@ -185,6 +185,7 @@ pub fn render_history_replay<'a>(
                 max,
                 grid_color: crate::theme_binding::color(theme_snapshot.palette().border),
                 smooth: true,
+                sliding: false,
                 hover: true,
                 scale: device_chart::DeviceMetricScale::AutoPeak,
                 readout: crate::perf_chart::ReadoutColors {

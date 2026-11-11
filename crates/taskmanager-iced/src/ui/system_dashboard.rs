@@ -151,6 +151,7 @@ fn history_card<'a>(
         color: crate::theme_binding::color(color),
         grid_color: crate::theme_binding::color(theme_snapshot.palette().border),
         smooth: false,
+        sliding: false,
         hover: true,
         scale,
         readout: crate::perf_chart::ReadoutColors {

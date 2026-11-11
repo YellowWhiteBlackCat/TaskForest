@@ -31,6 +31,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use iced::mouse;
 use iced::widget::canvas::{self, Cache, Geometry, Path, Stroke};
@@ -120,6 +121,7 @@ pub(crate) struct DeviceMultiChart {
     pub grid_color: Color,
     pub tick_color: Color,
     pub smooth: bool,
+    pub sliding: bool,
     pub hover: bool,
     pub format_value: fn(f32) -> String,
     pub readout: ReadoutColors,
@@ -186,10 +188,18 @@ struct DeviceMultiOverlayFingerprint {
 #[derive(Default)]
 pub(crate) struct DeviceMultiChartState {
     pub(crate) hover: HoverState,
+    slides: RefCell<MultiChartSlides>,
+    slide_fingerprint: RefCell<(u32, u32)>,
     data_cache: Cache,
     overlay_cache: Cache,
     data_fingerprint: RefCell<DeviceMultiDataFingerprint>,
     overlay_fingerprint: RefCell<DeviceMultiOverlayFingerprint>,
+}
+
+#[derive(Default)]
+struct MultiChartSlides {
+    primary: crate::perf_chart::SeriesSlide,
+    secondary: crate::perf_chart::SeriesSlide,
 }
 
 impl canvas::Program<Message> for DeviceMultiChart {
@@ -208,9 +218,43 @@ impl canvas::Program<Message> for DeviceMultiChart {
         match event {
             canvas::Event::Mouse(mouse::Event::CursorMoved { .. }) => {
                 let slots = self.slots(bounds.width);
-                let next = cursor
-                    .position_over(bounds)
-                    .and_then(|position| slots.index_at(position.x));
+                let now = Instant::now();
+                let (primary_phase, secondary_phase) = {
+                    let mut slides = state.slides.borrow_mut();
+                    (
+                        slides
+                            .primary
+                            .advance(&self.primary.samples, self.sliding, now),
+                        slides
+                            .secondary
+                            .advance(&self.secondary.samples, self.sliding, now),
+                    )
+                };
+                let next = cursor.position_over(bounds).and_then(|position| {
+                    if self.primary.samples.len() >= self.secondary.samples.len() {
+                        if let crate::perf_chart::SlidePhase::Sliding { progress } = primary_phase {
+                            state.slides.borrow().primary.index_at_x(
+                                self.primary.samples.len(),
+                                bounds.width,
+                                progress,
+                                position.x,
+                            )
+                        } else {
+                            slots.index_at(position.x)
+                        }
+                    } else if let crate::perf_chart::SlidePhase::Sliding { progress } =
+                        secondary_phase
+                    {
+                        state.slides.borrow().secondary.index_at_x(
+                            self.secondary.samples.len(),
+                            bounds.width,
+                            progress,
+                            position.x,
+                        )
+                    } else {
+                        slots.index_at(position.x)
+                    }
+                });
                 if next != state.hover.index {
                     state.hover.index = next;
                     return Some(canvas::Action::request_redraw());
@@ -243,6 +287,23 @@ impl canvas::Program<Message> for DeviceMultiChart {
             *state.data_fingerprint.borrow_mut() = data_fp.clone();
             state.data_cache.clear();
         }
+        let now = Instant::now();
+        let phases = {
+            let mut slides = state.slides.borrow_mut();
+            (
+                slides
+                    .primary
+                    .advance(&self.primary.samples, self.sliding, now),
+                slides
+                    .secondary
+                    .advance(&self.secondary.samples, self.sliding, now),
+            )
+        };
+        let slide_key = (phases.0.progress().to_bits(), phases.1.progress().to_bits());
+        if *state.slide_fingerprint.borrow() != slide_key {
+            *state.slide_fingerprint.borrow_mut() = slide_key;
+            state.data_cache.clear();
+        }
         let overlay_fp = DeviceMultiOverlayFingerprint {
             hover_index: state.hover.index,
             data: data_fp,
@@ -262,6 +323,7 @@ impl canvas::Program<Message> for DeviceMultiChart {
         let format_value = self.format_value;
         let capacity = self.capacity;
         let sample_count = self.sample_count();
+        let slides = state.slides.borrow();
         let data_geometry = state.data_cache.draw(renderer, bounds.size(), |frame| {
             let size = frame.size();
             draw_grid_opts(frame, size, grid_color, opts);
@@ -273,8 +335,32 @@ impl canvas::Program<Message> for DeviceMultiChart {
             // series sits on top at any crossing. Each series splits its own
             // NaN gaps and keeps its own slot positions.
             let slots = ChartSlots::new(sample_count, capacity, size.width);
-            draw_multi_series(frame, size, &slots, secondary, max, smooth, opts);
-            draw_multi_series(frame, size, &slots, primary, max, smooth, opts);
+            draw_multi_series(
+                frame,
+                size,
+                &slots,
+                secondary,
+                MultiSeriesPaint {
+                    slide: &slides.secondary,
+                    phase: phases.1,
+                    max,
+                    smooth,
+                    opts,
+                },
+            );
+            draw_multi_series(
+                frame,
+                size,
+                &slots,
+                primary,
+                MultiSeriesPaint {
+                    slide: &slides.primary,
+                    phase: phases.0,
+                    max,
+                    smooth,
+                    opts,
+                },
+            );
             draw_chart_legend(
                 frame,
                 size,
@@ -298,7 +384,25 @@ impl canvas::Program<Message> for DeviceMultiChart {
             };
             let size = frame.size();
             let slots = ChartSlots::new(sample_count, capacity, size.width);
-            let x = slots.x(index);
+            let x = match (phases.0, phases.1) {
+                (crate::perf_chart::SlidePhase::Sliding { progress }, _)
+                    if index < primary.samples.len() =>
+                {
+                    slides
+                        .primary
+                        .sample_position(primary.samples.len(), size.width, progress, index)
+                        .unwrap_or_else(|| slots.x(index))
+                }
+                (_, crate::perf_chart::SlidePhase::Sliding { progress })
+                    if index < secondary.samples.len() =>
+                {
+                    slides
+                        .secondary
+                        .sample_position(secondary.samples.len(), size.width, progress, index)
+                        .unwrap_or_else(|| slots.x(index))
+                }
+                _ => slots.x(index),
+            };
             // GPUI-parity crosshair: the vertical rule comes from the shared
             // pill; each series that holds a finite value at the index gets a
             // horizontal rule + snap dot on its own sample (the primary's
@@ -369,16 +473,36 @@ impl canvas::Program<Message> for DeviceMultiChart {
 /// grid (the parent module's single-series stroke/fill pair, fed by
 /// [`series_point_runs_windowed`]). Fewer than two points in a run strokes
 /// nothing — the honest collecting/gap state.
+struct MultiSeriesPaint<'a> {
+    slide: &'a crate::perf_chart::SeriesSlide,
+    phase: crate::perf_chart::SlidePhase,
+    max: f32,
+    smooth: bool,
+    opts: ChartOpts,
+}
+
 fn draw_multi_series(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
     slots: &ChartSlots,
     series: &DeviceMultiSeries,
-    max: f32,
-    smooth: bool,
-    opts: ChartOpts,
+    paint: MultiSeriesPaint<'_>,
 ) {
-    for points in series_point_runs_windowed(&series.samples, size, max, slots) {
+    let MultiSeriesPaint {
+        slide,
+        phase,
+        max,
+        smooth,
+        opts,
+    } = paint;
+    let runs = if let crate::perf_chart::SlidePhase::Sliding { progress } = phase {
+        slide
+            .points_in_range(series.samples.len(), size, 0.0, max, progress)
+            .unwrap_or_else(|| series_point_runs_windowed(&series.samples, size, max, slots))
+    } else {
+        series_point_runs_windowed(&series.samples, size, max, slots)
+    };
+    for points in runs {
         if points.len() < 2 {
             continue;
         }
@@ -529,6 +653,7 @@ fn device_multi_graph_with_length(
         grid_color,
         tick_color: caption_color,
         smooth: prefs.smooth,
+        sliding: prefs.sliding,
         hover: prefs.hover,
         format_value,
         readout: ReadoutColors {

@@ -518,6 +518,9 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         let _ = app.update(Message::SettingsChanged(SettingsChange::GrayZeroValues(
             true,
         )));
+        let _ = app.update(Message::SettingsChanged(SettingsChange::SlidingGraphs(
+            true,
+        )));
         app.capture.focus_target = Some(FocusTarget::SettingsChoice {
             section: if target == "settings-zero-gray" {
                 "zero-values"

@@ -218,9 +218,11 @@ fn fan_rpm_gauge(
     theme_snapshot: &Theme,
     compact: bool,
     smooth: bool,
+    sliding: bool,
 ) -> iced::Element<'static, Message, iced::Theme, iced::Renderer> {
     let prefs = device_chart::GraphPrefs {
         smooth,
+        sliding,
         max_override: Some(rpm_max),
         // The RPM main graph is hover-interactive; the temperature graph
         // below keeps hover off.
@@ -279,6 +281,7 @@ fn fan_block<'a>(
         theme_snapshot,
         compact,
         smooth,
+        app.preferences().sliding_graphs,
     )];
     let temperature_samples = sensors
         .readings
@@ -302,6 +305,7 @@ fn fan_block<'a>(
             device_chart::SECONDARY_DEVICE_CHART_HEIGHT,
             device_chart::GraphPrefs {
                 smooth,
+                sliding: app.preferences().sliding_graphs,
                 max_override: None,
                 // GPUI parity: every shared-chart surface is hover-interactive.
                 hover: true,

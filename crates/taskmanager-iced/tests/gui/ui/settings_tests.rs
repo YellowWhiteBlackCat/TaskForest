@@ -21,6 +21,7 @@ fn settings_modal_renders_from_preference_mirrors() {
     assert_eq!(prefs.startup_page, "");
     assert_eq!(prefs.motion, "normal");
     assert!(!prefs.history_persistence);
+    assert!(!prefs.sliding_graphs);
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::ContinuousHistory(
         true,

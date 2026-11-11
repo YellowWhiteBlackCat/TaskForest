@@ -103,8 +103,10 @@ native selection and renderer caches; all shared types use their defining module
 - The Settings surface is grouped (General/Appearance/Fonts/System/Notifications
   /Units) and renders real controls — segmented, slider, select, switch — over
   the same `SettingsChange` channel and persisted tokens; the shortcut legend
-  derives from the Iced binding declaration. Text rendering shows an honest
-  unavailable state (no dead selector).
+  derives from the Iced binding declaration. The graph-point slider spends
+  GPUI's one-point step and restart note, while the sliding-graph switch binds
+  the persisted `Config::sliding_graphs` fact to the Performance chart motion.
+  Text rendering shows an honest unavailable state (no dead selector).
 - Diagnostic review consumes the shared frozen plan and publication lifecycle.
   The title and Export/Retry/Close actions stay fixed around one bounded scroll
   body; only explicit confirmation admits a writer, and replacing the surface
