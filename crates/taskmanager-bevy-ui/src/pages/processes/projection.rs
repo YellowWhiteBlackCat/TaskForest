@@ -126,6 +126,9 @@ pub(crate) struct ProcessRowView {
     /// Core-backed incarnation key for semantic and accessibility identity.
     pub(crate) semantic_id: String,
     pub(crate) name: String,
+    /// Full provider-owned command line for a hover hint; bounded card text
+    /// stays clipped and the tooltip reveals only this already-owned fact.
+    pub(crate) cmdline: String,
     pub(crate) cells: Vec<String>,
     pub(crate) selected: bool,
     /// Whether the process carries a resolved application identity — the
@@ -162,6 +165,7 @@ pub(crate) fn rows_projection_with_hidden(
                 index,
                 semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
+                cmdline: process.cmdline.clone(),
                 cells: row_cells(process, &columns, is_selected),
                 selected: is_selected,
                 app_icon: process.current_application_identity().is_some(),
@@ -213,6 +217,7 @@ pub(crate) fn row_views_for_indices(
                 index: *index,
                 semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
+                cmdline: process.cmdline.clone(),
                 cells: row_cells(process, &columns, is_selected),
                 selected: is_selected,
                 app_icon: process.current_application_identity().is_some(),

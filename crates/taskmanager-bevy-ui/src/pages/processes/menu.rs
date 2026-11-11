@@ -257,7 +257,16 @@ pub(crate) type ProcessMenuModal = MenuModal<ProcessMenuCtx>;
 /// or aggregate row without a live identity keeps the menu closed (fail-closed,
 /// TUI `open_process_menu` parity).
 pub(crate) fn open_for_selected(modal: &mut ProcessMenuModal, shell: &ShellApp) -> bool {
-    let Some(process) = shell.visible_process_at(shell.selected) else {
+    open_for_visible_index(modal, shell, shell.selected)
+}
+
+/// Open the menu for one already projected visible-row coordinate.
+pub(crate) fn open_for_visible_index(
+    modal: &mut ProcessMenuModal,
+    shell: &ShellApp,
+    index: usize,
+) -> bool {
+    let Some(process) = shell.visible_process_at(index) else {
         return false;
     };
     let Some(identity) = ProcessLiveKey::from_process(process) else {

@@ -5,7 +5,7 @@ projection:
 
 - **Focus lane (default):** a current-selection/system-state dashboard, six
   status chips, and a bounded atomic-card flow grouped by the provider's own
-  process state. The visual reference is the public FlClash v0.9.1 redesign
+  process state. The visual reference is the [public FlClash v0.9.1 changelog](https://github.com/chen08209/FlClash/blob/main/changelog.json)
   description — dashboard around current focus, proxy groups as cards, group
   tabs as chips, optional two-tier Liquid Glass, iOS-style surfaces. No asset,
   code, or layout metric is copied from FlClash.
@@ -92,13 +92,25 @@ projection:
   rows. Keyboard/focus routing remains the shell's single authority. The
   optical card's hover, pressed and selected ink rides a state overlay above
   the glass, because an optical surface owns no painted fill to replace.
+- Atom-card hover hints expose the provider-owned command line when it is
+  longer than the displayed process name, matching the GPUI process-row
+  tooltip. The tooltip uses the existing shared hover state and glass surface.
+- The `applications-card-lane-optical-menu` capture opens the production
+  process Actions popover against a mounted atom card and freezes that same
+  card's visible-row identity. Its measured rectangle overlaps one depth-0
+  optical surface, so the menu samples the real chain target at depth 1.
+  Hardware capture readiness requires the menu's production material to be
+  `Attached`, an exact `(0, 1)` optical pair, complete lane bounds, and an
+  active chain camera; a Painted fallback cannot certify the optical frame.
 
 ## Evidence and boundaries
 
 - `tests/headless/pages/process_card_lane.rs` covers shared status pills,
   whole-group and focus-card admission, focus facts, dense-mode seams,
-  compact selected-card bounds, measured bounds, overflow activation, and the
-  typed painted fallback without an adapter.
+  compact selected-card bounds, measured bounds, overflow activation, the
+  GPUI-parity command hint, and the typed painted fallback without an adapter.
+- `tests/headless/pages/process_menu.rs` proves the card popover freezes the
+  identity of the visible row it is anchored to.
 - `tests/headless/pages/card_lane_width_admission.rs` asserts the capped
   right-edge verdict before the renderer spends it: whole group width
   admission, the measured card/content cap and residual, a narrow slot's
@@ -110,8 +122,10 @@ projection:
   mirrors are swept.
 - `capture_bevy_scenarios.tsv` adds the light and dark `applications-card-lane`
   scenarios and the wide/compact `applications-card-lane-details-*`
-  readiness scenarios. Their readiness waits for the measured optical hero,
-  whole admitted group bounds, and — for the details scenarios — the shared
+  readiness scenarios, plus standard and compact optical-menu scenarios.
+  Optical hardware readiness waits for the attached nested menu and active
+  chain; all card-lane frames also wait for whole-group or focus-card bounds.
+  The details scenarios use the shared
   `COMPACT_CONTENT_WIDTH` whole-group verdict against the rail's measured
   `Display`. Compact windows prove their zero-group degradation in headless
   bounds tests, rather than pretending painted card groups exist.
@@ -123,11 +137,9 @@ projection:
   tooltip and focused switch remain unobstructed. No overlap or clipped
   value was observed. The full durable matrix was not published (the run
   stayed targeted).
-- Optical GPU readiness remains covered by the existing capability/GPU gates.
-  The mirrored lower composite is proved headlessly and the nested optical
-  chain is GPU-measured. The GPU receipt remains the only pixel proof of two
-  simultaneously optical layers.
-- The GPU receipt records `max_nested_layers=2` and
-  `nesting_layers_proven=true` on this host's Intel Arc B390 (Vulkan)
-  adapter. No two-layer optical screenshot is published yet — the receipt is
-  the evidence, not an image.
+- The GPU proof renders a separate nested-only target and compares it with
+  the production chain target; the standard gate records both the pixel proof
+  and the adapter receipt. The targeted hardware `applications-card-lane-optical-menu`
+  window capture is additionally gated by attached depth-1 material readiness.
+  The compact screenshot is layout evidence only when hardware WESL capture is
+  disabled and does not claim optical output.

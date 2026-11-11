@@ -17,9 +17,6 @@ use crate::pages::performance::{
     DeviceViewCategory, DynBlock, PerformanceDeviceFocus, PerformanceDeviceTarget,
 };
 use crate::pages::process_tree::ProcessTreeRowMarker;
-use crate::pages::processes::card_lane::{
-    ProcessCardFlow, ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode,
-};
 use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
 use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::processes::{
@@ -31,11 +28,15 @@ use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
 use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::table::ZeroValueCell;
+use crate::window::backdrop_capture::BackdropChainCamera;
 use crate::window::capture_marker_cores::CoreGridCaptureAccess;
 use crate::window::capture_marker_interactive::InteractiveCaptureAccess;
-use crate::window::capture_marker_optical::{HelpGlassCapture, help_capture_ready};
+use crate::window::capture_marker_optical::{
+    CardLaneCapture, HelpGlassCapture, NestedGlassCapture, help_capture_ready,
+};
 use crate::window::{FeedbackLine, WindowPalette};
 use crate::window_surface::{ModalBody, WindowSurfaceKind, WindowSurfaceState};
+use bevy::camera::Camera;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::{With, Without};
@@ -74,6 +75,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     pub(super) process_pages: Query<'w, 's, &'static ComputedNode, With<ProcessPageRoot>>,
     pub(super) text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
     pub(super) help_glass: HelpGlassCapture<'w, 's>,
+    pub(super) nested_glass: NestedGlassCapture<'w, 's>,
     feedback_lines: Query<'w, 's, (&'static Text, &'static ComputedNode), With<FeedbackLine>>,
     focus: FocusCapture<'w, 's>,
     confirmation: ConfirmationCapture<'w, 's>,
@@ -98,25 +100,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     pub(super) startup_filter: Option<Res<'w, StartupStatusFilterState>>,
     pub(super) startup_rows: Query<'w, 's, &'static StartupRowMarker>,
     pub(super) process_scroll: Option<Res<'w, ProcessScrollState>>,
-    pub(super) card_mode: Option<Res<'w, ProcessViewMode>>,
-    pub(super) card_flow:
-        Query<'w, 's, (&'static ComputedNode, &'static UiGlobalTransform), With<ProcessCardFlow>>,
-    pub(super) card_groups: Query<
-        'w,
-        's,
-        (
-            &'static ProcessCardGroup,
-            &'static ComputedNode,
-            &'static UiGlobalTransform,
-        ),
-        With<ProcessCardGroup>,
-    >,
-    pub(super) dashboards: Query<
-        'w,
-        's,
-        (&'static ComputedNode, &'static UiGlobalTransform),
-        With<ProcessFocusDashboard>,
-    >,
+    pub(super) card_lane: CardLaneCapture<'w, 's>,
     pub(super) palette: Res<'w, WindowPalette>,
     tree_rows: Query<
         'w,
@@ -157,6 +141,7 @@ pub(super) struct CaptureAccess<'w, 's> {
             &'static ComputedNode,
         ),
     >,
+    pub(super) chain_cameras: Query<'w, 's, &'static Camera, With<BackdropChainCamera>>,
     cores: CoreGridCaptureAccess<'w, 's>,
     replay: Query<
         'w,
@@ -173,7 +158,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     application_history: Res<'w, HistoryProjectionResource>,
     pub(super) interactive: InteractiveCaptureAccess<'w, 's>,
     pub(super) details: Query<'w, 's, &'static Node, With<ProcessDetailsContainer>>,
-    process_menu: Option<ResMut<'w, ProcessMenuModal>>,
+    pub(super) process_menu: Option<ResMut<'w, ProcessMenuModal>>,
     pub(super) commands: Commands<'w, 's>,
 }
 
@@ -407,6 +392,18 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             if !super::capture_marker_interactive::tooltip_mounted(&access.interactive) {
                 return;
             }
+            if !access.state.data_presented {
+                access.state.data_presented = true;
+                return;
+            }
+        }
+        Some("applications-card-lane-optical-menu")
+            if route != Page::Processes
+                || !super::capture_marker_optical::optical_menu_capture_ready(&mut access) =>
+        {
+            return;
+        }
+        Some("applications-card-lane-optical-menu") => {
             if !access.state.data_presented {
                 access.state.data_presented = true;
                 return;

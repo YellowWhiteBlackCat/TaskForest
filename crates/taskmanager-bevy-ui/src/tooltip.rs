@@ -231,6 +231,7 @@ pub(crate) fn capture_target_from_measured(
         .map(|(entity, label, _)| (*entity, label.clone()))
 }
 
+#[must_use]
 /// Scene for the hovering explanation card.
 ///
 /// The card is viewport-anchored: the placement system writes its resolved
@@ -416,7 +417,7 @@ pub(crate) fn tooltip_focus_interaction_system(
 /// viewport fit — but it stays hidden until the pointer has rested on the
 /// same target for [`TOOLTIP_DELAY`].
 ///
-/// Demo-only capture arm for the `tooltip-overlay` scenario.
+/// Demo-only capture arm for the overlay scenarios.
 ///
 /// The production paths are pointer hover (after a 500 ms rest) and keyboard
 /// focus on a trigger. A deterministic capture can time neither: the pointer
@@ -435,7 +436,7 @@ fn arm_tooltip_overlay(
     if demo.is_none() || !matches!(scenario, Some("tooltip-overlay")) {
         return;
     }
-    let Some(mut state) = state else {
+    let Some(state) = state else {
         return;
     };
     // The scenario names the "Choose columns" button so the card sits over
@@ -451,6 +452,15 @@ fn arm_tooltip_overlay(
     else {
         return;
     };
+    publish_capture_session(state, target, text, &mut commands);
+}
+
+fn publish_capture_session(
+    mut state: ResMut<'_, TooltipState>,
+    target: Entity,
+    text: String,
+    commands: &mut Commands<'_, '_>,
+) {
     // Re-publish whenever the live target moved: the nav strip is respawned on
     // route remounts, and a session frozen on the old entity would leave the
     // card unplaced. Matching the CURRENT entity keeps the anchor live.

@@ -29,10 +29,10 @@ composite.
 
 The chain supplies PIXELS and the GPU proof now measures them. The production
 GPU test renders a first optical layer and the chain camera that republishes
-it, then asserts the chain target differs from the flat painted backdrop by
-more than a fixed threshold: the second layer really samples the first
-layer's own refracted, blurred and dispersed output. On the development
-adapter (Intel Arc B390, Vulkan) the standard gate records
+it, then asserts the chain target differs from the flat painted backdrop and
+captures a second nested-only output target: the second layer really
+re-refracts the first layer's own refracted, blurred and dispersed output. On
+the development adapter (Intel Arc B390, Vulkan) the standard gate records
 `max_nested_layers=2`, `nesting_layers_proven=true`, verdict `PROVEN`.
 
 `OPTICAL_GLASS_MAX_NESTED_LAYERS` is therefore `2`: depth `0` samples the
@@ -64,16 +64,20 @@ What IS proven today:
   between the capture and the presentation, its image target, and that the
   offscreen roots never steal the interactive shell's pointer target.
 - `cargo nextest run --locked -p taskmanager-bevy-ui -j 4 --no-fail-fast`
-  proves the chain does not disturb the 682-test headless composition.
+  proves the chain does not disturb the full Bevy headless test suite.
 
-What is NOT proven today: a third or deeper optical layer, and a reviewed
-real-window capture of two simultaneously optical layers. The GPU proof is
-a headless, offscreen harness that measures pixels; it is not the shipped
-window. A shipped-window composition with two active chain cameras is not
-stable in the default capture harness, so no targeted optical-layer scenario
-claims that appearance. The proof ran on one adapter: the receipt records
-the adapter it actually ran on, and a machine without that adapter records
-`PAINTED` instead.
+What is NOT proven today: a third or deeper optical layer, and multi-adapter
+parity. A targeted hardware `applications-card-lane-optical-menu` capture
+shows the production Actions popover over the Applications glass surfaces.
+Its readiness checks the mounted menu's attached production material at
+depth `1`, a top-level attached glass surface at depth `0`, complete card-lane
+bounds, and the active chain camera. The matching compact capture is layout
+and bounds evidence only; when hardware WESL capture is disabled, its Painted
+fallback is never reported as optical evidence. The GPU proof still runs in a
+headless offscreen harness, while the targeted window capture proves the
+shipped composition attaches both real materials. The proof ran on one
+adapter: the receipt records the adapter it actually ran on, and a machine
+without that adapter records `PAINTED` instead.
 
 ## Boundary
 
@@ -83,5 +87,5 @@ refuses a receipt whose recorded ceiling differs from it, and it refuses any
 ceiling above one layer that is not backed by `nesting_layers_proven=true`
 plus the proof's own chain assertions. Raising it further requires the same
 shape of evidence again: a named GPU proof, a fresh hardware receipt, the
-guard released with it, and targeted light/dark captures of an overlay above
-an optical card reviewed by eye.
+guard released with it, and targeted light/dark captures of a production
+overlay above an optical card reviewed by eye.

@@ -33,7 +33,9 @@ use crate::app::PageContext;
 use crate::glass::{BackdropMirror, GlassPanelMaterial, OpticalGlassCard, card_material};
 use crate::icons::{IconInk, InlineIcon};
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
+use crate::menu_modal::MenuModalTrigger;
 use crate::palette::{UiPalette, space_4, space_8};
+use crate::tooltip::TooltipText;
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole};
 
@@ -79,6 +81,7 @@ pub(crate) fn focus_projection_dashboard_scene(
         OpticalGlassCard { tier: GlassTier::Card, enabled: true }
         BackdropMirror { tier: GlassTier::Card }
         ProcessFocusDashboard
+        MenuModalTrigger
         Children [ @{ grain } -- @{ content } ]
     })
 }
@@ -441,7 +444,9 @@ fn state_overlay_scene() -> Box<dyn Scene> {
 
 /// One atomic process card on the real optical tier. It carries the same row
 /// link, semantic address, accessibility node and activation seams as a dense
-/// row, so selection, secondary press and keyboard focus never fork.
+/// row, so selection, secondary press and keyboard focus never fork. A hover
+/// hint above this optical card is the production two-layer glass case: the
+/// hint samples the chain target that carries this card's real optical pixels.
 pub(crate) fn atomic_card_scene(
     row: &ProcessRowView,
     hidden_columns: &[&str],
@@ -457,6 +462,7 @@ pub(crate) fn atomic_card_scene(
     let cpu = projection::cell_by_id(row, &columns, "CPU");
     let memory = projection::cell_by_id(row, &columns, "Memory");
     let name = row.name.clone();
+    let tooltip = card_tooltip_text(row);
     let index = row.index;
     let selected = row.selected;
     let accessibility_node = crate::semantic::process_row_node(&row.name, &row.semantic_id);
@@ -495,6 +501,8 @@ pub(crate) fn atomic_card_scene(
         ProcessRowLink({ index })
         ProcessAtomicCard({ index })
         ProcessTableArtifact
+        MenuModalTrigger
+        TooltipText({ tooltip })
         on(input::on_row_activated)
         on(input::on_row_secondary_pressed)
         SemanticAddress({ semantic.0.clone() })
@@ -539,6 +547,24 @@ pub(crate) fn atomic_card_scene(
             ]
         ]
     })
+}
+
+/// Resolve the card's hover hint from facts the shell row already owns.
+///
+/// A longer command line is the same extended-detail tooltip the GPUI process
+/// row paints. A card whose name already carries the whole command uses its
+/// labeled name/status/PID facts instead, so no tooltip is empty or invented.
+#[must_use]
+fn card_tooltip_text(row: &ProcessRowView) -> String {
+    let details_label = t_label("common.details");
+    if row.cmdline.len() > row.name.len() {
+        return format!(
+            "{} · {}",
+            key_value_label(&details_label, &row.name),
+            row.cmdline
+        );
+    }
+    key_value_label(&details_label, &row.name)
 }
 
 fn card_fact(label: &str, value: String) -> Box<dyn Scene> {

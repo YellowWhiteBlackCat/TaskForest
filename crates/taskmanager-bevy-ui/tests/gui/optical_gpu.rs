@@ -51,6 +51,7 @@ struct Targets {
     chain: Handle<Image>,
     chain_only_capture: Handle<Image>,
     nested_output: Handle<Image>,
+    nested_only_capture: Handle<Image>,
 }
 
 #[derive(Default, Resource)]
@@ -164,6 +165,20 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     assert!(
         interior_difference(baseline, chain_capture) > 8.0,
         "the chain must carry the first optical layer's real pixels"
+    );
+    let nested_only = app
+        .world()
+        .resource::<Targets>()
+        .nested_only_capture
+        .clone();
+    let nested_only_capture = &capture(&mut app, &[nested_only])[0];
+    let nested_only_delta = interior_difference(chain_capture, nested_only_capture);
+    println!(
+        "optical-gpu production comparison: chain-to-nested-only delta={nested_only_delta:.4}"
+    );
+    assert!(
+        nested_only_delta > 1.0,
+        "the production nested layer must re-refract the chain target"
     );
     assert!(
         interior_difference(baseline, chain_layer_capture) > 8.0,
@@ -427,6 +442,7 @@ fn setup(
     ));
 
     let nested_output = target(&mut images);
+    let nested_only_capture = target(&mut images);
     let nested_camera = commands
         .spawn((
             Camera2d,
@@ -450,6 +466,17 @@ fn setup(
         viewport_px: Vec2::new(WIDTH as f32, HEIGHT as f32),
         device_scale_factor: 1.0,
     };
+    let nested_only_camera = commands
+        .spawn((
+            Camera2d,
+            Camera {
+                order: 11,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..Camera::default()
+            },
+            RenderTarget::Image(nested_only_capture.clone().into()),
+        ))
+        .id();
     commands
         .spawn((
             Node {
@@ -484,6 +511,15 @@ fn setup(
                 ),
             ));
         });
+    commands.spawn((
+        Node {
+            width: percent(100),
+            height: percent(100),
+            ..Node::default()
+        },
+        ImageNode::new(nested_output.clone()),
+        UiTargetCamera(nested_only_camera),
+    ));
 
     commands.insert_resource(Targets {
         pattern,
@@ -491,6 +527,7 @@ fn setup(
         chain,
         chain_only_capture,
         nested_output,
+        nested_only_capture,
     });
 }
 

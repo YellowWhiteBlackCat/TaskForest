@@ -54,7 +54,7 @@ use taskmanager_app_host::NativeAppHost;
 use zhuge_ui_kit_bevy::frame_capture::install_sync_frame_capture;
 use zhuge_ui_kit_bevy::frame_timing::install_bevy_frame_timing;
 
-mod backdrop_capture;
+pub(crate) mod backdrop_capture;
 pub(crate) use backdrop_capture::{BackdropCaptureTarget, BackdropChainTarget, BackdropRevision};
 mod capture_marker;
 mod capture_marker_cores;

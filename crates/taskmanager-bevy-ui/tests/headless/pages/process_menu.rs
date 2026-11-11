@@ -21,7 +21,9 @@ use taskmanager_shell::fixture;
 use taskmanager_theme::tokens::UiSize;
 
 use crate::menu_modal::ActionMenuContext;
-use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
+use crate::pages::processes::menu::{
+    ProcessMenuCtx, ProcessMenuModal, open_for_selected, open_for_visible_index,
+};
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -214,6 +216,30 @@ fn a_row_without_a_live_identity_keeps_the_menu_closed() {
         "an unidentifiable row never arms a control verb"
     );
     assert!(modal.session.is_none());
+}
+
+#[test]
+fn the_card_popover_freezes_the_identity_of_its_anchor_row() {
+    let mut shell = shelved_shell(vec![
+        token_process(100, "selected"),
+        token_process(200, "anchored"),
+    ]);
+    assert!(shell.select_row(0));
+    let anchored = shell
+        .visible_process_at(1)
+        .and_then(taskforest_core::core::process::ProcessLiveKey::from_process)
+        .expect("the visible anchor row has a live identity");
+    let mut modal = ProcessMenuModal::default();
+
+    assert!(
+        open_for_visible_index(&mut modal, &shell, 1),
+        "the card's own visible row opens its action menu"
+    );
+    assert_eq!(
+        modal.session.expect("menu opens").frozen.identity,
+        anchored,
+        "the popover keeps the identity of the card it covers"
+    );
 }
 
 #[test]

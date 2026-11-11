@@ -48,6 +48,13 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   members and the overflow count includes the dashboard. The headless plan,
   mounted overflow, and standard/compact bounds tests prove that one shell row
   is never painted twice and that both responsive rungs stay bounded.
+- **Card actions / nested optical glass**: the action popover can anchor to an
+  atom card and freezes that card's visible-row identity. The standard
+  `applications-card-lane-optical-menu` hardware capture admits its frame only
+  when the menu's material is Attached at measured depth `1`, a depth-`0`
+  glass surface is Attached, the chain camera is active, and lane bounds fit.
+  The compact companion capture proves menu/card bounds; Painted fallback
+  pixels are not recorded as optical proof.
 - **Keyboard help**: bare `F1` opens the shell-owned help mode; `?` / Escape /
   the footer Close action leave it. `?` types into an active search field,
   and a learned page chord closes help while still moving the route.
@@ -87,9 +94,9 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
 - Nested optical glass is bounded by
   [`NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): depth `0` and `1` are
   admitted by the measured chain, depth `2` or deeper fails closed. The GPU
-  receipt measures both chain pixels and the theme-derived Fresnel rim. No
-  human-reviewed shipped-window screenshot of two simultaneously optical
-  layers is published.
+  receipt measures chain pixels, nested-only output and the theme-derived
+  Fresnel rim; the targeted standard hardware capture binds the shipped menu
+  to a real depth-1 material.
 - System-depth modal, multi-window/layer-shell, and GPUI-specific device hero
   work remain the frontend charter's public boundaries; this crate does not
   own a second vocabulary for them.

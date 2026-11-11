@@ -36,6 +36,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "perf-battery" => Some("perf-battery"),
         "process-force-kill" => Some("process-force-kill"),
         "applications-card-lane" => Some("applications-card-lane"),
+        "applications-card-lane-optical-menu" => Some("applications-card-lane-optical-menu"),
         "applications-card-lane-details-wide" => Some("applications-card-lane-details-wide"),
         "applications-card-lane-details-compact" => Some("applications-card-lane-details-compact"),
         "process-selection" => Some("process-selection"),
@@ -164,6 +165,7 @@ pub(crate) fn capture_page() -> Option<Page> {
         "storage-health" | "sensor-center" => Some(Page::System),
         "applications"
         | "applications-card-lane"
+        | "applications-card-lane-optical-menu"
         | "applications-card-lane-details-wide"
         | "applications-card-lane-details-compact"
         | "process-selection"

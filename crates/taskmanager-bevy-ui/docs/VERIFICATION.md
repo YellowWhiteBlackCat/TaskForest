@@ -100,13 +100,16 @@ is derived from the live `RenderAdapterInfo` in
 headless, software-adapter and no-adapter compositions fail closed to typed
 fallbacks. The proof now covers TWO simultaneous optical layers: the offscreen chain
 camera republishes the first layer's own optical output and the GPU test
-asserts that chain target differs from the flat painted backdrop, so
+asserts that chain target differs from the flat painted backdrop and that a
+nested-only output differs from the chain itself, so
 `OPTICAL_GLASS_MAX_NESTED_LAYERS = 2` and the receipt records
 `nesting_layers_proven=true` on a hardware adapter. A surface deeper than
 that still fails closed to a typed fallback. See
 [`docs/NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): the depth
-resolver is headlessly proved and the chain is GPU-measured, but no
-published screenshot shows the nested appearance in the shipped window.
+resolver is headlessly proved, the chain is GPU-measured, and the standard
+`applications-card-lane-optical-menu` hardware capture waits for the actual
+depth-1 production menu material. Its compact companion proves layout only
+when `hardware_wesl_capture=0`; that Painted fallback is not optical evidence.
 
 The pixel proof also verifies the authored dispersion boundary: a zero value
 must leave a neutral backdrop achromatic, while enabled dispersion separates

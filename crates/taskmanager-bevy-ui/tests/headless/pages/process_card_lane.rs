@@ -767,6 +767,36 @@ fn the_lane_mounts_one_focus_dashboard_and_a_bounded_card_flow() {
 }
 
 #[test]
+fn atomic_cards_expose_the_gpui_extended_command_hint() {
+    use crate::tooltip::TooltipText;
+
+    let mut selected = process(10, "selected", "Running");
+    selected.cmdline = "/usr/bin/selected --foreground".to_owned();
+    let mut visible = process(20, "worker", "Running");
+    visible.cmdline = "/usr/bin/worker --queue background".to_owned();
+    let mut app = card_lane_app(shell_with(vec![selected, visible]), palette());
+    for _ in 0..3 {
+        app.update();
+    }
+
+    let hints: Vec<_> = app
+        .world_mut()
+        .query_filtered::<(&ProcessAtomicCard, &TooltipText), ()>()
+        .iter(app.world())
+        .map(|(card, hint)| (card.0, hint.0.clone()))
+        .collect();
+    assert_eq!(hints.len(), 1, "the group paints one non-focus atomic card");
+    assert!(
+        hints[0].1.starts_with("Details: worker"),
+        "the hover hint names the same process identity as its card"
+    );
+    assert!(
+        hints[0].1.contains("/usr/bin/worker --queue background"),
+        "a longer command line remains available through the GPUI-parity hover hint"
+    );
+}
+
+#[test]
 fn a_group_overflow_action_reduces_through_the_shell_filter() {
     let items = vec![
         process(10, "alpha", "Running"),
