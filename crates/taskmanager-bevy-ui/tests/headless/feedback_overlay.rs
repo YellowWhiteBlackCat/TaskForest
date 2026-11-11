@@ -8,7 +8,7 @@ use bevy::input_focus::InputFocus;
 use bevy::picking::Pickable;
 use bevy::ui::widget::Text;
 use std::sync::{Arc, Mutex};
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, FeedbackTone};
 
 fn mounted_notice(app: &mut App) -> Option<String> {
     let world = app.world_mut();
@@ -161,7 +161,7 @@ fn same_notice_text_with_a_new_tone_repaints_the_overlay() {
         app.world()
             .get::<FeedbackToast>(first)
             .and_then(|toast| toast.tone),
-        Some(taskmanager_shell::FeedbackTone::Positive)
+        Some(FeedbackTone::Positive)
     );
 
     app.world_mut()
@@ -181,7 +181,7 @@ fn same_notice_text_with_a_new_tone_repaints_the_overlay() {
         app.world()
             .get::<FeedbackToast>(updated)
             .and_then(|toast| toast.tone),
-        Some(taskmanager_shell::FeedbackTone::Danger),
+        Some(FeedbackTone::Danger),
         "a changed visual tone is not hidden by identical feedback copy"
     );
 }
