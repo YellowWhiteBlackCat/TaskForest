@@ -15,6 +15,8 @@ budget       measured slot → typed page and slot allocation
    ↓
 card_flow    whole-group admission + card height clamp (one arithmetic)
    ↓
+card_width   whole-column admission + header fact group (one arithmetic)
+   ↓
 dashboard    the product metric count + the paged metric window
    ↓
 parity       probe grid and the unexplained-difference rule
@@ -50,6 +52,18 @@ control height, its padding, its gap) and spends the verdict — it never
 re-derives the ladder. A shape that caps the group count (a page that shows
 at most four metrics) says so with `admit_card_groups_capped`; the cap is
 product content, not a layout fact.
+
+## Card width is the same whole-group law on the other axis
+
+`card_width` owns how many WHOLE card columns one admitted group row may
+paint. The shape lifts its own measured card floor, gap, bucket-label floor
+and (when a bucket is truncated) overflow-action floor into
+`CardRowWidthSpec`; the contract answers `Full { columns }`, `SingleColumn`
+or `Degrade`. The header is a separate whole group above the row: its label
+and overflow action are charged together before any card column, so a narrow
+right edge degrades the lane instead of clipping the last card or the action
+that says which rows the lane left out. A frontend binds this verdict, never
+a second "how many columns fit" ladder.
 
 The elevation ladder a card wears is a different fact and lives with the
 theme's glass tiers: `taskmanager-theme` owns the two-layer shadow ink and

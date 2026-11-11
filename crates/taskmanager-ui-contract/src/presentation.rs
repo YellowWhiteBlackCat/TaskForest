@@ -24,6 +24,8 @@
 //!    ↓
 //! card_flow    whole-group admission + card height clamp (one arithmetic)
 //!    ↓
+//! card_width   whole-column admission + header fact group (one arithmetic)
+//!    ↓
 //! dashboard    the product metric count + the paged metric window
 //!    ↓
 //! parity       the probe grid and the unexplained-difference rule
@@ -39,6 +41,7 @@
 
 pub mod budget;
 pub mod card_flow;
+pub mod card_width;
 pub mod dashboard;
 pub mod load_tiers;
 pub mod motion;

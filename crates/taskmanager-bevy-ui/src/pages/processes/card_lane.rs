@@ -23,6 +23,9 @@ use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 use taskmanager_shell::saved_views::sort_token;
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, SortDir};
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowSpec, admit_card_groups};
+use taskmanager_ui_contract::presentation::card_width::{
+    CardRowWidthSpec, admit_card_row_width, card_row_columns,
+};
 
 use crate::palette::{UiPalette, space_4, space_8, space_16};
 
@@ -174,6 +177,12 @@ pub(crate) struct CardFlowMetrics {
     pub(crate) card_floor_px: f32,
     /// The tallest height one atomic card may grow to.
     pub(crate) card_ceiling_px: f32,
+    /// The group header's bucket label floor, measured from the caption role.
+    pub(crate) header_label_min_width_px: f32,
+    /// The header overflow action's own readable floor.
+    pub(crate) overflow_action_min_width_px: f32,
+    /// Largest card-column count the product paints in one row.
+    pub(crate) max_columns: usize,
 }
 
 impl CardFlowMetrics {
@@ -202,7 +211,22 @@ impl CardFlowMetrics {
             group_gap_px: space_8(),
             card_floor_px: card_height_px,
             card_ceiling_px: card_height_px,
+            header_label_min_width_px: control_height_px * 3.0,
+            overflow_action_min_width_px: control_height_px * 4.0,
+            max_columns: 4,
         }
+    }
+
+    /// The measured width facts the shared card-row admission spends.
+    #[must_use]
+    pub(crate) const fn width_spec(self) -> CardRowWidthSpec {
+        CardRowWidthSpec::new(
+            self.card_min_width_px,
+            self.group_gap_px,
+            self.header_label_min_width_px,
+            self.overflow_action_min_width_px,
+            self.max_columns,
+        )
     }
 
     /// The shared contract's spec for one group block: the header plus the
@@ -273,19 +297,24 @@ impl CardFlowBudget {
     /// Re-admit one bucket's lower content as WHOLE columns against the slot
     /// that was measured when this budget was resolved.
     ///
-    /// The height contract admits whole group BLOCKS. The overflow action
-    /// belongs to the group's own header lane above the cards, so a truncated
-    /// bucket keeps every admitted card column instead of reserving a whole
-    /// card width for a header control that never joins the card row.
+    /// A truncated bucket carries an overflow action in its header. The
+    /// header is a separate whole group, so its label and action are charged
+    /// together by the shared width contract before any card column is spent.
     #[must_use]
-    pub(crate) fn width_columns(self, member_count: usize) -> usize {
+    pub(crate) fn width_columns(self, member_count: usize, has_overflow: bool) -> usize {
         let Some(metrics) = self.metrics else {
             return self.columns.min(member_count);
         };
         if !self.width_px.is_finite() || self.width_px <= 0.0 {
             return self.columns.min(member_count);
         }
-        let admissible = admit_group_width(self.width_px, self.columns, &metrics, false).columns();
+        let admissible = admit_card_row_width(
+            self.width_px,
+            self.columns,
+            metrics.width_spec(),
+            has_overflow,
+        )
+        .columns();
         admissible.min(member_count)
     }
 }
@@ -305,8 +334,9 @@ pub(crate) fn card_flow_budget(
     palette: &UiPalette,
 ) -> CardFlowBudget {
     let metrics = CardFlowMetrics::from_palette(palette);
-    let requested_columns = card_columns(slot_width_px, &metrics);
-    let columns = admit_group_width(slot_width_px, requested_columns, &metrics, false)
+    let width_spec = metrics.width_spec();
+    let requested_columns = card_row_columns(slot_width_px, width_spec);
+    let columns = admit_card_row_width(slot_width_px, requested_columns, width_spec, false)
         .columns()
         .max(1);
     // The measured slot IS the bounded card-flow viewport: the mode row,
@@ -322,96 +352,6 @@ pub(crate) fn card_flow_budget(
         width_px: slot_width_px,
         metrics: Some(metrics),
     }
-}
-
-/// The number of card columns a measured width can hold.
-///
-/// The floor is the card's own minimum WIDTH — the width its PID/CPU/memory
-/// fact line needs — so a wide slot fills with a card grid instead of a
-/// handful of banner-width cards. The whole-group width predicate below
-/// decides how many of these requested columns a group may actually paint.
-#[must_use]
-pub(crate) fn card_columns(slot_width_px: f32, metrics: &CardFlowMetrics) -> usize {
-    if slot_width_px <= 0.0 || metrics.card_min_width_px <= 0.0 {
-        return 1;
-    }
-    let column_floor_px = metrics.card_min_width_px;
-    let columns =
-        ((slot_width_px + metrics.group_gap_px) / (column_floor_px + metrics.group_gap_px)).floor();
-    (columns.max(1.0) as usize).clamp(1, 4)
-}
-
-/// The right-edge budget for ONE admitted group row.
-///
-/// The shared height admission answers only how many COMPLETE group BLOCKS
-/// fit; the width predicate is the frontend's own elastic-layout duty. A
-/// group's lower content is admitted as a WHOLE: the header's bucket label
-/// (and its overflow action when a bucket is truncated) and every card's
-/// single-line facts all have to keep their readable floor. This verdict is
-/// pure and is asserted headlessly before a renderer may spend it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum GroupWidthAdmission {
-    /// The full `columns`-wide card row fits; paint every column.
-    Full { columns: usize },
-    /// Only ONE card keeps its whole lower content in this slot.
-    SingleColumn,
-    /// Even one card cannot keep its floor: degrade the whole lane.
-    Degrade,
-}
-
-impl GroupWidthAdmission {
-    /// The number of cards the admitted row paints, or zero when degraded.
-    #[must_use]
-    pub(crate) fn columns(self) -> usize {
-        match self {
-            Self::Full { columns } => columns,
-            Self::SingleColumn => 1,
-            Self::Degrade => 0,
-        }
-    }
-}
-
-/// Admit a group's lower content as whole columns against the measured slot.
-///
-/// A card keeps `[card_min_width_px, ...]`; the group header keeps the shared
-/// `more_rows_label` copy beside its own bucket label. The header is a
-/// separate whole group from the card row below it: its own clip protects
-/// both facts, while the card row admits its own whole card columns. The
-/// caller degrades the card row rather than clipping the last column.
-#[must_use]
-pub(crate) fn admit_group_width(
-    slot_width_px: f32,
-    columns: usize,
-    metrics: &CardFlowMetrics,
-    has_overflow: bool,
-) -> GroupWidthAdmission {
-    if !slot_width_px.is_finite()
-        || slot_width_px <= 0.0
-        || metrics.card_min_width_px <= 0.0
-        || metrics.group_gap_px <= 0.0
-    {
-        return GroupWidthAdmission::Degrade;
-    }
-    // One card keeps its fact line whole before anything else is admitted.
-    if slot_width_px < metrics.card_min_width_px {
-        return GroupWidthAdmission::Degrade;
-    }
-    let full = columns.clamp(1, 4);
-    if full <= 1 {
-        return GroupWidthAdmission::SingleColumn;
-    }
-    let row_width = |count: usize| {
-        metrics.card_min_width_px * count as f32
-            + metrics.group_gap_px * count.saturating_sub(1) as f32
-    };
-    let _ = has_overflow;
-    if row_width(full) <= slot_width_px {
-        return GroupWidthAdmission::Full { columns: full };
-    }
-    if row_width(1) <= slot_width_px {
-        return GroupWidthAdmission::SingleColumn;
-    }
-    GroupWidthAdmission::Degrade
 }
 
 /// The current focus resolves from the exact visible row the table cursor
@@ -538,7 +478,10 @@ pub(crate) fn card_flow_plan(
         if groups.len() >= budget.groups {
             break;
         }
-        let admitted = members.len().min(budget.width_columns(members.len()));
+        let has_overflow = members.len() > budget.columns;
+        let admitted = members
+            .len()
+            .min(budget.width_columns(members.len(), has_overflow));
         if admitted == 0 {
             break;
         }
