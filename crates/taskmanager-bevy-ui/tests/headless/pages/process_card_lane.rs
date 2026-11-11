@@ -596,8 +596,12 @@ fn the_card_plan_admits_whole_groups_only() {
     );
     let group = &plan.groups[0];
     assert_eq!(group.group, CardGroup::Running);
-    assert_eq!(group.members.len(), 2, "one row holds the admitted columns");
-    assert_eq!(group.members, &[0, 1]);
+    assert_eq!(
+        group.members.len(),
+        1,
+        "the dashboard represents the selected row; the group row holds the other column"
+    );
+    assert_eq!(group.members, &[1]);
     assert_eq!(
         group.total, 2,
         "the header states the whole bucket, not the admitted row"
@@ -638,11 +642,68 @@ fn the_card_plan_folds_one_bucket_across_the_whole_page() {
     let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
     assert_eq!(plan.groups.len(), 2, "two status buckets are admitted");
     assert_eq!(plan.groups[0].group, CardGroup::Running);
-    assert_eq!(plan.groups[0].members, &[0, 2]);
+    assert_eq!(plan.groups[0].members, &[2]);
     assert_eq!(plan.groups[0].total, 2);
     assert_eq!(plan.groups[1].group, CardGroup::Sleeping);
     assert_eq!(plan.groups[1].members, &[1, 3]);
     assert_eq!(plan.groups[1].total, 2);
+}
+
+#[test]
+fn standard_and_compact_lanes_keep_the_deduplicated_groups_bounded() {
+    use bevy::ui::UiGlobalTransform;
+
+    let items: Vec<ProcessItem> = (0..9)
+        .map(|pid| process(pid, "bounded-process", "Running"))
+        .collect();
+    for (width, height) in [(1180u32, 780u32), (720u32, 480u32)] {
+        let mut app = measured_process_app(width, height, items.clone());
+        for _ in 0..6 {
+            app.update();
+        }
+
+        let world = app.world_mut();
+        let (flow, flow_transform) = world
+            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessCardFlow>>()
+            .iter(world)
+            .find(|(node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+            .expect("a measured card flow exists");
+        let flow_left = flow_transform.translation.x - flow.size().x / 2.0;
+        let flow_right = flow_transform.translation.x + flow.size().x / 2.0;
+        let flow_bottom = flow_transform.translation.y + flow.size().y / 2.0;
+
+        let groups: Vec<_> = world
+            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessCardGroup>>()
+            .iter(world)
+            .map(|(node, transform)| (node.size(), *transform))
+            .collect();
+        let admission = world.resource::<CardFlowBudget>().admission;
+        let expects_groups = matches!(admission, CardFlowAdmission::Groups(_));
+        assert!(
+            expects_groups == !groups.is_empty(),
+            "the {width}x{height} lane follows its shared admission: {admission:?}"
+        );
+        for (size, transform) in groups {
+            let half = size / 2.0;
+            assert!(
+                transform.translation.x - half.x >= flow_left - 0.5
+                    && transform.translation.x + half.x <= flow_right + 0.5
+                    && transform.translation.y + half.y <= flow_bottom + 0.5,
+                "the {width}x{height} group must stay inside the bounded flow"
+            );
+        }
+
+        let links: Vec<usize> = card_links(&mut app)
+            .into_iter()
+            .map(|(_, row)| row)
+            .collect();
+        let shell = &app.world().non_send::<FrontendTrack>().shell;
+        assert_eq!(shell.selected, 0, "the lane keeps the shell's selected row");
+        assert!(
+            expects_groups == !links.contains(&0),
+            "the {width}x{height} lane follows the focus-card/group rung"
+        );
+    }
 }
 
 #[test]

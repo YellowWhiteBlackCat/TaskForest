@@ -254,6 +254,7 @@ fn rebuild_window_scenes(
             // admit nothing at all.
             let window = surface.card_window.as_deref().copied().unwrap_or_default();
             let plan = card_flow_plan(shell, card_budget, window);
+            let _ = plan.dashboard_visible;
             if plan.empty || plan.groups.is_empty() {
                 vec![empty_card_scene(
                     if plan.empty {

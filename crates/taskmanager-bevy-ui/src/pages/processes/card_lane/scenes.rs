@@ -285,8 +285,11 @@ pub(crate) fn group_scene(
     card_height_px: f32,
 ) -> Box<dyn Scene> {
     // A truncated row must SAY so: the header states the bucket's whole
-    // size, and the overflow action names what the row leaves out.
-    let hidden = group.total.saturating_sub(group.members.len());
+    // size, and the overflow action names what the row leaves out. When the
+    // focus dashboard represents the bucket's first row, its card is not
+    // painted a second time and does not count toward the hidden remainder.
+    let represented = group.members.len() + usize::from(group.focus_is_first);
+    let hidden = group.total.saturating_sub(represented);
     let header = key_value_label(group.group.label(), &group.total.to_string());
     let overflow = overflow_action_scene(group.group, hidden, palette);
     let row_width = if group.row_width.content_width_rem > 0.0 {

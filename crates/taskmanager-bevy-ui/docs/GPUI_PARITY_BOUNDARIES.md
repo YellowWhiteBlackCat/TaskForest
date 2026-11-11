@@ -42,6 +42,12 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   selection reveal, semantic address, official `Button`, and secondary-press
   seam. The focus ring follows the toolkit's `InputFocus`, and the card lane's
   overflow action filters through the shell and switches to dense mode.
+- **Focus card / group deduplication**: when the shared height verdict admits
+  complete status groups, the selected row's dashboard represents the first
+  card of its status bucket; the bounded group row admits only the remaining
+  members and the overflow count includes the dashboard. The headless plan,
+  mounted overflow, and standard/compact bounds tests prove that one shell row
+  is never painted twice and that both responsive rungs stay bounded.
 - **Keyboard help**: bare `F1` opens the shell-owned help mode; `?` / Escape /
   the footer Close action leave it. `?` types into an active search field,
   and a learned page chord closes help while still moving the route.

@@ -541,6 +541,8 @@ pub(crate) struct CardFlowPlan {
     pub(crate) empty: bool,
     /// The bounded lower content group's width in Bevy's rem unit.
     pub(crate) row_width: CardRowWidthMeasurements,
+    /// Whether the optional focus dashboard is painted with these groups.
+    pub(crate) dashboard_visible: bool,
 }
 
 /// One status bucket's admitted card row.
@@ -556,6 +558,8 @@ pub(crate) struct CardGroupPlan {
     pub(crate) total: usize,
     /// The bounded lower content group's width in Bevy's rem unit.
     pub(crate) row_width: CardRowWidthMeasurements,
+    /// Whether this bucket's card row is introduced by the focus dashboard.
+    pub(crate) focus_is_first: bool,
 }
 
 /// The card lane's group window.
@@ -598,11 +602,14 @@ pub(crate) fn card_flow_plan(
 ) -> CardFlowPlan {
     let visible = shell.visible_processes();
     let row_width = budget.row_width_measurements();
+    let dashboard_visible =
+        matches!(budget.admission, CardFlowAdmission::Groups(_)) && !visible.is_empty();
     if visible.is_empty() {
         return CardFlowPlan {
             groups: Vec::new(),
             empty: true,
             row_width,
+            dashboard_visible: false,
         };
     }
     // One bucket per provider status, in first-appearance order, with the
@@ -617,30 +624,50 @@ pub(crate) fn card_flow_plan(
         }
     }
     let group_count = budget.group_count();
+    let focus_bucket = if dashboard_visible {
+        visible
+            .get(shell.selected)
+            .map(|process| card_group(&process.status))
+    } else {
+        None
+    };
     let start = window.clamped(folded.len(), group_count).top;
     let mut groups: Vec<CardGroupPlan> = Vec::new();
     for (group, members) in folded.into_iter().skip(start) {
         if groups.len() >= group_count {
             break;
         }
-        let has_overflow = members.len() > budget.columns;
-        let admitted = members
+        let focus_is_first =
+            focus_bucket == Some(group) && members.first() == Some(&shell.selected);
+        let card_members: Vec<usize> = if focus_is_first {
+            members
+                .iter()
+                .copied()
+                .filter(|index| *index != shell.selected)
+                .collect()
+        } else {
+            members.clone()
+        };
+        let has_overflow = card_members.len() > budget.columns;
+        let admitted = card_members
             .len()
-            .min(budget.width_columns(members.len(), has_overflow));
-        if admitted == 0 {
+            .min(budget.width_columns(card_members.len(), has_overflow));
+        if admitted == 0 && !focus_is_first {
             break;
         }
         groups.push(CardGroupPlan {
             group,
-            members: members[..admitted].to_vec(),
+            members: card_members[..admitted].to_vec(),
             total: members.len(),
             row_width,
+            focus_is_first,
         });
     }
     CardFlowPlan {
         groups,
         empty: false,
         row_width,
+        dashboard_visible,
     }
 }
 

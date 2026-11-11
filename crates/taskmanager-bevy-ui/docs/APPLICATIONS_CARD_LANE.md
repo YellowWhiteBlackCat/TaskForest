@@ -46,6 +46,12 @@ projection:
   shared `admit_card_flow` fold spends its remaining height in order:
   complete status groups with the dashboard, one complete selected-process
   focus card with the optional dashboard removed, then the dense table.
+- With complete groups admitted, the dashboard is the current-focus card of
+  the selected row's status bucket: that row is not painted a second time in
+  the bucket's atomic-card row, and its header's overflow count treats the
+  dashboard as one represented member. This keeps the FlClash reference's
+  "dashboard around the current exit" above "proxy groups as cards" as one
+  hierarchy of distinct facts instead of a duplicated card.
 - The focus-card rung also spends `card_width` for one complete column. It
   preserves the selected row's full name/status and PID/CPU/memory lines,
   semantic address, accessibility node and activation seams. If either
