@@ -6,6 +6,7 @@ use iced::advanced::widget::operation::{Focusable, Operation};
 use iced::advanced::widget::{Id, Tree};
 use iced::{Element, Rectangle, Size};
 use taskmanager_assets::embedded_fonts;
+use taskmanager_application::AppPage;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -116,7 +117,7 @@ fn the_toast_mounts_the_shared_notice_and_a_keyboard_reachable_dismiss_stop() {
 #[test]
 fn the_toast_card_stays_inside_a_compact_720_by_480_frame() {
     let theme = theme();
-    let message = "Long capture path: /run/media/workspace/target/capture/runs/receipt.png";
+    let message = "Long capture receipt: workspace/target/capture/runs/receipt.png";
     let shell = notice_shell(message);
     let notice = shell
         .feedback_presentation()
@@ -140,4 +141,71 @@ fn the_toast_card_stays_inside_a_compact_720_by_480_frame() {
             node.bounds()
         );
     }
+}
+
+#[test]
+fn the_root_toast_sits_below_navigation_and_stays_inside_the_viewport() {
+    for viewport in [
+        Size::new(1180.0, 780.0),
+        Size::new(720.0, 480.0),
+        Size::new(1440.0, 900.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        app.shell.set_feedback_activity("");
+        app.shell.report_notice(
+            FeedbackSource::Interaction,
+            FeedbackSeverity::Success,
+            FeedbackLifecycle::UntilReplaced,
+            "Toast placement",
+        );
+        let _ = app.update(Message::WindowResized(viewport));
+        let mut element = crate::ui::view_root(&app);
+        let probe = probe(&mut element, viewport);
+
+        let page_tab = focus_bounds(&probe, FocusTarget::PageTab(AppPage::Performance))
+            .expect("the page navigation tab is rendered");
+        let navigation_toggle = focus_bounds(&probe, FocusTarget::NavigationToggle)
+            .expect("the navigation toolbar is rendered");
+        let settings =
+            focus_bounds(&probe, FocusTarget::SettingsTrigger).expect("toolbar actions are rendered");
+        let toast_text = probe
+            .text
+            .iter()
+            .find(|(text, _)| text == "Toast placement")
+            .map(|(_, bounds)| *bounds)
+            .expect("the shell notice text is rendered");
+        let toast_dismiss = focus_bounds(&probe, FocusTarget::ToastDismiss)
+            .expect("the toast dismiss action is rendered");
+        let navigation_bottom = [page_tab, navigation_toggle, settings]
+            .into_iter()
+            .map(|bounds| bounds.y + bounds.height)
+            .fold(0.0_f32, f32::max);
+
+        assert!(
+            toast_text.y >= navigation_bottom,
+            "the toast must begin below navigation in the {}x{} frame: toast={toast_text:?}, navigation_bottom={navigation_bottom}",
+            viewport.width,
+            viewport.height
+        );
+        for bounds in [toast_text, toast_dismiss] {
+            assert!(
+                bounds.x >= 0.0
+                    && bounds.y >= 0.0
+                    && bounds.x + bounds.width <= viewport.width
+                    && bounds.y + bounds.height <= viewport.height,
+                "toast content must stay inside the {}x{} frame: {bounds:?}",
+                viewport.width,
+                viewport.height
+            );
+        }
+    }
+}
+
+fn focus_bounds(probe: &CardProbe, target: FocusTarget) -> Option<Rectangle> {
+    let target_id = Id::from(focus_id(target));
+    probe
+        .focus
+        .iter()
+        .find(|(id, _)| *id == target_id)
+        .map(|(_, bounds)| *bounds)
 }
