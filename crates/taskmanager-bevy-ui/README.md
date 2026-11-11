@@ -21,7 +21,7 @@ in [`docs/PAGE_SEAMS.md`](docs/PAGE_SEAMS.md), never hidden. Feathers (the
 official skin system) is not adopted — theme tokens are the only skin
 authority. Glass surfaces project the shared `taskmanager-theme` tiers; the
 frontend-owned `glass` bridge resolves each panel tier's fill, gradient sheen,
-outline, REM radius, two-layer shadow and tiled embedded grain into one
+outline, REM radius, `Layered` two-layer shadow and tiled embedded grain into one
 `GlassPanelMaterial`. Page cards consume that bridge; dense rows, controls,
 chart tracks and device sub-blocks stay on opaque content tokens for
 legibility and frame cost. The bridge never re-derives the theme's material

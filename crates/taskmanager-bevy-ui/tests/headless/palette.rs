@@ -10,8 +10,11 @@
 use bevy::color::{Luminance, Srgba};
 use bevy::scene::WorldSceneExt;
 use bevy::text::{FontSize, RemSize};
+use bevy::ui::prelude::{ShadowStyle, Val};
 use taskmanager_theme::tokens::{self, UiSize};
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::{
+    GlassShadowProjection, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin, Theme,
+};
 
 use super::{UiPalette, composite_over, theme_color, ui_palette};
 use taskmanager_theme::Color;
@@ -209,6 +212,44 @@ fn light_and_dark_themes_resolve_to_different_surfaces() {
         light.nav_bg.to_srgba(),
         "nav surfaces follow the mode too"
     );
+}
+
+#[test]
+fn glass_shadows_use_the_shared_layered_opacity_budget() {
+    for theme in [Theme::dark(), light_theme()] {
+        let palette = ui_palette(&theme, UiSize::Standard);
+        for tier in GlassTier::ALL {
+            let layers = tier.projected_shadow(&theme, GlassShadowProjection::Layered);
+            let actual = palette.glass_shadow(tier);
+            assert_eq!(
+                actual,
+                vec![
+                    ShadowStyle {
+                        color: theme_color(layers.ambient.color),
+                        x_offset: Val::Rem(0.0),
+                        y_offset: Val::Rem(layers.ambient.offset_y),
+                        spread_radius: Val::Rem(0.0),
+                        blur_radius: Val::Rem(layers.ambient.blur_radius),
+                    },
+                    ShadowStyle {
+                        color: theme_color(layers.contact.color),
+                        x_offset: Val::Rem(0.0),
+                        y_offset: Val::Rem(layers.contact.offset_y),
+                        spread_radius: Val::Rem(0.0),
+                        blur_radius: Val::Rem(layers.contact.blur_radius),
+                    },
+                ],
+                "{tier:?} must preserve the theme's layered geometry and ink"
+            );
+            let ambient_alpha = actual[0].color.to_srgba().alpha;
+            let contact_alpha = actual[1].color.to_srgba().alpha;
+            let combined_alpha = 1.0 - (1.0 - ambient_alpha) * (1.0 - contact_alpha);
+            assert!(
+                (combined_alpha - theme.glass_layer(tier).shadow.a).abs() < 0.00001,
+                "{tier:?} combined shadow alpha {combined_alpha} must match the theme ink"
+            );
+        }
+    }
 }
 
 #[test]

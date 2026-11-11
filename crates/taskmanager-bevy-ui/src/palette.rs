@@ -18,7 +18,7 @@ use taskmanager_theme::Weight;
 use taskmanager_theme::palette::SeverityPalette;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::{self, UiSize};
-use taskmanager_theme::{Color, GlassTier, Length, LightDark};
+use taskmanager_theme::{Color, GlassShadowProjection, GlassTier, Length, LightDark};
 use zhuge_ui_core::easing::lerp;
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
@@ -211,7 +211,7 @@ impl UiPalette {
 
     #[must_use]
     pub(crate) fn glass_shadow(&self, tier: GlassTier) -> Vec<ShadowStyle> {
-        let layers = tier.shadow(&self.optical_theme);
+        let layers = tier.projected_shadow(&self.optical_theme, GlassShadowProjection::Layered);
         vec![
             ShadowStyle {
                 color: theme_color(layers.ambient.color),

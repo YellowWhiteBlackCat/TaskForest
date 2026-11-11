@@ -75,7 +75,7 @@ fn fixture() -> (App, Entity, Entity) {
 }
 
 #[test]
-fn a_marked_surface_is_mirrored_into_the_capture_root_at_its_measured_rectangle() {
+fn layered_shadow_projection_preserves_the_marked_surface_bounds_in_the_backdrop_mirror() {
     let (mut app, camera, source) = fixture();
     app.world_mut()
         .run_system_once(sync_backdrop_mirrors)
