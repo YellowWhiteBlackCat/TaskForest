@@ -1,9 +1,13 @@
 //! Keyboard, modifier, search-edit and focus message reducer.
 
 use super::super::surface::InteractionSnapshot;
-use super::super::{FocusTarget, IcedApp, IcedKey, InputScope, LocalSurface, Message};
+use super::super::{
+    ContextMenuKind, FocusTarget, IcedApp, IcedKey, InputScope, LocalSurface, Message,
+};
 use super::dispatch::UpdateDispatch;
+use taskmanager_application::KeyCode;
 use taskmanager_application::SurfaceKind;
+use taskmanager_shell::ShellKeyEvent;
 use taskmanager_ui_contract::InputModality;
 
 impl IcedApp {
@@ -32,7 +36,13 @@ impl IcedApp {
             Message::Key(IcedKey::Fixed(event)) => {
                 self.input.modality = InputModality::Keyboard;
                 self.configuration.set_focus_visible(true);
-                if let Some(copy) = self.copy_selected_row_summary(&event) {
+                if self.context_menu_kind().is_some() {
+                    match self.context_menu_key(event) {
+                        ContextMenuKeyOutcome::Focus(task) => UpdateDispatch::task(task),
+                        ContextMenuKeyOutcome::NoTask => UpdateDispatch::none(),
+                        ContextMenuKeyOutcome::Continue => self.continue_context_menu_key(event),
+                    }
+                } else if let Some(copy) = self.copy_selected_row_summary(&event) {
                     UpdateDispatch::task(copy)
                 } else {
                     UpdateDispatch::effect(self.handle_fixed_message(event))
@@ -125,3 +135,42 @@ impl IcedApp {
         self.configuration.set_focus_visible(false);
     }
 }
+
+enum ContextMenuKeyOutcome {
+    Focus(iced::Task<Message>),
+    NoTask,
+    Continue,
+}
+
+impl IcedApp {
+    fn continue_context_menu_key(&mut self, event: ShellKeyEvent) -> UpdateDispatch {
+        if let Some(copy) = self.copy_selected_row_summary(&event) {
+            UpdateDispatch::task(copy)
+        } else {
+            UpdateDispatch::effect(self.handle_fixed_message(event))
+        }
+    }
+
+    fn context_menu_key(&mut self, event: ShellKeyEvent) -> ContextMenuKeyOutcome {
+        match event.key {
+            KeyCode::ArrowUp | KeyCode::ArrowDown
+                if self.context_menu_kind() == Some(ContextMenuKind::ProcessActions)
+                    && self.shell.process_control_availability().is_ready() =>
+            {
+                ContextMenuKeyOutcome::NoTask
+            }
+            KeyCode::ArrowUp | KeyCode::ArrowDown => self
+                .context_menu_focus_menu_key(event.key == KeyCode::ArrowUp)
+                .map_or(ContextMenuKeyOutcome::Continue, |target| {
+                    ContextMenuKeyOutcome::Focus(iced::widget::operation::focus(
+                        crate::focus::focus_id(target),
+                    ))
+                }),
+            _ => ContextMenuKeyOutcome::Continue,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "../../../tests/gui/app/menu_focus_input_tests.rs"]
+mod tests;

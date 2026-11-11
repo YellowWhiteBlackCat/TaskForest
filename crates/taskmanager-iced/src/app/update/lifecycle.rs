@@ -38,7 +38,7 @@ impl UpdatePrelude {
                             | KeyCode::PageUp
                             | KeyCode::PageDown
                     )
-            ),
+            ) && app.context_menu_kind().is_none(),
             focus_cycle: match message {
                 Message::Key(IcedKey::Fixed(event)) if event.key == KeyCode::Tab => {
                     Some(if event.modifiers.shift {

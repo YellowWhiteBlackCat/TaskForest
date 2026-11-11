@@ -13,7 +13,6 @@ use iced::advanced::widget::operation::{Focusable, Operation};
 use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, Physical};
 use iced::{Element, Event, Point, Rectangle, Size, Vector, mouse};
-use taskforest_core::core::process::ProcessLiveKey;
 use taskforest_core::core::smart::SmartSelfTestKind;
 use taskmanager_application::AppPage;
 use taskmanager_assets::embedded_fonts;
@@ -21,7 +20,7 @@ use taskmanager_shell::SortCol;
 use taskmanager_shell::fixture::health::seed_smart_self_test_capabilities;
 use taskmanager_shell::presentation::smart::self_test_intent;
 
-type TestOverlay<'a> = Nested<'a, Message, iced::Theme, iced::Renderer>;
+pub(super) type TestOverlay<'a> = Nested<'a, Message, iced::Theme, iced::Renderer>;
 
 struct FocusTargetBounds {
     target: Id,
@@ -41,7 +40,7 @@ impl Operation<()> for FocusTargetBounds {
     }
 }
 
-fn renderer() -> iced::Renderer {
+pub(super) fn renderer() -> iced::Renderer {
     {
         let mut fonts = iced::advanced::graphics::text::font_system()
             .write()
@@ -58,7 +57,7 @@ fn renderer() -> iced::Renderer {
     .expect("software renderer")
 }
 
-fn build_view<'a>(
+pub(super) fn build_view<'a>(
     app: &'a IcedApp,
     renderer: &iced::Renderer,
     size: Size,
@@ -75,7 +74,7 @@ fn build_view<'a>(
     (view, tree, node)
 }
 
-fn first_overlay_panel_bounds(node: &Node, viewport: Size) -> Option<Rectangle> {
+pub(super) fn first_overlay_panel_bounds(node: &Node, viewport: Size) -> Option<Rectangle> {
     let bounds = node.bounds();
     if bounds.width < viewport.width || bounds.height < viewport.height {
         return Some(bounds);
@@ -101,7 +100,7 @@ fn focus_target_bounds(
     operation.bounds
 }
 
-fn focus_overlay_target_bounds(
+pub(super) fn focus_overlay_target_bounds(
     overlay: &mut TestOverlay<'_>,
     node: &Node,
     renderer: &iced::Renderer,
@@ -171,7 +170,7 @@ fn apply_messages(app: &mut IcedApp, messages: Vec<Message>) {
     }
 }
 
-fn key_pressed(named: Named, code: Code) -> iced::keyboard::Event {
+pub(super) fn key_pressed(named: Named, code: Code) -> iced::keyboard::Event {
     let key = Key::Named(named);
     iced::keyboard::Event::KeyPressed {
         key: key.clone(),
@@ -255,47 +254,6 @@ fn window_deactivation_removes_the_real_user_context_menu_without_submitting_an_
     assert!(
         super::message_for_window_event(iced::window::Event::Focused).is_none(),
         "window activation alone does not dismiss or submit a menu action"
-    );
-}
-
-#[test]
-fn process_context_menu_mounts_its_production_popover_action() {
-    let mut app = IcedApp::demo();
-    let size = Size::new(1180.0, 780.0);
-    let _ = app.update(Message::WindowResized(size));
-    let _ = app.update(Message::SelectPage(AppPage::Applications));
-    let identity = app
-        .shell
-        .visible_processes()
-        .iter()
-        .find_map(|process| ProcessLiveKey::from_process(process))
-        .expect("the demo process fixture has a live row identity");
-    let _ = app.update(Message::OpenProcessRowMenu { identity });
-    assert_eq!(app.process_menu_identity(), Some(identity));
-
-    let renderer = renderer();
-    let (mut view, mut tree, node) = build_view(&app, &renderer, size);
-    let overlay = view
-        .as_widget_mut()
-        .overlay(
-            &mut tree,
-            Layout::new(&node),
-            &renderer,
-            &Rectangle::with_size(size),
-            Vector::ZERO,
-        )
-        .expect("the selected process mounts its production Popover overlay");
-    let mut overlay = Nested::new(overlay);
-    let overlay_node = overlay.layout(&renderer, size);
-    let copy_pid = focus_overlay_target_bounds(
-        &mut overlay,
-        &overlay_node,
-        &renderer,
-        FocusTarget::ProcessMenuCopyPid,
-    );
-    assert!(
-        copy_pid.is_some_and(|bounds| bounds.width > 0.0 && bounds.height > 0.0),
-        "the mounted Process Popover exposes its real Copy PID action"
     );
 }
 

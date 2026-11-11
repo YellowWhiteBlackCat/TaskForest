@@ -65,3 +65,7 @@ fn message_for_keyboard_event(event: iced::keyboard::Event) -> Message {
 #[cfg(test)]
 #[path = "../../tests/gui/overlay_interaction_tests.rs"]
 mod overlay_interaction_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/app/context_menu_navigation_tests.rs"]
+mod context_menu_navigation_tests;

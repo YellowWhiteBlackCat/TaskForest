@@ -9,6 +9,98 @@ impl IcedApp {
         self.dismiss_context_menu();
     }
 
+    /// Arrow-key traversal for the one open context menu. The targets are the
+    /// menu's real focus stops in renderer order; Tab keeps Iced's native
+    /// traversal and Escape keeps the existing dismiss path.
+    pub(super) fn context_menu_focus_menu_key(&mut self, previous: bool) -> Option<FocusTarget> {
+        let kind = self.context_menu_kind()?;
+        let targets = self.context_menu_targets(kind);
+        let target = next_context_menu_target(&targets, self.input.focused_control, previous)?;
+        self.input.focused_control = Some(target);
+        Some(target)
+    }
+
+    fn context_menu_targets(&self, kind: ContextMenuKind) -> Vec<FocusTarget> {
+        match kind {
+            ContextMenuKind::Process => vec![
+                FocusTarget::ProcessMenuEndTask,
+                FocusTarget::ProcessMenuEndTree,
+                FocusTarget::ProcessMenuKill,
+                FocusTarget::ProcessMenuSuspend,
+                FocusTarget::ProcessMenuResume,
+                FocusTarget::ProcessMenuPriorityHigh,
+                FocusTarget::ProcessMenuPriorityNormal,
+                FocusTarget::ProcessMenuPriorityLow,
+                FocusTarget::ProcessMenuEfficiencyMode,
+                FocusTarget::ProcessMenuSignalHangup,
+                FocusTarget::ProcessMenuSignalInterrupt,
+                FocusTarget::ProcessMenuSignalUser1,
+                FocusTarget::ProcessMenuSignalUser2,
+                FocusTarget::ProcessMenuOpenLocation,
+                FocusTarget::ProcessMenuSearchOnline,
+                FocusTarget::ProcessMenuAffinity,
+                FocusTarget::ProcessMenuProperties,
+                FocusTarget::ProcessMenuCopyName,
+                FocusTarget::ProcessMenuCopyPid,
+                FocusTarget::ProcessMenuCopyCommandLine,
+                FocusTarget::ProcessMenuCopyTsv,
+                FocusTarget::ProcessMenuCopyJson,
+                FocusTarget::ProcessMenuClose,
+            ],
+            ContextMenuKind::Service => {
+                let Some(index) = self.service_menu_index() else {
+                    return Vec::new();
+                };
+                use ServiceAction::*;
+                [Start, Stop, Restart, Enable, Disable, ReloadDaemon]
+                    .into_iter()
+                    .map(|action| FocusTarget::ServiceMenuAction { index, action })
+                    .chain(std::iter::once(FocusTarget::ServiceMenuClose))
+                    .collect()
+            }
+            ContextMenuKind::Startup => {
+                let Some(index) = self.startup_menu_index() else {
+                    return Vec::new();
+                };
+                vec![
+                    FocusTarget::StartupMenuAction {
+                        index,
+                        enabled: true,
+                    },
+                    FocusTarget::StartupMenuAction {
+                        index,
+                        enabled: false,
+                    },
+                    FocusTarget::StartupMenuClose,
+                ]
+            }
+            ContextMenuKind::User => vec![
+                FocusTarget::UserRowMenuDisconnect,
+                FocusTarget::UserRowMenuLock,
+                FocusTarget::UserRowMenuClose,
+            ],
+            ContextMenuKind::ProcessColumns => {
+                let mut targets: Vec<FocusTarget> = crate::ui::applications::apps_columns(true)
+                    .into_iter()
+                    .filter(|(column, _)| crate::ui::applications::column_hideable(*column))
+                    .map(|(column, _)| FocusTarget::ProcessColumnToggle(column))
+                    .collect();
+                targets.extend([
+                    FocusTarget::ProcessColumnsReset,
+                    FocusTarget::ProcessColumnsClose,
+                ]);
+                targets
+            }
+            ContextMenuKind::ProcessActions => {
+                if self.shell.process_control_availability().is_ready() {
+                    vec![FocusTarget::ProcessPrioritySelect]
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+
     /// Open a Users row menu from the current canonical visual order and
     /// freeze the exact provider session before any later refresh can reorder
     /// the projection.
@@ -79,6 +171,11 @@ impl IcedApp {
             Message::OpenProcessRowMenu { .. } => Some(FocusTarget::ProcessMenuEndTask),
             Message::OpenProcessAffinity => Some(FocusTarget::ProcessAffinityCpu(0)),
             Message::OpenProcessColumnsMenu => Some(FocusTarget::ProcessColumnToggle(SortCol::Pid)),
+            Message::OpenProcessActionsMenu
+                if self.shell.process_control_availability().is_ready() =>
+            {
+                Some(FocusTarget::ProcessPrioritySelect)
+            }
             Message::OpenServiceRowMenu { source_index, .. } => {
                 Some(FocusTarget::ServiceMenuAction {
                     index: *source_index,
@@ -120,3 +217,27 @@ impl IcedApp {
         }
     }
 }
+
+pub(super) fn next_context_menu_target(
+    targets: &[FocusTarget],
+    focused: Option<FocusTarget>,
+    previous: bool,
+) -> Option<FocusTarget> {
+    if targets.is_empty() {
+        return None;
+    }
+
+    let current =
+        focused.and_then(|target| targets.iter().position(|candidate| *candidate == target));
+    let next = match (current, previous) {
+        (Some(0), true) | (None, true) => targets.len() - 1,
+        (Some(index), true) => index - 1,
+        (Some(index), false) => (index + 1) % targets.len(),
+        (None, false) => 0,
+    };
+    targets.get(next).copied()
+}
+
+#[cfg(test)]
+#[path = "../../tests/gui/app/menu_focus_tests.rs"]
+mod tests;
