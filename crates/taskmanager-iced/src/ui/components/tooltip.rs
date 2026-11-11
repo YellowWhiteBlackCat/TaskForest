@@ -54,6 +54,7 @@ pub(crate) struct Tooltip<'a> {
     focus_visible: bool,
     gap: f32,
     capture_open_marker: Option<PathBuf>,
+    anchored: bool,
 }
 
 impl<'a> Tooltip<'a> {
@@ -67,6 +68,7 @@ impl<'a> Tooltip<'a> {
             focus_visible: false,
             gap: f32::from(tokens::SPACE_4),
             capture_open_marker: None,
+            anchored: false,
         }
     }
 
@@ -79,6 +81,14 @@ impl<'a> Tooltip<'a> {
     /// capture. Ordinary production launches never install this path.
     pub(crate) fn open_for_capture(mut self, marker: PathBuf) -> Self {
         self.capture_open_marker = Some(marker);
+        self
+    }
+
+    /// Mount inventory-row details at the viewport edge farthest from the
+    /// trigger, the GPUI semantic for dense rows whose own text would be
+    /// covered by a cursor-adjacent plate.
+    pub(crate) fn anchored_to_viewport_edge(mut self) -> Self {
+        self.anchored = true;
         self
     }
 }
@@ -250,10 +260,11 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
         );
         let tooltip = open.then(|| {
             overlay::Element::new(Box::new(TooltipOverlay {
-                content_bounds: layout.bounds(),
+                content_bounds: layout.bounds() + translation,
                 tooltip: &mut self.tooltip,
                 tree: &mut tooltip_tree[0],
                 gap: self.gap,
+                anchored: self.anchored,
             }))
         });
         if tooltip.is_some()
@@ -293,6 +304,10 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Tooltip<'_> {
     }
 }
 
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/components/tooltip_placement_tests.rs"]
+mod tooltip_placement_tests;
+
 impl<'a> From<Tooltip<'a>> for Element<'a, Message, iced::Theme, iced::Renderer> {
     fn from(tooltip: Tooltip<'a>) -> Self {
         Self::new(tooltip)
@@ -317,6 +332,7 @@ struct TooltipOverlay<'a, 'b> {
     tooltip: &'b mut Element<'a, Message, iced::Theme, iced::Renderer>,
     tree: &'b mut Tree,
     gap: f32,
+    anchored: bool,
 }
 
 impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for TooltipOverlay<'_, '_> {
@@ -328,10 +344,24 @@ impl overlay::Overlay<Message, iced::Theme, iced::Renderer> for TooltipOverlay<'
             &layout::Limits::new(Size::ZERO, viewport.size()),
         );
         let size = tooltip_layout.size();
-        let x = (self.content_bounds.x + (self.content_bounds.width - size.width) / 2.0)
-            .clamp(0.0, (viewport.width - size.width).max(0.0));
-        let y = (self.content_bounds.y + self.content_bounds.height + self.gap)
-            .min((viewport.height - size.height).max(0.0));
+        let edge_margin = if self.anchored {
+            f32::from(tokens::SPACE_8)
+        } else {
+            0.0
+        };
+        let upper_region_limit = viewport.height * 0.66;
+        let y = if self.anchored && self.content_bounds.y <= upper_region_limit {
+            (viewport.height - edge_margin - size.height).max(edge_margin)
+        } else if self.anchored {
+            edge_margin
+        } else {
+            (self.content_bounds.y + self.content_bounds.height + self.gap)
+                .min((viewport.height - size.height).max(0.0))
+        };
+        let x = (self.content_bounds.x + (self.content_bounds.width - size.width) / 2.0).clamp(
+            edge_margin,
+            (viewport.width - edge_margin - size.width).max(edge_margin),
+        );
         layout::Node::with_children(size, vec![tooltip_layout]).translate(Vector::new(x, y))
     }
 

@@ -249,11 +249,13 @@ fn tooltip_owned_with_capture(
     if let Some(marker) = marker {
         Tooltip::new(content, hint)
             .with_focus_visible(focus_visible)
+            .anchored_to_viewport_edge()
             .open_for_capture(marker)
             .into()
     } else {
         Tooltip::new(content, hint)
             .with_focus_visible(focus_visible)
+            .anchored_to_viewport_edge()
             .into()
     }
 }

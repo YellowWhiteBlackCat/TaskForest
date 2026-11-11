@@ -25,7 +25,9 @@ native selection and renderer caches; all shared types use their defining module
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero); tooltip
   wrappers inspect descendant focus state and the keyboard-visible modality
-  so focusable hints open without requiring pointer hover;
+  so focusable hints open without requiring pointer hover, and inventory-row
+  detail plates park at the viewport edge farthest from the trigger so dense
+  table rows stay readable (GPUI `row_tooltip_anchor` parity);
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
   controls that route keyboard access through the focus shell. Services search
   combines a page-local name/description query with the GPUI-parity
