@@ -2,8 +2,8 @@
 
 use gpui::{
     AnimationExt, AnyElement, App, AppContext, Div, Entity, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Styled, Window, anchored, deferred,
-    div, px,
+    MouseButton, MouseDownEvent, ParentElement, Pixels, Point, Size, Styled, Window, anchored,
+    deferred, div, px,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -331,9 +331,31 @@ pub(crate) fn row_tooltip_overlay(
     t: &Theme,
     text: &str,
     anchor: Point<Pixels>,
+    viewport: Size<Pixels>,
 ) -> impl IntoElement {
-    let anchor = crate::gpui_app::list_view::row_tooltip_anchor(anchor);
-    tooltip_overlay_with_elevation(t, text, anchor, true)
+    let position = crate::gpui_app::list_view::table_geometry::row_tooltip_anchor(anchor, viewport);
+    let edge_margin = crate::gpui_app::list_view::table_geometry::ROW_TOOLTIP_EDGE_MARGIN;
+    let max_width = (f32::from(viewport.width) - edge_margin * 2.0).clamp(0.0, 420.0);
+    let max_height = (f32::from(viewport.height) - edge_margin * 2.0).max(0.0);
+    let content_width = (max_width - tokens::SPACE_4.0 * 4.0).max(0.0);
+    let label = CardSurface::new(t.palette())
+        .glass(GlassTier::Card)
+        .radius(tokens::control_radius(t))
+        .padding(tokens::SPACE_4)
+        .child(
+            div()
+                .min_w(px(0.0))
+                .max_w(px(content_width))
+                .whitespace_normal()
+                .text_size(font_size(tokens::FONT_12))
+                .text_color(hsla(t.fg))
+                .child(text.to_string()),
+        )
+        .render()
+        .max_w(px(max_width))
+        .max_h(px(max_height))
+        .overflow_hidden();
+    tooltip_overlay_with_label(label, position, Some(px(edge_margin)))
 }
 
 pub(crate) fn graph_tooltip_overlay(
@@ -360,10 +382,24 @@ fn tooltip_overlay_with_elevation(
         tooltip(t, text)
     } else {
         flat_tooltip(t, text)
-    }
-    .debug_selector(|| "tm-tooltip-overlay".to_string())
-    .with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
-    deferred(anchored().position(anchor).snap_to_window().child(label))
+    };
+    tooltip_overlay_with_label(label, anchor, None)
+}
+
+fn tooltip_overlay_with_label(
+    label: Div,
+    anchor: Point<Pixels>,
+    edge_margin: Option<Pixels>,
+) -> impl IntoElement {
+    let label = label
+        .debug_selector(|| "tm-tooltip-overlay".to_string())
+        .with_animation("tooltip-fade", fade_in(), |el, delta| el.opacity(delta));
+    let positioner = anchored().position(anchor);
+    let positioner = match edge_margin {
+        Some(margin) => positioner.snap_to_window_with_margin(margin),
+        None => positioner.snap_to_window(),
+    };
+    deferred(positioner.child(label))
 }
 
 // ── elastic text wrapper (gpui "min_w(0) + truncate" pattern) ──────────────

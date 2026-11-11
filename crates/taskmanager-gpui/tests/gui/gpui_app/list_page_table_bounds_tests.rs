@@ -1,6 +1,6 @@
 //! Measured bottom/right bounds for the compact GPUI inventory tables.
 
-use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
+use gpui::{AppContext, Modifiers, MouseButton, TestAppContext, VisualTestContext, px, size};
 
 use crate::gpui_app::list_view::LIST_PAGE_SCAFFOLD_SELECTOR;
 use crate::gpui_app::root::{RootView, TopPage};
@@ -244,4 +244,62 @@ async fn startup_command_column_fits_the_measured_compact_content_slot(cx: &mut 
         command_width <= px(f32::from(viewport.size.width)),
         "compact command column must fit the measured content slot: width={command_width:?}, viewport={viewport:?}"
     );
+}
+
+#[gpui::test]
+async fn startup_row_tooltip_preserves_adjacent_rows_inside_compact_and_wide_viewports(
+    cx: &mut TestAppContext,
+) {
+    for (width, height) in [(720.0, 480.0), (1600.0, 900.0)] {
+        let window = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
+        cx.simulate_window_resize(window.into(), size(px(width), px(height)));
+        let view = window.entity(cx).expect("RootView entity");
+        view.update(cx, |view, cx| {
+            view.mark_telemetry_frame_ready();
+            view.page = TopPage::Startup;
+            view.replace_startup_for_test((0..2).map(startup_entry).collect(), Vec::new());
+            cx.notify();
+        });
+        draw(cx, window);
+
+        let mut visual = VisualTestContext::from_window(window.into(), cx);
+        let hovered_row = visual
+            .debug_bounds("tm-startup-row:0")
+            .expect("first startup row must render");
+        let following_row = visual
+            .debug_bounds("tm-startup-row:1")
+            .expect("following startup row must render");
+        visual.simulate_mouse_move(hovered_row.center(), None::<MouseButton>, Modifiers::none());
+        draw(cx, window);
+
+        let mut visual = VisualTestContext::from_window(window.into(), cx);
+        let viewport = visual
+            .debug_bounds("tm-telemetry-ready-body")
+            .expect("startup viewport must render");
+        let tooltip = visual
+            .debug_bounds("tm-tooltip-overlay")
+            .expect("hovering a startup row must mount its tooltip");
+        assert!(
+            tooltip.origin.x >= px(0.0)
+                && tooltip.origin.y >= px(0.0)
+                && tooltip.right() <= px(width)
+                && tooltip.bottom() <= px(height),
+            "{width}x{height} tooltip must remain within the window: tooltip={tooltip:?}"
+        );
+        assert!(
+            !tooltip.intersects(&hovered_row),
+            "{width}x{height} tooltip must preserve the hovered row: tooltip={tooltip:?}, row={hovered_row:?}"
+        );
+        assert!(
+            !tooltip.intersects(&following_row),
+            "{width}x{height} tooltip must preserve the following row: tooltip={tooltip:?}, row={following_row:?}"
+        );
+        assert!(
+            tooltip.origin.x >= viewport.origin.x
+                && tooltip.origin.y >= viewport.origin.y
+                && tooltip.right() <= viewport.right() + px(0.5)
+                && tooltip.bottom() <= viewport.bottom() + px(0.5),
+            "{width}x{height} tooltip must stay inside the measured page viewport: tooltip={tooltip:?}, viewport={viewport:?}"
+        );
+    }
 }

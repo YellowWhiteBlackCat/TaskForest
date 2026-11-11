@@ -72,7 +72,12 @@ pub(super) fn compose(
             }
             let anchor = window.mouse_position();
             if frame.tooltip_row_anchored {
-                root.child(elements::row_tooltip_overlay(theme, &text, anchor))
+                root.child(elements::row_tooltip_overlay(
+                    theme,
+                    &text,
+                    anchor,
+                    window.viewport_size(),
+                ))
             } else {
                 root.child(elements::tooltip_overlay(theme, &text, anchor))
             }

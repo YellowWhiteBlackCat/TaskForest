@@ -29,7 +29,7 @@
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
 use gpui::{
-    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, Point,
+    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::rc::Rc;
@@ -843,13 +843,6 @@ pub fn feedback_status_line(
         .text_size(font_size(tokens::FONT_12))
         .text_color(hsla(color))
         .child(text)
-}
-
-/// Inventory-row tooltips are anchored one row below the cursor so dense row
-/// text stays readable while the hint is visible.
-#[must_use]
-pub(crate) fn row_tooltip_anchor(anchor: Point<gpui::Pixels>) -> Point<gpui::Pixels> {
-    gpui::point(anchor.x, anchor.y + px(tokens::SPACE_16.0))
 }
 
 #[cfg(test)]

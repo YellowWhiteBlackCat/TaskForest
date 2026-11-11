@@ -1,8 +1,7 @@
 //! Pure right-edge proof for the elastic Startup command column.
 
-use super::{TABLE_RAIL_WIDTH, elastic_last_column};
-use crate::gpui_app::list_view::row_tooltip_anchor;
-use gpui::{point, px};
+use super::{ROW_TOOLTIP_EDGE_MARGIN, TABLE_RAIL_WIDTH, elastic_last_column, row_tooltip_anchor};
+use gpui::{point, px, size};
 use taskmanager_theme::tokens;
 
 #[test]
@@ -27,9 +26,16 @@ fn an_extremely_narrow_slot_keeps_the_command_column_whole() {
 }
 
 #[test]
-fn inventory_row_tooltip_starts_below_the_hovered_text() {
-    let anchor = point(px(120.0), px(220.0));
-    let shifted = row_tooltip_anchor(anchor);
-    assert_eq!(shifted.x, anchor.x);
-    assert_eq!(shifted.y, anchor.y + px(tokens::SPACE_16.0));
+fn inventory_row_tooltip_uses_the_far_vertical_viewport_edge() {
+    let viewport = size(px(720.0), px(480.0));
+    let upper_cursor = point(px(120.0), px(220.0));
+    let lower_cursor = point(px(640.0), px(400.0));
+
+    let lower_edge = row_tooltip_anchor(upper_cursor, viewport);
+    let upper_edge = row_tooltip_anchor(lower_cursor, viewport);
+
+    assert_eq!(lower_edge.x, upper_cursor.x);
+    assert_eq!(lower_edge.y, viewport.height - px(ROW_TOOLTIP_EDGE_MARGIN));
+    assert_eq!(upper_edge.x, lower_cursor.x);
+    assert_eq!(upper_edge.y, px(ROW_TOOLTIP_EDGE_MARGIN));
 }
