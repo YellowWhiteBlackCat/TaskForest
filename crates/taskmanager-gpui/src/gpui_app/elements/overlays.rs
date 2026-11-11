@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme, WindowCorner};
+use taskmanager_theme::{GlassSurfaceRole, Theme, WindowCorner};
 use taskmanager_ui::overlays::dialog::Dialog;
 use taskmanager_ui::overlays::layer_stack::{LayerBackfill, LayerStack};
 use taskmanager_ui::primitives::card_surface::CardSurface;
@@ -236,10 +236,7 @@ pub fn dialog_overlay_width(
 /// [`tooltip_overlay`] to place it, or compose it directly inside your own
 /// `anchored` / `deferred` wrapper if you need custom placement.
 pub fn tooltip(t: &Theme, text: &str) -> Div {
-    CardSurface::new(t.palette())
-        .glass(GlassTier::Card)
-        .radius(tokens::control_radius(t))
-        .padding(tokens::SPACE_4)
+    tooltip_surface(t)
         .child(
             div()
                 .px(definite_length(tokens::SPACE_4))
@@ -253,10 +250,7 @@ pub fn tooltip(t: &Theme, text: &str) -> Div {
 /// The non-elevated tooltip leaf used by graph tooltips, which sit above an
 /// already-painted chart surface and must not stack a second card shadow.
 pub(crate) fn flat_tooltip(t: &Theme, text: &str) -> Div {
-    CardSurface::new(t.palette())
-        .glass(GlassTier::Card)
-        .radius(tokens::control_radius(t))
-        .padding(tokens::SPACE_4)
+    tooltip_surface(t)
         .inset()
         .child(
             div()
@@ -266,6 +260,12 @@ pub(crate) fn flat_tooltip(t: &Theme, text: &str) -> Div {
                 .child(text.to_string()),
         )
         .render()
+}
+
+pub(crate) fn tooltip_surface(t: &Theme) -> CardSurface {
+    CardSurface::for_role(t.palette(), GlassSurfaceRole::Tooltip)
+        .radius(tokens::control_radius(t))
+        .padding(tokens::SPACE_4)
 }
 
 /// A tooltip overlay: the [`tooltip`] label, raised above all siblings via
@@ -338,10 +338,7 @@ pub(crate) fn row_tooltip_overlay(
     let max_width = (f32::from(viewport.width) - edge_margin * 2.0).clamp(0.0, 420.0);
     let max_height = (f32::from(viewport.height) - edge_margin * 2.0).max(0.0);
     let content_width = (max_width - tokens::SPACE_4.0 * 4.0).max(0.0);
-    let label = CardSurface::new(t.palette())
-        .glass(GlassTier::Card)
-        .radius(tokens::control_radius(t))
-        .padding(tokens::SPACE_4)
+    let label = tooltip_surface(t)
         .child(
             div()
                 .min_w(px(0.0))
