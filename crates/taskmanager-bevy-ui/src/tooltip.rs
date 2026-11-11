@@ -198,6 +198,18 @@ pub(crate) fn resolve_placement(
     }
 }
 
+/// Resolve the card's fixed-layout top offset from its y-down placement.
+///
+/// A `FixedNode` with no explicit size has its layout origin at the viewport
+/// centre; its `top` inset is relative to that centre, while
+/// [`resolve_placement`] answers a y-down top-left corner. Converting through
+/// one owner prevents the pure viewport fit and the painted card from using
+/// two different coordinate systems.
+#[must_use]
+pub(crate) fn fixed_top(placement_y: f32, card_height: f32, viewport_height: f32) -> f32 {
+    placement_y + card_height * 0.5 - viewport_height * 0.5
+}
+
 /// Choose one measured capture anchor by its shared copy label.
 ///
 /// The named Applications trigger wins when it has been measured; otherwise
@@ -515,7 +527,7 @@ pub(crate) fn tooltip_placement_system(
         let card_size = card.size() * scale;
         let placement = resolve_placement(anchor, card_size, viewport, space_4());
         node.left = Val::Px(placement.origin.x);
-        node.top = Val::Px(placement.origin.y);
+        node.top = Val::Px(fixed_top(placement.origin.y, card_size.y, viewport.y));
     }
     let _ = palette;
 }

@@ -22,7 +22,9 @@ use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 
-use super::{TooltipOverlay, TooltipSession, TooltipState, TooltipText, tooltip_card_scene};
+use super::{
+    TooltipOverlay, TooltipSession, TooltipState, TooltipText, fixed_top, tooltip_card_scene,
+};
 use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
@@ -51,6 +53,16 @@ fn tooltip_state_transitions_are_explicit_and_discrete() {
     state.hide();
     assert!(!state.is_visible());
     assert_eq!(state.session, None);
+}
+
+#[test]
+fn fixed_top_maps_a_y_down_placement_into_the_fixed_layout_origin() {
+    // A 60px card placed at y=244 in a 600px viewport paints with its
+    // top-left corner at y=244 when the FixedNode origin is the viewport
+    // centre (y=300): 244 + 30 - 300 = -26.
+    assert_eq!(fixed_top(244.0, 60.0, 600.0), -26.0);
+    assert_eq!(fixed_top(0.0, 60.0, 600.0), -270.0);
+    assert_eq!(fixed_top(540.0, 60.0, 600.0), 270.0);
 }
 
 #[test]
