@@ -12,6 +12,7 @@ use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ecs::system::RunSystemOnce;
+use bevy::math::Vec2;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::prelude::{ComputedNode, Display, Node};
@@ -31,12 +32,14 @@ use crate::pages::processes::card_lane::{
     ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode, ProcessViewModeButton,
     card_flow_budget, card_flow_plan, focus_projection,
 };
+use crate::pages::processes::details::detail_row_slots;
 use crate::pages::processes::{
-    ProcessCountLine, ProcessRowLink, ProcessRowsRoot, ProcessTableArtifact, ProcessTableContainer,
-    content,
+    ProcessCountLine, ProcessDetailsContainer, ProcessPageRoot, ProcessRowLink, ProcessRowsRoot,
+    ProcessTableArtifact, ProcessTableContainer, content,
 };
 use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
+use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -69,8 +72,8 @@ fn card_lane_app(shell: ShellApp, palette: UiPalette) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins((AssetPlugin::default(), ScenePlugin));
-    app.add_plugins(crate::input::InputPlugin);
     app.init_resource::<Assets<Font>>();
+    app.add_plugins(crate::input::InputPlugin);
     app.insert_resource(WindowPalette {
         inner: palette.clone(),
     });
@@ -801,5 +804,76 @@ fn the_empty_state_is_distinct_from_a_quiet_platform() {
             .iter()
             .any(|text| text == t("empty.no_processes_reported")),
         "a quiet platform states the honest empty state: {texts:?}"
+    );
+}
+
+#[test]
+fn the_details_rail_is_admitted_as_a_whole_group_by_the_measured_page_slot() {
+    let mut app = card_lane_app(shell_with(Vec::new()), palette());
+    app.update();
+
+    let page_root = app
+        .world_mut()
+        .query_filtered::<Entity, With<ProcessPageRoot>>()
+        .single(app.world())
+        .expect("the page root is mounted");
+    let details_root = app
+        .world_mut()
+        .query_filtered::<Entity, With<ProcessDetailsContainer>>()
+        .single(app.world())
+        .expect("the details container is mounted");
+
+    let set_slot = |app: &mut App, width: f32| {
+        let mut entity = app
+            .world_mut()
+            .get_entity_mut(page_root)
+            .expect("page root entity");
+        entity.insert(ComputedNode {
+            size: Vec2::new(width, 720.0),
+            inverse_scale_factor: 1.0,
+            ..ComputedNode::default()
+        });
+        let _ = app
+            .world_mut()
+            .run_system_once(crate::pages::processes::sync_processes_responsive_layout);
+    };
+
+    set_slot(&mut app, COMPACT_CONTENT_WIDTH - 1.0);
+    let display = app
+        .world()
+        .get::<Node>(details_root)
+        .map(|node| node.display);
+    assert_eq!(
+        display,
+        Some(Display::None),
+        "one pixel below the shared band hides the whole details rail"
+    );
+
+    set_slot(&mut app, COMPACT_CONTENT_WIDTH);
+    let display = app
+        .world()
+        .get::<Node>(details_root)
+        .map(|node| node.display);
+    assert_eq!(
+        display,
+        Some(Display::Flex),
+        "the shared band admits the details rail beside the card lane"
+    );
+}
+
+#[test]
+fn a_detail_row_keeps_its_label_and_value_in_separate_bounded_slots() {
+    let slots = detail_row_slots();
+    assert!(
+        slots.label_shrink > 0.0 && slots.label_grow > 0.0,
+        "a long localized label may shrink and grow in its own bounded slot"
+    );
+    assert_eq!(
+        slots.value_shrink, 0.0,
+        "the value never shrinks out of the right edge"
+    );
+    assert!(
+        slots.value_min_width_rem > 0.0,
+        "the value keeps a measured floor in rem"
     );
 }

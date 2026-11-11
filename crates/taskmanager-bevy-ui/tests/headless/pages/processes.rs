@@ -44,13 +44,29 @@ use super::toolbar::{ProcessEndTaskButton, ProcessFilterButton, ProcessKillTaskB
 use super::{
     ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
     ProcessScrollState, ProcessSelectRow, ProcessSelectStep, ProcessSelectionChanged, content,
-    count_line_text, count_line_text_for_shell, empty_state_text, rows_projection, sort_projection,
+    count_line_text, count_line_text_for_shell, details_rail_is_admitted, empty_state_text,
+    rows_projection, sort_projection,
 };
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
+use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 
 // ---- fixtures -----------------------------------------------------------
+
+#[test]
+fn the_details_rail_is_whole_group_admitted_at_the_shared_compact_band() {
+    assert!(
+        !details_rail_is_admitted(COMPACT_CONTENT_WIDTH - 1.0),
+        "one pixel below the shared band hides the whole rail"
+    );
+    assert!(
+        details_rail_is_admitted(COMPACT_CONTENT_WIDTH),
+        "the shared band admits the rail, not a Bevy-local breakpoint"
+    );
+    assert!(!details_rail_is_admitted(f32::NAN));
+    assert!(!details_rail_is_admitted(0.0));
+}
 
 fn with_cpu(process: &mut ProcessItem, cpu: f32) {
     let mut scalars = *process.scalar_observations();

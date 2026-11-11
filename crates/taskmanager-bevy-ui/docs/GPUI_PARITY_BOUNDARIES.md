@@ -35,10 +35,13 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
 
 ## Explicit boundaries
 
-- The page-level details panel is hidden while the card lane owns the
-  Applications presentation. Its projection and effect seams are implemented,
-  but the targeted four-scenario capture does not present the dense-table
-  detail panel alongside the card lane.
+- The page-level details rail is an OPTIONAL whole group admitted at the
+  shared `COMPACT_CONTENT_WIDTH` band: a measured page slot at or above it
+  paints the selected-process details beside either the card lane or the dense
+  table, and a narrower slot hides the rail as one group instead of clipping
+  its label/value columns. Its projection, effect and typed-unavailable seams
+  are headlessly proved; no targeted capture yet shows the rail beside the
+  card lane.
 - The `tooltip-overlay` capture is a real tooltip above the Applications
   optical hero; the window uses a software renderer in the capture harness, so
   it proves placement, content and bounds, not hardware WESL refraction.

@@ -49,11 +49,6 @@ use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
 
-/// The detail row's label column width, in rem: the widest caption the
-/// detail rows carry, so every label starts at the same column and every
-/// value at the same one.
-const DETAIL_LABEL_COLUMN_WIDTH_REM: f32 = 8.125;
-
 /// The insight card's title slot width, in rem: the facet title's own
 /// bounded column, so the card's body starts at one place for every facet.
 const INSIGHT_TITLE_SLOT_WIDTH_REM: f32 = 6.5;
@@ -436,6 +431,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             display: bevy::ui::Display::None,
             flex_direction: FlexDirection::Column,
         }
+        super::ProcessDetailsContainer
         Children [
             Node {
                 width: percent(100),
@@ -454,7 +450,6 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             ScrollArea
             on(bootstrap_details_page)
             ProcessDetailsRoot
-            super::ProcessDetailsContainer
             Children [
                  @{ grain } --
                  @{ details_content_scene(&projection(context.shell), palette) }
@@ -536,9 +531,41 @@ fn details_content_scene(
     }
 }
 
-fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
+/// The two bounded label/value slots of one overview row.
+///
+/// A localized label can outgrow its column (`Page faults (minor / major)`),
+/// so the label owns an elastic, clip-protected slot while the value keeps a
+/// measured floor and never shrinks out of the right edge. This is a pure
+/// geometry fact the headless test can assert without a full UI world.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DetailRowSlots {
+    pub(crate) label_grow: f32,
+    pub(crate) label_shrink: f32,
+    pub(crate) label_basis_px: f32,
+    pub(crate) value_min_width_rem: f32,
+    pub(crate) value_shrink: f32,
+}
+
+#[must_use]
+pub(crate) const fn detail_row_slots() -> DetailRowSlots {
+    DetailRowSlots {
+        label_grow: 1.0,
+        label_shrink: 1.0,
+        label_basis_px: 0.0,
+        value_min_width_rem: 6.0,
+        value_shrink: 0.0,
+    }
+}
+
+pub(crate) fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
     let label = row.label.clone();
     let value = row.value.clone();
+    let slots = detail_row_slots();
+    let label_grow = slots.label_grow;
+    let label_shrink = slots.label_shrink;
+    let label_basis_px = slots.label_basis_px;
+    let value_min_width_rem = slots.value_min_width_rem;
+    let value_shrink = slots.value_shrink;
     bsn! {
         Node {
             width: percent(100),
@@ -549,16 +576,18 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
         Children [
 
                 Node {
-                    width: rem(DETAIL_LABEL_COLUMN_WIDTH_REM),
-                    min_width: rem(DETAIL_LABEL_COLUMN_WIDTH_REM),
+                    min_width: px(0.0),
+                    flex_grow: label_grow,
+                    flex_shrink: label_shrink,
+                    flex_basis: px(label_basis_px),
                     overflow: Overflow::clip_x(),
                 }
                 Children [  Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }  ]
             --
 
                 Node {
-                    min_width: px(0.0),
-                    flex_shrink: 1.0,
+                    min_width: rem(value_min_width_rem),
+                    flex_shrink: value_shrink,
                     overflow: Overflow::clip_x(),
                 }
                 Children [  Text(value) TextRole(Role::Body) TextLayout { linebreak: LineBreak::NoWrap }  ]

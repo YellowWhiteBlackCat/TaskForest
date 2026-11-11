@@ -19,6 +19,7 @@ use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_application::{AppAction, AppPage};
 
 use taskmanager_shell::ShellApp;
+use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 use zhuge_ui_core::row_page::RowPage;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
@@ -152,7 +153,7 @@ pub(crate) fn sync_processes_responsive_layout(
     mut lanes: ResponsiveLanes,
     mut details: ResponsiveDetails,
 ) {
-    let _page_width = pages
+    let page_width = pages
         .single()
         .map(|page| page.size().x * page.inverse_scale_factor())
         .unwrap_or(0.0);
@@ -183,11 +184,30 @@ pub(crate) fn sync_processes_responsive_layout(
             node.display = next;
         }
     }
+    // The details rail is an OPTIONAL whole group. It is admitted only when
+    // the page slot reaches the shared Compact band; below that the cards or
+    // the dense table own the full width and the rail is hidden as a group,
+    // never squeezed into a clipped column. The panel itself keeps its typed
+    // unavailable/empty copy when no row is selected.
+    let details_display = if details_rail_is_admitted(page_width) {
+        bevy::ui::Display::Flex
+    } else {
+        bevy::ui::Display::None
+    };
     for mut node in &mut details {
-        if node.display != bevy::ui::Display::None {
-            node.display = bevy::ui::Display::None;
+        if node.display != details_display {
+            node.display = details_display;
         }
     }
+}
+
+/// Whole-group admission for the Applications details rail.
+///
+/// The threshold is the SHARED Compact band, not a Bevy-local breakpoint;
+/// the shape only measures its own page width in logical pixels.
+#[must_use]
+pub(crate) const fn details_rail_is_admitted(page_width: f32) -> bool {
+    page_width.is_finite() && page_width >= COMPACT_CONTENT_WIDTH
 }
 
 /// Search-box commit: replace the shell query with `text` (sanitized and
