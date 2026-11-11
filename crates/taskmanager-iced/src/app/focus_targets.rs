@@ -69,6 +69,8 @@ pub enum FocusTarget {
     ServiceStatusFilterSegment,
     /// The Startup-page filter input.
     StartupSearch,
+    /// The Startup-page shared enabled-state filter segment group.
+    StartupStatusFilterSegment,
     /// A page-scoped retry action for a degraded inventory source.
     SourceRetry(RefreshRequest),
     /// Authorize CPU package power readouts via the RAPL helper.
@@ -336,7 +338,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 207] = [
+    pub const ALL: [Self; 208] = [
         Self::ModalClose,
         Self::ToastDismiss,
         Self::DiagnosticConfirm,
@@ -367,6 +369,7 @@ impl FocusTarget {
         Self::ServicesSearch,
         Self::ServiceStatusFilterSegment,
         Self::StartupSearch,
+        Self::StartupStatusFilterSegment,
         Self::SourceRetry(RefreshRequest::Services),
         Self::SourceRetry(RefreshRequest::Startup),
         Self::SourceRetry(RefreshRequest::Sessions),

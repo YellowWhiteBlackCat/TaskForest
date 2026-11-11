@@ -40,7 +40,7 @@ use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_shell::presentation::privilege_center::PrivilegeAction;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
-    ProcessStatusFilter, ShellApp, SortCol,
+    ProcessStatusFilter, ShellApp, SortCol, StartupStatusFilter,
 };
 use taskmanager_theme::{HighContrast, LightDark, ModePreference, Theme};
 use taskmanager_ui_contract::SemanticSnapshot;
@@ -86,6 +86,7 @@ mod settings;
 mod settings_types;
 mod sidebar;
 mod snapshot_export;
+pub(crate) mod startup_filter;
 mod startup_menu;
 mod startup_state;
 pub(crate) mod subscription;
@@ -314,6 +315,8 @@ pub enum Message {
     /// The Startup-page filter input changed (a frontend-local query over the
     /// canonical sorted Startup rows).
     StartupSearchChanged(String),
+    /// One GPUI/Bevy-parity Startup enabled-state segment was selected.
+    SelectStartupStatusFilter(StartupStatusFilter),
     /// Refresh the inventory page whose source reported a retryable failure.
     RefreshSource(RefreshRequest),
     /// Authorize or refresh CPU package power readouts via RAPL helper.
@@ -646,9 +649,12 @@ pub struct IcedApp {
     /// plus the transient drag session while an edge is held. Width semantics
     /// stay contract truth (`ui::applications`); this is override storage only.
     pub(crate) process_column_sizing: update::columns::ProcessColumnSizing,
-    /// Iced-local Startup search state; canonical startup inventory stays in
-    /// the shared shell projection.
+    /// Iced-local Startup search and the shell-owned enabled-state filter;
+    /// canonical startup inventory stays in the shared shell projection.
     pub(crate) startup_presentation: StartupPresentationState,
+    /// The shell-owned Startup enabled-state filter selected for this page.
+    /// The renderer holds the choice; the vocabulary and predicate stay shared.
+    pub(crate) startup_status_filter: StartupStatusFilter,
     /// Iced-local Services status filter; canonical service facts and order
     /// stay in the shared shell projection.
     pub(crate) services_status_filter: ServiceStatusFilter,

@@ -11,8 +11,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 use taskmanager_application::system_timeline::TimelineMetric;
 
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::trend::TrendSeries;
+use taskmanager_shell::{ShellApp, StartupStatusFilter};
+use taskmanager_shell::{matches_startup_status, matches_startup_text};
 
 use crate::app::services_state::ServiceStatusFilter;
 use crate::perf_history::{
@@ -130,7 +131,8 @@ pub(super) struct IcedProjectionCaches {
     processes: RefCell<ProcessProjectionMemo>,
     app_history: RefCell<Option<AppHistoryEntry>>,
     services: RefCell<InventoryProjection<crate::ui::tables::ServiceRow, ServiceStatusFilter>>,
-    startup: RefCell<InventoryProjection<crate::ui::startup_table::StartupRow>>,
+    startup:
+        RefCell<InventoryProjection<crate::ui::startup_table::StartupRow, StartupStatusFilter>>,
     users: RefCell<InventoryProjection<crate::ui::users::UserRow>>,
     performance_rail: RefCell<Option<RailProjectionEntry>>,
 }
@@ -290,18 +292,23 @@ impl IcedProjectionCaches {
         &self,
         fingerprint: InventoryDataFingerprint,
         query: &str,
+        status_filter: StartupStatusFilter,
         build: impl FnOnce() -> Vec<crate::ui::startup_table::StartupRow>,
     ) -> (
         Rc<Vec<crate::ui::startup_table::StartupRow>>,
         Rc<Vec<usize>>,
         u64,
     ) {
-        project_inventory(
+        project_inventory_with_key(
             &self.startup,
             fingerprint,
             query,
+            status_filter,
             build,
-            crate::app::startup_state::startup_query_matches_row,
+            |row, lower, status_filter| {
+                matches_startup_status(row.enabled, *status_filter)
+                    && matches_startup_text(&row.name, &row.exec, lower)
+            },
         )
     }
 

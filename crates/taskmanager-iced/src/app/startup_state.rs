@@ -1,8 +1,6 @@
 //! Iced-local Startup search state and filtered row projection.
 
-use taskmanager_shell::matches_startup_text;
-
-use crate::ui::startup_table::StartupRow;
+use taskmanager_shell::StartupStatusFilter;
 
 use super::IcedApp;
 
@@ -25,18 +23,29 @@ impl StartupPresentationState {
     }
 }
 
-pub(crate) fn startup_query_matches_row(row: &StartupRow, query: &str) -> bool {
-    matches_startup_text(&row.name, &row.exec, query)
-}
-
 impl IcedApp {
     pub(crate) fn startup_visible_indices(&self) -> std::rc::Rc<Vec<usize>> {
         self.startup_projection().1
     }
 
     pub(crate) fn set_startup_query(&mut self, query: String) {
+        self.reproject_startup_selection(|app| app.startup_presentation.replace_query(query));
+    }
+
+    pub(crate) fn set_startup_status_filter(&mut self, filter: StartupStatusFilter) {
+        self.reproject_startup_selection(|app| {
+            if app.startup_status_filter == filter {
+                false
+            } else {
+                app.startup_status_filter = filter;
+                true
+            }
+        });
+    }
+
+    fn reproject_startup_selection(&mut self, change: impl FnOnce(&mut Self) -> bool) {
         let selected_source = self.startup_source_index(self.shell.selected);
-        if !self.startup_presentation.replace_query(query) {
+        if !change(self) {
             return;
         }
 
@@ -57,3 +66,7 @@ impl IcedApp {
 #[cfg(test)]
 #[path = "../../tests/gui/app/startup_search_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/app/startup_status_tests.rs"]
+mod status_tests;

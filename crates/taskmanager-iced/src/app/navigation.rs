@@ -12,7 +12,7 @@ use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::ui::applications::application_row_height;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::{ProcessRowId, StartupStatusFilter};
 
 impl IcedApp {
     /// Ctrl+C: copy the current selected row's summary through the shared
@@ -65,9 +65,11 @@ impl IcedApp {
                 }
                 InputScope::Content
                     if self.shell.page() == AppPage::Startup
-                        && !self.startup_presentation.query().is_empty() =>
+                        && (!self.startup_presentation.query().is_empty()
+                            || self.startup_status_filter != StartupStatusFilter::All) =>
                 {
                     self.set_startup_query(String::new());
+                    self.set_startup_status_filter(StartupStatusFilter::All);
                 }
                 InputScope::Content => {}
             }

@@ -68,6 +68,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ServicesSearch => "iced-services-search".to_owned(),
         FocusTarget::ServiceStatusFilterSegment => "iced-services-status-filter".to_owned(),
         FocusTarget::StartupSearch => "iced-startup-search".to_owned(),
+        FocusTarget::StartupStatusFilterSegment => "iced-startup-status-filter".to_owned(),
         FocusTarget::SourceRetry(request) => {
             format!("iced-source-retry-{}", refresh_request_key(request))
         }

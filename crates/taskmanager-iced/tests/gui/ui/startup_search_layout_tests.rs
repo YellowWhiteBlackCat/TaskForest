@@ -10,13 +10,24 @@ use taskmanager_shell::{InfoSortCol, InfoTable};
 use crate::app::{FocusTarget, Message};
 
 #[derive(Default)]
-struct StartupSearchBounds {
-    bounds: Option<Rectangle>,
+struct StartupControlBounds {
+    segment: Option<Rectangle>,
+    search: Option<Rectangle>,
 }
 
-impl Operation<()> for StartupSearchBounds {
+impl Operation<()> for StartupControlBounds {
     fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
         visit(self);
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, bounds: Rectangle, _state: &mut dyn Focusable) {
+        if id
+            == Some(&Id::from(crate::focus::focus_id(
+                FocusTarget::StartupStatusFilterSegment,
+            )))
+        {
+            self.segment = Some(bounds);
+        }
     }
 
     fn text_input(&mut self, id: Option<&Id>, bounds: Rectangle, _state: &mut dyn TextInput) {
@@ -25,14 +36,16 @@ impl Operation<()> for StartupSearchBounds {
                 FocusTarget::StartupSearch,
             )))
         {
-            self.bounds = Some(bounds);
+            self.search = Some(bounds);
         }
     }
 }
 
 #[derive(Default)]
 struct StartupHeaderBounds {
-    bounds: Option<Rectangle>,
+    header: Option<Rectangle>,
+    first_row: Option<Rectangle>,
+    action: Option<Rectangle>,
 }
 
 impl Operation<()> for StartupHeaderBounds {
@@ -49,7 +62,21 @@ impl Operation<()> for StartupHeaderBounds {
                 },
             )))
         {
-            self.bounds = Some(bounds);
+            self.header = Some(bounds);
+        }
+        if id
+            == Some(&Id::from(crate::focus::focus_id(
+                FocusTarget::StartupRowSwitch { index: 0 },
+            )))
+        {
+            self.first_row = Some(bounds);
+        }
+        if id
+            == Some(&Id::from(crate::focus::focus_id(
+                FocusTarget::StartupControl,
+            )))
+        {
+            self.action = Some(bounds);
         }
     }
 }
@@ -71,7 +98,7 @@ fn renderer() -> iced::Renderer {
     .expect("software renderer")
 }
 
-fn startup_control_bounds(size: Size, renderer: &iced::Renderer) -> (Rectangle, Rectangle) {
+fn startup_control_bounds(size: Size, renderer: &iced::Renderer) -> StartupControlBands {
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::WindowResized(size));
     let _ = app.update(Message::SelectPage(AppPage::Startup));
@@ -81,16 +108,27 @@ fn startup_control_bounds(size: Size, renderer: &iced::Renderer) -> (Rectangle, 
         .as_widget_mut()
         .layout(&mut tree, renderer, &Limits::new(Size::ZERO, size));
 
-    let mut search = StartupSearchBounds::default();
+    let mut controls = StartupControlBounds::default();
     view.as_widget_mut()
-        .operate(&mut tree, Layout::new(&node), renderer, &mut search);
+        .operate(&mut tree, Layout::new(&node), renderer, &mut controls);
     let mut header = StartupHeaderBounds::default();
     view.as_widget_mut()
         .operate(&mut tree, Layout::new(&node), renderer, &mut header);
-    (
-        search.bounds.expect("the page mounts its search input"),
-        header.bounds.expect("the page mounts its sortable header"),
-    )
+    StartupControlBands {
+        segment: controls.segment.expect("the page mounts its status filter"),
+        search: controls.search.expect("the page mounts its search input"),
+        header: header.header.expect("the page mounts its sortable header"),
+        first_row: header.first_row,
+        action: header.action,
+    }
+}
+
+struct StartupControlBands {
+    segment: Rectangle,
+    search: Rectangle,
+    header: Rectangle,
+    first_row: Option<Rectangle>,
+    action: Option<Rectangle>,
 }
 
 #[test]
@@ -106,19 +144,48 @@ fn startup_search_slot_stays_inside_responsive_viewports() {
         Size::new(2048.0, 540.0),
         Size::new(1920.0, 1080.0),
     ] {
-        let (search, header) = startup_control_bounds(size, &renderer);
+        let bands = startup_control_bounds(size, &renderer);
+        let segment = bands.segment;
+        let search = bands.search;
+        let header = bands.header;
+        for control in [bands.segment, bands.search] {
+            assert!(
+                control.width > 0.0
+                    && control.height > 0.0
+                    && control.x >= 0.0
+                    && control.y >= 0.0
+                    && control.x + control.width <= size.width + 0.5
+                    && control.y + control.height <= size.height + 0.5,
+                "Startup control stays within {size:?}: {control:?}"
+            );
+        }
         assert!(
-            search.width > 0.0
-                && search.height > 0.0
-                && search.x >= 0.0
-                && search.y >= 0.0
-                && search.x + search.width <= size.width + 0.5
-                && search.y + search.height <= size.height + 0.5,
-            "Startup search stays within {size:?}: {search:?}"
+            bands.segment.x + bands.segment.width <= bands.search.x + 0.5
+                && bands.segment.y <= bands.search.y + bands.search.height
+                && bands.search.y <= bands.segment.y + bands.segment.height,
+            "Startup controls stay one complete horizontal group in {size:?}: {segment:?}, {search:?}"
         );
         assert!(
-            header.y >= search.y + search.height,
-            "the table header remains below search in {size:?}: {search:?}, {header:?}"
+            bands.header.y >= bands.search.y + bands.search.height,
+            "the table header remains below both controls in {size:?}: {segment:?}, {search:?}, {header:?}"
         );
+        if size.width >= 720.0 && size.height >= 480.0 {
+            let first_row = bands
+                .first_row
+                .unwrap_or_else(|| panic!("the first Startup row is mounted in {size:?}"));
+            let action = bands
+                .action
+                .unwrap_or_else(|| panic!("the Startup action bar is mounted in {size:?}"));
+            assert!(
+                first_row.y >= bands.header.y + bands.header.height
+                    && first_row.y + first_row.height <= size.height + 0.5,
+                "the first row stays inside its bounded slot in {size:?}: {first_row:?}"
+            );
+            assert!(
+                action.y >= first_row.y + first_row.height
+                    && action.y + action.height <= size.height + 0.5,
+                "the action bar keeps the bottom safety band in {size:?}: {action:?}"
+            );
+        }
     }
 }

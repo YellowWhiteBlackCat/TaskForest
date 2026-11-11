@@ -3,6 +3,10 @@
 use crate::ui::system_dashboard::SystemDashboardMessage;
 use std::path::PathBuf;
 use taskforest_core::core::diagnostics::{DiagnosticBundleError, DiagnosticBundleErrorKind};
+use taskforest_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
+    StartupImpactUnknownReason, StartupScope, StartupSource,
+};
 use taskmanager_application::ProcessDetailsSection;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
@@ -15,7 +19,7 @@ use taskmanager_shell::fixture::setup::setup_script_info;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
 use taskmanager_shell::fixture::startup::startup_failure_evidence;
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, StartupStatusFilter};
 
 use taskforest_core::core::SmartSelfTestKind;
 use taskforest_core::core::identity::DeviceGeneration;
@@ -174,6 +178,8 @@ pub(super) fn apply_capture_target(app: &mut IcedApp, target: &str) {
         app.shell.application.active_page = page;
         if page == AppPage::System {
             seed_capture_npu_fixture(app);
+        } else if page == AppPage::Startup {
+            seed_startup_status_filter_fixture(app);
         } else if page == AppPage::Users {
             app.shell.query = "dev".into();
         }
@@ -557,6 +563,39 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
         return false;
     }
     true
+}
+
+fn seed_startup_status_filter_fixture(app: &mut IcedApp) {
+    let mut entries = app
+        .shell
+        .projection()
+        .startup_entries
+        .clone()
+        .unwrap_or_default();
+    if let Some(first) = entries.first_mut() {
+        first.enabled = false;
+    }
+    entries.push(StartupEntry {
+        id: "user-service:update-notifier.service".into(),
+        name: "Update Notifier".into(),
+        exec: "update-notifier.service".into(),
+        enabled: false,
+        source: StartupSource::UserService,
+        scope: StartupScope::User,
+        control_policy: StartupControlPolicy::Direct,
+        locator: "update-notifier.service".into(),
+        impact: StartupImpact::Low,
+        impact_evidence: StartupImpactEvidence::Unknown {
+            reason: StartupImpactUnknownReason::NotInstrumented,
+        },
+    });
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::StartupEntries(Some(entries)),
+    );
+    let _ = app.update(Message::SelectStartupStatusFilter(
+        StartupStatusFilter::Enabled,
+    ));
 }
 
 fn apply_capture_alerts(app: &mut IcedApp, target: &str) -> bool {

@@ -18,7 +18,7 @@ use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 
 use taskmanager_shell::presentation::missing_value;
-use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp};
+use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, StartupStatusFilter};
 use taskmanager_theme::tokens;
 use zhuge_ui_kit_iced::surface::{self, StatePanelGeometry};
 
@@ -28,6 +28,7 @@ use super::tables::{
 };
 use super::virtual_list::{ColumnWidth, TableColumn};
 use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
+use crate::app::startup_filter::{startup_filter_index, startup_filter_message};
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
@@ -74,7 +75,9 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     let theme_snapshot = app.theme();
     let (rows, visible_indices, projection_generation) = app.startup_projection();
     let query = app.startup_presentation.query();
+    let status_filter = app.startup_status_filter;
     let search_active = !query.trim().is_empty();
+    let filter_active = !search_active && status_filter != StartupStatusFilter::All;
     let row_count = visible_indices.len();
     let list_state = startup_list_state(shell);
     let compact = app.compact_density() || app.compact_layout();
@@ -88,8 +91,8 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
             RefreshRequest::Startup,
         )
         .unwrap_or_else(|| message_panel(theme_snapshot, t("empty.no_startup_reported"))),
-        ListState::Ready if visible_indices.is_empty() && search_active => {
-            startup_search_empty_state(theme_snapshot, query)
+        ListState::Ready if visible_indices.is_empty() && (search_active || filter_active) => {
+            startup_filtered_empty_state(theme_snapshot, query, status_filter, search_active)
         }
         ListState::Ready => {
             // Clickable sort headers: the active column wears ▲/▼, clicks
@@ -146,7 +149,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                 table: InfoTable::Startup,
                 sort: shell.startup_sort,
                 query,
-                status_filter: None,
+                status_filter: Some(status_filter.key()),
                 search_active,
                 selected,
                 row_count,
@@ -282,30 +285,23 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     // They never join the focus/selection domain; each stays silent until
     // typed evidence arrives and silent on typed failure.
     let mut page =
-        column![text(startup_heading(list_state, rows.len())).size(f32::from(tokens::FONT_16))]
+        column![text(startup_heading(list_state, row_count)).size(f32::from(tokens::FONT_16))]
             .spacing(8);
-    page = page.push(
-        container(crate::ui::components::search_input(
+    page = page.push(startup_control_bar(theme_snapshot, query, status_filter));
+    if !compact {
+        if let Some(strip) = boot_evidence_strip(
             theme_snapshot,
-            FocusTarget::StartupSearch,
-            t("search.startup"),
-            query,
-            Message::StartupSearchChanged,
-        ))
-        .width(Length::Fixed(280.0)),
-    );
-    if let Some(strip) = boot_evidence_strip(
-        theme_snapshot,
-        app.shell.projection().startup_boot_evidence.as_ref(),
-    ) {
-        page = page.push(strip);
-    }
-    if let Some(block) = boot_timeline_block(
-        theme_snapshot,
-        app.shell.projection().startup_boot_evidence.as_ref(),
-        compact,
-    ) {
-        page = page.push(block);
+            app.shell.projection().startup_boot_evidence.as_ref(),
+        ) {
+            page = page.push(strip);
+        }
+        if let Some(block) = boot_timeline_block(
+            theme_snapshot,
+            app.shell.projection().startup_boot_evidence.as_ref(),
+            compact,
+        ) {
+            page = page.push(block);
+        }
     }
     let page = page.push(body).height(Length::Fill);
     // The enable/disable action bar renders only when there are entries to act
@@ -329,13 +325,23 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     page.into()
 }
 
-fn startup_search_empty_state(
+fn startup_filtered_empty_state(
     theme_snapshot: &Theme,
     query: &str,
+    status_filter: StartupStatusFilter,
+    search_active: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    let title = t("empty.no_match")
-        .replace("{noun}", t("startup.noun"))
-        .replace("{query}", query.trim());
+    let title = if search_active {
+        t("empty.no_match")
+            .replace("{noun}", t("startup.noun"))
+            .replace("{query}", query.trim())
+    } else {
+        format!(
+            "{} · {}",
+            t("empty.none").replace("{noun}", t("startup.noun")),
+            status_filter.label()
+        )
+    };
     let style_theme = *theme_snapshot;
     container(surface::state_panel(
         Some(title),
@@ -355,6 +361,35 @@ fn startup_search_empty_state(
     .height(Length::Fill)
     .style(move |_| theme::panel_style(&style_theme))
     .into()
+}
+
+fn startup_control_bar<'a>(
+    theme_snapshot: &'a Theme,
+    query: &'a str,
+    status_filter: StartupStatusFilter,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let choices: Vec<(String, usize)> = StartupStatusFilter::ALL
+        .into_iter()
+        .map(|filter| (filter.label().to_owned(), startup_filter_index(filter)))
+        .collect();
+    let segment = container(crate::ui::components::segmented(
+        theme_snapshot,
+        FocusTarget::StartupStatusFilterSegment,
+        &choices,
+        startup_filter_index(status_filter),
+        startup_filter_message,
+    ))
+    .height(Length::Fixed(VIRTUAL_TABLE_HEADER_HEIGHT))
+    .center_y(Length::Fixed(VIRTUAL_TABLE_HEADER_HEIGHT));
+    let search = container(crate::ui::components::search_input(
+        theme_snapshot,
+        FocusTarget::StartupSearch,
+        t("search.startup"),
+        query,
+        Message::StartupSearchChanged,
+    ))
+    .width(Length::Fixed(280.0));
+    row![segment, search].spacing(8).width(Length::Fill).into()
 }
 
 /// The gated startup-control confirmation bar: the enable/disable prompt
@@ -477,7 +512,7 @@ pub(crate) fn startup_switch_state(row: Option<&StartupRow>) -> StartupSwitchSta
 pub(crate) struct StartupRow {
     pub(super) id: String,
     pub(crate) name: String,
-    enabled: bool,
+    pub(crate) enabled: bool,
     source: StartupSource,
     scope: StartupScope,
     control_policy: StartupControlPolicy,

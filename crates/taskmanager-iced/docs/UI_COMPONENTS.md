@@ -30,9 +30,10 @@ native selection and renderer caches; all shared types use their defining module
   controls that route keyboard access through the focus shell. Services search
   combines a page-local name/description query with the GPUI-parity
   All/Active/Inactive/Failed status segmented filter; both narrow visible
-  indices while canonical rows retain provider identity. Startup search
-  filters its canonical sorted rows in the Iced page adapter; the shared
-  Startup projection remains complete for other consumers. Users keeps every
+  indices while canonical rows retain provider identity. Startup search and
+  the shell-owned All/Enabled/Disabled segmented filter compose through one
+  typed projection key; the shared Startup projection remains complete for
+  other consumers. Users keeps every
   session visible and applies GPUI's shared-process-query highlight to matching
   name text without filtering the session inventory.
 - `controls/strip.rs` owns the bounded horizontal action strip: all action

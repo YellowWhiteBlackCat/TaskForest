@@ -95,6 +95,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::ServicesSearchChanged(_)
         | Message::SelectServiceStatusFilter(_)
         | Message::StartupSearchChanged(_)
+        | Message::SelectStartupStatusFilter(_)
         | Message::SelectDetailsSection(_)
         | Message::SelectInsightsFacet(_)
         | Message::RefreshProcessInsights) => MessageDomain::Navigation(message),
