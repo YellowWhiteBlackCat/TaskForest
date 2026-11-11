@@ -25,7 +25,7 @@ use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
-    Stateful, StatefulInteractiveElement, Styled, Window, div, px,
+    Stateful, Styled, Window, div, px,
 };
 
 use crate::gpui_app::list_view;
@@ -40,7 +40,7 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 use taskmanager_shell::InfoSortCol;
-use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent, TableState};
+use taskmanager_ui::data::table::{TableColumn, TableDelegate, TableEvent, TableState};
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 use taskmanager_ui::primitives::button::ButtonState;
@@ -200,34 +200,19 @@ impl TableDelegate for ServicesDelegate {
     }
 
     /// Per-row container: keep the Table's default `div().id((_, ix))` shape
-    /// (the framework chains its own `on_click` / hover / selection styling on
-    /// top) and add an `on_hover` that publishes `Hover::Service(name)` to
-    /// RootView so the existing cursor-following tooltip (root.rs) keeps working.
+    /// so the framework owns row hover and selection styling. The service
+    /// description is already visible in its bounded cell and the Details
+    /// action exposes the full record, so rows do not add a floating tooltip
+    /// over neighboring text.
     fn render_tr(
         &mut self,
         row_ix: usize,
         _window: &mut Window,
         _cx: &mut Context<TableState<Self>>,
     ) -> Stateful<Div> {
-        let name = self.rows.get(row_ix).map(|s| s.name.clone());
-        let root = self.root.clone();
         div()
             .id(("svc-row", row_ix))
             .debug_selector(move || format!("tm-svc-row:{row_ix}"))
-            .on_hover(move |is_hov: &bool, _win, cx: &mut App| {
-                if let Some(n) = &name {
-                    root.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Service(n.clone()))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                }
-            })
     }
 
     /// Row context menu (Win11 TM parity): Start/Stop/Restart/Enable/Disable.
@@ -520,6 +505,7 @@ pub fn render_services(
         .unwrap_or_else(|| list_view::empty_state(&theme, i18n::t("svc.noun"), query))
     } else {
         let ent = table_entity;
+        let horizontal_scroll = ent.read(cx).horizontal_scroll_handle.clone();
         // Push the new row data + theme, then sync selection RootView → Table.
         // Only (re)set when the desired row actually differs to avoid
         // spurious SelectRow emits (and thus extra frames) every render.
@@ -554,7 +540,13 @@ pub fn render_services(
             div()
                 .flex_1()
                 .min_h(px(0.0))
-                .child(Table::new(&ent, theme.palette()).bordered(true)),
+                .child(list_view::table_scroll_frame(
+                    &ent,
+                    horizontal_scroll,
+                    &theme,
+                    page_budget.scrollbar_band,
+                    "tm-services-hscroll",
+                )),
         )
         .into_any_element()
     };

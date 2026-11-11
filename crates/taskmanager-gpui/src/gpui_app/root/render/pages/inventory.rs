@@ -82,7 +82,7 @@ impl RootView {
         let PageRenderContext {
             theme,
             hovered,
-            layout: page_layout,
+            layout,
             list_page_budget,
             ..
         } = context;
@@ -98,6 +98,7 @@ impl RootView {
                 startup_view::StartupViewProps {
                     theme,
                     page_budget: list_page_budget,
+                    page_layout: layout,
                     entries: &entries,
                     sources: &sources,
                     selected: selected.as_ref(),
@@ -114,12 +115,12 @@ impl RootView {
                     table_entity: table,
                     evidence: self.startup_boot_evidence(),
                     retry_button,
-                    layout: startup_view::StartupPageBudget::from_page_layout(page_layout),
+                    layout: startup_view::StartupPageBudget::from_page_layout(layout),
                 },
                 window,
                 cx,
             ),
-            px(page_layout.page_padding),
+            px(layout.page_padding),
         )
         .render()
     }

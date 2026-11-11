@@ -29,20 +29,24 @@
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
 use gpui::{
-    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement,
+    AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, Point,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
+use std::rc::Rc;
 use taskforest_core::core::FailureKind;
 use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::{RefreshRequest, merge_source_lines};
 use taskmanager_theme::{Color, Length, Palette, Theme, tokens};
+use taskmanager_ui::data::table::{Table, TableDelegate, TableState};
+use taskmanager_ui::data::virtual_list::VirtualListScrollHandle;
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::inputs::text_input::{TextInput, TextInputState};
 use taskmanager_ui::primitives::button::{Button, ButtonState, ButtonVariant};
 use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use taskmanager_ui::primitives::pill::{Pill, PillState};
+use taskmanager_ui::primitives::scrollbar::{SCROLLBAR_HEIGHT, Scrollbar, ScrollbarShow};
 use taskmanager_ui::primitives::state_panel::StatePanel;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
@@ -53,6 +57,7 @@ use taskmanager_ui_contract::IconId;
 
 mod budget;
 pub use budget::{ListPageBudget, ListPageRhythm};
+pub(crate) mod table_geometry;
 
 /// Debug-selector identity of the shared list-page inner shell.
 ///
@@ -62,6 +67,52 @@ pub const LIST_PAGE_SCAFFOLD_SELECTOR: &str = "tm-list-page-scaffold";
 
 /// Debug-selector identity of the one inset glass surface around a list header.
 pub const LIST_PAGE_HEADER_SURFACE_SELECTOR: &str = "tm-list-page-header-surface";
+pub const LIST_PAGE_TABLE_SCROLLBAR_SELECTOR: &str = "tm-list-page-table-scrollbar";
+
+/// Place the shared horizontal scrollbar in its own charged band below a list
+/// table, so it never paints over the final data row.
+#[must_use]
+pub(crate) fn table_scroll_frame<D: TableDelegate>(
+    state: &Entity<TableState<D>>,
+    horizontal_scroll: VirtualListScrollHandle,
+    theme: &Theme,
+    scrollbar_band: f32,
+    scrollbar_id: &'static str,
+) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .size_full()
+        .min_w(px(0.0))
+        .min_h(px(0.0))
+        .child(
+            div().flex_1().min_w(px(0.0)).min_h(px(0.0)).child(
+                Table::new(state, theme.palette())
+                    .bordered(true)
+                    .scrollbar_visible(true, false),
+            ),
+        )
+        .child(
+            div()
+                .debug_selector(|| LIST_PAGE_TABLE_SCROLLBAR_SELECTOR.to_string())
+                .w_full()
+                .h(px(scrollbar_band))
+                .flex()
+                .flex_col()
+                .flex_shrink_0()
+                .child(
+                    div().h(px(SCROLLBAR_HEIGHT)).flex_shrink_0().child(
+                        Scrollbar::horizontal(
+                            scrollbar_id,
+                            Rc::new(horizontal_scroll),
+                            theme.palette(),
+                        )
+                        .show(ScrollbarShow::Always),
+                    ),
+                )
+                .child(div().flex_1().min_h(px(0.0))),
+        )
+}
 
 /// Shared page shell for list-oriented top-level views.
 ///
@@ -794,6 +845,13 @@ pub fn feedback_status_line(
         .child(text)
 }
 
+/// Inventory-row tooltips are anchored one row below the cursor so dense row
+/// text stays readable while the hint is visible.
+#[must_use]
+pub(crate) fn row_tooltip_anchor(anchor: Point<gpui::Pixels>) -> Point<gpui::Pixels> {
+    gpui::point(anchor.x, anchor.y + px(tokens::SPACE_16.0))
+}
+
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_gpui_app_list_view_tests.rs"]
 mod tests;
@@ -801,6 +859,10 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/list_page_action_bar_bounds_tests.rs"]
 mod action_bar_bounds_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/list_page_table_bounds_tests.rs"]
+mod table_bounds_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/list_page_scaffold.rs"]

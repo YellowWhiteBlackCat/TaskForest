@@ -2,6 +2,7 @@
 
 use super::{ListPageBudget, ListPageRhythm};
 use taskmanager_theme::tokens;
+use taskmanager_ui::primitives::scrollbar::SCROLLBAR_HEIGHT;
 use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
     BOTTOM_SAFETY_BAND, LayoutProfile, NavigationPresentation, VerticalSpace,
@@ -67,6 +68,22 @@ fn budget_is_a_pure_fold_of_the_shared_page_slot() {
         budget,
         ListPageBudget::from_page_layout(slot, tokens::UiSize::Large, tokens::RowDensity::Compact)
     );
+}
+
+#[test]
+fn the_scrollbar_band_is_charged_before_the_table_slot() {
+    let slot = layout(540.0, VerticalSpace::Standard);
+    let budget = ListPageBudget::from_page_layout(
+        slot,
+        tokens::UiSize::Standard,
+        tokens::RowDensity::default(),
+    );
+    assert_eq!(budget.scrollbar_band, SCROLLBAR_HEIGHT + BOTTOM_SAFETY_BAND);
+    let header_height = tokens::UiSize::Standard.control_height().0 * budget.rows as f32
+        + budget.rhythm.gap * budget.rows.saturating_sub(1) as f32
+        + budget.rhythm.inset * 2.0;
+    let expected = slot.content_height - header_height - budget.rhythm.gap - budget.scrollbar_band;
+    assert_eq!(budget.table_height, expected);
 }
 
 #[test]

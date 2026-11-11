@@ -4,6 +4,7 @@ use super::{
     rebuild_table,
 };
 use crate::app::FrontendTrack;
+use crate::pages::processes::details::sync_details_whole_row_scroll;
 use crate::palette::{space_4, space_8};
 use crate::widgets::table::rows_in_viewport;
 use crate::window::WindowPalette;
@@ -83,5 +84,11 @@ pub(crate) fn register(app: &mut App) {
             crate::widgets::table::figures::apply_tabular_figures,
             crate::widgets::table::selection::paint_cell_selection,
         ),
+    );
+    app.add_systems(
+        PostUpdate,
+        sync_details_whole_row_scroll
+            .after(UiSystems::Content)
+            .before(UiSystems::Layout),
     );
 }

@@ -31,7 +31,7 @@ use taskmanager_ui::theme_binding::hsla;
 
 use gpui::{
     App, AppContext, Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
-    Stateful, StatefulInteractiveElement, Styled, Window, div, px,
+    Stateful, Styled, Window, div, px,
 };
 
 use crate::gpui_app::elements;
@@ -45,7 +45,7 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
 use taskmanager_shell::InfoSortCol;
-use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent, TableState};
+use taskmanager_ui::data::table::{TableColumn, TableDelegate, TableEvent, TableState};
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::toolbar::Toolbar;
@@ -177,35 +177,19 @@ impl TableDelegate for UsersDelegate {
             .expect("col_ix < columns.len() (Table contract; columns immutable)")
     }
 
-    /// Per-row container: keep the Table's default `div().id((_, ix))` shape (the
-    /// framework chains its own `on_click` / hover / selection styling on top) and
-    /// add an `on_hover` that publishes `Hover::User(user)` to RootView so the
-    /// existing cursor-following tooltip (root.rs) keeps working. The user name
-    /// (not session id) is published so the tooltip reads as an owner label.
+    /// Per-row container: keep the Table's default `div().id((_, ix))` shape so
+    /// the framework owns row hover and selection styling. The owner name is
+    /// already visible in the User column, so rows do not add a duplicate
+    /// floating tooltip over neighboring text.
     fn render_tr(
         &mut self,
         row_ix: usize,
         _window: &mut Window,
         _cx: &mut Context<TableState<Self>>,
     ) -> Stateful<Div> {
-        let user = self.rows.get(row_ix).map(|s| s.user.clone());
-        let root = self.root.clone();
         div()
             .id(("session-row", row_ix))
-            .on_hover(move |is_hov: &bool, _win, cx: &mut App| {
-                if let Some(n) = &user {
-                    root.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::User(n.clone()))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                }
-            })
+            .debug_selector(move || format!("tm-users-row:{row_ix}"))
     }
 
     /// Row context menu (Win11 parity): disconnect / lock the session.
@@ -474,6 +458,7 @@ pub fn render_users(
         .unwrap_or_else(|| list_view::empty_state(&theme, i18n::t("users.sessions"), ""))
     } else {
         let ent = &table_entity;
+        let horizontal_scroll = ent.read(cx).horizontal_scroll_handle.clone();
         {
             // Push the new row data + theme, then sync selection RootView → Table.
             // Only (re)set when the desired row actually differs to avoid spurious
@@ -509,7 +494,13 @@ pub fn render_users(
                 div()
                     .flex_1()
                     .min_h(px(0.0))
-                    .child(Table::new(ent, theme.palette()).bordered(true)),
+                    .child(list_view::table_scroll_frame(
+                        ent,
+                        horizontal_scroll,
+                        &theme,
+                        page_budget.scrollbar_band,
+                        "tm-users-hscroll",
+                    )),
             )
             .into_any_element()
         }

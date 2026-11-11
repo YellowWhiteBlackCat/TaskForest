@@ -22,10 +22,10 @@ pub(crate) use graphs::mini_graph_cell;
 pub use graphs::{
     GraphLegendEntry, graph_card, graph_card_with_dual_state, graph_card_with_state, graph_legend,
 };
-pub(crate) use overlays::graph_tooltip_overlay;
 pub use overlays::{
     dialog_overlay, dialog_overlay_width, more_rows_hint, tooltip, tooltip_overlay, truncated_text,
 };
+pub(crate) use overlays::{graph_tooltip_overlay, row_tooltip_overlay};
 pub(crate) use visual::sparkline;
 pub use visual::{
     focus_ring, focus_ring_shadow, highlighted_text, highlighted_text_with_ranges, status_bar,

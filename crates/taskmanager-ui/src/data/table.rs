@@ -40,14 +40,14 @@ use gpui::{
     App, Axis, Bounds, Context, Div, Edges, Entity, EventEmitter, FocusHandle, Focusable,
     InteractiveElement, IntoElement, KeyBinding, ListSizingBehavior, MouseUpEvent, ParentElement,
     Pixels, Point, Render, Size, Stateful, Styled, Subscription, Task, UniformListScrollHandle,
-    Window, actions, canvas, div, px, uniform_list,
+    Window, actions, canvas, container_query, div, px, uniform_list,
 };
 
 use taskmanager_theme::{Palette, Theme};
 
 use crate::data::virtual_list::VirtualListScrollHandle;
 use crate::overlays::popup::PopupMenuState;
-use crate::primitives::scrollbar::ScrollbarHandle;
+use crate::primitives::scrollbar::{SCROLLBAR_HEIGHT, ScrollbarHandle};
 use crate::styled::blend;
 use taskmanager_theme::tokens;
 
@@ -69,6 +69,21 @@ pub use resize::{
 pub use widget::Table;
 /// The table key context (navigation bindings live under it).
 pub const TABLE_CONTEXT: &str = "TaskManagerTable";
+const TABLE_ROWS_VIEWPORT_SELECTOR: &str = "tm-table-rows-viewport";
+
+/// Quantize the table body to the largest whole-row viewport that fits.
+///
+/// The table keeps its full outer allocation for page composition, while the
+/// tracked row list receives a smaller inner viewport when its remaining
+/// height is not an exact multiple of the row extent.
+fn whole_row_viewport_height(available_height: Pixels, row_height: Pixels) -> Pixels {
+    let row_height = f32::from(row_height);
+    if !row_height.is_finite() || row_height <= 0.0 {
+        return px(0.0);
+    }
+    let available_height = f32::from(available_height).max(0.0);
+    px((available_height / row_height).floor() * row_height)
+}
 
 actions!(
     table,
@@ -126,7 +141,8 @@ pub struct TableOptions {
     pub stripe: bool,
     /// Rounded container with a border.
     pub bordered: bool,
-    /// Uniform row height (rows are virtualized uniformly).
+    /// Uniform row height (rows are virtualized uniformly). The tracked table
+    /// body rounds its viewport down to a whole multiple of this value.
     pub row_height: Pixels,
     /// Whether the vertical/horizontal scrollbars render.
     pub scrollbar_visible: Edges<bool>,
@@ -616,108 +632,96 @@ impl<D: TableDelegate> Render for TableState<D> {
             .as_ref()
             .map(|open| open.menu.clone().into_any_element());
 
+        let rows = uniform_list(
+            "table-uniform-list",
+            render_rows_count,
+            cx.processor(move |table, visible_range: Range<usize>, window, cx| {
+                // Keep body widths sourced from the same prepared column widths
+                // as the header; layout bounds are painted later and may lag.
+                let col_sizes: Rc<Vec<Pixels>> = Rc::new(horizontal_scroll_widths(
+                    &table.col_groups,
+                    fixed_count,
+                    table.delegate.last_empty_col_width(),
+                ));
+                let horizontal_offset = table.horizontal_scroll_handle.offset().x;
+                let horizontal_viewport = table.horizontal_scroll_handle.bounds().size.width;
+                let horizontal_visible_range = if horizontal_viewport > px(0.0) {
+                    crate::data::virtual_list::visible_range_for(
+                        &col_sizes,
+                        f32::from(horizontal_offset),
+                        f32::from(horizontal_viewport),
+                        0.0,
+                    )
+                } else {
+                    0..col_sizes.len()
+                };
+                table.update_visible_range_if_need(
+                    horizontal_visible_range.clone(),
+                    Axis::Horizontal,
+                    cx,
+                );
+
+                table.load_more_if_need(rows_count, visible_range.end, cx);
+                table.update_visible_range_if_need(visible_range.clone(), Axis::Vertical, cx);
+
+                if visible_range.end > rows_count {
+                    table.scroll_to_row(
+                        std::cmp::min(visible_range.start, rows_count.saturating_sub(1)),
+                        cx,
+                    );
+                }
+
+                let mut items =
+                    Vec::with_capacity(visible_range.end.saturating_sub(visible_range.start));
+                for row_ix in visible_range {
+                    items.push(table.render_table_row(
+                        row_ix,
+                        TableRowLayout {
+                            rows_count,
+                            fixed_count,
+                            col_sizes: &col_sizes,
+                            horizontal_visible_range: horizontal_visible_range.clone(),
+                            horizontal_offset,
+                            columns_count,
+                            is_filled,
+                        },
+                        window,
+                        cx,
+                    ));
+                }
+                items
+            }),
+        )
+        .flex_grow(1.0)
+        .size_full()
+        .with_sizing_behavior(ListSizingBehavior::Auto)
+        .track_scroll(&self.vertical_scroll_handle);
+        let horizontal_overlay_height = if self.options.scrollbar_visible.bottom {
+            px(SCROLLBAR_HEIGHT)
+        } else {
+            px(0.0)
+        };
+        let rows_viewport = container_query(move |body_size, _window, _cx| {
+            let available_height = (body_size.height - horizontal_overlay_height).max(px(0.0));
+            let row_viewport_height = whole_row_viewport_height(available_height, row_height);
+            div()
+                .debug_selector(|| TABLE_ROWS_VIEWPORT_SELECTOR.to_string())
+                .w_full()
+                .h(row_viewport_height)
+                .min_h(px(0.0))
+                .overflow_hidden()
+                .child(rows)
+        });
+
         let inner_table = div()
             .id("table-inner")
             .size_full()
+            .flex()
             .flex_col()
             .overflow_hidden()
             .child(self.render_table_header(fixed_count, window, cx))
             .when(rows_count > 0 && !loading, |this| {
-                this.child(
-                    div().id("table-body").flex_grow(1.0).size_full().child(
-                        uniform_list(
-                            "table-uniform-list",
-                            render_rows_count,
-                            cx.processor(move |table, visible_range: Range<usize>, window, cx| {
-                                // Column sizes MUST come from the SAME source
-                                // the header uses (`col_group.width`, applied
-                                // synchronously via `.w()` in render_cell), not
-                                // from `group.bounds.size.width`. The bounds
-                                // field is painted by a post-layout canvas in
-                                // render_th whose containing block is the whole
-                                // columns row, so it resolves to the row width
-                                // for every column and is also one frame stale —
-                                // both of which desync the body's virtual_list
-                                // from the header (and make off-screen columns
-                                // unreachable, since header + body share one
-                                // horizontal scroll handle). `col_group.width` is
-                                // kept current by prepare_col_groups / refresh /
-                                // resize_cols, so the body matches the header by
-                                // construction.
-                                let col_sizes: Rc<Vec<Pixels>> = Rc::new(horizontal_scroll_widths(
-                                    &table.col_groups,
-                                    fixed_count,
-                                    table.delegate.last_empty_col_width(),
-                                ));
-                                let horizontal_offset = table.horizontal_scroll_handle.offset().x;
-                                let horizontal_viewport =
-                                    table.horizontal_scroll_handle.bounds().size.width;
-                                let horizontal_visible_range = if horizontal_viewport > px(0.0) {
-                                    crate::data::virtual_list::visible_range_for(
-                                        &col_sizes,
-                                        f32::from(horizontal_offset),
-                                        f32::from(horizontal_viewport),
-                                        0.0,
-                                    )
-                                } else {
-                                    0..col_sizes.len()
-                                };
-                                table.update_visible_range_if_need(
-                                    horizontal_visible_range.clone(),
-                                    Axis::Horizontal,
-                                    cx,
-                                );
-
-                                table.load_more_if_need(rows_count, visible_range.end, cx);
-                                table.update_visible_range_if_need(
-                                    visible_range.clone(),
-                                    Axis::Vertical,
-                                    cx,
-                                );
-
-                                // Self-correct stale scroll positions
-                                // after the data shrank (absorption
-                                // §4.3-B3).
-                                if visible_range.end > rows_count {
-                                    table.scroll_to_row(
-                                        std::cmp::min(
-                                            visible_range.start,
-                                            rows_count.saturating_sub(1),
-                                        ),
-                                        cx,
-                                    );
-                                }
-
-                                let mut items = Vec::with_capacity(
-                                    visible_range.end.saturating_sub(visible_range.start),
-                                );
-                                for row_ix in visible_range {
-                                    items.push(table.render_table_row(
-                                        row_ix,
-                                        TableRowLayout {
-                                            rows_count,
-                                            fixed_count,
-                                            col_sizes: &col_sizes,
-                                            horizontal_visible_range:
-                                                horizontal_visible_range.clone(),
-                                            horizontal_offset,
-                                            columns_count,
-                                            is_filled,
-                                        },
-                                        window,
-                                        cx,
-                                    ));
-                                }
-                                items
-                            }),
-                        )
-                        .flex_grow(1.0)
-                        .size_full()
-                        .with_sizing_behavior(ListSizingBehavior::Auto)
-                        .track_scroll(&self.vertical_scroll_handle)
-                        .into_any_element(),
-                    ),
-                )
+                this.child(rows_viewport.flex_grow(1.0).w_full().min_h(px(0.0)))
             })
             .when_some(context_menu_view, |this, menu| this.child(menu));
 
@@ -805,3 +809,7 @@ impl<D: TableDelegate> Render for TableState<D> {
 #[cfg(test)]
 #[path = "../../tests/gui/data/table.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/data/table_viewport.rs"]
+mod viewport_tests;

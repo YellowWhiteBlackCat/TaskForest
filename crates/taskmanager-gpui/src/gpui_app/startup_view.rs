@@ -29,7 +29,7 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent, TableState};
+use taskmanager_ui::data::table::{TableColumn, TableDelegate, TableEvent, TableState};
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 use taskmanager_ui::primitives::button::ButtonState;
@@ -48,6 +48,7 @@ use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 
 use taskmanager_shell::{InfoSortCol, SortDir};
 
@@ -481,6 +482,8 @@ pub struct StartupViewProps<'a> {
     pub theme: &'a Theme,
     /// Frame-derived header/body slot allocation.
     pub page_budget: list_view::ListPageBudget,
+    /// Frame-derived measured content slot for the elastic command column.
+    pub page_layout: PageLayoutBudget,
     pub entries: &'a [StartupEntry],
     pub sources: &'a [SourceStatus],
     pub selected: Option<&'a StartupEntryId>,
@@ -523,7 +526,8 @@ pub fn render_startup(
 ) -> Div {
     let StartupViewProps {
         theme,
-        page_budget: _,
+        page_budget,
+        page_layout,
         entries,
         sources,
         selected,
@@ -592,6 +596,17 @@ pub fn render_startup(
         .unwrap_or_else(|| list_view::empty_state(&theme, i18n::t("startup.noun"), query))
     } else {
         let ent = table_entity;
+        let horizontal_scroll = ent.read(cx).horizontal_scroll_handle.clone();
+        ent.update(cx, |table, _cx| {
+            let command_width = list_view::table_geometry::elastic_last_column(
+                &[80.0, 280.0, 110.0, 140.0],
+                page_layout.content_width,
+            );
+            if table.col_groups.len() == 5 {
+                table.col_groups[4].width = px(command_width);
+                table.delegate_mut().columns[4].width = px(command_width);
+            }
+        });
         // Push the new row data + theme, then sync selection RootView → Table.
         // Only (re)set when the desired row actually differs to avoid spurious
         // SelectRow emits (and thus extra frames) every render.
@@ -637,13 +652,21 @@ pub fn render_startup(
                 .debug_selector(|| "tm-startup-primary-table".to_string())
                 .flex_1()
                 .min_h(px(layout.table_min_height))
-                .child(Table::new(&ent, theme.palette()).bordered(true)),
+                .child(list_view::table_scroll_frame(
+                    &ent,
+                    horizontal_scroll,
+                    &theme,
+                    page_budget.scrollbar_band,
+                    "tm-startup-hscroll",
+                )),
         );
 
         layout::compose_content(&theme, evidence, boot_baseline, layout, primary)
     };
 
-    list_view::ListPageScaffold::new(&theme, header, body).render()
+    list_view::ListPageScaffold::new(&theme, header, body)
+        .budget(page_budget)
+        .render()
 }
 
 // ── controls row: status-filter pills (left) + search box (right) ────────────

@@ -22,6 +22,7 @@ use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::ScrollPosition;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, percent,
     px, rem,
@@ -49,11 +50,14 @@ use crate::input::PendingEffects;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod scroll;
+
+pub(crate) use scroll::{details_bottom_inset_px, sync_details_whole_row_scroll};
+
 /// The insight card's title slot width, in rem: the facet title's own
 /// bounded column, so the card's body starts at one place for every facet.
 const INSIGHT_TITLE_SLOT_WIDTH_REM: f32 = 6.5;
-
-const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
+pub(crate) const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
     (ProcessDetailsField::Pid, "proc.pid"),
     (ProcessDetailsField::User, "common.user"),
     (
@@ -119,6 +123,9 @@ pub(crate) struct ProcessDetailsSelection {
 /// stays page-scoped and route changes cleanly despawn the whole surface.
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct ProcessDetailsRoot;
+
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub(crate) struct ProcessDetailsRow;
 
 /// Sweep marker for one bounded details render. The root is never swept.
 #[derive(Component, Clone, Copy, Default)]
@@ -411,12 +418,12 @@ fn rebuild(
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
-    let bottom_inset = Val::Px(space_8() + palette.control_height_px());
+    let bottom_inset = details_bottom_inset_px(palette);
     let lane = crate::widgets::scrollbar::rail_lane(UiRect::new(
         Val::Px(space_8()),
         Val::Px(space_8()),
         Val::Px(space_8()),
-        bottom_inset,
+        Val::Px(bottom_inset),
     ));
     let GlassPanelMaterial {
         fill,
@@ -456,6 +463,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             ScrollArea
             on(bootstrap_details_page)
             ProcessDetailsRoot
+            ScrollPosition({ bevy::math::Vec2::new(0.0, 0.0) })
             Children [
                  @{ grain } --
                  @{ details_content_scene(&projection(context.shell), palette) }
@@ -579,6 +587,7 @@ pub(crate) fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_4()),
         }
+        ProcessDetailsRow
         Children [
 
                 Node {

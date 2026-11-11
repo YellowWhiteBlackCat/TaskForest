@@ -45,6 +45,7 @@ pub(super) struct TransientFrame {
     pub(super) server_decorations: bool,
     pub(super) nav_orientation: NavOrientation,
     pub(super) navigation_width: f32,
+    pub(super) tooltip_row_anchored: bool,
 }
 
 pub(super) fn compose(
@@ -69,11 +70,12 @@ pub(super) fn compose(
             if view.capture_evidence.tooltip_overlay_requested() {
                 view.capture_evidence.mark_tooltip_overlay_ready(true);
             }
-            root.child(elements::tooltip_overlay(
-                theme,
-                &text,
-                window.mouse_position(),
-            ))
+            let anchor = window.mouse_position();
+            if frame.tooltip_row_anchored {
+                root.child(elements::row_tooltip_overlay(theme, &text, anchor))
+            } else {
+                root.child(elements::tooltip_overlay(theme, &text, anchor))
+            }
         }
         (Some(_) | None, true) | (None, false) => root,
     }

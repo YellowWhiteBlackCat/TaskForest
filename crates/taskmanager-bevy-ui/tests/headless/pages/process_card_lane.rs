@@ -6,6 +6,7 @@
 //! protected, a headless renderer keeps the typed painted fallback, and the
 //! dense table keeps every row/menu/keyboard seam.
 
+use crate::pages::processes::details::ProcessDetailsRow;
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
@@ -33,12 +34,15 @@ use crate::pages::processes::card_lane::{
     ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode, ProcessViewModeButton,
     card_flow_budget, card_flow_plan, focus_projection,
 };
-use crate::pages::processes::details::{ProcessDetailsRoot, detail_row_slots};
+use crate::pages::processes::details::scroll::whole_row_scroll_offset;
+use crate::pages::processes::details::{
+    ProcessDetailsRoot, detail_row_slots, details_bottom_inset_px,
+};
 use crate::pages::processes::{
     ProcessCountLine, ProcessDetailsContainer, ProcessPageRoot, ProcessRowLink, ProcessRowsRoot,
     ProcessTableArtifact, ProcessTableContainer, content,
 };
-use crate::palette::{UiPalette, space_8, ui_palette};
+use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
 use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 
@@ -940,9 +944,109 @@ fn the_details_scroll_area_reserves_a_control_height_bottom_safety_band() {
         .expect("the details scroll area is mounted");
     assert_eq!(
         node.padding.bottom,
-        Val::Px(space_8() + palette.control_height_px()),
-        "the scroll content keeps a full control-height safety band after its final row"
+        Val::Px(details_bottom_inset_px(&palette)),
+        "the scroll content keeps two whole control rows after its final detail row"
     );
+    assert!(
+        details_bottom_inset_px(&palette) >= palette.control_height_px() * 2.0,
+        "an intermediate scroll position cannot expose a partial final row through the safety band"
+    );
+}
+
+#[test]
+fn intermediate_details_scroll_snaps_the_lower_edge_to_a_whole_row_boundary() {
+    let rows = [(0.0, 28.0), (36.0, 64.0), (72.0, 100.0)];
+    let correction = whole_row_scroll_offset(0.0, 0.0, 80.0, 90.0, 4.0, &rows);
+    assert_eq!(
+        correction, 14.0,
+        "scrolling down reveals the complete row and a four-pixel clear gap"
+    );
+    assert_eq!(
+        whole_row_scroll_offset(0.0, 0.0, 80.0, 100.0, 4.0, &rows),
+        0.0,
+        "an already whole row boundary keeps the official scroll position"
+    );
+    assert_eq!(
+        whole_row_scroll_offset(20.0, 30.0, 80.0, 90.0, 4.0, &rows),
+        -12.0,
+        "scrolling up excludes the partial row without reversing direction"
+    );
+    assert_eq!(
+        whole_row_scroll_offset(0.0, 5.0, 0.0, 15.0, 4.0, &[(0.0, 28.0)]),
+        0.0,
+        "a scroll limit that cannot reach either row edge stays clamped"
+    );
+    assert_eq!(
+        whole_row_scroll_offset(80.0, 80.0, 80.0, 90.0, 4.0, &rows),
+        -22.0,
+        "the maximum scroll boundary selects the reachable whole-row edge"
+    );
+}
+
+#[test]
+fn the_wide_measured_details_viewport_never_exposes_a_partial_final_row() {
+    use bevy::ui::{ScrollPosition, UiGlobalTransform};
+
+    let items: Vec<ProcessItem> = (0..24).map(|pid| process(pid, "p", "Running")).collect();
+    let mut app = measured_process_app(1280, 800, items);
+    app.world_mut().commands().trigger(ShellProjectionFolded);
+    for _ in 0..5 {
+        app.update();
+    }
+    let world = app.world_mut();
+    let maximum = world
+        .query_filtered::<&ComputedNode, With<ProcessDetailsRoot>>()
+        .single(world)
+        .map(|viewport| {
+            let scale = viewport.inverse_scale_factor();
+            (viewport.content_size().y * scale - viewport.size().y * scale).max(0.0)
+        })
+        .expect("the wide details scroll owner is measured");
+    assert!(maximum > 0.0, "the wide details viewport really scrolls");
+
+    for fraction in [0.0, 0.17, 0.41, 0.63, 0.37, 0.0, 1.0] {
+        let world = app.world_mut();
+        world
+            .query_filtered::<&mut ScrollPosition, With<ProcessDetailsRoot>>()
+            .single_mut(world)
+            .expect("the scroll position stays mounted")
+            .0
+            .y = maximum * fraction;
+        app.update();
+        let world = app.world_mut();
+        let (viewport, transform, scroll) = world
+            .query_filtered::<(
+                &ComputedNode,
+                &UiGlobalTransform,
+                &ScrollPosition,
+            ), With<ProcessDetailsRoot>>()
+            .single(world)
+            .expect("the wide details scroll owner stays measured");
+        let visible = viewport.size().y * viewport.inverse_scale_factor();
+        let viewport_bottom = transform.translation.y + visible * 0.5;
+        let applied_scroll = viewport.scroll_position.y * viewport.inverse_scale_factor();
+        assert!(
+            (scroll.0.y - applied_scroll).abs() <= 1.0,
+            "Bevy layout applies and clamps the snapped scroll position"
+        );
+        assert!(
+            scroll.0.y >= 0.0 && scroll.0.y <= maximum + 1.0,
+            "the snapped offset remains inside the ScrollArea range"
+        );
+        let cropped = world
+            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessDetailsRow>>()
+            .iter(world)
+            .any(|(node, transform)| {
+                let half_height = node.size().y * node.inverse_scale_factor() * 0.5;
+                let top = transform.translation.y - half_height;
+                let bottom = transform.translation.y + half_height;
+                top < viewport_bottom - 0.5 && bottom > viewport_bottom + 0.5
+            });
+        assert!(
+            !cropped,
+            "an intermediate scroll position exposes no partial row at {fraction:.2}"
+        );
+    }
 }
 
 #[test]

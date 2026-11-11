@@ -324,6 +324,18 @@ pub fn tooltip_overlay(t: &Theme, text: &str, anchor: Point<Pixels>) -> impl Int
     tooltip_overlay_with_elevation(t, text, anchor, true)
 }
 
+/// A row detail tooltip anchored below the cursor. Dense inventory rows paint
+/// their text directly under the pointer, so placing the plate at the cursor
+/// itself obscures the value it describes.
+pub(crate) fn row_tooltip_overlay(
+    t: &Theme,
+    text: &str,
+    anchor: Point<Pixels>,
+) -> impl IntoElement {
+    let anchor = crate::gpui_app::list_view::row_tooltip_anchor(anchor);
+    tooltip_overlay_with_elevation(t, text, anchor, true)
+}
+
 pub(crate) fn graph_tooltip_overlay(
     t: &Theme,
     text: &str,

@@ -7,6 +7,7 @@
 
 use taskmanager_theme::tokens::{self, RowDensity, UiSize};
 use taskmanager_ui::presentation_binding::control_measurement;
+use taskmanager_ui::primitives::scrollbar::SCROLLBAR_HEIGHT;
 use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 use taskmanager_ui_contract::presentation::vocabulary::{BOTTOM_SAFETY_BAND, VerticalSpace};
@@ -39,6 +40,8 @@ pub struct ListPageBudget {
     pub rows: usize,
     /// The single rhythm spent by the fold and the scaffold.
     pub rhythm: ListPageRhythm,
+    /// Fixed bottom band for the table's horizontal scrollbar.
+    pub scrollbar_band: f32,
     /// Whole height one optional header group charges, including its gap.
     pub optional_group_height: f32,
     /// Height available to the primary body after the header and safety band.
@@ -58,6 +61,7 @@ impl ListPageBudget {
         Self {
             rows: 2,
             rhythm: ListPageRhythm::shared(),
+            scrollbar_band: SCROLLBAR_HEIGHT + BOTTOM_SAFETY_BAND,
             optional_group_height: 0.0,
             table_height: 0.0,
             admit_optional_group: false,
@@ -94,7 +98,7 @@ impl ListPageBudget {
         let gap = rhythm.gap;
         let header_inset = rhythm.inset * 2.0;
         let mandatory_footprint = control_extent * 2.0 + gap + header_inset;
-        let safety = BOTTOM_SAFETY_BAND;
+        let safety = BOTTOM_SAFETY_BAND + SCROLLBAR_HEIGHT;
         let remaining_after_mandatory =
             (layout.content_height - mandatory_footprint - safety).max(0.0);
         let optional_footprint = control_extent + gap;
@@ -106,6 +110,7 @@ impl ListPageBudget {
         Self {
             rows,
             rhythm,
+            scrollbar_band: safety,
             optional_group_height: control_extent + gap,
             table_height: (layout.content_height - header_height - gap - safety).max(0.0),
             admit_optional_group,

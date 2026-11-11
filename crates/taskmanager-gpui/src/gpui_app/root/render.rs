@@ -425,6 +425,7 @@ impl Render for RootView {
                     server_decorations: false,
                     nav_orientation: NavOrientation::Horizontal,
                     navigation_width: 0.0,
+                    tooltip_row_anchored: false,
                 },
                 None,
                 window,
@@ -514,6 +515,10 @@ impl Render for RootView {
         // The root cursor listener is needed exclusively for the custom
         // cursor-following tooltip, so keep it completely out of the hot path
         // when the current row has no tooltip text to show.
+        let tooltip_row_anchored = matches!(
+            hovered,
+            Some(Hover::Service(_) | Hover::Startup(_) | Hover::User(_))
+        );
         let cursor_tooltip_active = tooltip_text.is_some();
 
         let viewport = window.viewport_size();
@@ -712,6 +717,7 @@ impl Render for RootView {
                 server_decorations,
                 nav_orientation: self.nav_orientation,
                 navigation_width: frame_budget.navigation_width,
+                tooltip_row_anchored,
             },
             tooltip_text,
             window,

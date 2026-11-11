@@ -20,6 +20,17 @@ parent owns the discoverable scroll affordance.
 `bounded_scroll_column_with_fixed_footer` budgets the entire review column,
 reserving complete action groups and a gap below its shrinkable body viewport.
 
+## Table row viewport
+
+`data::table::Table` keeps its outer frame at the size assigned by its parent,
+but the tracked virtualized body admits only complete uniform rows. After the
+header and any internal horizontal scrollbar are accounted for, the body
+viewport is rounded down to a whole multiple of `TableOptions::row_height`.
+Any remaining pixels stay as empty space at the bottom of the table frame.
+The vertical scroll handle, visible-row range, and selection reveal all use
+this snapped viewport, so the final row can scroll fully into view without
+being clipped by the table edge or overlapping a sibling scrollbar.
+
 ## Page scaffold
 
 `PageScaffold` is the data-page family's ONE outer shell (ADR-042): every
