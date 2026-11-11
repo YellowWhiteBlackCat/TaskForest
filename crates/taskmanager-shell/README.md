@@ -74,6 +74,7 @@ src/viewmodel.rs                    product-first view-model projections
 src/history.rs                      correlated outcomes → telemetry store mapping
 src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions
 src/process_filter.rs               process filter predicates
+src/startup_filter.rs               Startup enabled-state filter vocabulary
 src/startup_query.rs                Startup search predicate
 src/memory.rs                       memory presentation helpers
 src/fixture/ (cpu_topology dashboard_history inventory process_insights setup smbios_memory) deterministic demo/capture/test seam
