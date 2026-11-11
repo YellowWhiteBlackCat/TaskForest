@@ -339,7 +339,10 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                 header.into(),
                 table_body.into(),
                 Length::Fill,
-                iced::widget::scrollable::Direction::Vertical(theme::scrollbar()),
+                crate::ui::components::virtual_table_direction(
+                    crate::ui::components::VirtualTableScrollAxis::Vertical,
+                    crate::ui::components::ScrollScale::Standard,
+                ),
                 Message::ServicesScrolled,
             );
             if let Some(banner) = source_notice_banner(

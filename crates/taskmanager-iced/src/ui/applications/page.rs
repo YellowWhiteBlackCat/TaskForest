@@ -4,7 +4,6 @@ use super::*;
 use crate::IcedApp;
 use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::column;
-use iced::widget::scrollable::Direction;
 use iced::{Alignment, Element, Length, Padding, Renderer, Theme};
 use taskforest_core::core::process::ProcessBatchAction;
 use zhuge_ui_core::virtual_list::VirtualWindow;
@@ -217,10 +216,10 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         header_row,
         table_body,
         Length::Fixed(table_extent),
-        Direction::Both {
-            vertical: crate::theme::scrollbar(),
-            horizontal: crate::theme::scrollbar(),
-        },
+        crate::ui::components::virtual_table_direction(
+            crate::ui::components::VirtualTableScrollAxis::Both,
+            crate::ui::components::ScrollScale::Standard,
+        ),
         Message::ApplicationsScrolled,
     );
 

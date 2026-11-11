@@ -608,6 +608,9 @@ fi
 if maybe card-width-owner; then
     run_stage card-width-owner quick run_py scripts/quality/test_card_width_owner.py
 fi
+if maybe iced-scroll-owner; then
+    run_stage iced-scroll-owner quick run_py scripts/quality/test_iced_scroll_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

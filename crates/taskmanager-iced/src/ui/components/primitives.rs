@@ -470,6 +470,42 @@ pub(crate) fn scrollable<'a, Message: 'a>(
         .style(style)
 }
 
+/// The one `Direction` a kit `virtual_table` may spend.
+///
+/// The kit builds its own `Scrollable`, so it cannot consume the shared
+/// [`scrollable`] widget. Its direction and scrollbar geometry must still
+/// come from the SAME owner: a page that constructs
+/// `Direction::Vertical(theme::scrollbar())` itself would re-open the
+/// "one page, a second rail material" gap this family closes. `Both` is the
+/// Applications table's typed two-axis case and uses the same standard bar
+/// on each axis.
+#[must_use]
+pub(crate) fn virtual_table_direction(
+    axis: VirtualTableScrollAxis,
+    scale: ScrollScale,
+) -> iced::widget::scrollable::Direction {
+    let bar = match scale {
+        ScrollScale::Standard => theme::scrollbar(),
+        ScrollScale::Compact => theme::compact_scrollbar(),
+    };
+    match axis {
+        VirtualTableScrollAxis::Vertical => iced::widget::scrollable::Direction::Vertical(bar),
+        VirtualTableScrollAxis::Both => iced::widget::scrollable::Direction::Both {
+            vertical: bar,
+            horizontal: bar,
+        },
+    }
+}
+
+/// The scroll axes a kit virtual table owns; one page declares one owner.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum VirtualTableScrollAxis {
+    /// A single vertical scroll owner.
+    Vertical,
+    /// The Applications table's bounded two-axis scroll owner.
+    Both,
+}
+
 #[cfg(test)]
 #[path = "../../../tests/gui/ui/components_primitives_tests.rs"]
 mod components_primitives_tests;
