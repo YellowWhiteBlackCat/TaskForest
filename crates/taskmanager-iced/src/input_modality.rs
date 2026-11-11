@@ -67,6 +67,24 @@ impl Operation<()> for FocusTargetPresence {
     }
 }
 
+#[derive(Default)]
+struct StartupSearchFocus {
+    focused: bool,
+}
+
+impl Operation<()> for StartupSearchFocus {
+    fn traverse(&mut self, visit: &mut dyn FnMut(&mut dyn Operation<()>)) {
+        visit(self);
+    }
+
+    fn focusable(&mut self, id: Option<&Id>, _bounds: Rectangle, state: &mut dyn Focusable) {
+        self.focused |= id.is_some_and(|id| {
+            id == &Id::from(crate::focus::focus_id(FocusTarget::StartupSearch))
+                && state.is_focused()
+        });
+    }
+}
+
 impl Widget<Message, iced::Theme, iced::Renderer> for Observer<'_> {
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.content)]
@@ -134,7 +152,7 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Observer<'_> {
                 renderer,
                 &mut presence,
             );
-            if !presence.found {
+            if !presence.found && target != FocusTarget::StartupSearch {
                 shell.publish(Message::FocusedTargetUnmounted(target));
             }
         }
@@ -154,6 +172,28 @@ impl Widget<Message, iced::Theme, iced::Renderer> for Observer<'_> {
             shell,
             viewport,
         );
+        let mut startup_search = StartupSearchFocus::default();
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            &mut startup_search,
+        );
+        let target = FocusTarget::StartupSearch;
+        let focused = startup_search.focused;
+        if focused && self.focused_target != Some(target) {
+            self.focused_target = Some(target);
+            shell.publish(Message::TextInputFocusChanged {
+                target,
+                focused: true,
+            });
+        } else if !focused && self.focused_target == Some(target) {
+            self.focused_target = None;
+            shell.publish(Message::TextInputFocusChanged {
+                target,
+                focused: false,
+            });
+        }
     }
 
     fn draw(

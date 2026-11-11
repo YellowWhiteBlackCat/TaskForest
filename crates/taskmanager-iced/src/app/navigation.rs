@@ -51,6 +51,10 @@ impl IcedApp {
                 InputScope::Help | InputScope::Suggestions => self.shell.dismiss_overlay(),
                 InputScope::ContextMenu(_) => self.close_context_menus(),
                 InputScope::Search => self.shell.close_search(),
+                InputScope::StartupSearch if !self.startup_presentation.query().is_empty() => {
+                    self.set_startup_query(String::new());
+                }
+                InputScope::StartupSearch => {}
                 InputScope::Content
                     if self.shell.page() == AppPage::Services
                         && !self.services_query().is_empty() =>
@@ -58,6 +62,12 @@ impl IcedApp {
                     // SearchInput's cross-frontend contract uses Escape to
                     // clear the active filter and return to the restored list.
                     self.shell.set_services_query("");
+                }
+                InputScope::Content
+                    if self.shell.page() == AppPage::Startup
+                        && !self.startup_presentation.query().is_empty() =>
+                {
+                    self.set_startup_query(String::new());
                 }
                 InputScope::Content => {}
             }
@@ -116,6 +126,9 @@ impl IcedApp {
     /// behavior tests on both frontends). Every
     /// other page keeps the shared shell `move_selection` path.
     fn visual_nav_intercepts(&mut self, event: ShellKeyEvent) -> bool {
+        if self.startup_nav_intercepts(event) {
+            return true;
+        }
         if self.shell.page() != AppPage::Applications {
             return false;
         }
@@ -145,6 +158,70 @@ impl IcedApp {
             }
             _ => false,
         }
+    }
+
+    fn startup_nav_intercepts(&mut self, event: ShellKeyEvent) -> bool {
+        if self.shell.page() != AppPage::Startup
+            || self.modal_open()
+            || self.shell.help_open()
+            || self.shell.suggestions_open()
+            || self.shell.search_active()
+            || self.context_menu_kind().is_some()
+        {
+            return false;
+        }
+
+        let search_focused = self.input_scope() == InputScope::StartupSearch;
+        if search_focused {
+            return matches!(
+                event.key,
+                KeyCode::ArrowLeft
+                    | KeyCode::ArrowRight
+                    | KeyCode::ArrowUp
+                    | KeyCode::ArrowDown
+                    | KeyCode::PageUp
+                    | KeyCode::PageDown
+                    | KeyCode::Home
+                    | KeyCode::End
+            );
+        }
+
+        if self.startup_presentation.query().trim().is_empty() {
+            return false;
+        }
+        match event.key {
+            KeyCode::ArrowUp
+            | KeyCode::ArrowDown
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::Home
+            | KeyCode::End => {
+                self.move_startup_selection(event.key);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn move_startup_selection(&mut self, key: KeyCode) {
+        let row_count = self.startup_visible_indices().len();
+        if row_count == 0 {
+            self.shell.move_selection_to(0);
+            return;
+        }
+        let current = self.shell.selected.min(row_count.saturating_sub(1));
+        let step = if matches!(key, KeyCode::PageUp | KeyCode::PageDown) {
+            10
+        } else {
+            1
+        };
+        let selected = match key {
+            KeyCode::Home => 0,
+            KeyCode::End => row_count.saturating_sub(1),
+            KeyCode::ArrowUp | KeyCode::PageUp => current.saturating_sub(step),
+            _ => (current + step).min(row_count.saturating_sub(1)),
+        };
+        self.shell.move_selection_to(selected);
     }
 
     /// Move the shared selection over the visible-row projection (the render
@@ -322,8 +399,12 @@ impl IcedApp {
 
     pub(super) fn selected_table_focus_target(&self) -> Option<FocusTarget> {
         let page = self.shell.page();
-        self.shell
-            .table_row_count()
+        let row_count = if page == AppPage::Startup {
+            Some(self.startup_visible_indices().len())
+        } else {
+            self.shell.table_row_count()
+        };
+        row_count
             .filter(|row_count| self.shell.selected < *row_count)
             .map(|_| FocusTarget::TableRow {
                 page,

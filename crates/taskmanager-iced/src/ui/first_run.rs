@@ -8,7 +8,7 @@ use taskforest_core::core::setup::{SetupScriptAction, SetupScriptInfo};
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::first_run::first_run_failure_key;
 
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 use taskmanager_theme::tokens;
@@ -233,24 +233,24 @@ fn action_controls<'a>(
 }
 
 /// The dialog's dedicated focus-stop helper: every control maps onto the
-/// first-run registry variants ([`crate::app::FocusTarget::FirstRunCopy`] /
-/// [`crate::app::FocusTarget::FirstRunAction`]) so each has a stable,
+/// first-run registry variants (`FocusTarget::FirstRunCopy` /
+/// `FocusTarget::FirstRunAction`) so each has a stable,
 /// collision-free focus identity.
 struct FocusSlot;
 
 impl FocusSlot {
-    const fn copy(row: u8) -> crate::app::FocusTarget {
-        crate::app::FocusTarget::FirstRunCopy(row)
+    const fn copy(row: u8) -> FocusTarget {
+        FocusTarget::FirstRunCopy(row)
     }
 
-    const fn action(index: u8) -> crate::app::FocusTarget {
-        crate::app::FocusTarget::FirstRunAction(index)
+    const fn action(index: u8) -> FocusTarget {
+        FocusTarget::FirstRunAction(index)
     }
 }
 
 fn action_button<'a>(
     theme_snapshot: &'a Theme,
-    target: crate::app::FocusTarget,
+    target: FocusTarget,
     label: String,
     message: Message,
 ) -> IcedElement<'a> {

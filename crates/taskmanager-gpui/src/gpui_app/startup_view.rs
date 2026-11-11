@@ -17,8 +17,8 @@
 
 use std::rc::Rc;
 use taskforest_core::core::BootTimeline;
-use taskforest_core::core::text::contains_ascii_ci;
 use taskmanager_shell::InfoTable;
+use taskmanager_shell::matches_startup_text;
 use taskmanager_shell::order_startup_rows;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -147,13 +147,9 @@ pub fn filter_startup(
     filter: StartupFilter,
     query: &str,
 ) -> Vec<StartupEntry> {
-    let q = query.trim();
     entries
         .iter()
-        .filter(|e| {
-            filter.matches(e.enabled)
-                && (q.is_empty() || contains_ascii_ci(&e.name, q) || contains_ascii_ci(&e.exec, q))
-        })
+        .filter(|e| filter.matches(e.enabled) && matches_startup_text(&e.name, &e.exec, query))
         .cloned()
         .collect()
 }

@@ -26,7 +26,7 @@ use taskmanager_application::i18n::t;
 
 use taskmanager_theme::tokens;
 
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 
@@ -243,15 +243,9 @@ pub(super) fn usage_panel<'a>(
     // disk's scan is running (the conditional destructive affordance).
     let scanning = own.is_some_and(|snapshot| snapshot.status == DirectoryScanStatus::Scanning);
     let (target, label) = if scanning {
-        (
-            crate::app::FocusTarget::DirectoryUsageCancel,
-            t("disk.usage_cancel"),
-        )
+        (FocusTarget::DirectoryUsageCancel, t("disk.usage_cancel"))
     } else {
-        (
-            crate::app::FocusTarget::DirectoryUsageScan,
-            t("disk.usage_scan"),
-        )
+        (FocusTarget::DirectoryUsageScan, t("disk.usage_scan"))
     };
     let action = if scanning {
         focus::button(

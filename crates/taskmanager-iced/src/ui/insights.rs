@@ -37,7 +37,7 @@ use taskmanager_shell::presentation::{
 };
 use taskmanager_theme::{Theme, tokens};
 
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 use crate::focus;
 use taskforest_core::core::percent::percent_text;
 
@@ -163,7 +163,7 @@ fn escalation_pill<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     focus::dynamic_button(
         theme_snapshot,
-        crate::app::FocusTarget::ProcessNetworkEscalation,
+        FocusTarget::ProcessNetworkEscalation,
         t("proc_insights.enable_network_capture").to_string(),
         Message::RequestProcessNetworkEscalation,
         false,

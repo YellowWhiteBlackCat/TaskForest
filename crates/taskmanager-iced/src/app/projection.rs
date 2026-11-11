@@ -313,8 +313,9 @@ impl IcedApp {
         })
     }
 
-    /// Memoized Startup rows. Startup has no page-local filter, so its visible
-    /// indices remain the full canonical sorted order until data/sort changes.
+    /// Memoized canonical Startup rows and their page-local query projection.
+    /// The rows remain complete; only visible indices change with the Iced
+    /// query.
     pub(crate) fn startup_projection(
         &self,
     ) -> (
@@ -332,9 +333,10 @@ impl IcedApp {
                 .map_or(0, Vec::len),
             sort: shell.startup_sort,
         };
-        self.projection_caches.startup(fingerprint, || {
-            crate::ui::startup_table::startup_rows(shell)
-        })
+        self.projection_caches
+            .startup(fingerprint, self.startup_presentation.query(), || {
+                crate::ui::startup_table::startup_rows(shell)
+            })
     }
 
     /// Memoized Users rows. Shared process search remains a highlight-only

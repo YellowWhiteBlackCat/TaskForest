@@ -6,6 +6,7 @@ use taskmanager_shell::presentation::smart::{
 };
 
 use super::*;
+use crate::app::FocusTarget;
 use iced::Element;
 use taskforest_core::core::device_state::DeviceStatus;
 use taskforest_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
@@ -327,7 +328,7 @@ fn smart_footer<'a>(
     if has_smart_fields(disk) {
         Some(crate::ui::focus::ghost_button(
             theme_snapshot,
-            crate::app::FocusTarget::DiskSmartOpen { index },
+            FocusTarget::DiskSmartOpen { index },
             t("disk.smart_health"),
             Message::OpenDiskSmart { index },
         ))

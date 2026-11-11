@@ -70,6 +70,7 @@ impl IcedApp {
                         .shell
                         .handle_local_char(character, modifiers)
                         .into_effect(),
+                    InputScope::StartupSearch => None,
                     InputScope::Content if matches!(character, 'a' | 'A') && modifiers.control => {
                         self.open_local_surface(LocalSurface::About);
                         None
@@ -114,6 +115,14 @@ impl IcedApp {
                     && !matches!(target, FocusTarget::ModalClose)
                 {
                     self.input.focused_control = Some(target);
+                }
+                UpdateDispatch::none()
+            }
+            Message::TextInputFocusChanged { target, focused } => {
+                if focused {
+                    self.input.focused_control = Some(target);
+                } else if self.input.focused_control == Some(target) {
+                    self.input.focused_control = None;
                 }
                 UpdateDispatch::none()
             }

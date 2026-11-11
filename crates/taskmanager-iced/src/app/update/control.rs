@@ -53,7 +53,7 @@ impl IcedApp {
             }
             Message::RequestStartupControl(enabled) => {
                 self.dismiss_context_menu_kind(ContextMenuKind::Startup);
-                self.shell.request_startup_control(enabled)
+                self.apply_startup_row_switch(self.shell.selected, enabled)
             }
             Message::RequestStartupControlFor { index, enabled } => {
                 // A row switch addresses the row it sits on; a row-menu action

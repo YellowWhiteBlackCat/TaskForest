@@ -35,6 +35,7 @@ pub mod presentation;
 pub mod process_filter;
 pub mod saved_views;
 pub mod service_query;
+pub mod startup_query;
 pub mod system_timeline;
 pub mod viewmodel;
 
@@ -78,3 +79,4 @@ pub use presentation::{
 };
 pub use process_filter::{ProcessStatusFilter, matches_process_query};
 pub use service_query::{matches_service_query, matches_service_text};
+pub use startup_query::matches_startup_text;

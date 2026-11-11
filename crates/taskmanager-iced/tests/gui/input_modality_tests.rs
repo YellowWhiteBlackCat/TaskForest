@@ -16,8 +16,9 @@ use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::{Focusable, Operation};
 use iced::advanced::widget::{Id, Tree};
 use iced::{Element, Event, Size, mouse};
-use taskmanager_application::AppPage;
+use taskmanager_application::{AppPage, KeyCode, Modifiers};
 use taskmanager_assets::embedded_fonts;
+use taskmanager_shell::ShellKeyEvent;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::InputModality;
 
@@ -327,4 +328,69 @@ fn an_unmounted_focused_target_clears_the_ring_on_the_next_real_event() {
     assert_eq!(app.input.modality, InputModality::Programmatic);
     assert!(!app.theme().focus_visible());
     assert_eq!(focus_ring_color(app.theme(), false).a, 0.0);
+}
+
+#[test]
+fn startup_text_input_focus_owns_horizontal_navigation() {
+    let mut app = IcedApp::demo();
+    let size = Size::new(1180.0, 780.0);
+    let _ = app.update(Message::WindowResized(size));
+    let _ = app.update(Message::SelectPage(AppPage::Startup));
+
+    let renderer = renderer();
+    let messages = {
+        let mut view = crate::ui::view(&app);
+        let mut tree = Tree::new(&view);
+        let node = layout(&mut view, &mut tree, &renderer, size);
+        assert!(
+            focus_target(
+                &mut view,
+                &mut tree,
+                &node,
+                &renderer,
+                FocusTarget::StartupSearch,
+            ),
+            "the native Startup search input participates in real focus operations"
+        );
+        dispatch_window_event(
+            &mut view,
+            &mut tree,
+            &node,
+            &renderer,
+            Event::Window(iced::window::Event::Focused),
+        )
+    };
+    assert!(
+        messages.iter().any(|message| matches!(
+            message,
+            Message::TextInputFocusChanged {
+                target: FocusTarget::StartupSearch,
+                focused: true
+            }
+        )),
+        "the root observer reports native text-input focus"
+    );
+    for message in messages {
+        let _ = app.update(message);
+    }
+    assert_eq!(
+        app.input_scope(),
+        crate::app::InputScope::StartupSearch,
+        "the focused text input owns keyboard navigation"
+    );
+
+    let selected = app.shell.selected;
+    let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
+        KeyCode::ArrowLeft,
+        Modifiers::NONE,
+    ))));
+    assert_eq!(
+        app.shell.selected, selected,
+        "the table cursor does not move when the search caret handles Left"
+    );
+    assert_eq!(
+        app.input_scope(),
+        crate::app::InputScope::StartupSearch,
+        "native text input focus remains in the search field"
+    );
 }

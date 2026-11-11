@@ -1,7 +1,7 @@
 //! Durable application-history page.
 
 use super::*;
-use crate::app::AppHistoryRowModel;
+use crate::app::{AppHistoryRowModel, FocusTarget};
 use crate::app_history_chart::{SPARK_HEIGHT, Sparkline};
 use crate::ui::components::styled_scrollable;
 use crate::{focus, theme};
@@ -121,7 +121,7 @@ fn history_window_controls<'a>(
     for window in HistoryWindow::ALL {
         controls = controls.push(focus::choice_pill(
             theme_snapshot,
-            crate::app::FocusTarget::HistoryReplayWindow(window),
+            FocusTarget::HistoryReplayWindow(window),
             i18n::history_window_label(window).to_owned(),
             selected == window,
             Message::SelectHistoryReplayWindow(window),
@@ -129,7 +129,7 @@ fn history_window_controls<'a>(
     }
     controls = controls.push(focus::dynamic_button(
         theme_snapshot,
-        crate::app::FocusTarget::HistoryReplayRefresh,
+        FocusTarget::HistoryReplayRefresh,
         t("perf.replay.refresh").to_owned(),
         Message::RefreshHistoryReplay,
         false,

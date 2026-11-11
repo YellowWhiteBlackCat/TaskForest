@@ -45,14 +45,22 @@ impl IcedApp {
         visual_index: usize,
         enabled: bool,
     ) -> Option<PlatformEffect> {
-        let entry = self.shell.sorted_startup_entry_at(visual_index)?.clone();
+        let source_index = self.startup_source_index(visual_index)?;
+        let entry = self
+            .shell
+            .projection()
+            .startup_entries
+            .as_deref()?
+            .get(source_index)?
+            .clone();
         self.shell.request_startup_control_for(entry, enabled)
     }
 
     pub(super) fn startup_source_index(&self, visual_index: usize) -> Option<usize> {
+        let canonical_index = *self.startup_visible_indices().get(visual_index)?;
         self.shell
             .sorted_startup_indices()
-            .get(visual_index)
+            .get(canonical_index)
             .copied()
     }
 }

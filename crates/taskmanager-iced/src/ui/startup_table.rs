@@ -5,7 +5,7 @@
 //! route through the shared startup-control gate.
 
 use iced::widget::{column, container, row, text};
-use iced::{Element, Length};
+use iced::{Element, Length, Padding};
 use std::rc::Rc;
 use taskforest_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupImpact, StartupImpactEvidence,
@@ -20,6 +20,7 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp};
 use taskmanager_theme::tokens;
+use zhuge_ui_kit_iced::surface::{self, StatePanelGeometry};
 
 use super::tables::{
     InventoryTableKey, ListState, info_header_cell, inventory_row_height, inventory_table_key,
@@ -71,8 +72,10 @@ pub(super) fn startup_columns() -> StartupColumns {
 pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
-    let (rows, _visible_indices, projection_generation) = app.startup_projection();
-    let row_count = rows.len();
+    let (rows, visible_indices, projection_generation) = app.startup_projection();
+    let query = app.startup_presentation.query();
+    let search_active = !query.trim().is_empty();
+    let row_count = visible_indices.len();
     let list_state = startup_list_state(shell);
     let compact = app.compact_density() || app.compact_layout();
     let row_padding = theme::row_padding(compact);
@@ -85,6 +88,9 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
             RefreshRequest::Startup,
         )
         .unwrap_or_else(|| message_panel(theme_snapshot, t("empty.no_startup_reported"))),
+        ListState::Ready if visible_indices.is_empty() && search_active => {
+            startup_search_empty_state(theme_snapshot, query)
+        }
         ListState::Ready => {
             // Clickable sort headers: the active column wears ▲/▼, clicks
             // route to the shell's shared per-table sort slot. Widths come
@@ -122,14 +128,12 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
             // Sticky header: the header row sits outside the body scrollable,
             // so the body window carries no header prefix.
             let window = VirtualWindow::for_sticky_rows(
-                rows.len(),
+                row_count,
                 scroll_y,
                 viewport_height,
                 inventory_row_height(compact),
             );
             let table_theme = *theme_snapshot;
-            let query = shell.query.clone();
-            let search_active = shell.search_active();
             let selected = shell.selected;
             // The open Startup-row menu re-hosts its row. The stored menu
             // identity is the provider source index; the visual→source mapping
@@ -141,30 +145,34 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                 generation: projection_generation,
                 table: InfoTable::Startup,
                 sort: shell.startup_sort,
-                query: &query,
+                query,
                 search_active,
                 selected,
-                row_count: rows.len(),
+                row_count,
                 compact,
                 open_menu: open_menu_source.map(|index| index.to_string()),
             });
             let body_rows = Rc::clone(&rows);
+            let body_visible = Rc::clone(&visible_indices);
             let body_open_menu = open_menu_source;
             let body_sorted = Rc::clone(&sorted_indices);
-            let body_query = query.clone();
+            let body_query = query.to_owned();
             let columns = startup_columns();
             let table_body = iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
                 let rows = Rc::clone(&body_rows);
+                let visible_indices = Rc::clone(&body_visible);
                 let open_menu_source = body_open_menu;
                 let sorted_indices = Rc::clone(&body_sorted);
                 let query = body_query.clone();
                 virtual_table_body(window, Length::Fill, move |start, end| {
-                    rows.get(start..end)
+                    visible_indices
+                        .get(start..end)
                         .unwrap_or(&[])
                         .iter()
                         .enumerate()
-                        .map(|(offset, startup)| {
+                        .filter_map(|(offset, canonical_index)| {
                             let index = start + offset;
+                            let startup = rows.get(*canonical_index)?;
                             let is_selected = index == selected;
                             let zebra = theme::zebra_index(index);
                             let row = row![
@@ -192,7 +200,13 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                         enabled,
                                     },
                                 ),
-                                text(startup.exec.clone()).width(columns.command.length()),
+                                highlight::cell(
+                                    &table_theme,
+                                    startup.exec.as_str(),
+                                    query.as_str(),
+                                    search_active,
+                                    columns.command.length(),
+                                ),
                             ]
                             .spacing(8)
                             .padding(row_padding)
@@ -211,7 +225,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                     visual_index: index,
                                 },
                             );
-                            let row = match sorted_indices.get(index).copied() {
+                            let row = match sorted_indices.get(*canonical_index).copied() {
                                 Some(source_index) if open_menu_source == Some(source_index) => {
                                     // The open menu floats on its own row:
                                     // anchored by the popover primitive and
@@ -231,7 +245,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                 }
                                 _ => row,
                             };
-                            virtual_table_row(row, inventory_row_height(compact))
+                            Some(virtual_table_row(row, inventory_row_height(compact)))
                         })
                         .collect()
                 })
@@ -267,8 +281,18 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     // They never join the focus/selection domain; each stays silent until
     // typed evidence arrives and silent on typed failure.
     let mut page =
-        column![text(startup_heading(list_state, row_count)).size(f32::from(tokens::FONT_16))]
+        column![text(startup_heading(list_state, rows.len())).size(f32::from(tokens::FONT_16))]
             .spacing(8);
+    page = page.push(
+        container(crate::ui::components::search_input(
+            theme_snapshot,
+            FocusTarget::StartupSearch,
+            t("search.startup"),
+            query,
+            Message::StartupSearchChanged,
+        ))
+        .width(Length::Fixed(280.0)),
+    );
     if let Some(strip) = boot_evidence_strip(
         theme_snapshot,
         app.shell.projection().startup_boot_evidence.as_ref(),
@@ -289,14 +313,47 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     // A pending startup request gates behind a confirmation bar (mirrors the
     // F12 Kill confirm + GPUI's startup confirm dialog); otherwise the normal
     // enable/disable action bar.
-    let page = if rows.is_empty() {
+    let page = if row_count == 0 {
         page
     } else if let Some(request) = shell.pending_startup() {
         page.push(startup_confirm_bar(theme_snapshot, request))
     } else {
-        page.push(startup_action_bar(theme_snapshot, shell, rows.as_ref()))
+        page.push(startup_action_bar(
+            theme_snapshot,
+            shell,
+            rows.as_ref(),
+            visible_indices.as_slice(),
+        ))
     };
     page.into()
+}
+
+fn startup_search_empty_state(
+    theme_snapshot: &Theme,
+    query: &str,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    let title = t("empty.no_match")
+        .replace("{noun}", t("startup.noun"))
+        .replace("{query}", query.trim());
+    let style_theme = *theme_snapshot;
+    container(surface::state_panel(
+        Some(title),
+        None,
+        None,
+        StatePanelGeometry {
+            padding: Padding::ZERO,
+            spacing: 0.0,
+            title_size: f32::from(tokens::FONT_13),
+            ..StatePanelGeometry::default()
+        },
+        |_| container::Style::default(),
+    ))
+    .center_x(Length::Fill)
+    .center_y(Length::Fill)
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .style(move |_| theme::panel_style(&style_theme))
+    .into()
 }
 
 /// The gated startup-control confirmation bar: the enable/disable prompt
@@ -345,8 +402,11 @@ fn startup_action_bar<'a>(
     theme_snapshot: &'a Theme,
     shell: &ShellApp,
     rows: &[StartupRow],
+    visible_indices: &[usize],
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let selected = rows.get(shell.selected);
+    let selected = visible_indices
+        .get(shell.selected)
+        .and_then(|index| rows.get(*index));
     // GPUI parity: an Unsupported-policy entry never carries a live toggle —
     // the underlying control request can never succeed for it, so the switch
     // renders as the same inert affordance the no-selection branch uses.
@@ -597,3 +657,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/ui/startup_switch_tests.rs"]
 mod switch_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/startup_search_layout_tests.rs"]
+mod search_layout_tests;

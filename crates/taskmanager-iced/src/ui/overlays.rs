@@ -20,7 +20,7 @@ use taskmanager_shell::presentation::smart::{
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_theme::{Theme, tokens};
 
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 use crate::ui::components::{key_value_rows, styled_scrollable};
@@ -78,7 +78,6 @@ pub(super) fn smart_overlay<'a>(
     app: &'a crate::IcedApp,
     index: usize,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    use crate::app::FocusTarget;
     let body: Element<'a, Message, iced::Theme, iced::Renderer> =
         match app.shell.projection().snapshot.as_ref() {
             Some(snapshot) => match snapshot.disks.get(index) {

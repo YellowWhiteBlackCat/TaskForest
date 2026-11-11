@@ -18,7 +18,7 @@ use super::components::{key_value_rows, message_panel, styled_scrollable, titled
 use super::system_dashboard::{SystemDashboardMessage, window_controls};
 use super::tables::ListState;
 use crate::IcedApp;
-use crate::app::Message;
+use crate::app::{FocusTarget, Message};
 use taskforest_core::core::metrics::CpuMetrics;
 use taskforest_core::core::metrics::SmbiosMemorySnapshot;
 use taskmanager_application::SmbiosMemoryState;
@@ -83,7 +83,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         text(t("system.title")).size(f32::from(tokens::FONT_16)),
         crate::focus::dynamic_button(
             theme_snapshot,
-            crate::app::FocusTarget::AboutCopyDetails,
+            FocusTarget::AboutCopyDetails,
             t("about.copy_details").to_string(),
             Message::CopyTextToClipboard {
                 label: "System Details".to_string(),
@@ -111,7 +111,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
             };
             crate::focus::choice_pill(
                 theme_snapshot,
-                crate::app::FocusTarget::SystemSection(section),
+                FocusTarget::SystemSection(section),
                 label.to_owned(),
                 app.system_section == section,
                 Message::SystemDashboard(SystemDashboardMessage::SelectSection(section)),

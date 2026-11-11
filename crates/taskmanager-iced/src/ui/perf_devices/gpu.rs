@@ -1,6 +1,7 @@
 //! Performance page GPU detail block and series graph projection.
 
 use super::*;
+use crate::app::FocusTarget;
 use iced::Element;
 use taskforest_core::core::metrics::{GpuMetrics, SystemSnapshot};
 
@@ -544,7 +545,7 @@ pub(crate) fn gpu_engines_panel<'a>(
     let header_title = iced::widget::row![
         crate::focus::ghost_button(
             theme_snapshot,
-            crate::app::FocusTarget::GpuEnginesExpandToggle,
+            FocusTarget::GpuEnginesExpandToggle,
             expand_glyph,
             Message::ToggleGpuEnginesExpanded,
         ),

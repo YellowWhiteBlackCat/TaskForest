@@ -86,6 +86,7 @@ mod settings_types;
 mod sidebar;
 mod snapshot_export;
 mod startup_menu;
+mod startup_state;
 pub(crate) mod subscription;
 mod surface;
 pub(crate) mod toast;
@@ -118,6 +119,7 @@ pub use service_details::ServiceDetailsSnapshot;
 pub use settings_types::SettingsChange;
 // Session-local process-table column sizing (drag overrides + the open drag
 // session), reduced by `update::columns`.
+use startup_state::StartupPresentationState;
 pub(crate) use surface::{
     ContextMenu, ContextMenuKind, ContextMenuState, InputScope, LocalSurface, LocalSurfaceKind,
     LocalSurfaceState, PresenceTransition,
@@ -305,6 +307,9 @@ pub enum Message {
     /// The Services-page filter input changed (a frontend-local query that
     /// never touches the shared process query).
     ServicesSearchChanged(String),
+    /// The Startup-page filter input changed (a frontend-local query over the
+    /// canonical sorted Startup rows).
+    StartupSearchChanged(String),
     /// Refresh the inventory page whose source reported a retryable failure.
     RefreshSource(RefreshRequest),
     /// Authorize or refresh CPU package power readouts via RAPL helper.
@@ -366,6 +371,11 @@ pub enum Message {
     ConfirmStartupControl,
     /// A toolkit focusable adapter reported its focus target.
     Focus(FocusTarget),
+    /// A native Startup search field gained or lost keyboard focus.
+    TextInputFocusChanged {
+        target: FocusTarget,
+        focused: bool,
+    },
     /// The renderer confirmed that the app's tracked focus target is no
     /// longer mounted in the current widget tree.
     FocusedTargetUnmounted(FocusTarget),
@@ -632,6 +642,9 @@ pub struct IcedApp {
     /// plus the transient drag session while an edge is held. Width semantics
     /// stay contract truth (`ui::applications`); this is override storage only.
     pub(crate) process_column_sizing: update::columns::ProcessColumnSizing,
+    /// Iced-local Startup search state; canonical startup inventory stays in
+    /// the shared shell projection.
+    pub(crate) startup_presentation: StartupPresentationState,
     /// Named client of the app-host's process-wide diagnostic writer.
     service_log_export: service_log::IcedServiceLogExportRuntime,
     diagnostics: diagnostics::IcedDiagnosticRuntime,

@@ -190,6 +190,23 @@ impl IcedApp {
             Message::CloseSearch if self.shell.search_active() => Some(FocusTarget::SearchTrigger),
             Message::Key(IcedKey::Fixed(event))
                 if event.key == KeyCode::Escape
+                    && self.shell.page() == AppPage::Startup
+                    && !self.startup_presentation.query().trim().is_empty() =>
+            {
+                let source_index = self.startup_source_index(self.shell.selected)?;
+                let index = self
+                    .shell
+                    .sorted_startup_indices()
+                    .iter()
+                    .position(|source| *source == source_index)
+                    .unwrap_or(0);
+                Some(FocusTarget::TableRow {
+                    page: AppPage::Startup,
+                    index,
+                })
+            }
+            Message::Key(IcedKey::Fixed(event))
+                if event.key == KeyCode::Escape
                     && self.context_menu_kind() == Some(ContextMenuKind::ProcessColumns) =>
             {
                 Some(FocusTarget::ProcessColumnsTrigger)

@@ -269,13 +269,20 @@ impl IcedProjectionCaches {
     pub(super) fn startup(
         &self,
         fingerprint: InventoryDataFingerprint,
+        query: &str,
         build: impl FnOnce() -> Vec<crate::ui::startup_table::StartupRow>,
     ) -> (
         Rc<Vec<crate::ui::startup_table::StartupRow>>,
         Rc<Vec<usize>>,
         u64,
     ) {
-        project_inventory(&self.startup, fingerprint, "", build, |_, _| true)
+        project_inventory(
+            &self.startup,
+            fingerprint,
+            query,
+            build,
+            crate::app::startup_state::startup_query_matches_row,
+        )
     }
 
     pub(super) fn users(

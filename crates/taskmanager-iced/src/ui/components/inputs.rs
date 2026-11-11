@@ -344,8 +344,8 @@ fn select_style(
 /// focus id and is focusable through iced's native text-input focus, so
 /// keyboard users reach and edit it with the standard traversal; the clear
 /// button is the pointer convenience over the same contract. Consumed by the
-/// Services page's filter field; the Users and Startup pages carry no search
-/// field today, so they have no call site yet.
+/// Services and Startup filter fields; each page supplies its own query
+/// message so filtering never changes the shared Applications query.
 #[must_use]
 pub(crate) fn search_input<'a>(
     theme_snapshot: &'a Theme,

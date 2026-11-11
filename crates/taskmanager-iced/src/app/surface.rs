@@ -6,11 +6,13 @@
 //! through exhaustive events, so two local modals or two row menus cannot be
 //! represented at the same time.
 
+use super::FocusTarget;
 use taskforest_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskforest_core::core::services::ServiceItem;
 use taskforest_core::core::session::SessionItem;
 use taskforest_core::core::startup::StartupEntry;
 use taskforest_core::core::target::ServiceId;
+use taskmanager_application::AppPage;
 use taskmanager_application::ConfirmationKind;
 use taskmanager_application::SurfaceKind;
 use taskmanager_application::diagnostics::DiagnosticBundleUiState;
@@ -214,6 +216,7 @@ pub(crate) enum InputScope {
     Suggestions,
     ContextMenu(ContextMenuKind),
     Search,
+    StartupSearch,
     Content,
 }
 
@@ -240,7 +243,7 @@ impl InputScope {
                     | ConfirmationKind::SmartSelfTest
             ),
             Self::LocalSurface(_) | Self::ServiceLog | Self::Help | Self::Suggestions => true,
-            Self::ContextMenu(_) | Self::Search | Self::Content => false,
+            Self::ContextMenu(_) | Self::Search | Self::StartupSearch | Self::Content => false,
         }
     }
 }
@@ -492,6 +495,10 @@ impl IcedApp {
             InputScope::Suggestions
         } else if let Some(menu) = self.context_menu_kind() {
             InputScope::ContextMenu(menu)
+        } else if self.shell.page() == AppPage::Startup
+            && self.input.focused_control == Some(FocusTarget::StartupSearch)
+        {
+            InputScope::StartupSearch
         } else if self.shell.search_active() {
             InputScope::Search
         } else {

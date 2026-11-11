@@ -64,6 +64,7 @@ impl IcedApp {
             Message::ServicesSearchChanged(query) => {
                 self.shell.set_services_query(query);
             }
+            Message::StartupSearchChanged(query) => self.set_startup_query(query),
             Message::SelectDetailsSection(section) => {
                 self.process_presentation.details_section = section;
                 if section == ProcessDetailsSection::Insights {

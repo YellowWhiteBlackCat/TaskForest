@@ -65,6 +65,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::SearchBackspace
         | Message::DismissToast
         | Message::Focus(_)
+        | Message::TextInputFocusChanged { .. }
         | Message::FocusedTargetUnmounted(_)) => MessageDomain::Input(message),
 
         message @ (Message::SelectPage(_)
@@ -92,6 +93,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::FocusSearch
         | Message::CloseSearch
         | Message::ServicesSearchChanged(_)
+        | Message::StartupSearchChanged(_)
         | Message::SelectDetailsSection(_)
         | Message::SelectInsightsFacet(_)
         | Message::RefreshProcessInsights) => MessageDomain::Navigation(message),
