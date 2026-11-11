@@ -5,6 +5,7 @@ use bevy::text::{LineBreak, TextLayout};
 
 use super::impact::impact_badge_cell_scene;
 use super::timeline::boot_timeline_scene;
+use taskmanager_shell::StartupStatusFilter;
 
 pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
@@ -70,18 +71,19 @@ pub(super) fn startup_toolbar_scene(has_selection: bool, palette: &UiPalette) ->
 
 pub(super) fn startup_body_scene(
     shell: &ShellApp,
+    rows: &[StartupRowModel],
+    filter: StartupStatusFilter,
     palette: &UiPalette,
     selection: &StartupSelection,
     forensics: &forensics::StartupForensicsExpanded,
 ) -> impl Scene + use<> {
-    let rows = startup_rows(shell);
-    let selected = selected_row(&rows, selection);
+    let selected = selected_row(rows, selection);
     let sources = shell.projection().startup_source.as_deref();
     let notice = source_notice_text(sources);
     let empty = empty_state_text(sources);
     let evidence = evidence_line(shell);
     let boot_evidence = shell.projection().startup_boot_evidence.as_ref();
-    let mut children = body_children(&rows, selected, notice, evidence, empty, palette);
+    let mut children = body_children(rows, selected, notice, evidence, empty, palette);
     if let Some(timeline) = boot_timeline_scene(boot_evidence, palette) {
         children.insert(0, timeline);
     }
@@ -93,6 +95,7 @@ pub(super) fn startup_body_scene(
         sections.push(panel);
     }
     sections.push(startup_toolbar_scene(selection.target.is_some(), palette));
+    sections.push(super::status_filter::scene(filter, palette));
     sections.push(Box::new(header_scene(shell.startup_sort, palette)) as Box<dyn Scene>);
     sections.extend(children);
     bsn! {

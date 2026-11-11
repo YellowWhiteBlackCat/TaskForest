@@ -21,6 +21,11 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   `tests/headless/pages/settings.rs` and `settings_widgets_parity.rs` prove
   activation, read-back, rem scaling, high contrast, unavailable permission
   data, and the focused switch.
+- **Startup status filter**: the Startup page offers GPUI's `All`, `Enabled`,
+  and `Disabled` choices through the shared shell filter vocabulary. Filtering
+  preserves provider identity for selection, keyboard movement, and the
+  fallback action menu; `startup-status-enabled` standard and compact captures
+  prove the mounted filter and filtered rows.
 - **Process details**: `pages/processes/details.rs` consumes
   `taskmanager_application::process_details_vm`; the effect observer queues
   refresh/network/escalation commands through the shell. The detail tests

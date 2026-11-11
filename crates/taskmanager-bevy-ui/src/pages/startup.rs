@@ -3,10 +3,9 @@
 //! Same architecture as [`crate::pages::services`] (the template page); the
 //! differences are the data family and its semantics:
 //!
-//! - rows project through [`ShellApp::sorted_startup_entries`] and a visual
-//!   row resolves back to its target ONLY through
-//!   [`ShellApp::sorted_startup_entry_at`] (the shell's single "row N →
-//!   target" translation — bypassing it is the wrong-row defect class);
+//! - rows project through [`ShellApp::sorted_startup_entries`], then the
+//!   shared Startup status filter narrows that sorted projection while
+//!   preserving each provider-issued target identity;
 //! - the state column renders the enabled/disabled chip (TUI parity:
 //!   `Enabled`/`Disabled` via the shared catalog);
 //! - the source column reads `source · scope` and the impact column carries
@@ -55,7 +54,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 
 use taskmanager_application::i18n::control_error_detail;
-use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
+use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir, StartupStatusFilter};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
@@ -70,6 +69,7 @@ pub(crate) mod menu;
 mod paint;
 pub(crate) mod phases;
 mod scene;
+pub(crate) mod status_filter;
 pub(crate) mod timeline;
 
 use impact::ImpactTier;
@@ -112,6 +112,13 @@ pub(crate) fn startup_rows(shell: &ShellApp) -> Vec<StartupRowModel> {
             exec: entry.exec.clone(),
         })
         .collect()
+}
+
+pub(crate) fn startup_rows_for(
+    shell: &ShellApp,
+    filter: StartupStatusFilter,
+) -> Vec<StartupRowModel> {
+    status_filter::startup_rows_for(shell, filter)
 }
 
 pub(crate) use taskmanager_shell::presentation::{startup_impact_text, startup_source_text};
@@ -361,8 +368,8 @@ pub(crate) fn evidence_fingerprint(
 #[derive(Event)]
 pub(crate) struct StartupSortClicked(pub(crate) InfoSortCol);
 
-/// Pointer input: a row was clicked; the payload is the VISUAL
-/// row index, resolved through the shell's `sorted_startup_entry_at` only.
+/// Pointer input: a row was clicked; the payload is its index in the current
+/// filtered, sorted Startup projection.
 #[derive(Event)]
 pub(crate) struct StartupRowClicked(pub(crate) usize);
 
@@ -451,6 +458,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.add_observer(on_startup_disable_button_activated);
     app.add_observer(on_startup_selection_moved);
     app.add_observer(on_startup_body_added);
+    status_filter::register(app);
     inks::register(app);
     paint::register(app);
 }
@@ -510,18 +518,20 @@ fn on_startup_sort_clicked(
     commands.trigger(paint::RepaintRequested);
 }
 
-/// Row-click tail. The visual row resolves to its target through the shell's
-/// single `sorted_startup_entry_at` translation.
+/// Row-click tail. The index resolves through the same filtered projection
+/// that painted the visible rows.
 fn on_startup_row_clicked(
     click: On<StartupRowClicked>,
     track: ShellTrack,
     mut selection: ResMut<StartupSelection>,
+    filter: Res<status_filter::StartupStatusFilterState>,
     mut commands: Commands,
 ) {
-    let Some(entry) = track.shell().sorted_startup_entry_at(click.event().0) else {
+    let rows = startup_rows_for(track.shell(), filter.selected);
+    let Some(row) = rows.get(click.event().0) else {
         return;
     };
-    selection.target = Some(entry.id.clone());
+    selection.target = Some(row.target.clone());
     commands.trigger(paint::RepaintRequested);
 }
 
@@ -530,17 +540,18 @@ fn on_startup_selection_moved(
     movement: On<StartupSelectionMoved>,
     track: ShellTrack,
     mut selection: ResMut<StartupSelection>,
+    filter: Res<status_filter::StartupStatusFilterState>,
     mut commands: Commands,
 ) {
-    let rows = startup_rows(track.shell());
+    let rows = startup_rows_for(track.shell(), filter.selected);
     let current = selected_row(&rows, &selection);
     let Some(next) = moved_row(rows.len(), current, movement.event().0) else {
         return;
     };
-    let Some(entry) = track.shell().sorted_startup_entry_at(next) else {
+    let Some(row) = rows.get(next) else {
         return;
     };
-    selection.target = Some(entry.id.clone());
+    selection.target = Some(row.target.clone());
     commands.trigger(paint::RepaintRequested);
 }
 

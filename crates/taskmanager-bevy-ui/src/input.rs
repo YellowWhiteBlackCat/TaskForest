@@ -53,6 +53,7 @@ use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
 use crate::pages::startup::menu::StartupMenuCtx;
+use crate::pages::startup::status_filter::StartupStatusFilterState;
 
 #[path = "input/dispatch.rs"]
 mod dispatch;
@@ -197,6 +198,7 @@ impl InventoryActionModals<'_> {
 pub(crate) struct InventorySelections<'w> {
     pub(crate) svc: Option<Res<'w, crate::pages::services::ServiceSelection>>,
     pub(crate) stu: Option<Res<'w, crate::pages::startup::StartupSelection>>,
+    pub(crate) startup_filter: Option<Res<'w, StartupStatusFilterState>>,
     pub(crate) ses: Option<Res<'w, crate::pages::sessions::SessionSelection>>,
 }
 

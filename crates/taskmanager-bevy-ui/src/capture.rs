@@ -55,6 +55,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
         "startup-impact" => Some("startup-impact"),
         "startup-failure-evidence" => Some("startup-failure-evidence"),
         "startup-boot-markers" => Some("startup-boot-markers"),
+        "startup-status-enabled" => Some("startup-status-enabled"),
         "services-search-highlight" => Some("services-search-highlight"),
         "apps-search-highlight" => Some("apps-search-highlight"),
         "apps-group-expanded" => Some("apps-group-expanded"),
@@ -211,9 +212,11 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "sidebar-edit" => Some(Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => Some(Page::Services),
         "keyboard-help" => Some(Page::Settings),
-        "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
-            Some(Page::Startup)
-        }
+        "startup"
+        | "startup-impact"
+        | "startup-failure-evidence"
+        | "startup-boot-markers"
+        | "startup-status-enabled" => Some(Page::Startup),
         "system" | "system-dashboard" | "history-60m" | "system-hardware" | "system-npu"
         | "about" | "system-about" | "diagnostic-preview" | "diagnostic-failure" => {
             Some(Page::System)

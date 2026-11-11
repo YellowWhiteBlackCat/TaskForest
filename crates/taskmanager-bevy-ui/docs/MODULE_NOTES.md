@@ -172,7 +172,9 @@ Detail behind the README module map:
   (the three-phase proportion rows; the phases come from the shared
   contract's measured split, and an unmeasured phase renders as an
   unavailable row with no bar at all, never a zero-width one), `forensics.rs` (the pinned
-  failed-unit forensics panel with typed disclosure state), `inks.rs` (the
+  failed-unit forensics panel with typed disclosure state), `status_filter.rs`
+  (the shared shell-owned All/Enabled/Disabled filter bound to the sorted row
+  projection), `inks.rs` (the
   page's semantic ink painter — the sanctioned route when the window's text
   role observer owns the default ink).
 

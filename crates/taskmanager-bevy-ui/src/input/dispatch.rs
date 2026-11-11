@@ -18,7 +18,7 @@ use bevy::input::keyboard::{KeyCode, KeyboardInput};
 use bevy::input_focus::InputFocus;
 use taskmanager_application::{Modifiers, PlatformEffect};
 
-use taskmanager_shell::{InputDispatch, SearchSlot, ShellApp, ShellKeyEvent};
+use taskmanager_shell::{InputDispatch, SearchSlot, ShellApp, ShellKeyEvent, StartupStatusFilter};
 
 use crate::app::{
     FrontendTrack, Page, Route, action_for_page, modifier_state, request_route, route_key_press,
@@ -489,10 +489,14 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
             .as_ref()
             .and_then(|state| state.target.clone())
             .or_else(|| {
-                self.shell
-                    .sorted_startup_entries()
+                let filter = self
+                    .selections
+                    .startup_filter
+                    .as_ref()
+                    .map_or(StartupStatusFilter::All, |state| state.selected);
+                crate::pages::startup::startup_rows_for(self.shell, filter)
                     .first()
-                    .map(|e| e.id.clone())
+                    .map(|row| row.target.clone())
             });
         target.is_some_and(|t| {
             crate::pages::startup::menu::open_for(&mut self.modals.stu, self.shell, &t)

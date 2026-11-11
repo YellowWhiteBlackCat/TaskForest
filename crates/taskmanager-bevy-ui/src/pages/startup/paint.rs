@@ -27,6 +27,7 @@ struct PaintAccess<'w, 's> {
     track: NonSend<'w, FrontendTrack>,
     palette: Res<'w, WindowPalette>,
     selection: ResMut<'w, StartupSelection>,
+    filter: Res<'w, status_filter::StartupStatusFilterState>,
     forensics: Res<'w, forensics::StartupForensicsExpanded>,
     rendered: ResMut<'w, StartupRenderState>,
     state: ResMut<'w, PaintState>,
@@ -43,14 +44,17 @@ fn paint(mut access: PaintAccess) {
     };
     access.state.dirty = false;
     let shell = &access.track.shell;
-    let rows = startup_rows(shell);
+    let all_rows = startup_rows(shell);
     if let Some(target) = &access.selection.target
-        && !rows.iter().any(|row| &row.target == target)
+        && !all_rows.iter().any(|row| &row.target == target)
     {
         access.selection.target = None;
     }
+    let rows = status_filter::filter_startup_rows(all_rows, access.filter.selected);
     let scene = startup_body_scene(
         shell,
+        &rows,
+        access.filter.selected,
         &access.palette.inner,
         &access.selection,
         &access.forensics,

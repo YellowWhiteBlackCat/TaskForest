@@ -6,7 +6,7 @@
 //! boot-evidence line, the id-keyed selection survives re-sorts, and the
 //! wired `MinimalPlugins` page renders folded rows, repaints only on
 //! startup-domain folds, routes header clicks through the shell's sort entry
-//! and resolves clicked/moved rows ONLY through `sorted_startup_entry_at`.
+//! and keeps selection keyed by provider identity through row movement.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -56,7 +56,7 @@ use taskforest_core::core::startup::StartupFailedUnit;
 
 // ---- fixtures ----
 
-fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
+pub(super) fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
     StartupEntry {
         id: StartupEntryId::new(id),
         name: name.to_owned(),
@@ -107,7 +107,7 @@ impl CapabilityCatalog for FixedCapabilities {
 }
 
 #[derive(Default)]
-struct ScriptedEvents(Mutex<VecDeque<EventEnvelope<PlatformEvent>>>);
+pub(super) struct ScriptedEvents(Mutex<VecDeque<EventEnvelope<PlatformEvent>>>);
 
 impl EventPort for ScriptedEvents {
     type Event = PlatformEvent;
@@ -137,7 +137,7 @@ fn descriptor(id: CapabilityId, status: CapabilityStatus) -> CapabilityDescripto
     }
 }
 
-fn headless_startup_app() -> (App, Arc<ScriptedEvents>) {
+pub(super) fn headless_startup_app() -> (App, Arc<ScriptedEvents>) {
     let events = Arc::new(ScriptedEvents::default());
     let snapshot = CapabilitySnapshot::from_descriptors([descriptor(
         CapabilityId::STARTUP,
@@ -165,7 +165,7 @@ fn headless_startup_app() -> (App, Arc<ScriptedEvents>) {
     (app, events)
 }
 
-fn push_startup(events: &ScriptedEvents, entries: Vec<StartupEntry>) {
+pub(super) fn push_startup(events: &ScriptedEvents, entries: Vec<StartupEntry>) {
     events
         .0
         .lock()
@@ -187,7 +187,7 @@ fn push_startup(events: &ScriptedEvents, entries: Vec<StartupEntry>) {
 
 /// Route before the first update: the app mounts the Startup page on frame 1
 /// and never mounts the Processes default route (out of this page's scope).
-fn route_to_startup(app: &mut App) {
+pub(super) fn route_to_startup(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Startup;
     app.world_mut().commands().trigger(RouteChanged);
 }

@@ -9,13 +9,16 @@ use crate::demo_fixture::{
 };
 use crate::pages::performance::{PerformanceDeviceFocus, PerformanceFocus};
 use crate::pages::processes::card_lane::ProcessViewMode;
+use crate::pages::startup::status_filter::StartupStatusFilterState;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::window_surface::WindowSurfaceCommand;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
+use taskmanager_shell::StartupStatusFilter;
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
 use taskmanager_shell::fixture::smbios_memory::seed_shell_memory_inventory;
+use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 
 pub(super) fn is_production(demo: Option<Res<DemoMode>>) -> bool {
@@ -32,6 +35,7 @@ pub(super) struct CapturePresentationState<'w> {
     device_focus: ResMut<'w, PerformanceDeviceFocus>,
     curve_focus: ResMut<'w, PerformanceFocus>,
     process_view_mode: ResMut<'w, ProcessViewMode>,
+    startup_filter: ResMut<'w, StartupStatusFilterState>,
 }
 
 pub(super) fn initialize_capture_state(
@@ -48,6 +52,21 @@ pub(super) fn initialize_capture_state(
         seed_service_log_fixture(&mut shell);
     }
     seed_capture_confirmation_fixture(&mut shell);
+    if capture_scenario_target() == Some("startup-status-enabled") {
+        let mut entries: Vec<_> = shell
+            .sorted_startup_entries()
+            .into_iter()
+            .cloned()
+            .collect();
+        for (index, entry) in entries.iter_mut().enumerate() {
+            entry.enabled = index == 0;
+        }
+        seed_projection_fact(
+            &mut shell,
+            ProjectionSeedFact::StartupEntries(Some(entries)),
+        );
+        state.startup_filter.selected = StartupStatusFilter::Enabled;
+    }
     if let Some(target) = capture_perf_device_target(&shell) {
         if let Some(curve) = target.curve() {
             state.curve_focus.0 = curve;

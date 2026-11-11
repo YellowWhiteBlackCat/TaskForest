@@ -25,6 +25,7 @@ use crate::pages::processes::properties_modal::PropertiesCapture;
 use crate::pages::processes::{
     ProcessDetailsContainer, ProcessPageRoot, ProcessRowsRoot, ProcessScrollState,
 };
+use crate::pages::startup::{StartupRowMarker, status_filter::StartupStatusFilterState};
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
@@ -94,6 +95,8 @@ pub(super) struct CaptureAccess<'w, 's> {
         ),
     >,
     pub(super) process_roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
+    pub(super) startup_filter: Option<Res<'w, StartupStatusFilterState>>,
+    pub(super) startup_rows: Query<'w, 's, &'static StartupRowMarker>,
     pub(super) process_scroll: Option<Res<'w, ProcessScrollState>>,
     pub(super) card_mode: Option<Res<'w, ProcessViewMode>>,
     pub(super) card_flow:
@@ -526,6 +529,9 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             }) {
                 return;
             }
+        }
+        Some("startup-status-enabled") if !super::capture_marker_startup_filter::ready(&access) => {
+            return;
         }
         Some("keyboard-focus")
             if !crate::focus_visible::capture_ready(&mut access.focus, false) =>
