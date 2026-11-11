@@ -81,6 +81,7 @@ mod selectors;
 mod service_details;
 mod service_log;
 mod service_menu;
+pub(crate) mod services_state;
 mod settings;
 mod settings_types;
 mod sidebar;
@@ -107,6 +108,7 @@ pub use selectors::PerfDevice;
 // `crate::app::<Type>` paths stay valid through these re-exports.
 pub use alerts::AlertsMessage;
 pub use focus_targets::FocusTarget;
+pub use services_state::ServiceStatusFilter;
 // The first-run dialog and System dashboard segment vocabularies (the same
 // re-export shape `AlertsMessage` uses so the `Message` payload types stay
 // nameable at the crate boundary).
@@ -307,6 +309,8 @@ pub enum Message {
     /// The Services-page filter input changed (a frontend-local query that
     /// never touches the shared process query).
     ServicesSearchChanged(String),
+    /// One GPUI-parity Services status-filter segment was selected.
+    SelectServiceStatusFilter(ServiceStatusFilter),
     /// The Startup-page filter input changed (a frontend-local query over the
     /// canonical sorted Startup rows).
     StartupSearchChanged(String),
@@ -645,6 +649,9 @@ pub struct IcedApp {
     /// Iced-local Startup search state; canonical startup inventory stays in
     /// the shared shell projection.
     pub(crate) startup_presentation: StartupPresentationState,
+    /// Iced-local Services status filter; canonical service facts and order
+    /// stay in the shared shell projection.
+    pub(crate) services_status_filter: ServiceStatusFilter,
     /// Named client of the app-host's process-wide diagnostic writer.
     service_log_export: service_log::IcedServiceLogExportRuntime,
     diagnostics: diagnostics::IcedDiagnosticRuntime,

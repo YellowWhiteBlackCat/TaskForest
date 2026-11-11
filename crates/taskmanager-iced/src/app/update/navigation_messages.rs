@@ -64,6 +64,9 @@ impl IcedApp {
             Message::ServicesSearchChanged(query) => {
                 self.shell.set_services_query(query);
             }
+            Message::SelectServiceStatusFilter(filter) => {
+                self.set_services_status_filter(filter);
+            }
             Message::StartupSearchChanged(query) => self.set_startup_query(query),
             Message::SelectDetailsSection(section) => {
                 self.process_presentation.details_section = section;

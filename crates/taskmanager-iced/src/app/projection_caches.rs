@@ -14,6 +14,7 @@ use taskmanager_application::system_timeline::TimelineMetric;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::trend::TrendSeries;
 
+use crate::app::services_state::ServiceStatusFilter;
 use crate::perf_history::{
     ProcessPerfHistory, ProcessPerfHistoryCache, ProcessPerfHistorySnapshot,
 };
@@ -82,6 +83,23 @@ fn project_inventory<T, M>(
 where
     M: Fn(&T, &str) -> bool,
 {
+    project_inventory_with_key(cache, fingerprint, query, (), build, |row, lower, _| {
+        matches(row, lower)
+    })
+}
+
+fn project_inventory_with_key<T, K, M>(
+    cache: &RefCell<InventoryProjection<T, K>>,
+    fingerprint: InventoryDataFingerprint,
+    query: &str,
+    key: K,
+    build: impl FnOnce() -> Vec<T>,
+    matches: M,
+) -> (Rc<Vec<T>>, Rc<Vec<usize>>, u64)
+where
+    K: Clone + PartialEq,
+    M: Fn(&T, &str, &K) -> bool,
+{
     let rebuild = !cache.borrow().matches_data(fingerprint);
     if rebuild {
         // The renderer builder may re-enter another projection path. Never
@@ -89,9 +107,9 @@ where
         let rows = build();
         cache
             .borrow_mut()
-            .replace_rows_and_project(fingerprint, query, rows, matches)
+            .replace_rows_and_project(fingerprint, query, key, rows, matches)
     } else {
-        cache.borrow_mut().project_query(query, matches)
+        cache.borrow_mut().project_query(query, key, matches)
     }
 }
 
@@ -111,7 +129,7 @@ pub(super) struct IcedProjectionCaches {
     dual_device: RefCell<HashMap<DualSeriesKey, DualSeriesEntry>>,
     processes: RefCell<ProcessProjectionMemo>,
     app_history: RefCell<Option<AppHistoryEntry>>,
-    services: RefCell<InventoryProjection<crate::ui::tables::ServiceRow>>,
+    services: RefCell<InventoryProjection<crate::ui::tables::ServiceRow, ServiceStatusFilter>>,
     startup: RefCell<InventoryProjection<crate::ui::startup_table::StartupRow>>,
     users: RefCell<InventoryProjection<crate::ui::users::UserRow>>,
     performance_rail: RefCell<Option<RailProjectionEntry>>,
@@ -255,14 +273,16 @@ impl IcedProjectionCaches {
         &self,
         fingerprint: InventoryDataFingerprint,
         query: &str,
+        status_filter: ServiceStatusFilter,
         build: impl FnOnce() -> Vec<crate::ui::tables::ServiceRow>,
     ) -> (Rc<Vec<crate::ui::tables::ServiceRow>>, Rc<Vec<usize>>, u64) {
-        project_inventory(
+        project_inventory_with_key(
             &self.services,
             fingerprint,
             query,
+            status_filter,
             build,
-            crate::ui::tables::service_matches_lower,
+            |row, lower, status_filter| status_filter.matches_row(row, lower),
         )
     }
 

@@ -66,6 +66,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessColumnsReset => "iced-process-columns-reset".to_owned(),
         FocusTarget::ProcessColumnsClose => "iced-process-columns-close".to_owned(),
         FocusTarget::ServicesSearch => "iced-services-search".to_owned(),
+        FocusTarget::ServiceStatusFilterSegment => "iced-services-status-filter".to_owned(),
         FocusTarget::StartupSearch => "iced-startup-search".to_owned(),
         FocusTarget::SourceRetry(request) => {
             format!("iced-source-retry-{}", refresh_request_key(request))

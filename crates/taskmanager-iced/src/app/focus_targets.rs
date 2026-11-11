@@ -65,6 +65,8 @@ pub enum FocusTarget {
     ProcessActionsTrigger,
     /// The Services-page filter input.
     ServicesSearch,
+    /// The Services-page connected status-filter segment group.
+    ServiceStatusFilterSegment,
     /// The Startup-page filter input.
     StartupSearch,
     /// A page-scoped retry action for a degraded inventory source.
@@ -334,7 +336,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 206] = [
+    pub const ALL: [Self; 207] = [
         Self::ModalClose,
         Self::ToastDismiss,
         Self::DiagnosticConfirm,
@@ -363,6 +365,7 @@ impl FocusTarget {
         Self::ProcessColumnsReset,
         Self::ProcessColumnsClose,
         Self::ServicesSearch,
+        Self::ServiceStatusFilterSegment,
         Self::StartupSearch,
         Self::SourceRetry(RefreshRequest::Services),
         Self::SourceRetry(RefreshRequest::Startup),

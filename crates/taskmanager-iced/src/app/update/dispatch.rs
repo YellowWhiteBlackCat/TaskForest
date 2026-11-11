@@ -93,6 +93,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::FocusSearch
         | Message::CloseSearch
         | Message::ServicesSearchChanged(_)
+        | Message::SelectServiceStatusFilter(_)
         | Message::StartupSearchChanged(_)
         | Message::SelectDetailsSection(_)
         | Message::SelectInsightsFacet(_)

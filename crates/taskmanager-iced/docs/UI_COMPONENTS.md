@@ -27,7 +27,10 @@ native selection and renderer caches; all shared types use their defining module
   wrappers inspect descendant focus state and the keyboard-visible modality
   so focusable hints open without requiring pointer hover;
   `src/ui/components/inputs.rs` adds switch/slider/select/search/segmented
-  controls that route keyboard access through the focus shell. Startup search
+  controls that route keyboard access through the focus shell. Services search
+  combines a page-local name/description query with the GPUI-parity
+  All/Active/Inactive/Failed status segmented filter; both narrow visible
+  indices while canonical rows retain provider identity. Startup search
   filters its canonical sorted rows in the Iced page adapter; the shared
   Startup projection remains complete for other consumers.
 - `controls/strip.rs` owns the bounded horizontal action strip: all action

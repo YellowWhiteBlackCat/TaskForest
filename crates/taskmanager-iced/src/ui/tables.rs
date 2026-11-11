@@ -7,7 +7,6 @@ use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual
 // Startup column headers, action labels, confirm/cancel) that was previously
 // hard-coded English.
 use std::rc::Rc;
-use taskforest_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
 use taskforest_core::core::services::{ServiceAction, ServiceStatus};
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
@@ -21,17 +20,18 @@ pub(super) use super::components::{
 };
 use super::virtual_list::{ColumnWidth, TableColumn, resolve_table_window};
 use super::{VIRTUAL_TABLE_HEADER_HEIGHT, virtual_table_key};
+use crate::app::services_state::ServiceStatusFilter;
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
-use taskforest_core::core::process::ProcessBatchIntent;
 use taskmanager_shell::presentation::MISSING_VALUE;
-use taskmanager_shell::presentation::process_batch_action_label;
 use taskmanager_shell::service_cycle_members;
 use taskmanager_theme::Theme;
 
 mod headings;
 pub(super) use headings::service_heading;
+mod confirm_bars;
+pub(super) use confirm_bars::{confirm_bar, confirm_batch_bar};
 
 /// A clickable column-header cell for the shared inventory tables (Services /
 /// Startup / Users). The active column shows the ▲/▼ direction marker; clicking
@@ -129,7 +129,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
     let theme_snapshot = app.theme();
     let query = app.services_query();
     let (rows, filtered_indices, projection_generation) = app.services_projection(query);
-    let row_count = rows.len();
+    let row_count = filtered_indices.len();
     let list_state = service_list_state(shell);
     // A compact density preference and a compact viewport share the same
     // bounded row geometry. The latter must also drive action wrapping or a
@@ -153,6 +153,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
             // route to the shell's shared per-table sort slot. Widths come
             // from the typed column specs the body cells also read.
             let columns = services_columns(compact);
+            let status_filter = app.services_status_filter;
             let mut header_cells: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = vec![
                 info_header_cell(
                     theme_snapshot,
@@ -202,6 +203,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
             let query_text = query.to_owned();
             let table_theme = *theme_snapshot;
             let selected = shell.selected;
+            let status_filter_key = status_filter.key();
             // The open Services-row menu re-hosts its row; its source index is
             // both the lazy-invalidation marker and the mount condition.
             let open_menu_service = app.service_menu_index();
@@ -211,6 +213,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                 table: InfoTable::Services,
                 sort: shell.services_sort,
                 query: &query_text,
+                status_filter: Some(status_filter_key),
                 search_active: !query_text.trim().is_empty(),
                 selected,
                 row_count: filtered_indices.len(),
@@ -413,10 +416,28 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
     ))
     .width(Length::Fixed(280.0))
     .into();
+    let choices: Vec<(String, usize)> = ServiceStatusFilter::ALL
+        .into_iter()
+        .map(|filter| (filter.label().to_owned(), filter.index()))
+        .collect();
+    let service_filter = row![
+        container(crate::ui::components::segmented(
+            theme_snapshot,
+            FocusTarget::ServiceStatusFilterSegment,
+            &choices,
+            app.services_status_filter.index(),
+            crate::app::services_state::service_filter_message,
+        ))
+        .height(Length::Fixed(VIRTUAL_TABLE_HEADER_HEIGHT))
+        .center_y(Length::Fixed(VIRTUAL_TABLE_HEADER_HEIGHT)),
+        search,
+    ]
+    .spacing(8)
+    .width(Length::Fill);
 
     column![
         text(heading).size(f32::from(tokens::FONT_16)),
-        search,
+        service_filter,
         body,
         control_bar,
     ]
@@ -540,8 +561,8 @@ pub(crate) struct ServiceRow {
     /// resolves the target against `shell.projection().services` — sorting or
     /// filtering the view must never reinterpret who gets Stop/Restart.
     pub(super) source_index: usize,
-    pub(super) name: String,
-    pub(super) status: ServiceStatus,
+    pub(crate) name: String,
+    pub(crate) status: ServiceStatus,
     pub(super) description: String,
     pub(super) cycle: bool,
 }
@@ -581,6 +602,8 @@ pub(super) struct InventoryTableKey<'a> {
     pub(super) table: InfoTable,
     pub(super) sort: Option<(InfoSortCol, SortDir)>,
     pub(super) query: &'a str,
+    /// Services-only typed status key; other inventories use `None`.
+    pub(super) status_filter: Option<&'static str>,
     pub(super) search_active: bool,
     pub(super) selected: usize,
     pub(super) row_count: usize,
@@ -607,6 +630,7 @@ pub(super) fn inventory_table_key(input: InventoryTableKey<'_>) -> u64 {
                 .map(|(column, direction)| (column.label(), direction.label())),
         )
         .field(input.query)
+        .field(input.status_filter)
         .field(input.search_active)
         .field(input.selected)
         .field(input.row_count)
@@ -654,89 +678,14 @@ pub(super) fn service_description(description: &str) -> &str {
     }
 }
 
-/// Confirm the pending process termination through the shared shell intent.
-pub(super) fn confirm_bar<'a>(
-    theme_snapshot: &'a Theme,
-    target: &FrozenProcessIdentity,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    row![
-        text(format!("End {} ({})?", target.name, target.pid)),
-        focus::button(
-            theme_snapshot,
-            FocusTarget::ConfirmEndTask,
-            t("common.confirm"),
-            Message::ConfirmEndTask,
-            true,
-        ),
-        focus::button(
-            theme_snapshot,
-            FocusTarget::CancelEndTask,
-            t("common.cancel"),
-            Message::DismissOverlay,
-            false,
-        ),
-    ]
-    .spacing(8)
-    .padding(4)
-    .into()
-}
-
-/// The destructive batch (Kill) confirmation bar — mirrors [`confirm_bar`] but
-/// confirms the pending batch intent (`ShellApp::pending_batch`). The target is
-/// the intent's single frozen identity (single-select today); if the target
-/// vanished before confirmation, only the cancel affordance renders.
-pub(super) fn confirm_batch_bar<'a>(
-    theme_snapshot: &'a Theme,
-    intent: &ProcessBatchIntent,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let confirm = focus::button(
-        theme_snapshot,
-        FocusTarget::ConfirmProcessBatch,
-        t("common.confirm"),
-        Message::ConfirmProcessBatch,
-        true,
-    );
-    let cancel = focus::button(
-        theme_snapshot,
-        FocusTarget::CancelEndTask,
-        t("common.cancel"),
-        Message::DismissOverlay,
-        false,
-    );
-    let action_label = process_batch_action_label(intent.action);
-    // Surface the full target scope so a multi-target destructive action reads
-    // as a frozen identity set rather than the single first row (mirrors the
-    // GPUI confirmation scope).
-    let prompt: String = match intent.targets.len() {
-        0 => action_label.to_string(),
-        1 => {
-            let target = &intent.targets[0];
-            format!("{action_label} {} ({})?", target.name, target.pid)
-        }
-        count => {
-            let target = if intent.action == ProcessBatchAction::EndProcessTree {
-                &intent.targets[count - 1]
-            } else {
-                &intent.targets[0]
-            };
-            format!(
-                "{action_label} {} ({}) +{} more?",
-                target.name,
-                target.pid,
-                count - 1
-            )
-        }
-    };
-    if intent.targets.is_empty() {
-        row![cancel].spacing(8).padding(4).into()
-    } else {
-        row![text(prompt), confirm, cancel]
-            .spacing(8)
-            .padding(4)
-            .into()
-    }
-}
-
 #[cfg(test)]
 #[path = "../../tests/gui/ui/tables_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/services_status_layout_tests.rs"]
+mod status_layout_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/services_status_interaction_tests.rs"]
+mod status_interaction_tests;

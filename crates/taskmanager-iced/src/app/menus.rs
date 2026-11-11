@@ -168,6 +168,7 @@ impl IcedApp {
             Message::SelectProcessStatusFilter(filter) => {
                 Some(FocusTarget::ProcessStatusFilterTab(*filter))
             }
+            Message::SelectServiceStatusFilter(_) => Some(FocusTarget::ServiceStatusFilterSegment),
             Message::OpenProcessRowMenu { .. } => Some(FocusTarget::ProcessMenuEndTask),
             Message::OpenProcessAffinity => Some(FocusTarget::ProcessAffinityCpu(0)),
             Message::OpenProcessColumnsMenu => Some(FocusTarget::ProcessColumnToggle(SortCol::Pid)),

@@ -32,19 +32,21 @@ pub(crate) struct InventoryDataFingerprint {
 /// change scans the owned facts but does not clone or re-sort them. The
 /// renderer then uses the same indices for selection and widget rows.
 #[derive(Clone)]
-pub(crate) struct InventoryProjection<T> {
+pub(crate) struct InventoryProjection<T, K = ()> {
     data_fingerprint: Option<InventoryDataFingerprint>,
     query: String,
+    key: K,
     rows: Rc<Vec<T>>,
     visible_indices: Rc<Vec<usize>>,
     generation: u64,
 }
 
-impl<T> Default for InventoryProjection<T> {
+impl<T, K: Default> Default for InventoryProjection<T, K> {
     fn default() -> Self {
         Self {
             data_fingerprint: None,
             query: String::new(),
+            key: K::default(),
             rows: Rc::new(Vec::new()),
             visible_indices: Rc::new(Vec::new()),
             generation: 0,
@@ -52,7 +54,7 @@ impl<T> Default for InventoryProjection<T> {
     }
 }
 
-impl<T> InventoryProjection<T> {
+impl<T, K: Clone + PartialEq> InventoryProjection<T, K> {
     pub(crate) fn matches_data(&self, data_fingerprint: InventoryDataFingerprint) -> bool {
         self.data_fingerprint == Some(data_fingerprint)
     }
@@ -61,45 +63,54 @@ impl<T> InventoryProjection<T> {
         &mut self,
         data_fingerprint: InventoryDataFingerprint,
         query: &str,
+        key: K,
         rows: Vec<T>,
         matches: M,
     ) -> (Rc<Vec<T>>, Rc<Vec<usize>>, u64)
     where
-        M: Fn(&T, &str) -> bool,
+        M: Fn(&T, &str, &K) -> bool,
     {
         self.rows = Rc::new(rows);
-        self.visible_indices = Rc::new((0..self.rows.len()).collect());
         self.data_fingerprint = Some(data_fingerprint);
-        self.query.clear();
         self.generation = self.generation.wrapping_add(1);
-        self.project_query(query, matches)
+        self.query.clear();
+        self.project_query(query, key, matches)
     }
 
     pub(crate) fn project_query<M>(
         &mut self,
         query: &str,
+        key: K,
         matches: M,
     ) -> (Rc<Vec<T>>, Rc<Vec<usize>>, u64)
     where
-        M: Fn(&T, &str) -> bool,
+        M: Fn(&T, &str, &K) -> bool,
     {
         let query = query.trim().to_lowercase();
-        if self.query != query {
-            self.visible_indices = Rc::new(
-                self.rows
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, row)| matches(row, &query).then_some(index))
-                    .collect(),
-            );
-            self.query = query;
-            self.generation = self.generation.wrapping_add(1);
+        if self.visible_indices.is_empty() || self.query != query || self.key != key {
+            self.reproject(&query, key, matches);
         }
         (
             Rc::clone(&self.rows),
             Rc::clone(&self.visible_indices),
             self.generation,
         )
+    }
+
+    fn reproject<M>(&mut self, query: &str, key: K, matches: M)
+    where
+        M: Fn(&T, &str, &K) -> bool,
+    {
+        self.visible_indices = Rc::new(
+            self.rows
+                .iter()
+                .enumerate()
+                .filter_map(|(index, row)| matches(row, query, &key).then_some(index))
+                .collect(),
+        );
+        self.query = query.to_owned();
+        self.key = key;
+        self.generation = self.generation.wrapping_add(1);
     }
 }
 
@@ -303,14 +314,16 @@ impl IcedApp {
         query: &str,
     ) -> (Rc<Vec<crate::ui::tables::ServiceRow>>, Rc<Vec<usize>>, u64) {
         let shell = &self.shell;
+        let status_filter = self.services_status_filter;
         let fingerprint = InventoryDataFingerprint {
             watermark: shell.projection().services_revision,
             source_len: shell.projection().services.as_ref().map_or(0, Vec::len),
             sort: shell.services_sort,
         };
-        self.projection_caches.services(fingerprint, query, || {
-            crate::ui::tables::service_rows(shell)
-        })
+        self.projection_caches
+            .services(fingerprint, query, status_filter, || {
+                crate::ui::tables::service_rows(shell)
+            })
     }
 
     /// Memoized canonical Startup rows and their page-local query projection.

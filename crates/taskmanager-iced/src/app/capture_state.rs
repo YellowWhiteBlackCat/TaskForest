@@ -452,6 +452,9 @@ fn apply_capture_hardware_and_perf(app: &mut IcedApp, target: &str) -> bool {
     } else if target == "services-search-highlight" {
         app.shell.application.active_page = AppPage::Services;
         let _ = app.update(Message::ServicesSearchChanged("Network".into()));
+        let _ = app.update(Message::SelectServiceStatusFilter(
+            super::services_state::ServiceStatusFilter::Active,
+        ));
     } else if target == "service-details-logs" {
         app.shell.application.active_page = AppPage::Services;
         seed_service_log_fixture(&mut app.shell);

@@ -146,6 +146,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                 table: InfoTable::Startup,
                 sort: shell.startup_sort,
                 query,
+                status_filter: None,
                 search_active,
                 selected,
                 row_count,
