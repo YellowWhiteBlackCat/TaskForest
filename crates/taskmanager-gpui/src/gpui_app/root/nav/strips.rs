@@ -7,8 +7,7 @@ use gpui::{
     Context, Div, InteractiveElement, ParentElement, StatefulInteractiveElement, Styled, div,
     prelude::FluentBuilder, px,
 };
-use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_theme::{GlassSurfaceRole, Length, Theme, tokens};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::hsla;
@@ -17,7 +16,20 @@ use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
-/// The page-navigation strip: a floating rounded row or column of page tabs.
+#[cfg(test)]
+#[path = "../../../../tests/gui/gpui_app/root/navigation_surface_tests.rs"]
+mod navigation_surface_tests;
+
+/// The one persistent navigation material. Chrome is inset in the window, so
+/// the role retains the shared Sidebar-tier glass without a floating shadow.
+fn navigation_surface(theme: &Theme, padding: Length) -> CardSurface {
+    CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::Chrome)
+        .radius(tokens::card_radius(theme))
+        .bordered(true)
+        .padding(padding)
+}
+
+/// The page-navigation strip: an inset rounded row or column of page tabs.
 pub fn nav_strip(
     t: &Theme,
     active: TopPage,
@@ -173,9 +185,7 @@ pub fn nav_strip_horizontal(
         .pt(definite_length(tokens::SPACE_6))
         .pb(definite_length(tokens::SPACE_4))
         .child(
-            CardSurface::unpadded(t.palette())
-                .glass(GlassTier::Sidebar)
-                .radius(tokens::card_radius(t))
+            navigation_surface(t, Length(0.0))
                 .render()
                 .debug_selector(|| "tm-navigation-strip".to_string())
                 .h(px(crate::gpui_app::chrome::titlebar_height(t) + 4.0))
@@ -347,10 +357,7 @@ pub fn nav_strip_vertical(
         .pl(definite_length(tokens::SPACE_8))
         .pr(definite_length(tokens::SPACE_4))
         .child(
-            CardSurface::new(t.palette())
-                .glass(GlassTier::Sidebar)
-                .radius(tokens::card_radius(t))
-                .padding(tokens::SPACE_6)
+            navigation_surface(t, tokens::SPACE_6)
                 .render()
                 .debug_selector(|| "tm-navigation-rail".to_string())
                 .h_full()
