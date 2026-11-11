@@ -88,7 +88,7 @@
 - `[F]` TUI 的 `FocusVisible` 为 `Divergent`：cursor row 是唯一焦点指示，没有 pointer/keyboard modality ring（`crates/taskmanager-tui/src/capabilities.rs`）。
 - `[V]` TUI 的 vertical nav 是 header-line 模式，不是带图标的垂直导轨（`crates/taskmanager-tui/src/ui/header.rs:44`）。
 - `[E]` TUI 的 sidebar edit 是模态编辑器，不是内联列编辑（`crates/taskmanager-tui/src/ui/sidebar_editor.rs`）。
-- `[O]` TUI 使用 `footer.activity-line`，Bevy 使用 `root.feedback-line`；Iced 的 `TransientFeedback` owner 决策改为 `Local { route: "root.toast" }`，其非模态 Card-glass Toast 与 GPUI 的场景语义对齐。footer activity line 仍是同一 shell 事实的并行 readout，不再是 semantic replacement；四端声明仍是唯一权威。
+- `[O]` TUI 使用 `footer.activity-line`；Bevy 在无 footer 的 Performance 路由以 shell notice 投影非模态玻璃 Toast，其他路由保留 activity footer 且不挂第二张卡；Iced 的 `TransientFeedback` owner 决策为 `Local { route: "root.toast" }`，其非模态 Card-glass Toast 与 GPUI 的场景语义对齐。Bevy 的其余路由差异仍保留为存异。
 - `[D]` `DiagnosticBundle` 为 `AcceptedDifference`：Iced 提供 clipboard report，TUI 提供 plain-text report，GPUI 提供 preview/write bundle（四端 `src/functional.rs`）。
 
 ## 组件与意图级存异

@@ -72,8 +72,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
             route: "performance.gpu.metric-selector",
         },
         ProductIntent::TransientFeedback => SurfaceDecision::AcceptedDifference {
-            route: "root.feedback-line",
-            reason: "transient feedback renders through the Bevy shell feedback line instead of a floating toast",
+            route: "root.feedback-overlay",
+            reason: "the floating shell notice mounts on Performance; other routed pages retain their footer activity surface without a second overlay",
         },
     }
 }

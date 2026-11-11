@@ -28,7 +28,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use bevy::DefaultPlugins;
-use bevy::app::{App, AppExit, Plugin, PluginGroup, PostUpdate, PreUpdate, Startup};
+use bevy::app::{App, AppExit, Plugin, PluginGroup, PostStartup, PostUpdate, PreUpdate, Startup};
 use bevy::asset::{Assets, Handle};
 use bevy::camera::ClearColor;
 use bevy::ecs::change_detection::DetectChanges;
@@ -38,7 +38,7 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::{Changed, Has, Or, With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut};
 use bevy::image::Image;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::CommandsSceneExt;
@@ -64,6 +64,7 @@ mod capture_marker_optical;
 mod capture_marker_zero_gray;
 mod capture_state;
 mod frame_capture;
+pub(crate) mod overlay_root;
 use backdrop_capture::{drive_backdrop_capture, sync_backdrop_capture};
 use capture_marker::emit_capture_marker;
 use capture_state::{initialize_capture_state, is_demo, is_production};
@@ -87,6 +88,7 @@ use crate::pages::settings::ThemePreferences;
 use crate::pages::system::diagnostic_modal::DiagnosticRuntime;
 use crate::palette::{self, UiPalette};
 use crate::runtime::SharedRuntime;
+use crate::scene_attach::attach_child;
 use crate::widgets::chart::ChartPointer;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::widgets::layout_budget::{
@@ -98,7 +100,6 @@ use taskmanager_application::DiagnosticBundleSession;
 use taskmanager_application::i18n::t;
 use taskmanager_application::snapshot_export::SnapshotExportSession;
 use taskmanager_assets::embedded_fonts;
-use taskmanager_shell::FeedbackTone;
 use taskmanager_shell::ShellApp;
 
 /// The resolved token palette, injected as a resource for spawn systems.
@@ -154,10 +155,12 @@ pub(crate) enum Role {
 #[derive(Component, Clone, Default)]
 pub(crate) struct SummaryLine;
 
-/// Marker for the status/feedback caption under the capability summary. The
-/// drain's [`crate::drain::FeedbackChanged`] observer rewrites it from the
-/// shell's typed feedback lifecycle (control outcomes, notices).
+/// Marker for the persistent shell activity caption under the summary.
 #[derive(Component, Clone, Default)]
+pub(crate) struct FeedbackActivityLine;
+
+/// Marker on the feedback message carried by the transient toast card.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FeedbackLine;
 
 /// Marker on the window shell's root node — the mount point the confirmation
@@ -427,6 +430,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.init_resource::<PlaceholderFonts>();
         app.init_resource::<crate::drain::FeedbackCache>();
+        app.init_resource::<crate::drain::FeedbackActivityCache>();
         backdrop_capture::register(app);
         crate::window_surface::register(app);
         crate::saved_views::register(app);
@@ -458,7 +462,8 @@ impl Plugin for FrontendWindowPlugin {
         );
         crate::pages::history::scene::register(app);
         app.add_observer(rewrite_summary_line);
-        app.add_observer(rewrite_feedback_line);
+        app.add_observer(rewrite_feedback_activity_line);
+        crate::feedback_overlay::register(app);
         app.add_observer(style_text_role);
         // Accessibility resource plumbing: the winit AccessKit bridge (the
         // `accesskit_unix` feature) publishes `AccessibilityNode` components
@@ -499,6 +504,7 @@ impl Plugin for FrontendWindowPlugin {
         );
         app.add_systems(PreUpdate, drain::drain_system.run_if(is_production));
         app.add_systems(PreUpdate, drain::drain_demo_effects.run_if(is_demo));
+        app.add_systems(PostStartup, drain::sync_feedback_activity_after_mount);
         app.add_systems(
             PostUpdate,
             reset_demo_chart_pointer
@@ -686,40 +692,14 @@ fn rewrite_summary_line(
     }
 }
 
-/// Observer: rewrite the feedback line when the shell's status copy changed.
-/// Empty feedback keeps the line blank — never a fabricated status.
-fn rewrite_feedback_line(
-    feedback: On<crate::drain::FeedbackChanged>,
-    palette: Res<WindowPalette>,
-    mut lines: Query<(
-        &mut Text,
-        &mut TextColor,
-        Option<&FeedbackLine>,
-        Option<&SummaryLine>,
-    )>,
+/// Observer: rewrite the background activity caption only when the shell
+/// publishes an activity change.
+fn rewrite_feedback_activity_line(
+    activity: On<crate::drain::FeedbackActivityChanged>,
+    mut lines: Query<&mut Text, With<FeedbackActivityLine>>,
 ) {
-    let summary = lines
-        .iter()
-        .find_map(|(line, _, _, marker)| marker.map(|_| line.0.clone()));
-    let color = match feedback.event().tone {
-        Some(FeedbackTone::Neutral) | None => palette.inner.body_color,
-        Some(FeedbackTone::Positive) => palette.inner.success_color,
-        Some(FeedbackTone::Caution) => palette.inner.warning_color,
-        Some(FeedbackTone::Danger) => palette.inner.danger_color,
-    };
-    for (mut line, mut ink, feedback_marker, _) in &mut lines {
-        if feedback_marker.is_some() {
-            // The demo shell seeds its informational feedback with the same
-            // text used by the summary line. Keep one visual owner instead of
-            // painting the sentence twice in the standard (non-Performance)
-            // shell.
-            line.0 = if summary.as_deref() == Some(feedback.event().text.as_str()) {
-                String::new()
-            } else {
-                feedback.event().text.clone()
-            };
-            ink.0 = color;
-        }
+    if let Ok(mut line) = lines.single_mut() {
+        line.0 = activity.event().0.clone();
     }
 }
 
@@ -736,6 +716,7 @@ fn spawn_app_shell(
     palette: Res<WindowPalette>,
     route: Res<Route>,
     demo: Option<Res<DemoMode>>,
+    track: NonSend<crate::app::FrontendTrack>,
     windows: Query<&Window, With<PrimaryWindow>>,
     images: Option<ResMut<Assets<Image>>>,
     mut commands: Commands,
@@ -752,13 +733,20 @@ fn spawn_app_shell(
         .iter()
         .next()
         .is_some_and(|window| window.decorations);
-    commands.spawn_scene(app_shell_scene(
-        &palette.inner,
-        route.page,
-        demo_notice,
-        summary,
-        !decorated,
-    ));
+    let shell = commands
+        .spawn_scene(app_shell_scene(
+            &palette.inner,
+            route.page,
+            demo_notice,
+            summary,
+            track.shell.feedback_activity().to_owned(),
+            !decorated,
+        ))
+        .id();
+    let overlay_root = commands
+        .spawn_scene(overlay_root::overlay_root_scene())
+        .id();
+    attach_child(&mut commands, shell, overlay_root);
 }
 
 #[cfg(test)]

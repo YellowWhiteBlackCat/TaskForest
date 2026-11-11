@@ -21,7 +21,7 @@ use taskmanager_application::{
 use taskmanager_shell::{ShellApp, fixture};
 
 use crate::app::{FrontendTrack, PageContext, SharedRuntimeHandle};
-use crate::drain::{FeedbackCache, drain_system};
+use crate::drain::{FeedbackActivityCache, FeedbackCache, drain_system};
 use crate::input::PendingEffects;
 use crate::palette::{UiPalette, ui_palette};
 use crate::runtime::SharedRuntime;
@@ -120,6 +120,7 @@ fn app_with_process_requests(
     app.add_plugins(MinimalPlugins);
     app.init_resource::<PendingEffects>();
     app.init_resource::<FeedbackCache>();
+    app.init_resource::<FeedbackActivityCache>();
     app.insert_resource(SharedRuntimeHandle { shared });
     app.insert_non_send(FrontendTrack {
         shell,
@@ -163,6 +164,7 @@ fn app_with_mounted_details(
     app.init_resource::<Assets<Font>>();
     app.init_resource::<PendingEffects>();
     app.init_resource::<FeedbackCache>();
+    app.init_resource::<FeedbackActivityCache>();
     app.insert_resource(SharedRuntimeHandle { shared });
     app.insert_resource(WindowPalette { inner: palette });
     app.insert_non_send(FrontendTrack {

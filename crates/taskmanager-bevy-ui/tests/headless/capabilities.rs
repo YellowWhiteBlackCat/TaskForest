@@ -260,7 +260,7 @@ fn capability_declaration_is_complete_and_pinned() {
         (DropdownMenu, Kind::Native),
         // Hover- or keyboard-focus-opened explanation tooltip overlay.
         (Tooltip, Kind::Ported),
-        (Toast, Kind::Divergent),
+        (Toast, Kind::Ported),
         (TextInput, Kind::Native),
         (SearchInput, Kind::Ported),
         // Read-only native text input selection plus table cell selection.

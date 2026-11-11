@@ -106,6 +106,7 @@ impl Plugin for InputPlugin {
         app.init_resource::<PendingEffects>()
             .init_resource::<QuitForwarded>()
             .init_resource::<crate::drain::FeedbackCache>()
+            .init_resource::<crate::drain::FeedbackActivityCache>()
             .init_resource::<crate::pages::services::log_panel::ServiceLogExportDir>()
             .init_resource::<TextInputState>()
             .init_resource::<bevy::input_focus::InputFocus>();

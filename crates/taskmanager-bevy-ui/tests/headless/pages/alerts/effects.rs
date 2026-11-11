@@ -19,7 +19,7 @@ use taskmanager_application::{
 use taskmanager_shell::{ShellApp, fixture};
 
 use crate::app::{FrontendTrack, SharedRuntimeHandle};
-use crate::drain::{FeedbackCache, drain_system};
+use crate::drain::{FeedbackActivityCache, FeedbackCache, drain_system};
 use crate::input::PendingEffects;
 use crate::runtime::SharedRuntime;
 
@@ -69,6 +69,7 @@ fn app_with_notifications(shell: ShellApp, notifications: Arc<Notifications>) ->
     app.add_plugins(MinimalPlugins);
     app.init_resource::<PendingEffects>();
     app.init_resource::<FeedbackCache>();
+    app.init_resource::<FeedbackActivityCache>();
     app.insert_resource(SharedRuntimeHandle { shared });
     app.insert_non_send(FrontendTrack {
         shell,

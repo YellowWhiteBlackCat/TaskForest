@@ -1,5 +1,5 @@
 //! One bounded workspace separates navigation width from page and feedback slots.
-use super::{AppShellRoot, FeedbackLine, Role, SummaryLine, TextRole};
+use super::{AppShellRoot, FeedbackActivityLine, Role, SummaryLine, TextRole};
 use crate::app::nav_strip::demo_notice_scene;
 use crate::app::nav_strip::nav_strip_scene;
 use crate::app::{ContentSlot, Page};
@@ -18,6 +18,7 @@ pub(super) fn app_shell_scene(
     route: Page,
     demo_notice: Option<String>,
     summary: String,
+    activity: String,
     edge_highlight: bool,
 ) -> Box<dyn Scene> {
     let strip = nav_strip_scene(route, palette);
@@ -27,7 +28,7 @@ pub(super) fn app_shell_scene(
     } else {
         vec![Box::new(
             bsn! {Node {width:percent(100),flex_direction:FlexDirection::Column,flex_shrink:0.0,padding:UiRect::horizontal(px(space_12()))}
-            Children [Text(summary) SummaryLine TextRole(Role::Caption) -- Text("") FeedbackLine TextRole(Role::Caption)]},
+            Children [Text(summary) SummaryLine TextRole(Role::Caption) -- Text(activity) FeedbackActivityLine TextRole(Role::Caption)]},
         )]
     };
     // The focus ring's outer halo: one overlay for the whole window, moved

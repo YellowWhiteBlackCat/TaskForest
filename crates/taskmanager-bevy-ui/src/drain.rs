@@ -21,11 +21,11 @@ use taskforest_core::core::time::unix_millis;
 use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
-use taskmanager_shell::FeedbackTone;
+use taskmanager_shell::{FeedbackPresentation, FeedbackSource, FeedbackTone};
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
+use bevy::ecs::system::{Commands, NonSend, NonSendMut, Res, ResMut, SystemParam};
 use taskforest_contract::CapabilitySnapshot;
 use taskmanager_application::{PlatformClient, PlatformEffect, RefreshRequest};
 
@@ -65,19 +65,79 @@ pub(crate) struct CapabilitySummaryChanged(pub(crate) String);
 #[derive(Event)]
 pub(crate) struct ShellProjectionFolded;
 
-/// Observer event carrying the shell's status/feedback line after it changed.
-/// Control submissions (`queue_effect` reports the honest outcome) and their
-/// async completions both surface here — the Bevy counterpart of the TUI
-/// status bar.
-#[derive(Event)]
-pub(crate) struct FeedbackChanged {
-    pub(crate) text: String,
-    pub(crate) tone: Option<FeedbackTone>,
+/// Immutable renderer snapshot of the shell's active notice metadata.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct FeedbackNoticeProjection {
+    pub(crate) source: FeedbackSource,
+    pub(crate) tone: FeedbackTone,
 }
 
-/// Last feedback text seen by the drain, for change detection.
+impl From<FeedbackPresentation<'_>> for FeedbackNoticeProjection {
+    fn from(feedback: FeedbackPresentation<'_>) -> Self {
+        Self {
+            source: feedback.source(),
+            tone: feedback.tone(),
+        }
+    }
+}
+
+/// Observer event carrying the shell's visible feedback and active notice
+/// projection. The shell remains the source and lifecycle authority.
+#[derive(Clone, Debug, Event, PartialEq, Eq)]
+pub(crate) struct FeedbackChanged {
+    pub(crate) text: String,
+    pub(crate) notice: Option<FeedbackNoticeProjection>,
+}
+
+/// Observer event carrying the shell's background activity, independently of
+/// the point-of-action notice displayed by the floating feedback card.
+#[derive(Clone, Debug, Event, PartialEq, Eq)]
+pub(crate) struct FeedbackActivityChanged(pub(crate) String);
+
+/// Last visual notice projection seen by the renderer. Notice lifetime stays
+/// in the shell; this cache only prevents repainting an unchanged card.
 #[derive(Resource, Default)]
-pub(crate) struct FeedbackCache(pub(crate) Option<String>);
+pub(crate) struct FeedbackCache(pub(crate) Option<FeedbackChanged>);
+
+/// Last shell activity text sent to the persistent footer line.
+#[derive(Resource, Default)]
+pub(crate) struct FeedbackActivityCache(Option<String>);
+
+#[derive(SystemParam)]
+pub(crate) struct FeedbackTargets<'w> {
+    notice_cache: ResMut<'w, FeedbackCache>,
+    activity_cache: ResMut<'w, FeedbackActivityCache>,
+}
+
+fn sync_feedback_activity(
+    activity: &str,
+    cache: &mut FeedbackActivityCache,
+    commands: &mut Commands,
+) {
+    if cache.0.as_deref() != Some(activity) {
+        cache.0 = Some(activity.to_owned());
+        commands.trigger(FeedbackActivityChanged(activity.to_owned()));
+    }
+}
+
+pub(crate) fn feedback_changed(shell: &ShellApp) -> FeedbackChanged {
+    FeedbackChanged {
+        text: shell.feedback_text().to_owned(),
+        notice: shell
+            .feedback_presentation()
+            .map(FeedbackNoticeProjection::from),
+    }
+}
+
+/// Seed the footer activity when the shell scene is mounted. The drain shares
+/// this cache, so later folds publish only actual activity changes.
+pub(crate) fn sync_feedback_activity_after_mount(
+    track: NonSend<FrontendTrack>,
+    mut cache: ResMut<FeedbackActivityCache>,
+    mut commands: Commands,
+) {
+    sync_feedback_activity(track.shell.feedback_activity(), &mut cache, &mut commands);
+}
 
 /// One frame's drain outcome, consumed by the UI adapter.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -305,7 +365,7 @@ pub(crate) fn drain_system(
     runtime: Res<SharedRuntimeHandle>,
     mut track: NonSendMut<FrontendTrack>,
     mut pending: ResMut<crate::input::PendingEffects>,
-    mut feedback_cache: ResMut<FeedbackCache>,
+    mut feedback: FeedbackTargets,
     mut peripherals: PeripheralTargets,
     mut appearance_targets: AppearanceTargets,
     mut commands: Commands,
@@ -423,17 +483,15 @@ pub(crate) fn drain_system(
             );
         }
     }
-    let feedback = track.shell.feedback_text().to_owned();
-    if feedback_cache.0.as_deref() != Some(feedback.as_str()) {
-        feedback_cache.0 = Some(feedback.clone());
-        let tone = track
-            .shell
-            .feedback_presentation()
-            .map(|feedback| feedback.tone());
-        commands.trigger(FeedbackChanged {
-            text: feedback,
-            tone,
-        });
+    sync_feedback_activity(
+        track.shell.feedback_activity(),
+        &mut feedback.activity_cache,
+        &mut commands,
+    );
+    let projection = feedback_changed(&track.shell);
+    if feedback.notice_cache.0.as_ref() != Some(&projection) {
+        feedback.notice_cache.0 = Some(projection.clone());
+        commands.trigger(projection);
     }
 }
 

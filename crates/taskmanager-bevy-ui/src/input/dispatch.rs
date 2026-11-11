@@ -768,16 +768,10 @@ pub(crate) fn keyboard_dispatch_system(
         outputs.commands.trigger(ConfirmationChanged(view));
     }
     if let Some(cache) = outputs.feedback_cache.as_mut() {
-        let feedback = shell.feedback_text().to_owned();
-        if cache.0.as_deref() != Some(feedback.as_str()) {
+        let feedback = crate::drain::feedback_changed(shell);
+        if cache.0.as_ref() != Some(&feedback) {
             cache.0 = Some(feedback.clone());
-            let tone = shell
-                .feedback_presentation()
-                .map(|feedback| feedback.tone());
-            outputs.commands.trigger(crate::drain::FeedbackChanged {
-                text: feedback,
-                tone,
-            });
+            outputs.commands.trigger(feedback);
         }
     }
     // Quit forwarding is frame-level, not key-level: a quit requested

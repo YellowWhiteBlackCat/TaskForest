@@ -65,6 +65,7 @@ pub mod drain;
 pub(crate) mod event_center;
 pub mod export;
 pub mod feature_coverage;
+pub(crate) mod feedback_overlay;
 pub(crate) mod first_run_modal;
 pub(crate) mod focus_visible;
 pub(crate) mod frame_timing;

@@ -41,12 +41,7 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         // and dismisses on pointer exit, pointer press, Escape, or focus loss
         // (tests/headless/tooltip.rs drives the mounted overlay).
         (Tooltip, Ported),
-        (
-            Toast,
-            Divergent {
-                reason: "transient feedback renders through the shared feedback line",
-            },
-        ),
+        (Toast, Ported),
         // Applications/Services search fields are native text inputs; the
         // shell stays the single query authority through the editor bridge.
         (

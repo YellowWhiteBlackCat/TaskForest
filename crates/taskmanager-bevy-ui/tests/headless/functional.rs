@@ -41,6 +41,18 @@ fn functional_declaration_is_complete_and_explicit() {
             route: "services.log-panel.export",
         }))
     );
+    assert_eq!(
+        report
+            .iter()
+            .find(|(intent, _)| *intent == ProductIntent::TransientFeedback)
+            .map(|(_, status)| status),
+        Some(&FunctionalStatus::Declared(
+            SurfaceDecision::AcceptedDifference {
+                route: "root.feedback-overlay",
+                reason: "the floating shell notice mounts on Performance; other routed pages retain their footer activity surface without a second overlay",
+            }
+        ))
+    );
     assert!(matches!(
         report
             .iter()

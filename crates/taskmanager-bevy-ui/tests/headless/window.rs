@@ -54,7 +54,8 @@ use super::backdrop_capture::{
     BackdropRevision, PresentationCamera, drive_backdrop_capture,
 };
 use super::{
-    AppShellRoot, FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, WindowPalette,
+    AppShellRoot, FeedbackActivityLine, FrontendWindowPlugin, Role, SummaryLine, TextRole,
+    WindowPalette,
 };
 use crate::drain::ShellProjectionFolded;
 use crate::glass::optical::{OpticalGlassRaster, OpticalGlassSurface};
@@ -625,7 +626,7 @@ fn the_accessibility_bridge_resources_are_installed_once() {
 }
 
 #[test]
-fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_line() {
+fn timed_feedback_notice_mounts_and_retires_the_performance_overlay() {
     let (client, _host_requests) = scripted_client();
     let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
     let runtime = cache
@@ -635,17 +636,24 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
 
     // Initial update to run Startup systems and spawn the app shell.
     app.update();
+    app.world_mut().resource_mut::<crate::app::Route>().page = crate::app::Page::Performance;
+    app.world_mut().trigger(crate::app::RouteChanged);
+    app.update();
 
     let world = app.world_mut();
     let line = world
-        .query_filtered::<&Text, With<FeedbackLine>>()
+        .query_filtered::<&Text, With<FeedbackActivityLine>>()
         .iter(world)
         .map(|text| text.0.clone())
         .collect::<Vec<String>>();
-    assert_eq!(line.len(), 1, "app shell spawns exactly one feedback line");
     assert_eq!(
-        line[0], "Refresh queued",
-        "initial feedback line reports queued refresh"
+        line.len(),
+        1,
+        "app shell spawns exactly one footer activity line"
+    );
+    assert_eq!(
+        line[0], "Waiting for telemetry…",
+        "footer activity remains the background projection"
     );
 
     // Report a timed feedback notice with 30ms lifetime.
@@ -659,25 +667,22 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
             "Screenshot captured",
         );
 
-    // Frame 1: drain_system advances 16ms (leaving 14ms), detects changed feedback,
-    // fires FeedbackChanged, and the observer rewrites FeedbackLine.
+    // Frame 1: drain_system advances 16ms (leaving 14ms), detects the shell
+    // notice and mounts its floating overlay.
     app.update();
 
     let world = app.world_mut();
-    let line = world
-        .query_filtered::<&Text, With<FeedbackLine>>()
-        .single(world)
-        .expect("feedback line text")
-        .0
-        .clone();
     assert_eq!(
-        line, "Screenshot captured",
-        "feedback line must display the active notice text"
+        world
+            .query_filtered::<Entity, With<crate::feedback_overlay::FeedbackToast>>()
+            .iter(world)
+            .count(),
+        1,
+        "active shell notice mounts one feedback overlay"
     );
 
     // Frame 2: drain_system advances another 16ms (32ms total >= 30ms).
-    // The timed notice expires and becomes None; drain_system fires FeedbackChanged(""),
-    // and the observer clears FeedbackLine.
+    // The shell expires the notice and the overlay retires.
     app.update();
 
     let world = app.world_mut();
@@ -689,15 +694,13 @@ fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_l
             .is_none(),
         "timed notice must be cleared from shell after expiring"
     );
-    let line = world
-        .query_filtered::<&Text, With<FeedbackLine>>()
-        .single(world)
-        .expect("feedback line text")
-        .0
-        .clone();
     assert_eq!(
-        line, "Waiting for telemetry…",
-        "feedback line must return to background activity after timed notice expires"
+        world
+            .query_filtered::<Entity, With<crate::feedback_overlay::FeedbackToast>>()
+            .iter(world)
+            .count(),
+        0,
+        "expired shell notice removes the floating overlay"
     );
 }
 

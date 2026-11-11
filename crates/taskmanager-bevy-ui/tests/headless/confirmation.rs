@@ -43,7 +43,7 @@ use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
 use crate::app::FrontendTrack;
 use crate::demo_fixture::{demo_shell, seed_capture_confirmation_scenario};
 use crate::input::PendingEffects;
-use crate::window::{FeedbackLine, FrontendWindowPlugin};
+use crate::window::{FeedbackActivityLine, FrontendWindowPlugin};
 use taskforest_core::core::process::PriorityTier;
 use taskforest_core::core::smart::SmartSelfTestKind;
 use taskforest_core::core::system_health::SmartSelfTestIntent;
@@ -269,7 +269,7 @@ fn delete_arms_the_modal_and_confirm_completes_the_submission_loop() {
     // The queued trigger dispatches at the next sync point, and the drain
     // submits the re-emitted effect through the shared queue_effect seam in
     // the same frame — so the honest observables are the closed gate, the
-    // despawned modal, and the reported outcome on the feedback line.
+    // despawned modal, and the shell-owned outcome notice.
     app.update();
     app.update();
     assert!(
@@ -281,21 +281,35 @@ fn delete_arms_the_modal_and_confirm_completes_the_submission_loop() {
         "confirm closes the gate"
     );
     assert!(overlay_despawned(&mut app), "a confirmed modal despawns");
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some(),
+        "the submitted effect is reported through the shell notice"
+    );
+    let activity = app
+        .world()
+        .non_send::<FrontendTrack>()
+        .shell
+        .feedback_activity()
+        .to_owned();
     let world = app.world_mut();
     let feedback = world
-        .query_filtered::<&Text, With<FeedbackLine>>()
+        .query_filtered::<&Text, With<FeedbackActivityLine>>()
         .iter(world)
         .map(|text| text.0.clone())
         .collect::<Vec<_>>();
     assert_eq!(feedback.len(), 1);
     assert!(
-        !feedback[0].is_empty(),
-        "the submitted effect is reported on the feedback line"
+        feedback[0] == activity,
+        "the footer continues to show background activity"
     );
 }
 
 #[test]
-fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
+fn dismiss_never_submits_and_confirm_keeps_notice_separate_from_footer_activity() {
     let mut app = window_app();
     seed_processes(&mut app);
     app.update();
@@ -318,24 +332,38 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
     );
 
     // The full loop: re-arm, confirm, let the drain submit through the
-    // shared queue_effect seam, and observe the header feedback line leave
-    // its cold-start blank — the honest outcome of the submission.
+    // shared queue_effect seam, and observe the shell-owned notice while the
+    // persistent footer keeps its background activity projection.
     press(&mut app, KeyCode::Delete, None);
     app.update();
     assert!(!overlay_despawned(&mut app), "the gate re-arms");
     let confirm = button_entity(&mut app, "confirm");
     activate(&mut app, confirm);
     app.update();
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some(),
+        "the drain publishes the submission outcome as a shell notice"
+    );
+    let activity = app
+        .world()
+        .non_send::<FrontendTrack>()
+        .shell
+        .feedback_activity()
+        .to_owned();
     let world = app.world_mut();
     let feedback = world
-        .query_filtered::<&Text, With<FeedbackLine>>()
+        .query_filtered::<&Text, With<FeedbackActivityLine>>()
         .iter(world)
         .map(|text| text.0.clone())
         .collect::<Vec<_>>();
-    assert_eq!(feedback.len(), 1, "exactly one feedback line");
+    assert_eq!(feedback.len(), 1, "exactly one footer activity line");
     assert!(
-        !feedback[0].is_empty(),
-        "the drain publishes the submission outcome to the feedback line"
+        feedback[0] == activity,
+        "the footer remains bound to shell background activity"
     );
 }
 
