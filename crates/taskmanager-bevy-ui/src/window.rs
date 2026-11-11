@@ -60,6 +60,7 @@ mod capture_marker;
 mod capture_marker_cores;
 mod capture_marker_health;
 mod capture_marker_interactive;
+mod capture_marker_optical;
 mod capture_marker_zero_gray;
 mod capture_state;
 mod frame_capture;

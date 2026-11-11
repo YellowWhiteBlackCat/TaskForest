@@ -28,58 +28,33 @@ use crate::ui::components::divider;
 
 use super::activation::{checkbox_style, checked_glass_background};
 use super::state::{ControlPaintState, button_style};
-use super::text::text_input_style;
+use super::text::{text_editor_style, text_input_style};
 use super::*;
 
 type TestElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
-/// The multi-line editor's local control. The product has no multi-line text
-/// surface (the GPUI reference input is single-line too), so the shape lives
-/// here instead of the production component tree — but it is built from the
-/// SAME shared material and geometry seams, so the multi-line shape keeps
-/// the shared contract proven.
-fn multi_line_text_input<'a>(
+/// Bind the production multi-line editor into the compact component suite.
+fn production_multi_line_text_input<'a>(
     theme_snapshot: &'a Theme,
     content: &'a text_editor::Content,
-    placeholder: &'a str,
 ) -> TestElement<'a> {
-    let extent = crate::theme::control_extent(theme_snapshot, ControlRole::Input);
-    let padding_x = crate::theme::control_padding_x(theme_snapshot, ControlRole::Input);
-    text_editor::TextEditor::new(content)
-        .placeholder(placeholder)
-        .padding([4.0, padding_x])
-        .size(13.0)
-        .height(iced::Length::Fixed(extent * 3.0))
-        .style(move |_, status| text_editor_style(theme_snapshot, editor_paint_state(status)))
-        .into()
+    multi_line_text_input(
+        theme_snapshot,
+        None,
+        content,
+        "hint",
+        Message::UpdateRunTaskEditor,
+        None,
+        false,
+    )
 }
 
-/// The multi-line editor's paint seam: the shared Input-role glass with the
-/// same keyboard-only focus ring the production single-line field reads.
-fn text_editor_style(theme: &Theme, state: ControlPaintState) -> text_editor::Style {
-    let glass = control_glass(theme, ControlRole::Input, state.visual());
-    let palette = theme.palette();
-    let ink = glass
-        .text_color
-        .unwrap_or_else(|| crate::theme_binding::color(palette.fg));
-    text_editor::Style {
-        background: glass.background.unwrap_or_else(|| {
-            iced::Background::Color(crate::theme_binding::color(palette.surface))
-        }),
-        border: glass.border,
-        placeholder: ink,
-        value: ink,
-        selection: crate::theme_binding::color(palette.selection),
-    }
+fn production_text_editor_style(theme: &Theme, state: ControlPaintState) -> text_editor::Style {
+    text_editor_style(theme, ControlRole::Input, state)
 }
 
 fn editor_paint_state(status: text_editor::Status) -> ControlPaintState {
-    match status {
-        text_editor::Status::Active => ControlPaintState::Active,
-        text_editor::Status::Hovered => ControlPaintState::Hovered,
-        text_editor::Status::Focused { .. } => ControlPaintState::Focused,
-        text_editor::Status::Disabled => ControlPaintState::Disabled,
-    }
+    ControlPaintState::from_text_editor(status)
 }
 
 #[derive(Default)]
@@ -307,8 +282,8 @@ fn control_styles_share_one_glass_material_and_keep_state_geometry_invariant() {
         input_focused.border.color,
         crate::theme::focus_ring_color(&theme, false)
     );
-    let editor_active = text_editor_style(&theme, ControlPaintState::Active);
-    let editor_focused = text_editor_style(&theme, ControlPaintState::Focused);
+    let editor_active = production_text_editor_style(&theme, ControlPaintState::Active);
+    let editor_focused = production_text_editor_style(&theme, ControlPaintState::Focused);
     assert_eq!(editor_active.border.radius, editor_focused.border.radius);
     assert_eq!(
         editor_focused.border.color,
@@ -319,9 +294,9 @@ fn control_styles_share_one_glass_material_and_keep_state_geometry_invariant() {
     assert!(crate::ui::spinner::arc_span(0.75).1 > end);
     let _ = (
         pill(&theme, FocusTarget::EndTask, "pill", false, Message::Tick),
-        multi_line_text_input(&theme, &text_editor::Content::with_text("line"), "hint"),
+        production_multi_line_text_input(&theme, &text_editor::Content::with_text("line")),
         text_input_style(&theme, ControlRole::Input, ControlPaintState::Active),
-        text_editor_style(&theme, editor_paint_state(text_editor::Status::Active)),
+        production_text_editor_style(&theme, editor_paint_state(text_editor::Status::Active)),
         checkbox_style(&theme, ControlPaintState::Active, true),
         checkbox_style(&theme, ControlPaintState::Active, false),
         checked_glass_background(&theme),
@@ -435,11 +410,11 @@ fn control_family_builds_within_a_compact_measured_viewport() {
             None,
             "single",
             "",
-            Message::UpdateRunTaskCommand,
+            Message::SearchChanged,
             Some(Message::SubmitRunTask),
             false,
         ),
-        multi_line_text_input(&theme, &content, "multi"),
+        production_multi_line_text_input(&theme, &content),
         icon_button(
             &theme,
             FocusTarget::SearchClose,

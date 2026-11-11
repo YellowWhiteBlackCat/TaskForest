@@ -10,6 +10,8 @@
 use iced::Length;
 use iced::advanced::text::IntoFragment;
 use iced::widget::{button, text};
+use iced::{Color, Padding};
+use std::rc::Rc;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -20,34 +22,72 @@ use crate::ui::components::IcedElement;
 
 use super::state::{ButtonTone, ControlPaintState};
 
-/// Build the inner native button every activation shape composes. The caller
-/// owns the focus shell, so no widget tree here owns a second focus policy.
-/// Horizontal padding comes from the shared `ControlRole` resolver and the
-/// vertical gutter from the theme spacing token; callers choose whether their
-/// slot spends the role's measured extent or keeps an intrinsic row height.
+type StyleFn<'a> = Rc<dyn Fn(&iced::Theme, button::Status) -> button::Style + 'a>;
+
+/// Composition inputs for one native Iced button. The caller owns the content,
+/// exact style resolver and geometry; the adapter owns the single native
+/// constructor and, when a focus target is supplied, the shared focus shell.
+pub(crate) struct ContentButtonOptions<'a> {
+    pub(crate) content: iced::Element<'a, Message, iced::Theme, iced::Renderer>,
+    pub(crate) style: StyleFn<'a>,
+    pub(crate) padding: Padding,
+    pub(crate) width: Option<Length>,
+    pub(crate) height: Option<Length>,
+    pub(crate) on_press: Option<Message>,
+    pub(crate) target: Option<FocusTarget>,
+    pub(crate) focus_color: Color,
+    pub(crate) focus_radius: f32,
+    pub(crate) activate_on_pointer: bool,
+    pub(crate) enabled: bool,
+    pub(crate) clip: bool,
+}
+
+/// The ONE native-button constructor. A target wraps the control in the shared
+/// focus shell; without one, the native pointer path alone owns activation
+/// (search clear, switch and segmented segments use this branch).
 #[must_use]
-pub(crate) fn control_button<'a>(
-    theme_snapshot: Theme,
-    content: iced::Element<'a, Message, iced::Theme, iced::Renderer>,
-    role: ControlRole,
-    tone: ButtonTone,
-    on_press: Option<Message>,
-) -> button::Button<'a, Message, iced::Theme, iced::Renderer> {
-    let padding_x = crate::theme::control_padding_x(&theme_snapshot, role);
+pub(crate) fn content_button<'a>(options: ContentButtonOptions<'a>) -> IcedElement<'a> {
+    let ContentButtonOptions {
+        content,
+        style,
+        padding,
+        width,
+        height,
+        on_press,
+        target,
+        focus_color,
+        focus_radius,
+        activate_on_pointer,
+        enabled,
+        clip,
+    } = options;
     let mut inner = button(content)
-        .padding([f32::from(tokens::SPACE_4), padding_x])
-        .style(move |_, status| {
-            super::state::button_style(
-                &theme_snapshot,
-                role,
-                tone,
-                ControlPaintState::from_button(status),
-            )
-        });
-    if let Some(message) = on_press {
+        .padding(padding)
+        .style(move |theme, status| (*style)(theme, status));
+    inner = inner.clip(clip);
+    if let Some(width) = width {
+        inner = inner.width(width);
+    }
+    if let Some(height) = height {
+        inner = inner.height(height);
+    }
+    if let Some(message) = on_press.clone().filter(|_| enabled) {
         inner = inner.on_press(message);
     }
-    inner
+    match (target, on_press) {
+        (Some(target), Some(on_press)) => FocusableButton::new(
+            focus_id(target),
+            inner.into(),
+            on_press,
+            target,
+            focus_color,
+            focus_radius,
+            activate_on_pointer,
+        )
+        .with_enabled(enabled)
+        .into(),
+        _ => inner.into(),
+    }
 }
 
 /// Compose the shared focus shell around a FULL measured control button. The
@@ -62,21 +102,17 @@ pub(crate) fn focusable_control_button<'a>(
     enabled: bool,
 ) -> IcedElement<'a> {
     let extent = crate::theme::control_extent(theme_snapshot, ControlRole::Button);
-    let inner = control_button(
+    glass_content_button(
         *theme_snapshot,
         text(label).size(f32::from(tokens::FONT_13)).into(),
-        ControlRole::Button,
-        tone,
-        enabled.then_some(on_press.clone()),
-    )
-    .height(Length::Fixed(extent));
-    focus_shell(
-        theme_snapshot,
-        target,
-        inner.into(),
-        on_press,
-        tone,
-        enabled,
+        GlassContentButtonRequest {
+            role: ControlRole::Button,
+            tone,
+            target,
+            on_press,
+            height: Some(Length::Fixed(extent)),
+            enabled,
+        },
     )
 }
 
@@ -95,42 +131,68 @@ pub(crate) fn focusable_control_button_intrinsic<'a>(
     tone: ButtonTone,
     enabled: bool,
 ) -> IcedElement<'a> {
-    let inner = control_button(
+    glass_content_button(
         *theme_snapshot,
         text(label).size(f32::from(tokens::FONT_13)).into(),
-        ControlRole::Button,
-        tone,
-        enabled.then_some(on_press.clone()),
-    );
-    focus_shell(
-        theme_snapshot,
-        target,
-        inner.into(),
-        on_press,
-        tone,
-        enabled,
+        GlassContentButtonRequest {
+            role: ControlRole::Button,
+            tone,
+            target,
+            on_press,
+            height: None,
+            enabled,
+        },
     )
 }
 
-fn focus_shell<'a>(
-    theme_snapshot: &'a Theme,
-    target: FocusTarget,
+fn glass_content_button<'a>(
+    theme_snapshot: Theme,
     content: iced::Element<'a, Message, iced::Theme, iced::Renderer>,
-    on_press: Message,
-    tone: ButtonTone,
-    enabled: bool,
+    request: GlassContentButtonRequest,
 ) -> IcedElement<'a> {
-    FocusableButton::new(
-        focus_id(target),
-        content,
-        on_press,
+    let GlassContentButtonRequest {
+        role,
+        tone,
         target,
-        crate::theme::focus_ring_color(theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
-        false,
-    )
-    .with_enabled(enabled)
-    .into()
+        on_press,
+        height,
+        enabled,
+    } = request;
+    let padding_x = crate::theme::control_padding_x(&theme_snapshot, role);
+    let style_theme = theme_snapshot;
+    content_button(ContentButtonOptions {
+        content,
+        style: Rc::new(move |_, status| {
+            super::state::button_style(
+                &style_theme,
+                role,
+                tone,
+                ControlPaintState::from_button(status),
+            )
+        }),
+        padding: Padding::from([f32::from(tokens::SPACE_4), padding_x]),
+        width: None,
+        height,
+        on_press: Some(on_press),
+        target: Some(target),
+        focus_color: crate::theme::focus_ring_color(&theme_snapshot, tone == ButtonTone::Danger),
+        focus_radius: crate::theme::scaled_radius(
+            &theme_snapshot,
+            theme_snapshot.palette().control_radius,
+        ),
+        activate_on_pointer: false,
+        enabled,
+        clip: false,
+    })
+}
+
+struct GlassContentButtonRequest {
+    role: ControlRole,
+    tone: ButtonTone,
+    target: FocusTarget,
+    on_press: Message,
+    height: Option<Length>,
+    enabled: bool,
 }
 
 /// The owned-theme variant: a lazy body must own every captured style input
@@ -144,24 +206,32 @@ pub(crate) fn focusable_control_button_owned(
     tone: ButtonTone,
     enabled: bool,
 ) -> IcedElement<'static> {
-    let inner = control_button(
-        theme_snapshot,
-        text(label).size(f32::from(tokens::FONT_13)).into(),
-        ControlRole::Button,
-        tone,
-        enabled.then_some(on_press.clone()),
-    );
-    FocusableButton::new(
-        focus_id(target),
-        inner.into(),
-        on_press,
-        target,
-        crate::theme::focus_ring_color(&theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(&theme_snapshot, theme_snapshot.palette().control_radius),
-        false,
-    )
-    .with_enabled(enabled)
-    .into()
+    let padding_x = crate::theme::control_padding_x(&theme_snapshot, ControlRole::Button);
+    let style_theme = theme_snapshot;
+    content_button(ContentButtonOptions {
+        content: text(label).size(f32::from(tokens::FONT_13)).into(),
+        style: Rc::new(move |_, status| {
+            super::state::button_style(
+                &style_theme,
+                ControlRole::Button,
+                tone,
+                ControlPaintState::from_button(status),
+            )
+        }),
+        padding: Padding::from([f32::from(tokens::SPACE_4), padding_x]),
+        width: None,
+        height: None,
+        on_press: Some(on_press),
+        target: Some(target),
+        focus_color: crate::theme::focus_ring_color(&theme_snapshot, tone == ButtonTone::Danger),
+        focus_radius: crate::theme::scaled_radius(
+            &theme_snapshot,
+            theme_snapshot.palette().control_radius,
+        ),
+        activate_on_pointer: false,
+        enabled,
+        clip: false,
+    })
 }
 
 /// A shared control button that carries a semantic icon before its label.
@@ -181,22 +251,16 @@ pub(crate) fn focusable_icon_label_button_intrinsic<'a>(
     let content = iced::widget::row![glyph, text(label).size(f32::from(tokens::FONT_13))]
         .spacing(f32::from(tokens::SPACE_8))
         .align_y(iced::Alignment::Center);
-    let inner = control_button(
+    glass_content_button(
         *theme_snapshot,
         content.into(),
-        ControlRole::Button,
-        tone,
-        enabled.then_some(on_press.clone()),
-    );
-    FocusableButton::new(
-        focus_id(target),
-        inner.into(),
-        on_press,
-        target,
-        crate::theme::focus_ring_color(theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
-        false,
+        GlassContentButtonRequest {
+            role: ControlRole::Button,
+            tone,
+            target,
+            on_press,
+            height: None,
+            enabled,
+        },
     )
-    .with_enabled(enabled)
-    .into()
 }

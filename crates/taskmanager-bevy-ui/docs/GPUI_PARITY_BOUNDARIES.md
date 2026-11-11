@@ -22,6 +22,12 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   refresh/network/escalation commands through the shell. The detail tests
   prove empty, partial, unavailable, unreadable, and permission-dependent
   states without fabricating zero or success.
+- **System information groups**: `system_information_modal.rs` now renders
+  the shell-owned `SystemInformationGroup` facts as titled groups with
+  bounded label/value rows, matching GPUI's grouped review instead of one
+  unstructured copy blob. The headless tree proves mounted titles/values,
+  clipped slots, the non-shrinking value floor and the typed unavailable
+  state. Copy All still exports the complete provider-owned text.
 - **Keyboard / secondary press / linkage**: `input::dispatch` owns one ordered
   key pass; the card and dense presentations address the same shell row,
   selection reveal, semantic address, official `Button`, and secondary-press
@@ -40,16 +46,19 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   paints the selected-process details beside either the card lane or the dense
   table, and a narrower slot hides the rail as one group instead of clipping
   its label/value columns. Its projection, effect and typed-unavailable seams
-  are headlessly proved; no targeted capture yet shows the rail beside the
-  card lane.
+  are headlessly proved. The `applications-card-lane-details-wide` and
+  `applications-card-lane-details-compact` scenarios make both whole-group
+  decisions reviewable in a real window; their results are not yet reviewed
+  by eye on the current tree.
 - The `tooltip-overlay` capture is a real tooltip above the Applications
   optical hero; the window uses a software renderer in the capture harness, so
   it proves placement, content and bounds, not hardware WESL refraction.
 - Nested optical glass is bounded by
   [`NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): depth `0` and `1` are
   admitted by the measured chain, depth `2` or deeper fails closed. The GPU
-  receipt measures chain pixels; no shipped-window screenshot proves the
-  visual appearance of two optical layers with human eyes.
+  receipt measures both chain pixels and the theme-derived Fresnel rim. No
+  human-reviewed shipped-window screenshot of two simultaneously optical
+  layers is published.
 - System-depth modal, multi-window/layer-shell, and GPUI-specific device hero
   work remain the frontend charter's public boundaries; this crate does not
   own a second vocabulary for them.

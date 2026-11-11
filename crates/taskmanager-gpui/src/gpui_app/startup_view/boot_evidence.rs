@@ -1,12 +1,12 @@
-//! Boot-evidence rendering for the Startup page: a non-interactive stat-pill
-//! strip (failed systemd units + critical-chain total) followed by a bounded
-//! waterfall over the measured critical chain.
+//! Boot-evidence rendering for the Startup page: a bounded waterfall over the
+//! measured critical chain. The page's typed admission verdict decides where
+//! the whole timeline group is placed; the header carries no duplicate strip.
 //!
 //! Split out of [`super::startup_view`] (BN-05 / P1-ARCH-10). Pure render
 //! functions and their unit tests; holds no UI state of its own — the typed
 //! [`StartupBootEvidenceSnapshot`] arrives as a render param.
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
+use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px, relative};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
 use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
@@ -17,92 +17,13 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
 
-use crate::gpui_app::formatting;
 use taskforest_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot,
 };
 use taskmanager_application::i18n;
-use taskmanager_application::{critical_chain_summary, failed_units_summary};
-use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-
-// ── boot evidence strip: failed units + critical chain ──────────────────────
-//
-// P1-ARCH-10/#11 closure: the typed systemd boot evidence (`systemctl
-// --failed` + `systemd-analyze critical-chain`) surfaces here as two
-// non-interactive stat pills. Failures stay typed ("boot evidence
-// unavailable"), a true empty set reads as "no failed units" — never a
-// fabricated zero or a silent absence.
-
-/// Non-interactive boot-evidence strip shown between the controls row and the
-/// table. Renders nothing until a typed evidence snapshot arrives.
-pub(super) fn boot_evidence_strip(
-    theme: &Theme,
-    evidence: Option<&StartupBootEvidenceSnapshot>,
-) -> Div {
-    let Some(evidence) = evidence else {
-        return div();
-    };
-    if evidence.failed_units_failure.is_some() && evidence.critical_chain_failure.is_some() {
-        return div();
-    }
-    let failed = failed_units_summary(evidence);
-    let chain = critical_chain_summary(evidence, &formatting::missing_value());
-    let failed_color = if evidence.failed_units.is_empty() {
-        theme.fg_dim
-    } else {
-        theme.danger
-    };
-    let pill = |id: &'static str, label: &str, value: &str, value_color: Color| {
-        CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
-            .radius(tokens::card_radius(theme))
-            .render()
-            .id(id)
-            .debug_selector(move || id.to_string())
-            .flex()
-            .flex_row()
-            .items_center()
-            .gap(rem_length(tokens::SPACE_3))
-            .px(rem_length(tokens::SPACE_3))
-            .py(rem_length(tokens::SPACE_2))
-            .child(
-                div()
-                    .text_size(font_size(tokens::FONT_11))
-                    .text_color(hsla(theme.fg_dim))
-                    .child(label.to_string()),
-            )
-            .child(
-                div()
-                    .text_size(font_size(tokens::FONT_11))
-                    .text_color(hsla(value_color))
-                    .child(value.to_string()),
-            )
-    };
-    div()
-        .flex()
-        .flex_row()
-        .gap(definite_length(tokens::SPACE_4))
-        .child(
-            pill(
-                "startup-evidence-failed",
-                i18n::t("startup.failed_units"),
-                &failed,
-                failed_color,
-            )
-            .into_any_element(),
-        )
-        .child(
-            pill(
-                "startup-evidence-chain",
-                i18n::t("startup.critical_chain"),
-                &chain,
-                theme.fg,
-            )
-            .into_any_element(),
-        )
-}
 
 // ── boot timeline waterfall (BN-05) ──────────────────────────────────────────
 //

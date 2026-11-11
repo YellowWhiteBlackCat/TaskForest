@@ -19,12 +19,13 @@ impl IcedApp {
                 self.run_task.error_msg = None;
                 None
             }
-            Message::UpdateRunTaskCommand(command) if self.run_task_open() => {
-                self.run_task.command = command;
+            Message::UpdateRunTaskEditor(action) if self.run_task_open() => {
+                self.run_task.perform(action);
                 None
             }
             Message::SubmitRunTask if self.run_task_open() => {
-                if self.run_task.command.trim().is_empty() {
+                let command = self.run_task.normalized_command();
+                if command.trim().is_empty() {
                     self.run_task.error_msg = Some(t("search.run_command").to_string());
                     None
                 } else {
@@ -34,11 +35,11 @@ impl IcedApp {
                     // queued launch is a submitted request and not a silent
                     // dismissal.
                     let request = CommandLaunchRequest {
-                        command: self.run_task.command.trim().to_owned(),
+                        command: command.trim().to_owned(),
                     };
                     self.dismiss_local_surface_kind(LocalSurfaceKind::RunTask);
                     self.run_task.error_msg = None;
-                    self.run_task.command.clear();
+                    self.run_task.clear_command();
                     Some(PlatformEffect::CommandLaunch(request))
                 }
             }

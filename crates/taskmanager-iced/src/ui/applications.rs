@@ -10,7 +10,7 @@ use crate::app::ColumnWidthOverrides;
 use crate::theme;
 use iced::Length;
 use iced::alignment::Horizontal;
-use iced::widget::{Space, Stack, button, container, mouse_area, row, text};
+use iced::widget::{Space, Stack, container, mouse_area, row, text};
 use std::rc::Rc;
 use taskforest_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessStatusFilter;
@@ -438,21 +438,26 @@ fn header_cell(
                 .into(),
         };
     let sort_action = Message::SortBy(column);
-    let sort_button = button(
-        container(label)
-            .width(Length::Fill)
-            .align_x(column_alignment(column)),
-    )
-    .on_press(sort_action.clone())
-    .style(move |_theme, status| theme::header_button_style(theme_snapshot, status, active))
-    .padding([2.0, HEADER_CELL_INSET_X])
-    .width(Length::Fixed(width));
-    let sort_button = focus::focusable_control(
-        theme_snapshot,
-        FocusTarget::ProcessSortHeader(column),
-        sort_button.into(),
-        sort_action,
-    );
+    let sort_button =
+        crate::ui::components::content_button(crate::ui::components::ContentButtonOptions {
+            content: container(label)
+                .width(Length::Fill)
+                .align_x(column_alignment(column))
+                .into(),
+            style: Rc::new(move |_theme, status| {
+                theme::header_button_style(theme_snapshot, status, active)
+            }),
+            padding: iced::Padding::from([2.0, HEADER_CELL_INSET_X]),
+            width: Some(Length::Fixed(width)),
+            height: None,
+            on_press: Some(sort_action),
+            target: Some(FocusTarget::ProcessSortHeader(column)),
+            focus_color: theme::focus_ring_color(theme_snapshot, false),
+            focus_radius: f32::from(theme_snapshot.palette().control_radius),
+            activate_on_pointer: false,
+            enabled: true,
+            clip: false,
+        });
     if !column_resizable(column) {
         return tinted_header_cell(theme_snapshot, active_sort.0, column, sort_button);
     }

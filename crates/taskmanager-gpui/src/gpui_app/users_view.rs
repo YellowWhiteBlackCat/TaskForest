@@ -392,6 +392,8 @@ pub(crate) fn init_table_entity(
 /// consolidation); `window`/`cx` stay explicit render-lifetime handles.
 pub struct UsersViewProps<'a> {
     pub theme: &'a Theme,
+    /// Frame-derived header/body slot allocation.
+    pub page_budget: list_view::ListPageBudget,
     pub rows: Rc<Vec<SessionItem>>,
     pub sources: &'a [SourceStatus],
     pub selected: Option<&'a SessionIdentity>,
@@ -409,6 +411,7 @@ pub fn render_users(
 ) -> Div {
     let UsersViewProps {
         theme,
+        page_budget,
         rows,
         sources,
         selected,
@@ -512,7 +515,9 @@ pub fn render_users(
         }
     };
 
-    list_view::ListPageScaffold::new(header, body).render()
+    list_view::ListPageScaffold::new(&theme, header, body)
+        .budget(page_budget)
+        .render()
 }
 
 // ── action bar (Disconnect / Lock) ───────────────────────────────────────────

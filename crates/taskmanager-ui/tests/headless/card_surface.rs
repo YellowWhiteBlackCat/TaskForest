@@ -19,6 +19,7 @@ fn theme() -> Theme {
 #[test]
 fn overlay_roles_resolve_one_tier_and_one_elevation() {
     assert_eq!(GlassSurfaceRole::Chrome.tier(), GlassTier::Sidebar);
+    assert_eq!(GlassSurfaceRole::PageHeader.tier(), GlassTier::Card);
     assert_eq!(GlassSurfaceRole::Menu.tier(), GlassTier::Card);
     assert_eq!(GlassSurfaceRole::Toast.tier(), GlassTier::Card);
     assert_eq!(GlassSurfaceRole::Tooltip.tier(), GlassTier::Card);
@@ -27,6 +28,10 @@ fn overlay_roles_resolve_one_tier_and_one_elevation() {
 
     assert_eq!(
         GlassSurfaceRole::Chrome.elevation(),
+        SurfaceElevation::Inset
+    );
+    assert_eq!(
+        GlassSurfaceRole::PageHeader.elevation(),
         SurfaceElevation::Inset
     );
     assert_eq!(
@@ -52,12 +57,13 @@ fn overlay_roles_resolve_one_tier_and_one_elevation() {
 }
 
 /// Every floating role's shared surface paints its tier's layered shadow;
-/// the one inset role paints the same material without a second elevation.
+/// every inset role paints the same material without a second elevation.
 #[test]
 fn every_overlay_role_uses_the_shared_surface_contract() {
     let theme = theme();
     for role in [
         GlassSurfaceRole::Chrome,
+        GlassSurfaceRole::PageHeader,
         GlassSurfaceRole::Menu,
         GlassSurfaceRole::Toast,
         GlassSurfaceRole::Tooltip,

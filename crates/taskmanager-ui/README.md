@@ -26,9 +26,11 @@ if a registry entry points at a component that does not exist.
 `primitives/card_surface.rs` owns the shared glass material: the theme's
 translucent gradient fill, the hairline edge and the tier's two-layer soft
 shadow. `GlassSurfaceRole` is the one tier/elevation map — `Chrome` (Sidebar
-tier, inset), `Menu` / `Toast` / `Tooltip` / `InlinePlot` (Card tier) and
-`Dialog` (Modal tier, floating) — so an overlay resolves its depth through
-`CardSurface::for_role` instead of hand-assembling fill + edge + shadow. The
+tier, inset), `Menu` / `Toast` / `Tooltip` / `PageHeader` / `InlinePlot`
+(Card tier) and `Dialog` (Modal tier, floating) — so an overlay or inset page
+header resolves its depth through `CardSurface::for_role` instead of
+hand-assembling fill + edge + shadow. `PageHeader` is inset, so it uses the
+same material without adding a second floating elevation inside the page. The
 focus ring is deliberately NOT part of this ladder: it is a keyboard-focus
 affordance with its own geometry, owned by the GPUI product's
 `elements::focus_ring`.

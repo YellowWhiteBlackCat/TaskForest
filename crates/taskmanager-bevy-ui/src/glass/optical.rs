@@ -30,7 +30,7 @@ use super::GlassNoise;
 const OPTICAL_GLASS_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("cbbc6713-31a6-4b99-95d6-5f4c1193832c");
 
-mod capability;
+pub(crate) mod capability;
 pub(crate) use capability::{OPTICAL_GLASS_MAX_BLUR_PX, optical_glass_capability};
 mod backdrop_mirror;
 pub(crate) use backdrop_mirror::BackdropMirror;
@@ -116,8 +116,9 @@ impl OpticalGlassRaster {
 /// - `element`: origin XY, size XY;
 /// - `viewport`: target XY, corner radius, device scale factor.
 ///
-/// The trailing `ior` scalar carries the deep refraction's index of
-/// refraction, clamped and admitted by [`OpticalGlassParams`] before upload.
+/// The trailing `refraction` lane carries the deep refraction's IOR and the
+/// theme-derived Schlick F0; both are clamped and admitted by
+/// [`OpticalGlassParams`] before upload and stay GPU aligned.
 #[derive(Clone, Copy, Debug, PartialEq, ShaderType)]
 pub(crate) struct OpticalGlassUniform {
     pub(crate) optics: Vec4,
@@ -126,7 +127,7 @@ pub(crate) struct OpticalGlassUniform {
     pub(crate) grain: Vec4,
     pub(crate) element: Vec4,
     pub(crate) viewport: Vec4,
-    pub(crate) ior: f32,
+    pub(crate) refraction: Vec2,
 }
 
 impl OpticalGlassUniform {
@@ -179,7 +180,7 @@ impl OpticalGlassUniform {
                 geometry.corner_radius_px,
                 raster.device_scale_factor,
             ),
-            ior: params.ior,
+            refraction: Vec2::new(params.ior, params.fresnel_base),
         })
     }
 }

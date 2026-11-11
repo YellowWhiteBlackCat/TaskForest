@@ -1,6 +1,6 @@
 //! "Run New Task" modal overlay for launching an unprivileged command.
 
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, text, text_editor};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
@@ -11,10 +11,44 @@ use crate::focus;
 use taskmanager_theme::Theme;
 
 /// State backing the Run New Task modal.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct RunTaskState {
-    pub command: String,
+    pub command: text_editor::Content,
     pub error_msg: Option<String>,
+}
+
+impl Default for RunTaskState {
+    fn default() -> Self {
+        Self {
+            command: text_editor::Content::new(),
+            error_msg: None,
+        }
+    }
+}
+
+impl RunTaskState {
+    /// The current command draft as one owned string. The dialog's native
+    /// editor owns caret/selection; this projection is the sole reducer input.
+    #[must_use]
+    pub fn command(&self) -> String {
+        self.command.text()
+    }
+
+    /// Canonicalize native editor line endings into the shell's newline
+    /// separator before the existing typed `CommandLaunchRequest` leaves the
+    /// frontend. CRLF-only scripts stay real multi-line commands on Windows.
+    #[must_use]
+    pub fn normalized_command(&self) -> String {
+        self.command().replace("\r\n", "\n").replace('\r', "\n")
+    }
+
+    pub fn perform(&mut self, action: text_editor::Action) {
+        self.command.perform(action);
+    }
+
+    pub fn clear_command(&mut self) {
+        self.command = text_editor::Content::new();
+    }
 }
 
 pub fn run_task_overlay<'a>(
@@ -22,12 +56,12 @@ pub fn run_task_overlay<'a>(
     state: &'a RunTaskState,
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let input = crate::ui::components::plain_text_input(
+    let input = crate::ui::components::multi_line_text_input(
         theme_snapshot,
         Some(FocusTarget::RunTaskCommandInput),
-        t("search.run_command"),
         &state.command,
-        Message::UpdateRunTaskCommand,
+        t("search.run_command"),
+        Message::UpdateRunTaskEditor,
         Some(Message::SubmitRunTask),
         false,
     );

@@ -7,7 +7,7 @@ struct OpticalGlassUniform {
     grain: vec4<f32>,
     element: vec4<f32>,
     viewport: vec4<f32>,
-    ior: f32,
+    refraction: vec2<f32>,
 }
 
 @group(1) @binding(0)
@@ -61,9 +61,15 @@ fn blurred_backdrop(uv: vec2<f32>, radius_px: f32) -> vec4<f32> {
 fn refracted_offset(normal2: vec2<f32>, edge_band: f32, strength_px: f32) -> vec2<f32> {
     let incident = vec3<f32>(0.0, 0.0, -1.0);
     let surface = normalize(vec3<f32>(normal2 * edge_band, 1.0));
-    let ratio = 1.0 / max(glass.ior, 1.0);
+    let ratio = 1.0 / max(glass.refraction.x, 1.0);
     let bent = refract(incident, surface, ratio);
     return -bent.xy * strength_px;
+}
+
+fn fresnel_rim(edge_band: f32) -> f32 {
+    let cos_theta = 1.0 - edge_band;
+    let grazing = pow(1.0 - clamp(cos_theta, 0.0, 1.0), 5.0);
+    return glass.refraction.y + (1.0 - glass.refraction.y) * grazing;
 }
 
 @fragment
@@ -106,6 +112,7 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
         rim_width,
         inside,
     );
+    let fresnel = fresnel_rim(refraction_edge) * specular_rim;
     let mask = 1.0 - smoothstep(-1.0, 0.0, distance);
     let backdrop_uv = (glass.element.xy + in.uv * glass.element.zw)
         / glass.viewport.xy;
@@ -131,14 +138,15 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
     let fill_light = normalize(vec2<f32>(0.55, 0.84));
     let key_dot = max(dot(normal, key_light), 0.0);
     let fill_dot = max(dot(normal, fill_light), 0.0);
-    let key_specular = pow(key_dot, 12.0) * specular_rim * glass.finish.y
-        + key_dot * specular_rim * (glass.finish.y * 0.35);
-    let fill_specular = pow(fill_dot, 8.0) * specular_rim * (glass.finish.y * 0.25)
-        + fill_dot * specular_rim * (glass.finish.y * 0.12);
+    let key_specular = pow(key_dot, 12.0) * fresnel * glass.finish.y
+        + key_dot * fresnel * (glass.finish.y * 0.35);
+    let fill_specular = pow(fill_dot, 8.0) * fresnel * (glass.finish.y * 0.25)
+        + fill_dot * fresnel * (glass.finish.y * 0.12);
     let specular = key_specular + fill_specular;
 
     let inner_rim = 1.0 - smoothstep(0.5, max(glass.optics.z * 0.35, 4.0), inside);
-    let inner_glow = inner_rim * 0.08 * glass.finish.y;
+    let inner_glow = inner_rim * 0.08 * glass.finish.y
+        * (1.0 + glass.refraction.y);
     let dispersion_fringe = vec3<f32>(
         key_dot * 0.06,
         (key_dot + fill_dot) * 0.02,

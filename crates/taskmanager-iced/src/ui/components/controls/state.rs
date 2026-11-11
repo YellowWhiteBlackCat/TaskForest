@@ -4,7 +4,7 @@
 //! `ControlVisualState` is the only vocabulary `control_glass` accepts. This
 //! module owns that conversion and no geometry or interaction policy.
 
-use iced::widget::{button, checkbox, text_input};
+use iced::widget::{button, checkbox, text_editor, text_input};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, Theme};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -61,6 +61,16 @@ impl ControlPaintState {
             checkbox::Status::Active { .. } => Self::Active,
             checkbox::Status::Hovered { .. } => Self::Hovered,
             checkbox::Status::Disabled { .. } => Self::Disabled,
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn from_text_editor(status: text_editor::Status) -> Self {
+        match status {
+            text_editor::Status::Active => Self::Active,
+            text_editor::Status::Hovered => Self::Hovered,
+            text_editor::Status::Focused { .. } => Self::Focused,
+            text_editor::Status::Disabled => Self::Disabled,
         }
     }
 }

@@ -414,7 +414,7 @@ fn modal_scrim_and_cancel_events_never_activate_the_page_underneath() {
                 FocusTarget::RunTaskCommandInput,
             )
             .is_some(),
-            "the opened Run Task surface exposes its tracked command input"
+            "the opened Run Task surface exposes its tracked multi-line command editor"
         );
         let press = dispatch(
             &mut view,

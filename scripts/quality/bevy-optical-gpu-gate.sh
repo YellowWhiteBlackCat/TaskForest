@@ -43,7 +43,7 @@ if [[ "${1:-}" == "--self-test" ]]; then
     mkdir -p "$run_dir"
     : >"$empty_log"
     timeout --kill-after=10s 120s python3 scripts/quality/bevy_optical_gpu_receipt.py self-test
-    receipt_line='optical-gpu receipt: adapter=AdapterInfo { name: "self-test", device_type: DiscreteGpu, backend: Vulkan } operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false'
+    receipt_line='optical-gpu receipt: adapter=AdapterInfo { name: "self-test", device_type: DiscreteGpu, backend: Vulkan } operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false fresnel_rim_proven=false'
     printf '%s\n' "$receipt_line" >"$run_dir/self-test-run.log"
     timeout --kill-after=10s 120s python3 scripts/quality/bevy_optical_gpu_receipt.py write \
         --mode auto --discovery-log "$empty_log" \

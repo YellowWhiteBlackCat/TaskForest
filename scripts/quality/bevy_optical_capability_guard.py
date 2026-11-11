@@ -50,6 +50,11 @@ NESTED_PROOF_TOKENS = (
     "the chain must carry the first optical layer's real pixels",
     "chain_only_capture",
 )
+FRESNEL_PROOF_TOKENS = (
+    "the theme-derived Fresnel lane must change real rim pixels",
+    "fresnel_rim_proven=true",
+    "fresnel_difference",
+)
 
 NESTED_CEILING_PATTERN = re.compile(
     r"OPTICAL_GLASS_MAX_NESTED_LAYERS\s*:\s*u8\s*=\s*(?P<ceiling>\d+)"
@@ -111,6 +116,8 @@ def check_implementation(repo: Path, findings: list[str]) -> None:
         # and by a declared ceiling above one layer.
         for token in NESTED_PROOF_TOKENS:
             require(proof, token, PROOF, findings)
+        for token in FRESNEL_PROOF_TOKENS:
+            require(proof, token, PROOF, findings)
         ceiling = nested_ceiling(capability)
         if ceiling is None:
             findings.append(f"{CAPABILITY}: the nesting ceiling is not declared")
@@ -167,6 +174,10 @@ def evaluate_receipt(
             )
         if not capability.startswith("OPTICAL"):
             findings.append("receipt: PROVEN must report an OPTICAL runtime capability")
+        if current is not None and not bool(receipt.get("fresnel_rim_proven")):
+            findings.append(
+                "receipt: PROVEN must carry the Fresnel rim's measured GPU assertion"
+            )
     elif verdict in {"NO_ADAPTER", "SOFTWARE_ADAPTER", "SKIPPED", "REGRESSION"}:
         if not capability.startswith("PAINTED"):
             findings.append("receipt: a degraded optical proof must explicitly record Painted")
@@ -247,6 +258,7 @@ def self_test() -> int:
                 "operations_proven": operations,
                 "runtime_capability": capability,
                 "nesting_layers_proven": False,
+                "fresnel_rim_proven": verdict == "PROVEN",
             }
             path.write_text(json.dumps(payload), encoding="utf-8")
             loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -265,6 +277,7 @@ def self_test() -> int:
             "runtime_capability": "OPTICAL (proven)",
             "nesting_layers_proven": True,
             "max_nested_layers": 2,
+            "fresnel_rim_proven": True,
         }
         findings = evaluate_receipt(
             nested_ok, current="current", mode="auto", declared_ceiling=2
@@ -292,6 +305,15 @@ def self_test() -> int:
         findings = evaluate_receipt(stale, current="new", mode="auto")
         if "receipt: source digest is stale; re-run the optical GPU gate" not in findings:
             print(f"self-test FAIL: stale receipt was accepted: {findings}")
+            return 1
+
+        no_fresnel = dict(nested_ok)
+        no_fresnel.pop("fresnel_rim_proven")
+        findings = evaluate_receipt(
+            no_fresnel, current="current", mode="auto", declared_ceiling=2
+        )
+        if "receipt: PROVEN must carry the Fresnel rim's measured GPU assertion" not in findings:
+            print(f"self-test FAIL: an unmeasured Fresnel claim was accepted: {findings}")
             return 1
 
         print("bevy-optical capability guard self-test: PASS")

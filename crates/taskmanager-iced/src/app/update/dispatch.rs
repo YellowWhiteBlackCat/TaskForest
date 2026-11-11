@@ -172,7 +172,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::CloseAlertCenter
         | Message::OpenRunTask
         | Message::CloseRunTask
-        | Message::UpdateRunTaskCommand(_)
+        | Message::UpdateRunTaskEditor(_)
         | Message::SubmitRunTask) => MessageDomain::Surface(message),
 
         message @ (Message::SelectPerformanceGraphPoints(_)

@@ -12,6 +12,7 @@ use super::*;
 use iced::widget::canvas;
 use iced::widget::text::Wrapping;
 use std::path::PathBuf;
+use std::rc::Rc;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::metrics::ScalarAvailability;
 use taskforest_core::core::process::ProcessLiveKey;
@@ -231,18 +232,22 @@ fn tree_node_row(
             identity: row.row_key().and_then(|key| key.live_key()),
             flat_index: *flat_index,
         };
-        let parent_button = iced::widget::button(row_content)
-            .on_press(action.clone())
-            .style(move |_theme, status| {
+        crate::ui::components::content_button(crate::ui::components::ContentButtonOptions {
+            content: row_content.into(),
+            style: Rc::new(move |_theme, status| {
                 theme::header_button_style(&theme_snapshot, status, selected)
-            })
-            .padding(0);
-        focus::focusable_control(
-            &theme_snapshot,
-            FocusTarget::ProcessTreeNode(*flat_index),
-            parent_button.into(),
-            action,
-        )
+            }),
+            padding: iced::Padding::ZERO,
+            width: None,
+            height: None,
+            on_press: Some(action),
+            target: Some(FocusTarget::ProcessTreeNode(*flat_index)),
+            focus_color: theme::focus_ring_color(&theme_snapshot, false),
+            focus_radius: f32::from(theme_snapshot.palette().control_radius),
+            activate_on_pointer: false,
+            enabled: true,
+            clip: false,
+        })
     } else {
         let identity = row.row_key().and_then(|key| key.live_key());
         let row_element = match identity {
@@ -680,21 +685,27 @@ fn group_header_row(
         name: expansion_key.clone(),
         row_key: *row_key,
     };
-    let header = iced::widget::button(container(
-        iced::widget::row(cells)
-            .padding(theme::row_padding(ctx.compact))
-            .spacing(theme::table_column_spacing()),
-    ))
-    .on_press(action.clone())
-    .style(move |_theme, status| theme::header_button_style(&theme_snapshot, status, selected))
-    .padding(0)
-    .width(Length::Fill);
-    focus::focusable_control(
-        &theme_snapshot,
-        FocusTarget::ProcessGroupHeader(row_index),
-        header.into(),
-        action,
-    )
+    crate::ui::components::content_button(crate::ui::components::ContentButtonOptions {
+        content: container(
+            iced::widget::row(cells)
+                .padding(theme::row_padding(ctx.compact))
+                .spacing(theme::table_column_spacing()),
+        )
+        .into(),
+        style: Rc::new(move |_theme, status| {
+            theme::header_button_style(&theme_snapshot, status, selected)
+        }),
+        padding: iced::Padding::ZERO,
+        width: Some(Length::Fill),
+        height: None,
+        on_press: Some(action),
+        target: Some(FocusTarget::ProcessGroupHeader(row_index)),
+        focus_color: theme::focus_ring_color(&theme_snapshot, false),
+        focus_radius: f32::from(theme_snapshot.palette().control_radius),
+        activate_on_pointer: false,
+        enabled: true,
+        clip: false,
+    })
 }
 
 /// One per-row CPU sparkline cell, or a same-width blank container when the

@@ -5,6 +5,7 @@
 
 use super::super::{Hover, PresentationSnapshot, RootView, SelectedDevice, TopPage};
 use super::init_search_entity;
+use crate::gpui_app::list_view;
 use crate::gpui_app::root::{containers_view, elements, i18n, responsive};
 use gpui::{AppContext, Context, Div, Pixels, Window, px};
 use taskforest_core::core::metrics::SystemSnapshot;
@@ -49,6 +50,7 @@ struct PageRenderContext<'a> {
     page_padding: f32,
     content_width: Pixels,
     presentation: PresentationSnapshot,
+    list_page_budget: list_view::ListPageBudget,
 }
 
 impl RootView {
@@ -67,6 +69,12 @@ impl RootView {
             .source_retry_button
             .get_or_insert_with(|| cx.new(|cx| ButtonState::new(cx)))
             .clone();
+        let presentation = self.presentation_snapshot();
+        let list_page_budget = list_view::ListPageBudget::from_page_layout(
+            layout,
+            presentation.appearance.ui_size,
+            presentation.appearance.density,
+        );
         let context = PageRenderContext {
             theme: frame.theme,
             snapshot: frame.snapshot,
@@ -79,36 +87,20 @@ impl RootView {
             layout,
             page_padding,
             content_width,
-            presentation: self.presentation_snapshot(),
+            presentation,
+            list_page_budget,
         };
         match self.page {
             TopPage::Performance => self.render_performance_page(cx, context),
             TopPage::Apps => self.render_apps_page(window, cx, context),
-            TopPage::Services => self.render_services_page(
-                window,
-                cx,
-                context.theme,
-                context.hovered,
-                source_retry_button.clone(),
-                context.page_padding,
-            ),
+            TopPage::Services => {
+                self.render_services_page(window, cx, context, source_retry_button.clone())
+            }
             TopPage::System => self.render_system_page(cx, context),
-            TopPage::Startup => self.render_startup_page(
-                window,
-                cx,
-                context.theme,
-                context.hovered,
-                source_retry_button.clone(),
-                context.layout,
-            ),
-            TopPage::Users => self.render_users_page(
-                window,
-                cx,
-                context.theme,
-                context.hovered,
-                source_retry_button,
-                context.page_padding,
-            ),
+            TopPage::Startup => {
+                self.render_startup_page(window, cx, context, source_retry_button.clone())
+            }
+            TopPage::Users => self.render_users_page(window, cx, context, source_retry_button),
             TopPage::AppHistory => self.render_app_history_page(cx, context),
             TopPage::Containers => self.render_containers_page(context),
         }

@@ -28,7 +28,6 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use crate::gpui_app::elements;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
 use taskforest_core::core::services::ServiceAction;
@@ -45,14 +44,15 @@ use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent,
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 use taskmanager_ui::primitives::button::ButtonState;
-use taskmanager_ui::primitives::toolbar::Toolbar;
 use taskmanager_ui_contract::IconId;
 
 pub use crate::gpui_app::list_view::ActionFeedback;
 
+mod action_bar;
 mod details;
 mod details_state;
 mod projection;
+use action_bar::{ActionBarProps, action_bar};
 pub use details::{render_details, render_service_log_section};
 pub(crate) use details_state::ServiceLogExportNotice;
 pub use details_state::{ServiceDetailsSnapshot, ServiceDetailsState};
@@ -410,6 +410,8 @@ fn build_service_menu(root: Entity<RootView>) -> Vec<MenuEntry> {
 /// consolidation); `window`/`cx` stay explicit render-lifetime handles.
 pub struct ServicesViewProps<'a> {
     pub theme: &'a Theme,
+    /// Frame-derived header/body slot allocation.
+    pub page_budget: list_view::ListPageBudget,
     pub items: &'a [ServiceItem],
     pub sources: &'a [SourceStatus],
     pub selected: Option<&'a ServiceId>,
@@ -432,6 +434,7 @@ pub fn render_services(
 ) -> Div {
     let ServicesViewProps {
         theme,
+        page_budget,
         // The full list is no longer read here: the action bar keys off the
         // selected/hovered identities and the table body reads the memoized
         // `rows` projection.
@@ -556,256 +559,8 @@ pub fn render_services(
         .into_any_element()
     };
 
-    list_view::ListPageScaffold::new(header, body).render()
-}
-
-// ── action bar (Start / Stop / Restart / Enable / Disable) ───────────────────
-
-/// Build the Services action bar: Start / Stop / Restart / Enable / Disable /
-/// Details, each inert until a row is selected, plus a trailing status line.
-/// Each button re-scans services on success; the typed outcome lands in the
-/// shell-owned feedback slot and the status line renders its render-time fold
-/// (`RootView::services_feedback`) or a selection hint via the shared
-/// [`list_view::feedback_status_line`].
-struct ActionBarProps<'a> {
-    theme: &'a Theme,
-    selected: Option<&'a ServiceId>,
-    selected_name: Option<&'a str>,
-    hovered: Option<&'a Hover>,
-    feedback: Option<ActionFeedback>,
-}
-
-fn action_bar(props: ActionBarProps<'_>, cx: &mut Context<RootView>) -> Div {
-    let ActionBarProps {
-        theme,
-        selected,
-        selected_name,
-        hovered,
-        feedback,
-    } = props;
-    // Transient action feedback (folded at render time from the shell-owned
-    // typed outcome by `RootView::services_feedback`); when present it takes
-    // the status line over the selection hint.
-    let hint = match selected_name {
-        Some(name) => format!("{} {}", i18n::t("hint.selected"), name),
-        None => i18n::t("hint.select_service").to_string(),
-    };
-    // RootView entity, captured (cloned) into each action button's on_click /
-    // on_hover closures so `elements::tool_btn` stays decoupled from `root` — the
-    // same entity-binding pattern `filter_pill` (above) uses for the status pills.
-    // `hovered_bool` mirrors filter_pill's `is_hov`: enabled AND this label hovered.
-    let entity = cx.entity();
-    Toolbar::new()
-        .debug_selector("tm-svc-action-bar")
-        .child({
-            let label = "Start";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("svc.start"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.request_service_action(n, ServiceAction::Start);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child({
-            let label = "Stop";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("svc.stop"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.request_service_control_confirmation(n, ServiceAction::Stop);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child({
-            let label = "Restart";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("svc.restart"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.request_service_control_confirmation(n, ServiceAction::Restart);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child({
-            let label = "Enable";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("common.enable"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.request_service_action(n, ServiceAction::Enable);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child({
-            let label = "Disable";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("common.disable"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.request_service_control_confirmation(n, ServiceAction::Disable);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child({
-            let label = "Details";
-            let enabled = selected.is_some_and(|id| !id.as_str().is_empty());
-            let hovered_bool = enabled && hovered == Some(&Hover::Static(label));
-            let ent_c = entity.clone();
-            let ent_h = entity.clone();
-            elements::tool_btn(
-                theme,
-                label,
-                i18n::t("common.details"),
-                enabled,
-                hovered_bool,
-                move |_win: &mut Window, cx: &mut App| {
-                    ent_c.update(cx, |v, cx| {
-                        if let Some(n) = v.selected_service.clone() {
-                            v.open_service_details(n);
-                            cx.notify();
-                        }
-                    });
-                },
-                move |is_hov: &bool, _win: &mut Window, cx: &mut App| {
-                    ent_h.update(cx, |v, cx| {
-                        v.set_hover(
-                            if *is_hov {
-                                Some(Hover::Static(label))
-                            } else {
-                                None
-                            },
-                            cx,
-                        );
-                    });
-                },
-            )
-        })
-        .child(list_view::feedback_status_line(
-            theme,
-            feedback.as_ref(),
-            &hint,
-        ))
+    list_view::ListPageScaffold::new(&theme, header, body)
+        .budget(page_budget)
         .render()
 }
 

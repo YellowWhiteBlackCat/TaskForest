@@ -26,9 +26,10 @@ use taskmanager_theme::{
 };
 
 use super::optical::{
-    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassSurface,
-    OpticalGlassUniform,
+    OPTICAL_GLASS_MAX_BLUR_PX, OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster,
+    OpticalGlassSurface, OpticalGlassUniform,
 };
+use super::optical_wesl::OpticalGlassParams;
 use super::{
     GlassNoise, GlassNoiseLayer, GlassPanelMaterial, build_glass_noise, card_material,
     noise_overlay_scene, panel_material, register,
@@ -250,6 +251,16 @@ fn optical_uniform_projects_the_shared_spec_without_private_constants() {
     });
     assert_eq!(uniform.grain.w, spec.grain_strength);
     assert_eq!(uniform.element, Vec4::new(220.0, 150.0, 520.0, 300.0));
+    assert_eq!(
+        uniform.refraction,
+        Vec2::new(
+            OpticalGlassParams::DEFAULT_IOR,
+            OpticalGlassParams::from_spec(spec, geometry)
+                .admitted(OPTICAL_GLASS_MAX_BLUR_PX)
+                .expect("the card Fresnel lane admits")
+                .fresnel_base,
+        )
+    );
     assert_eq!(
         uniform.viewport,
         Vec4::new(1600.0, 900.0, geometry.corner_radius_px, 2.0)

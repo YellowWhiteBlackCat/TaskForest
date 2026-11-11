@@ -562,8 +562,8 @@ pub enum Message {
     OpenRunTask,
     /// Close the Run New Task modal.
     CloseRunTask,
-    /// Update the Run New Task command string.
-    UpdateRunTaskCommand(String),
+    /// Apply one native multi-line editor action to the Run Task command draft.
+    UpdateRunTaskEditor(iced::widget::text_editor::Action),
     /// Submit the Run New Task action.
     SubmitRunTask,
 }

@@ -8,6 +8,7 @@ use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::{Focusable, Operation, TextInput};
 use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, NativeCode, Physical};
+use iced::widget::text_editor;
 use iced::{Element, Event, Point, Rectangle, Size, Vector, mouse};
 use taskforest_core::core::config::DeviceVisibilityKey;
 use taskmanager_application::AppPage;
@@ -95,6 +96,25 @@ impl Operation<()> for InputBounds {
     fn text_input(&mut self, _id: Option<&Id>, bounds: Rectangle, _state: &mut dyn TextInput) {
         self.0.push(bounds);
     }
+}
+
+fn editor_bounds(
+    element: &mut TestElement<'_>,
+    tree: &mut Tree,
+    node: &Node,
+    renderer: &iced::Renderer,
+    target: Id,
+) -> Rectangle {
+    let mut operation = FocusableBounds {
+        target,
+        bounds: None,
+    };
+    element
+        .as_widget_mut()
+        .operate(tree, Layout::new(node), renderer, &mut operation);
+    operation
+        .bounds
+        .expect("the production surface exposes its multi-line editor focus stop")
 }
 
 fn input_bounds(
@@ -239,6 +259,19 @@ fn key_pressed(named: Named, code: Code) -> Event {
     })
 }
 
+fn command_key_pressed(named: Named, code: Code) -> Event {
+    let key = Key::Named(named);
+    Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key: key.clone(),
+        modified_key: key,
+        physical_key: Physical::Code(code),
+        location: iced::keyboard::Location::Standard,
+        modifiers: iced::keyboard::Modifiers::COMMAND,
+        text: None,
+        repeat: false,
+    })
+}
+
 fn character_pressed(character: char) -> Event {
     let text = character.to_string();
     let key = Key::Character(text.clone().into());
@@ -267,8 +300,14 @@ fn type_run_task_x(app: &mut crate::IcedApp, renderer: &iced::Renderer, viewport
     let mut element = run_task_view(app);
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, renderer, viewport);
-    let bounds = input_bounds(&mut element, &mut tree, &node, renderer);
-    let point = Point::new(bounds.x + bounds.width - 4.0, bounds.center_y());
+    let bounds = editor_bounds(
+        &mut element,
+        &mut tree,
+        &node,
+        renderer,
+        Id::from(crate::focus::focus_id(FocusTarget::RunTaskCommandInput)),
+    );
+    let point = Point::new(bounds.x + bounds.width / 2.0, bounds.center_y());
     let _ = click_messages(&mut element, &mut tree, &node, renderer, &viewport, point);
     let edited = dispatch(
         &mut element,
@@ -280,23 +319,26 @@ fn type_run_task_x(app: &mut crate::IcedApp, renderer: &iced::Renderer, viewport
         mouse::Cursor::Available(point),
     );
     assert!(
-        edited.iter().any(
-            |message| matches!(message, Message::UpdateRunTaskCommand(command) if command == "x")
-        ),
-        "typing in the mounted Run Task TextInput publishes its edit"
+        edited.iter().any(|message| matches!(
+            message,
+            Message::UpdateRunTaskEditor(text_editor::Action::Edit(text_editor::Edit::Insert('x')))
+        )),
+        "typing in the mounted Run Task multi-line editor publishes its edit"
     );
     drop(element);
     apply(app, edited);
     assert_eq!(
-        app.run_task.command, "x",
+        app.run_task.command(),
+        "x",
         "the consumer stores the edited buffer"
     );
 }
 
-/// Run Task's production TextInput edits the command, Enter submits it, and
-/// Escape dismisses the local surface without sending a launch request.
+/// Run Task's production multi-line editor edits the command, Ctrl/Cmd-Enter
+/// submits it, and Escape dismisses the local surface without sending a launch
+/// request. Plain Enter remains an editor newline, never a launch shortcut.
 #[test]
-fn run_task_text_input_edits_submits_and_escape_cancels() {
+fn run_task_editor_edits_submits_and_escape_cancels() {
     let renderer = renderer();
     let viewport = viewport();
     let mut app = crate::IcedApp::demo();
@@ -306,10 +348,16 @@ fn run_task_text_input_edits_submits_and_escape_cancels() {
     let mut element = run_task_view(&app);
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, viewport);
-    let bounds = input_bounds(&mut element, &mut tree, &node, &renderer);
-    let point = Point::new(bounds.x + bounds.width - 4.0, bounds.center_y());
+    let bounds = editor_bounds(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        Id::from(crate::focus::focus_id(FocusTarget::RunTaskCommandInput)),
+    );
+    let point = Point::new(bounds.x + bounds.width / 2.0, bounds.center_y());
     let _ = click_messages(&mut element, &mut tree, &node, &renderer, &viewport, point);
-    let submitted = dispatch(
+    let newline = dispatch(
         &mut element,
         &mut tree,
         &node,
@@ -319,19 +367,36 @@ fn run_task_text_input_edits_submits_and_escape_cancels() {
         mouse::Cursor::Available(point),
     );
     assert!(
+        newline.iter().any(|message| matches!(
+            message,
+            Message::UpdateRunTaskEditor(text_editor::Action::Edit(text_editor::Edit::Enter))
+        )),
+        "plain Enter edits a newline in the multi-line command"
+    );
+    let submitted = dispatch(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        &viewport,
+        command_key_pressed(Named::Enter, Code::Enter),
+        mouse::Cursor::Available(point),
+    );
+    assert!(
         submitted
             .iter()
             .any(|message| matches!(message, Message::SubmitRunTask)),
-        "Enter in the production TextInput reaches its submit message"
+        "Ctrl/Cmd-Enter in the production editor reaches its submit message"
     );
     drop(element);
+    apply(&mut app, newline);
     apply(&mut app, submitted);
     assert!(
         !app.run_task_open(),
         "committing closes the Run Task surface"
     );
     assert!(
-        app.run_task.command.is_empty(),
+        app.run_task.command().is_empty(),
         "committing clears the draft"
     );
 
@@ -342,8 +407,14 @@ fn run_task_text_input_edits_submits_and_escape_cancels() {
     let mut element = run_task_view(&canceled);
     let mut tree = Tree::new(&element);
     let node = layout(&mut element, &mut tree, &renderer, viewport);
-    let bounds = input_bounds(&mut element, &mut tree, &node, &renderer);
-    let point = Point::new(bounds.x + bounds.width - 4.0, bounds.center_y());
+    let bounds = editor_bounds(
+        &mut element,
+        &mut tree,
+        &node,
+        &renderer,
+        Id::from(crate::focus::focus_id(FocusTarget::RunTaskCommandInput)),
+    );
+    let point = Point::new(bounds.x + bounds.width / 2.0, bounds.center_y());
     let _ = click_messages(&mut element, &mut tree, &node, &renderer, &viewport, point);
     let _ = dispatch(
         &mut element,
@@ -369,7 +440,8 @@ fn run_task_text_input_edits_submits_and_escape_cancels() {
         "canceling does not create a launch session"
     );
     assert_eq!(
-        canceled.run_task.command, "x",
+        canceled.run_task.command(),
+        "x",
         "canceling preserves the unsubmitted command draft"
     );
 }

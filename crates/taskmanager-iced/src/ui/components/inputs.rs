@@ -20,6 +20,7 @@
 //!   choice list renders no dead track.
 
 use std::ops::RangeInclusive;
+use std::rc::Rc;
 
 use iced::widget::{Space, button, container, row, text};
 use iced::{Background, Border, Color, Length};
@@ -30,7 +31,7 @@ use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use super::IcedElement;
 use crate::app::{FocusTarget, Message};
-use crate::focus::{FocusableButton, focus_id};
+use crate::focus::focus_id;
 use crate::theme::{self, ControlVisualState};
 
 /// Switch track width (GPUI parity: 36px pill).
@@ -81,26 +82,21 @@ pub(crate) fn switch<'a>(
         .height(Length::Fixed(SWITCH_TRACK_HEIGHT));
 
     let press = on_toggle(!enabled);
-    let control = button(track)
-        .padding(0.0)
-        .width(Length::Fixed(SWITCH_TRACK_WIDTH))
-        .height(Length::Fixed(SWITCH_TRACK_HEIGHT))
-        .style(move |_theme, status| switch_track_style(&theme_snapshot, enabled, status));
-    if disabled {
-        // Without `on_press` the iced button never fires and its style never
-        // leaves `Status::Disabled`; no focus wrapper means no Tab stop.
-        return control.into();
-    }
-    FocusableButton::new(
-        focus_id(focus_target),
-        control.on_press(press.clone()).into(),
-        press,
-        focus_target,
-        theme::focus_ring_color(&theme_snapshot, false),
-        theme::scaled_radius(&theme_snapshot, palette.control_radius),
-        false,
-    )
-    .into()
+    let style_theme = theme_snapshot;
+    super::content_button(super::ContentButtonOptions {
+        content: track.into(),
+        style: Rc::new(move |_theme, status| switch_track_style(&style_theme, enabled, status)),
+        padding: iced::Padding::ZERO,
+        width: Some(Length::Fixed(SWITCH_TRACK_WIDTH)),
+        height: Some(Length::Fixed(SWITCH_TRACK_HEIGHT)),
+        on_press: Some(press),
+        target: (!disabled).then_some(focus_target),
+        focus_color: theme::focus_ring_color(&theme_snapshot, false),
+        focus_radius: theme::scaled_radius(&theme_snapshot, palette.control_radius),
+        activate_on_pointer: false,
+        enabled: !disabled,
+        clip: false,
+    })
 }
 
 /// The switch track fill for one pointer/disabled status, read off the
@@ -374,12 +370,20 @@ pub(crate) fn search_input<'a>(
     .padding(f32::from(tokens::SPACE_4))
     .align_y(iced::Alignment::Center);
     if search_shows_clear(value) {
-        field = field.push(
-            button(crate::icons::icon(theme_snapshot, IconId::Close, 12.0))
-                .padding(f32::from(tokens::SPACE_2))
-                .style(move |_theme, status| search_clear_style(theme_snapshot, status))
-                .on_press(clear),
-        );
+        field = field.push(super::content_button(super::ContentButtonOptions {
+            content: crate::icons::icon(theme_snapshot, IconId::Close, 12.0),
+            style: Rc::new(move |_theme, status| search_clear_style(theme_snapshot, status)),
+            padding: iced::Padding::from(f32::from(tokens::SPACE_2)),
+            width: None,
+            height: None,
+            on_press: Some(clear),
+            target: None,
+            focus_color: crate::theme_binding::color(theme_snapshot.palette().ring),
+            focus_radius: f32::from(theme_snapshot.palette().control_radius),
+            activate_on_pointer: true,
+            enabled: true,
+            clip: false,
+        }));
     }
     // ONE glass surface around the whole field: the icon, the input and the
     // clear affordance share a single material, never a nested panel.
@@ -493,13 +497,25 @@ pub(crate) fn segmented<'a>(
                     })
                     .into()
             });
-            let segment: IcedElement<'a> = button(text(label.clone()))
-                .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-                .style(move |_theme, status| {
+            let segment: IcedElement<'a> = super::content_button(super::ContentButtonOptions {
+                content: text(label.clone()).into(),
+                style: Rc::new(move |_theme, status| {
                     segment_style(theme_snapshot, index, choice_count, selected, status)
-                })
-                .on_press(on_change(*value))
-                .into();
+                }),
+                padding: iced::Padding::from([
+                    f32::from(tokens::SPACE_4),
+                    f32::from(tokens::SPACE_10),
+                ]),
+                width: None,
+                height: None,
+                on_press: Some(on_change(*value)),
+                target: None,
+                focus_color: crate::theme_binding::color(theme_snapshot.palette().ring),
+                focus_radius: f32::from(theme_snapshot.palette().control_radius),
+                activate_on_pointer: true,
+                enabled: true,
+                clip: false,
+            });
             (divider, segment)
         })
         .unzip();

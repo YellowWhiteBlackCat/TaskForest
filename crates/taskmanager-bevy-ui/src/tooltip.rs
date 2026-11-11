@@ -429,7 +429,8 @@ fn arm_tooltip_overlay(
     targets: Query<(Entity, &TooltipText, &ComputedNode, &UiGlobalTransform)>,
     mut commands: Commands,
 ) {
-    if demo.is_none() || crate::capture::capture_scenario_target() != Some("tooltip-overlay") {
+    let scenario = crate::capture::capture_scenario_target();
+    if demo.is_none() || !matches!(scenario, Some("tooltip-overlay")) {
         return;
     }
     let Some(mut state) = state else {

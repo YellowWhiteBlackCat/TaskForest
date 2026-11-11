@@ -27,6 +27,7 @@ RECEIPT_LINE = re.compile(
     r"optical-gpu receipt:\s*adapter=(?P<adapter>.*?)\s+operations=(?P<operations>[A-Za-z,]+)"
     r"\s+max_nested_layers=(?P<nested>\d+)\s+max_blur_px=(?P<blur>\d+)"
     r"\s+nesting_layers_proven=(?P<nesting_proven>true|false)"
+    r"\s+fresnel_rim_proven=(?P<fresnel_proven>true|false)"
 )
 OPERATIONS = (
     "BackdropSampling",
@@ -47,6 +48,7 @@ DIGEST_FILES = (
     "crates/taskmanager-bevy-ui/src/glass/optical/capability.rs",
     "crates/taskmanager-bevy-ui/src/glass/optical/scene.rs",
     "crates/taskmanager-bevy-ui/src/glass/optical_glass.wesl",
+    "crates/taskmanager-bevy-ui/src/glass/optical_wesl.rs",
     "crates/taskmanager-bevy-ui/src/palette.rs",
     "crates/taskmanager-bevy-ui/src/window/backdrop_capture.rs",
     "crates/taskmanager-bevy-ui/tests/gui/optical_gpu.rs",
@@ -106,6 +108,7 @@ def classify(
             "max_blur_px": 0,
             "adapter": None,
             "nesting_layers_proven": False,
+            "fresnel_rim_proven": False,
         }
 
     if not discovered:
@@ -119,6 +122,7 @@ def classify(
             "max_blur_px": None,
             "adapter": None,
             "nesting_layers_proven": False,
+            "fresnel_rim_proven": False,
         }
 
     parsed = parse_run_log(log)
@@ -134,6 +138,7 @@ def classify(
                 "max_blur_px": None,
                 "adapter": None,
                 "nesting_layers_proven": False,
+                "fresnel_rim_proven": False,
             }
         operations = parsed["operations"].split(",")
         if operations != list(OPERATIONS):
@@ -147,6 +152,7 @@ def classify(
                 "max_blur_px": int(parsed["blur"]),
                 "adapter": parsed["adapter"],
                 "nesting_layers_proven": parsed["nesting_proven"] == "true",
+                "fresnel_rim_proven": parsed["fresnel_proven"] == "true",
             }
         if "device_type: Cpu" in parsed["adapter"]:
             return {
@@ -162,6 +168,7 @@ def classify(
                 "max_blur_px": int(parsed["blur"]),
                 "adapter": parsed["adapter"],
                 "nesting_layers_proven": parsed["nesting_proven"] == "true",
+                "fresnel_rim_proven": parsed["fresnel_proven"] == "true",
             }
         return {
             "verdict": "PROVEN",
@@ -173,6 +180,7 @@ def classify(
             "max_blur_px": int(parsed["blur"]),
             "adapter": parsed["adapter"],
             "nesting_layers_proven": parsed["nesting_proven"] == "true",
+            "fresnel_rim_proven": parsed["fresnel_proven"] == "true",
         }
 
     if NO_ADAPTER_SIGNATURE in log:
@@ -189,6 +197,7 @@ def classify(
             "max_blur_px": 0,
             "adapter": None,
             "nesting_layers_proven": False,
+            "fresnel_rim_proven": False,
         }
 
     reason = "the ignored GPU proof failed; this is a production optical regression"
@@ -204,6 +213,7 @@ def classify(
         "max_blur_px": int(parsed["blur"]) if parsed else None,
         "adapter": parsed["adapter"] if parsed else None,
         "nesting_layers_proven": parsed["nesting_proven"] == "true" if parsed else False,
+        "fresnel_rim_proven": parsed["fresnel_proven"] == "true" if parsed else False,
     }
 
 
@@ -302,7 +312,8 @@ def self_test() -> int:
         'optical-gpu receipt: adapter=AdapterInfo { name: "GPU", '
         "device_type: DiscreteGpu, backend: Vulkan } "
         "operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain "
-        "max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false"
+        "max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false "
+        "fresnel_rim_proven=false"
     )
     no_adapter = f"panicked at renderer/mod.rs:1: {NO_ADAPTER_SIGNATURE}"
     failure = "assertion failed: blur should suppress high-frequency backdrop detail"
@@ -331,7 +342,8 @@ def self_test() -> int:
         'optical-gpu receipt: adapter=AdapterInfo { name: "llvmpipe", '
         "device_type: Cpu, backend: Vulkan } "
         "operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain "
-        "max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false"
+        "max_nested_layers=1 max_blur_px=64 nesting_layers_proven=false "
+        "fresnel_rim_proven=false"
     )
     result = classify(mode="auto", exit_code=0, discovered=True, log=software)
     if (
@@ -353,7 +365,8 @@ def self_test() -> int:
         'optical-gpu receipt: adapter=AdapterInfo { name: "GPU", '
         "device_type: DiscreteGpu, backend: Vulkan } "
         "operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain "
-        "max_nested_layers=2 max_blur_px=64 nesting_layers_proven=true"
+        "max_nested_layers=2 max_blur_px=64 nesting_layers_proven=true "
+        "fresnel_rim_proven=true"
     )
     result = classify(mode="auto", exit_code=0, discovered=True, log=nested)
     if (
@@ -361,6 +374,7 @@ def self_test() -> int:
         or result["runtime_capability"] != "OPTICAL (proven)"
         or result.get("max_nested_layers") != 2
         or result.get("nesting_layers_proven") is not True
+        or result.get("fresnel_rim_proven") is not True
         or bool(result["blocking"])
     ):
         print(f"self-test FAIL: proven nested-layer classification: {result}")

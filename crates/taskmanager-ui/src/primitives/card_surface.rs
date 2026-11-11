@@ -24,6 +24,8 @@ use taskmanager_theme::{Color, GlassTier, Length, Palette, tokens};
 pub enum GlassSurfaceRole {
     /// Persistent side navigation or titlebar chrome.
     Chrome,
+    /// A page header that already sits inside the page viewport.
+    PageHeader,
     /// Anchored popup / context / dropdown menu panel.
     Menu,
     /// Transient status receipt card.
@@ -42,7 +44,9 @@ impl GlassSurfaceRole {
     pub const fn tier(self) -> GlassTier {
         match self {
             Self::Chrome => GlassTier::Sidebar,
-            Self::Menu | Self::Toast | Self::Tooltip | Self::InlinePlot => GlassTier::Card,
+            Self::Menu | Self::Toast | Self::Tooltip | Self::PageHeader | Self::InlinePlot => {
+                GlassTier::Card
+            }
             Self::Dialog => GlassTier::Modal,
         }
     }
@@ -52,7 +56,7 @@ impl GlassSurfaceRole {
     pub const fn elevation(self) -> SurfaceElevation {
         match self {
             Self::Menu | Self::Toast | Self::Tooltip | Self::Dialog => SurfaceElevation::Floating,
-            Self::Chrome | Self::InlinePlot => SurfaceElevation::Inset,
+            Self::Chrome | Self::PageHeader | Self::InlinePlot => SurfaceElevation::Inset,
         }
     }
 }

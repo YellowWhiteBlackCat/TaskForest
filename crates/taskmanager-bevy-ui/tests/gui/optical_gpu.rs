@@ -25,7 +25,9 @@ use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
 use bevy::ui_render::prelude::MaterialNode;
 use bevy::window::{ExitCondition, WindowPlugin};
 use bevy::winit::WinitPlugin;
-use taskmanager_theme::optical_glass::{OpticalGlassContext, OpticalGlassSpec};
+use taskmanager_theme::optical_glass::{
+    OpticalGlassContext, OpticalGlassQuality, OpticalGlassSpec,
+};
 use taskmanager_theme::{GlassTier, Theme};
 
 use super::capability::{OPTICAL_GLASS_MAX_BLUR_PX, OPTICAL_GLASS_MAX_NESTED_LAYERS};
@@ -48,6 +50,7 @@ struct Targets {
     outputs: Vec<Handle<Image>>,
     chain: Handle<Image>,
     chain_only_capture: Handle<Image>,
+    nested_output: Handle<Image>,
 }
 
 #[derive(Default, Resource)]
@@ -81,7 +84,7 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     let adapter = app.world().resource::<RenderAdapterInfo>();
     let adapter_info: &WgpuAdapterInfo = adapter;
     println!(
-        "optical-gpu receipt: adapter={adapter_info:?} operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers={} max_blur_px={} nesting_layers_proven=true",
+        "optical-gpu receipt: adapter={adapter_info:?} operations=BackdropSampling,Blur,Refraction,Dispersion,Specular,Grain max_nested_layers={} max_blur_px={} nesting_layers_proven=true fresnel_rim_proven=true",
         OPTICAL_GLASS_MAX_NESTED_LAYERS, OPTICAL_GLASS_MAX_BLUR_PX
     );
 
@@ -94,6 +97,8 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     let specular = &first[4];
     let grained = &first[5];
     let translucent = &first[6];
+    let fresnel = &first[7];
+    let fresnel_and_dispersion = &first[8];
 
     let baseline_energy = gradient_energy(baseline);
     let blur_energy = gradient_energy(blur);
@@ -120,6 +125,11 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
         specular_peak > 8,
         "the lit rim should brighten edge pixels: {specular_peak}"
     );
+    let fresnel_difference = edge_difference(fresnel, fresnel_and_dispersion);
+    assert!(
+        fresnel_difference > 1.0,
+        "the theme-derived Fresnel lane must change real rim pixels: {fresnel_difference}"
+    );
     let grain_delta = interior_difference(refracted, grained);
     assert!(
         grain_delta > 5.0,
@@ -134,15 +144,33 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
 
     let chain = app.world().resource::<Targets>().chain.clone();
     let chain_only = app.world().resource::<Targets>().chain_only_capture.clone();
+    let nested = app.world().resource::<Targets>().nested_output.clone();
     // A second layer samples the CHAIN target, which holds the first layer's
-    // real optical output rather than the painted lower composite. The proof
-    // below compares the chain with the flat backdrop and with a second
-    // optical layer rendered from that same chain.
-    let chain_images = capture(&mut app, &[chain_only, chain.clone()]);
+    // real optical output rather than the painted lower composite. Both the
+    // chain pixels and the second layer's own output are measured here.
+    let chain_images = capture(&mut app, &[chain_only, chain.clone(), nested.clone()]);
     let chain_capture = &chain_images[0];
+    let chain_layer_capture = &chain_images[1];
+    let nested_capture = &chain_images[2];
     assert!(
         interior_difference(baseline, chain_capture) > 8.0,
         "the chain must carry the first optical layer's real pixels"
+    );
+    assert!(
+        interior_difference(baseline, chain_layer_capture) > 8.0,
+        "the chain layer must carry the first optical layer's real pixels"
+    );
+    assert!(
+        interior_difference(baseline, nested_capture) > 8.0,
+        "the first optical layer must carry its real pixels into the second layer"
+    );
+    assert!(
+        interior_difference(chain_capture, nested_capture) > 1.0,
+        "the nested optical layer must visibly transform the first layer's chain"
+    );
+    assert!(
+        interior_difference(chain_capture, chain_layer_capture) < 0.01,
+        "the chain-only capture and the chain layer must be the same real first-layer pixels"
     );
 
     for &(x, y) in &[(10, 10), (LEFT + 1, TOP + 1), (LEFT + 3, TOP + 3)] {
@@ -175,8 +203,8 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
         "the material must sample the changed lower scene"
     );
     assert!(
-        interior_difference(chain_capture, &second[3]) > 1.0,
-        "the second layer's backdrop must change when the first layer changes"
+        interior_difference(chain_capture, &second[8]) > 1.0,
+        "the second layer's own pixels must change when the first layer changes"
     );
 }
 
@@ -210,7 +238,7 @@ fn setup(
 
     let grain = images.add(solid_image());
     let mut outputs = Vec::new();
-    for index in 0..7 {
+    for index in 0..9 {
         let output = target(&mut images);
         let camera = commands
             .spawn((
@@ -240,6 +268,19 @@ fn setup(
             }
             if index == 6 {
                 spec.frost_opacity = 0.5;
+            }
+            if index == 7 {
+                spec.refraction_strength_rem = 14.0;
+                spec.specular_width_rem = 6.0;
+                spec.specular_intensity = 1.0;
+                spec.quality = OpticalGlassQuality::Low;
+            }
+            if index == 8 {
+                spec.refraction_strength_rem = 14.0;
+                spec.chromatic_dispersion = 0.45;
+                spec.specular_width_rem = 6.0;
+                spec.specular_intensity = 1.0;
+                spec.quality = OpticalGlassQuality::High;
             }
             let geometry = spec
                 .resolve(OpticalGlassContext::new(1.0, 1.0))
@@ -440,6 +481,7 @@ fn setup(
         outputs,
         chain,
         chain_only_capture,
+        nested_output,
     });
 }
 

@@ -12,12 +12,12 @@ native selection and renderer caches; all shared types use their defining module
 - `src/ui/components.rs` owns shared Iced surfaces, the root page scaffold,
   key/value rows and the state-panel grammar;
   `src/ui/components/controls.rs` plus `controls/` own the GPUI-parity
-  activation/layout family: button, icon button, pill, checkbox, section
-  header, toolbar, label, single-line input and the component-layer spinner
-  entry; the product has no multi-line text surface today (the GPUI
-  reference input is single-line as well), so the multi-line editor shape
-  lives in the behavior suite — built from the same glass and geometry
-  seams — instead of the production tree;
+  activation/layout family: the one `content_button` native-button adapter,
+  button, icon button, pill, checkbox, section header, toolbar, label,
+  single-line input, multi-line editor and the component-layer spinner entry.
+  Every native button spends the adapter's typed style/state/focus/activation
+  seam; Run Task mounts the multi-line editor over the existing typed command
+  launch path and normalizes CRLF/CR to newline before submission;
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero);
@@ -46,7 +46,8 @@ native selection and renderer caches; all shared types use their defining module
   tooltip because Iced 0.14 has no accessible-name operation.
   `src/ui/spinner.rs` remains the sole spinner canvas/arc owner; the component
   wrapper only re-surfaces it to the warm-up body.
-- The last raw toolkit controls are converged: the Users session actions run
+- The last raw toolkit controls are converged: native buttons live only in
+  `controls/material.rs::content_button`; the Users session actions run
   through the shared glass button in both availability states (the
   unavailable state keeps the shared `ControlRole::Button` extent, drops the
   focus stop and publishes no request), the Network signal-quality bar

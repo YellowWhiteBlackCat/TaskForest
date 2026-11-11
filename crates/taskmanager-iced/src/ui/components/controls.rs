@@ -20,14 +20,18 @@ mod text;
 pub(crate) use activation::{check_box, glass_button, icon_button, pill};
 pub(crate) use layout::{label, section_header, toolbar};
 pub(crate) use material::{
-    focusable_control_button_intrinsic, focusable_control_button_owned,
-    focusable_icon_label_button_intrinsic,
+    ContentButtonOptions, content_button, focusable_control_button_intrinsic,
+    focusable_control_button_owned, focusable_icon_label_button_intrinsic,
 };
 pub(crate) use spinner_module::spinner;
 pub(crate) use state::ButtonTone;
 pub(crate) use strip::bounded_toolbar;
-pub(crate) use text::plain_text_input;
+pub(crate) use text::{multi_line_text_input, plain_text_input};
 
 #[cfg(test)]
 #[path = "../../../tests/gui/ui/components_controls_tests.rs"]
 mod components_controls_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/ui/content_button_tests.rs"]
+mod content_button_tests;

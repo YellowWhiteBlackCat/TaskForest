@@ -2,23 +2,26 @@
 
 use gpui::{Context, Div, Entity, Window, px};
 use taskforest_core::core::services::ServiceStatus;
-use taskmanager_theme::Theme;
 use taskmanager_ui::{layout::PageScaffold, primitives::button::ButtonState};
 
-use super::{Hover, RootView, elements, i18n};
+use super::{PageRenderContext, RootView, elements, i18n};
 use crate::gpui_app::{services_view, startup_view, users_view};
-use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 
 impl RootView {
     pub(super) fn render_services_page(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        theme: &Theme,
-        hovered: Option<&Hover>,
+        context: PageRenderContext<'_>,
         retry_button: Entity<ButtonState>,
-        page_padding: f32,
     ) -> Div {
+        let PageRenderContext {
+            theme,
+            hovered,
+            page_padding,
+            list_page_budget,
+            ..
+        } = context;
         let selected = self.selected_service.clone();
         let services = self.services_rc().clone();
         let sources = self.service_sources_rc().clone();
@@ -30,6 +33,7 @@ impl RootView {
             services_view::render_services(
                 services_view::ServicesViewProps {
                     theme,
+                    page_budget: list_page_budget,
                     items: &services,
                     sources: &sources,
                     selected: selected.as_ref(),
@@ -72,11 +76,16 @@ impl RootView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        theme: &Theme,
-        hovered: Option<&Hover>,
+        context: PageRenderContext<'_>,
         retry_button: Entity<ButtonState>,
-        page_layout: PageLayoutBudget,
     ) -> Div {
+        let PageRenderContext {
+            theme,
+            hovered,
+            layout: page_layout,
+            list_page_budget,
+            ..
+        } = context;
         let selected = self.selected_startup.clone();
         let entries = self.startup_entries_rc().clone();
         let sources = self.startup_sources_rc().clone();
@@ -88,6 +97,7 @@ impl RootView {
             startup_view::render_startup(
                 startup_view::StartupViewProps {
                     theme,
+                    page_budget: list_page_budget,
                     entries: &entries,
                     sources: &sources,
                     selected: selected.as_ref(),
@@ -118,11 +128,16 @@ impl RootView {
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        theme: &Theme,
-        hovered: Option<&Hover>,
+        context: PageRenderContext<'_>,
         retry_button: Entity<ButtonState>,
-        page_padding: f32,
     ) -> Div {
+        let PageRenderContext {
+            theme,
+            hovered,
+            page_padding,
+            list_page_budget,
+            ..
+        } = context;
         let selected = self.selected_session.clone();
         let sources = self.session_sources_rc().clone();
         let table = self
@@ -133,6 +148,7 @@ impl RootView {
             users_view::render_users(
                 users_view::UsersViewProps {
                     theme,
+                    page_budget: list_page_budget,
                     rows: self.sessions_rows(),
                     sources: &sources,
                     selected: selected.as_ref(),

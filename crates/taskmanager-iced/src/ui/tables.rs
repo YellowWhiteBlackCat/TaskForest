@@ -1,6 +1,6 @@
 //! Typed Services projections and shared inventory helpers for the Iced frontend.
 
-use iced::widget::{button, column, container, row, text};
+use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body, virtual_table_row};
 // Shared locale catalog for the shared-page body chrome (System / Services /
@@ -64,17 +64,22 @@ pub(super) fn info_header_cell<'a>(
         _ => text(t(column.label())).width(Length::Fill).into(),
     };
     let action = Message::SortInfoTable { table, column };
-    let header = button(label)
-        .on_press(action.clone())
-        .style(move |_theme, status| theme::header_button_style(theme_snapshot, status, is_active))
-        .padding([2.0, 4.0])
-        .width(width);
-    focus::focusable_control(
-        theme_snapshot,
-        FocusTarget::InfoSortHeader { table, column },
-        header.into(),
-        action,
-    )
+    crate::ui::components::content_button(crate::ui::components::ContentButtonOptions {
+        content: label,
+        style: Rc::new(move |_theme, status| {
+            theme::header_button_style(theme_snapshot, status, is_active)
+        }),
+        padding: iced::Padding::from([2.0, 4.0]),
+        width: Some(width),
+        height: None,
+        on_press: Some(action),
+        target: Some(FocusTarget::InfoSortHeader { table, column }),
+        focus_color: theme::focus_ring_color(theme_snapshot, false),
+        focus_radius: f32::from(theme_snapshot.palette().control_radius),
+        activate_on_pointer: false,
+        enabled: true,
+        clip: false,
+    })
 }
 
 /// A non-sortable column-header cell: a plain caption text at the spec's

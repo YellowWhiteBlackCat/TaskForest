@@ -7,13 +7,14 @@
 
 use iced::advanced::text::IntoFragment;
 use iced::widget::{checkbox, container};
-use iced::{Background, Length};
+use iced::{Background, Length, Padding};
+use std::rc::Rc;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
-use super::material::{control_button, focusable_control_button};
+use super::material::focusable_control_button;
 use super::state::{ButtonTone, ControlPaintState};
 use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
@@ -49,24 +50,36 @@ pub(crate) fn icon_button<'a>(
 ) -> IcedElement<'a> {
     let extent = theme::control_extent(theme_snapshot, ControlRole::IconButton);
     let glyph = crate::icons::icon(theme_snapshot, icon_id, f32::from(tokens::ICON_INLINE));
-    let inner = control_button(
-        *theme_snapshot,
-        container(glyph)
+    let style_theme = *theme_snapshot;
+    let inner = super::content_button(super::ContentButtonOptions {
+        content: container(glyph)
             .width(Length::Fixed(extent))
             .height(Length::Fixed(extent))
             .center_x(Length::Fixed(extent))
             .center_y(Length::Fixed(extent))
             .into(),
-        ControlRole::IconButton,
-        ButtonTone::Secondary,
-        enabled.then_some(on_press.clone()),
-    )
-    .padding(0.0)
-    .width(Length::Fixed(extent))
-    .height(Length::Fixed(extent));
+        style: Rc::new(move |_, status| {
+            super::state::button_style(
+                &style_theme,
+                ControlRole::IconButton,
+                ButtonTone::Secondary,
+                ControlPaintState::from_button(status),
+            )
+        }),
+        padding: Padding::ZERO,
+        width: Some(Length::Fixed(extent)),
+        height: Some(Length::Fixed(extent)),
+        on_press: enabled.then_some(on_press.clone()),
+        target: None,
+        focus_color: theme::focus_ring_color(theme_snapshot, false),
+        focus_radius: theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
+        activate_on_pointer: false,
+        enabled: true,
+        clip: false,
+    });
     let activation: IcedElement<'a> = FocusableButton::new(
         focus_id(target),
-        inner.into(),
+        inner,
         on_press,
         target,
         theme::focus_ring_color(theme_snapshot, false),

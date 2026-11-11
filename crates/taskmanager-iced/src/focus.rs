@@ -7,6 +7,7 @@
 //! reusable so later modal controls do not smuggle focus state into the shell.
 
 use iced::Element;
+use std::rc::Rc;
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
@@ -391,23 +392,23 @@ pub(crate) fn device_rail_card_owned(
     selected: bool,
     on_press: Message,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    FocusableButton::new(
-        focus_id(target),
-        iced::widget::button(content)
-            .padding(8)
-            .width(iced::Length::Fill)
-            .style(move |_theme, status| {
-                crate::theme::device_row_button_style(&theme_snapshot, selected, status)
-            })
-            .on_press(on_press.clone())
-            .into(),
-        on_press,
-        target,
-        crate::theme::focus_ring_color(&theme_snapshot, false),
-        f32::from(theme_snapshot.palette().control_radius),
-        false,
-    )
-    .into()
+    let style_theme = theme_snapshot;
+    crate::ui::components::content_button(crate::ui::components::ContentButtonOptions {
+        content,
+        style: Rc::new(move |_theme, status| {
+            crate::theme::device_row_button_style(&style_theme, selected, status)
+        }),
+        padding: iced::Padding::from(8.0),
+        width: Some(iced::Length::Fill),
+        height: None,
+        on_press: Some(on_press),
+        target: Some(target),
+        focus_color: crate::theme::focus_ring_color(&theme_snapshot, false),
+        focus_radius: f32::from(theme_snapshot.palette().control_radius),
+        activate_on_pointer: false,
+        enabled: true,
+        clip: false,
+    })
 }
 /// A focusable selection pill: accent-filled when selected, ghost otherwise.
 /// Used by the settings choosers so the active choice reads immediately.

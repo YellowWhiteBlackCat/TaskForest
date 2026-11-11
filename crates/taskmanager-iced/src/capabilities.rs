@@ -53,13 +53,11 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
             },
         ),
         // `components::plain_text_input` owns the single-line native
-        // TextInput binding; its style reads `control_glass` and its
-        // geometry resolves through ControlRole::Input. The Applications
-        // search field, the Services filter, the process-properties
-        // environment filter and the Run Task command field all mount it.
-        // Every editable text surface of this product is single-line, like
-        // the GPUI reference input; the multi-line editor shape is proven
-        // by the behavior suite only, over the same glass and geometry.
+        // TextInput binding; `components::multi_line_text_input` owns the
+        // native TextEditor binding. Both read `control_glass` and resolve
+        // geometry through ControlRole::Input. Search/filter fields use the
+        // single-line control; Run Task uses the multi-line editor so a typed
+        // shell command can span real newlines before submission.
         (TextInput, Ported),
         (SearchInput, Ported),
         (

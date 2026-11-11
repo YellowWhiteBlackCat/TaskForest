@@ -1,4 +1,4 @@
-//! Capture readiness for interactive mounted surfaces.
+//! Capture readiness for interactive mounted surfaces (BEVY-INTERACTIVE).
 
 use crate::menu_modal::MenuModalPopover;
 use crate::tooltip::TooltipOverlay;
@@ -20,7 +20,7 @@ pub(super) struct InteractiveCaptureAccess<'w, 's> {
     tooltips: Query<'w, 's, (&'static ComputedNode, &'static Visibility), With<TooltipOverlay>>,
 }
 
-pub(super) fn process_menu_mounted(access: &mut InteractiveCaptureAccess<'_, '_>) -> bool {
+pub(super) fn process_menu_mounted(access: &InteractiveCaptureAccess<'_, '_>) -> bool {
     let Ok((root, root_transform)) = access.shell_roots.single() else {
         return false;
     };
@@ -47,7 +47,7 @@ pub(super) fn process_menu_mounted(access: &mut InteractiveCaptureAccess<'_, '_>
     })
 }
 
-pub(super) fn tooltip_mounted(access: &mut InteractiveCaptureAccess<'_, '_>) -> bool {
+pub(super) fn tooltip_mounted(access: &InteractiveCaptureAccess<'_, '_>) -> bool {
     // A hidden or zero-size overlay is not painted evidence.
     access.tooltips.iter().any(|(node, visibility)| {
         *visibility == Visibility::Visible && node.size().x > 0.0 && node.size().y > 0.0

@@ -91,9 +91,12 @@ projection:
   composite revision, that an unchanged surface does not, and that stale
   mirrors are swept.
 - `capture_bevy_scenarios.tsv` adds the light and dark `applications-card-lane`
-  scenarios. Their readiness waits for the measured optical hero and whole
-  admitted group bounds. Compact windows prove their zero-group degradation in
-  headless bounds tests, rather than pretending painted card groups exist.
+  scenarios and the wide/compact `applications-card-lane-details-*`
+  readiness scenarios. Their readiness waits for the measured optical hero,
+  whole admitted group bounds, and — for the details scenarios — the shared
+  `COMPACT_CONTENT_WIDTH` whole-group verdict against the rail's measured
+  `Display`. Compact windows prove their zero-group degradation in headless
+  bounds tests, rather than pretending painted card groups exist.
 - Targeted Wayland captures of the light and dark card lane, the tooltip
   overlay and the settings switch focus were run on this host and reviewed
   by eye: the three-column card grid paints name/status and PID/CPU/memory
@@ -104,8 +107,8 @@ projection:
   stayed targeted).
 - Optical GPU readiness remains covered by the existing capability/GPU gates.
   The mirrored lower composite is proved headlessly and the nested optical
-  chain is GPU-measured; a hardware-adapter screenshot of the deepened
-  refraction, and of two simultaneously optical layers, is NOT yet published.
+  chain is GPU-measured. The GPU receipt remains the only pixel proof of two
+  simultaneously optical layers.
 - The GPU receipt records `max_nested_layers=2` and
   `nesting_layers_proven=true` on this host's Intel Arc B390 (Vulkan)
   adapter. No two-layer optical screenshot is published yet — the receipt is

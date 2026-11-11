@@ -1,4 +1,5 @@
-use super::{boot_timeline_rows, critical_chain_summary, failed_units_summary};
+use super::boot_timeline_rows;
+use taskmanager_application::{critical_chain_summary, failed_units_summary};
 use taskmanager_shell::presentation::missing_value;
 
 fn dash() -> String {

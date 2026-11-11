@@ -37,28 +37,31 @@ use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::{RefreshRequest, merge_source_lines};
-use taskmanager_theme::Color;
-use taskmanager_theme::Theme;
-use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Palette, Theme, tokens};
+use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::inputs::text_input::{TextInput, TextInputState};
+use taskmanager_ui::primitives::button::{Button, ButtonState, ButtonVariant};
+use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use taskmanager_ui::primitives::pill::{Pill, PillState};
+use taskmanager_ui::primitives::state_panel::StatePanel;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
-
-use taskmanager_theme::Palette;
-use taskmanager_ui::icons_binding::icon;
-use taskmanager_ui::inputs::text_input::{TextInput, TextInputState};
-use taskmanager_ui::primitives::button::{Button, ButtonState, ButtonVariant};
-use taskmanager_ui::primitives::pill::{Pill, PillState};
-use taskmanager_ui::primitives::state_panel::StatePanel;
 use taskmanager_ui_contract::IconId;
+
+mod budget;
+pub use budget::ListPageBudget;
 
 /// Debug-selector identity of the shared list-page inner shell.
 ///
 /// Shared between the builder and the render-path guard (ADR-042) so the
 /// assertion can never spell a drifted selector.
 pub const LIST_PAGE_SCAFFOLD_SELECTOR: &str = "tm-list-page-scaffold";
+
+/// Debug-selector identity of the one inset glass surface around a list header.
+pub const LIST_PAGE_HEADER_SURFACE_SELECTOR: &str = "tm-list-page-header-surface";
 
 /// Shared page shell for list-oriented top-level views.
 ///
@@ -67,32 +70,62 @@ pub const LIST_PAGE_SCAFFOLD_SELECTOR: &str = "tm-list-page-scaffold";
 /// shrinkable body boundary below those controls. Keeping that boundary here
 /// prevents each page from inventing a slightly different flex contract.
 pub struct ListPageScaffold {
+    theme: Theme,
     header: AnyElement,
     body: AnyElement,
+    budget: ListPageBudget,
 }
 
 impl ListPageScaffold {
     /// Build a list-page shell from its page-specific header and body.
-    pub fn new(header: impl IntoElement, body: impl IntoElement) -> Self {
+    pub fn new(theme: &Theme, header: impl IntoElement, body: impl IntoElement) -> Self {
         Self {
+            theme: *theme,
             header: header.into_any_element(),
             body: body.into_any_element(),
+            budget: ListPageBudget {
+                rows: 2,
+                gap: tokens::SPACE_8.0,
+                table_height: 0.0,
+                admit_optional_group: false,
+            },
         }
+    }
+
+    /// Bind the frame-derived slot budget. Production pages always call this;
+    /// the default keeps direct component tests on the mandatory-only rung.
+    #[must_use]
+    pub fn budget(mut self, budget: ListPageBudget) -> Self {
+        self.budget = budget;
+        self
     }
 
     /// Render the common full-size column with a bounded, shrinkable body.
     #[must_use]
     pub fn render(self) -> Div {
+        let gap = rem_length(tokens::SPACE_8);
+        let header =
+            CardSurface::unpadded_for_role(self.theme.palette(), GlassSurfaceRole::PageHeader)
+                .radius(tokens::control_radius(&self.theme))
+                .render()
+                .debug_selector(|| LIST_PAGE_HEADER_SURFACE_SELECTOR.to_string())
+                .w_full()
+                .min_w(px(0.0))
+                .flex()
+                .flex_col()
+                .gap(gap)
+                .p(rem_length(tokens::SPACE_6))
+                .child(self.header);
         div()
             .flex()
             .flex_col()
-            .gap(definite_length(tokens::SPACE_8))
+            .gap(gap)
             .size_full()
             // The list-page family's ONE inner shell (ADR-042): header band
             // + bounded body, shared by every inventory page so their
             // chrome/list separation adjusts in one place.
             .debug_selector(|| LIST_PAGE_SCAFFOLD_SELECTOR.to_string())
-            .child(self.header)
+            .child(header)
             .child(
                 div()
                     .flex()
@@ -757,3 +790,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/list_page_action_bar_bounds_tests.rs"]
 mod action_bar_bounds_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/list_page_scaffold.rs"]
+mod list_page_scaffold_tests;

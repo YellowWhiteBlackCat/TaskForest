@@ -217,13 +217,17 @@ fn test_run_new_task_modal_lifecycle() {
     assert!(app.run_task.error_msg.is_none());
 
     // 2. Edit command
-    let _ = app.update(Message::UpdateRunTaskCommand("pwsh.exe".to_string()));
-    assert_eq!(app.run_task.command, "pwsh.exe");
+    let _ = app.update(Message::UpdateRunTaskEditor(
+        iced::widget::text_editor::Action::Edit(iced::widget::text_editor::Edit::Paste(
+            std::sync::Arc::new("pwsh.exe".to_string()),
+        )),
+    ));
+    assert_eq!(app.run_task.command(), "pwsh.exe");
 
     // 3. Submit non-empty
     let _ = app.update(Message::SubmitRunTask);
     assert!(!app.run_task_open());
-    assert!(app.run_task.command.is_empty());
+    assert!(app.run_task.command().is_empty());
 
     // 4. Submit empty triggers error
     let _ = app.update(Message::OpenRunTask);
@@ -292,8 +296,10 @@ fn submitting_run_task_launches_the_command_through_the_platform_lane() {
     ));
     let mut app = IcedApp::new(Some(client));
     let _ = app.update(Message::OpenRunTask);
-    let _ = app.update(Message::UpdateRunTaskCommand(
-        "  alacritty -e htop  ".to_string(),
+    let _ = app.update(Message::UpdateRunTaskEditor(
+        iced::widget::text_editor::Action::Edit(iced::widget::text_editor::Edit::Paste(
+            std::sync::Arc::new("  alacritty -e htop  ".to_string()),
+        )),
     ));
 
     let _ = app.update(Message::SubmitRunTask);

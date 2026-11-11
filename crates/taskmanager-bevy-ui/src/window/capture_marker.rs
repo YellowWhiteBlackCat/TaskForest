@@ -22,7 +22,9 @@ use crate::pages::processes::card_lane::{
 };
 use crate::pages::processes::menu::{ProcessMenuCtx, ProcessMenuModal, open_for_selected};
 use crate::pages::processes::properties_modal::PropertiesCapture;
-use crate::pages::processes::{ProcessRowsRoot, ProcessScrollState};
+use crate::pages::processes::{
+    ProcessDetailsContainer, ProcessPageRoot, ProcessRowsRoot, ProcessScrollState,
+};
 use crate::pages::system::dashboard::SystemDashboardCurve;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::pages::system::{MemoryInventoryAnchor, SystemBody};
@@ -38,7 +40,7 @@ use bevy::ecs::query::{With, Without};
 use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, SystemParam};
 use bevy::text::TextColor;
 use bevy::ui::widget::Text;
-use bevy::ui::{ComputedNode, ScrollPosition, UiGlobalTransform};
+use bevy::ui::{ComputedNode, Node, ScrollPosition, UiGlobalTransform};
 use taskforest_core::core::metrics::ScalarAvailability;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
@@ -66,7 +68,8 @@ pub(super) struct CaptureAccess<'w, 's> {
     >,
     pub(super) route: Res<'w, Route>,
     pub(super) state: ResMut<'w, CaptureMarkerState>,
-    pages: Query<'w, 's, &'static PageContent>,
+    pub(super) pages: Query<'w, 's, &'static PageContent>,
+    pub(super) process_pages: Query<'w, 's, &'static ComputedNode, With<ProcessPageRoot>>,
     pub(super) text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
     feedback_lines: Query<'w, 's, (&'static Text, &'static ComputedNode), With<FeedbackLine>>,
     focus: FocusCapture<'w, 's>,
@@ -90,10 +93,10 @@ pub(super) struct CaptureAccess<'w, 's> {
     >,
     pub(super) process_roots: Query<'w, 's, Entity, With<ProcessRowsRoot>>,
     pub(super) process_scroll: Option<Res<'w, ProcessScrollState>>,
-    card_mode: Option<Res<'w, ProcessViewMode>>,
-    card_flow:
+    pub(super) card_mode: Option<Res<'w, ProcessViewMode>>,
+    pub(super) card_flow:
         Query<'w, 's, (&'static ComputedNode, &'static UiGlobalTransform), With<ProcessCardFlow>>,
-    card_groups: Query<
+    pub(super) card_groups: Query<
         'w,
         's,
         (
@@ -103,7 +106,7 @@ pub(super) struct CaptureAccess<'w, 's> {
         ),
         With<ProcessCardGroup>,
     >,
-    dashboards: Query<
+    pub(super) dashboards: Query<
         'w,
         's,
         (&'static ComputedNode, &'static UiGlobalTransform),
@@ -163,7 +166,8 @@ pub(super) struct CaptureAccess<'w, 's> {
     performance: Res<'w, PerformancePresentation>,
     performance_history: Res<'w, PerformanceHistoryProjectionResource>,
     application_history: Res<'w, HistoryProjectionResource>,
-    interactive: InteractiveCaptureAccess<'w, 's>,
+    pub(super) interactive: InteractiveCaptureAccess<'w, 's>,
+    pub(super) details: Query<'w, 's, &'static Node, With<ProcessDetailsContainer>>,
     process_menu: Option<ResMut<'w, ProcessMenuModal>>,
     pub(super) commands: Commands<'w, 's>,
 }
@@ -231,33 +235,9 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
     match capture_scenario_target() {
         Some("applications-card-lane") => {
             if route != Page::Processes
-                || access
-                    .card_mode
-                    .is_none_or(|mode| *mode != ProcessViewMode::Cards)
-                || !access
-                    .dashboards
-                    .iter()
-                    .any(|(node, _)| node.size().x > 0.0 && node.size().y > 0.0)
-                || !access
-                    .card_groups
-                    .iter()
-                    .any(|(_, node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+                || !super::capture_marker_optical::card_lane_bounds_ready(&access)
             {
                 return;
-            }
-            if let Some((flow, flow_transform)) = access.card_flow.iter().next() {
-                let flow_bottom = flow_transform.translation.y + flow.size().y / 2.0;
-                let flow_right = flow_transform.translation.x + flow.size().x / 2.0;
-                let groups_inside = access.card_groups.iter().all(|(_, node, transform)| {
-                    let half = node.size() / 2.0;
-                    transform.translation.x - half.x
-                        >= flow_transform.translation.x - flow.size().x / 2.0 - 0.5
-                        && transform.translation.x + half.x <= flow_right + 0.5
-                        && transform.translation.y + half.y <= flow_bottom + 0.5
-                });
-                if !groups_inside {
-                    return;
-                }
             }
             if !access.state.data_presented {
                 access.state.data_presented = true;
@@ -396,7 +376,7 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 access.state.menu_open_requested = true;
                 return;
             }
-            if !super::capture_marker_interactive::process_menu_mounted(&mut access.interactive) {
+            if !super::capture_marker_interactive::process_menu_mounted(&access.interactive) {
                 return;
             }
             if !access.state.data_presented {
@@ -419,7 +399,7 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
             }
         }
         Some("tooltip-overlay") => {
-            if !super::capture_marker_interactive::tooltip_mounted(&mut access.interactive) {
+            if !super::capture_marker_interactive::tooltip_mounted(&access.interactive) {
                 return;
             }
             if !access.state.data_presented {
@@ -653,6 +633,13 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
         return;
     }
     let page = capture_page_name(route);
+    if let Some(
+        target @ ("applications-card-lane-details-wide" | "applications-card-lane-details-compact"),
+    ) = capture_scenario_target()
+        && !super::capture_marker_optical::details_rail_capture_ready(Some(target), &access)
+    {
+        return;
+    }
     println!("BEVY_CAPTURE_MARKER event=frame_ready mode=demo page={page}");
     println!("BEVY_CAPTURE_MARKER event=target_ready mode=demo page={page}");
     access.state.emitted = true;

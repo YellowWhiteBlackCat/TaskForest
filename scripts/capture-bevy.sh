@@ -82,6 +82,22 @@ case "$DBUS_ADDRESS_SHA256" in
     [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
     *) die 'private D-Bus address hash could not be recorded' ;;
 esac
+# A hardware WESL launch is opt-in: the default private KWin/Niri harness
+# forces software GL and therefore proves bounds/content only. Do not set
+# TM_BEVY_CAPTURE_HARDWARE_WESL unless the host exposes a real Vulkan
+# adapter to the nested compositor AND the standard GPU gate has produced a
+# fresh PROVEN receipt under target/optical-gpu-evidence/receipt.json.
+CAPTURE_HARDWARE_WESL="${TM_BEVY_CAPTURE_HARDWARE_WESL:-0}"
+case "$CAPTURE_HARDWARE_WESL" in
+    0 | 1) ;;
+    *) die 'TM_BEVY_CAPTURE_HARDWARE_WESL must be 0 or 1' ;;
+esac
+if [ "$CAPTURE_HARDWARE_WESL" -eq 1 ]; then
+    GPU_RECEIPT="$REPO/target/optical-gpu-evidence/receipt.json"
+    [ -s "$GPU_RECEIPT" ] || die 'hardware WESL capture requires a fresh optical GPU receipt'
+    jq -e '.verdict == "PROVEN" and .fresnel_rim_proven == true' "$GPU_RECEIPT" >/dev/null \
+        || die 'hardware WESL capture requires PROVEN fresnel_rim_proven=true'
+fi
 HOST_XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
 HOST_WAYLAND_DISPLAY="$WAYLAND_DISPLAY"
 
@@ -347,12 +363,16 @@ capture_one() {
         timeout 60s python3 "$REPO/scripts/capture_history_fixtures.py" \
             --directory "$RUNTIME_DIR/data/taskmanager/history" --kind "$history_kind"
     fi
+    CAPTURE_GL_ENV=(LIBGL_ALWAYS_SOFTWARE=1)
+    if [ "$CAPTURE_HARDWARE_WESL" -eq 1 ]; then
+        CAPTURE_GL_ENV=(WGPU_BACKEND="${WGPU_BACKEND:-vulkan}")
+    fi
     XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
         XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
         XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \
         TM_BEVY_CAPTURE_PAGE="$page" TM_BEVY_WINDOW_SIZE="$window_size" \
         TM_SKIN="$skin" \
-        LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
+        env "${CAPTURE_GL_ENV[@]}" setsid "$APP" --demo >"$log" 2>&1 &
     app_pid=$!
     for _ in $(seq 1 300); do
         if grep -q "BEVY_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$log" 2>/dev/null \
@@ -508,6 +528,8 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'appearance_control=%s\n' "$APPEARANCE_CONTROL"
     printf 'appearance_mechanism=bevy-demo-theme-honors-tm-skin-light-reference-default\n'
     printf 'appearance_receipt=%s\n' "${APPEARANCE_RECEIPT#"$REPO/"}"
+    printf 'hardware_wesl_capture=%s\n' "$CAPTURE_HARDWARE_WESL"
+    printf 'optical_evidence_scope=target/\n'
     printf 'command=bash scripts/capture-bevy.sh\n'
 } >"$RUN_DIR/metadata.txt"
 # The validator fully decodes each PNG in Python; 30 seconds was sized for a

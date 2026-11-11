@@ -18,9 +18,9 @@ Scrollbar is declared `Native` via iced's scrollable; every other capability is
 `Ported`. A silent omission or unexplained difference fails the crate gate.
 
 The control family (button, icon button, pill, checkbox, label, section
-header, toolbar, spinner, single-line input, switch, slider, select, search
-field, segmented track, progress) paints the SAME material the GPUI
-component layer wears: the shared Card glass gradient, its specular edge,
+header, toolbar, spinner, single-line input, multi-line input, switch, slider,
+select, search field, segmented track, progress) paints the SAME material the
+GPUI component layer wears: the shared Card glass gradient, its specular edge,
 and the theme's own two-layer glass shadow folded into the single quad Iced can
 paint (`theme::control_glass`). `theme/control_measurement.rs` binds the live
 theme snapshot to `ControlRole`/`resolve_size`; hover/pressed/focus/disabled
@@ -29,14 +29,16 @@ shared ring token, so pointer-driven focus paints no ring, and all copy is
 resolved through `taskmanager-application::i18n`. `Checkbox` is now a real
 `components::check_box` production path in the Applications column menu;
 `TextInput` is mounted through `plain_text_input` on the Applications search
-field, the Services filter, the process-properties environment filter and
-the Run Task command field. The remaining raw toolkit controls are gone from
-the production tree: the Users session actions share the glass button in
-both availability states, the Network signal-quality bar spends the shared
-progress primitive, and the Applications priority preset uses the shared
-select. The multi-line editor shape shares that material and geometry but
-exists only in the behavior suite, because every editable text surface of
-this product is single-line (like the GPUI reference input). These are
+field, the Services filter and the process-properties environment filter.
+`TextEditor` is mounted through `multi_line_text_input` on the Run Task
+command field: its typed edit actions stay in the frontend's command draft,
+and Ctrl/Cmd-Enter publishes the existing `SubmitRunTask` command. Plain
+Enter stays a real newline. The remaining raw toolkit buttons are gone from
+the production tree: one `content_button` adapter owns all native button
+composition and its focus shell, while the Users session actions share the
+glass button in both availability states, the Network signal-quality bar
+spends the shared progress primitive, and the Applications priority preset
+uses the shared select. These are
 PRESENTATION executions of the shared tokens, not new semantics: the
 three registered divergences above keep their reasons unchanged.
 

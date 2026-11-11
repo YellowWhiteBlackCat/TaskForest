@@ -54,7 +54,6 @@ use taskmanager_shell::{InfoSortCol, SortDir};
 pub use crate::gpui_app::list_view::ActionFeedback;
 
 mod boot_evidence;
-use boot_evidence::boot_evidence_strip;
 mod layout;
 pub use layout::{StartupPageBudget, TimelinePresentation};
 mod source_notice;
@@ -480,6 +479,8 @@ pub(crate) fn init_table_entity(
 /// not view state.
 pub struct StartupViewProps<'a> {
     pub theme: &'a Theme,
+    /// Frame-derived header/body slot allocation.
+    pub page_budget: list_view::ListPageBudget,
     pub entries: &'a [StartupEntry],
     pub sources: &'a [SourceStatus],
     pub selected: Option<&'a StartupEntryId>,
@@ -522,6 +523,7 @@ pub fn render_startup(
 ) -> Div {
     let StartupViewProps {
         theme,
+        page_budget: _,
         entries,
         sources,
         selected,
@@ -574,8 +576,7 @@ pub fn render_startup(
             hovered.as_ref(),
             &search_entity,
             &cx.entity(),
-        ))
-        .child(boot_evidence_strip(&theme, evidence));
+        ));
     let body = if sorted.is_empty() {
         // EMPTY-STATE: 0 rows → a centered hint. An empty list caused by a
         // failed source (systemctl missing / init not recognized) shows the
@@ -642,7 +643,7 @@ pub fn render_startup(
         layout::compose_content(&theme, evidence, boot_baseline, layout, primary)
     };
 
-    list_view::ListPageScaffold::new(header, body).render()
+    list_view::ListPageScaffold::new(&theme, header, body).render()
 }
 
 // ── controls row: status-filter pills (left) + search box (right) ────────────
