@@ -1,5 +1,6 @@
 //! Responsive Dashboard header, navigation summaries, and history cards.
 
+use super::surfaces::page_card;
 use super::{DashboardPanel, DashboardState};
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, Stateful,
@@ -32,8 +33,7 @@ use taskforest_core::core::AlertEvent;
 use taskmanager_application::i18n;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier, Theme};
-use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_theme::{Color, Theme};
 use taskmanager_ui_contract::presentation::budget::SystemPageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::SystemSurfacePresentation;
 
@@ -241,8 +241,7 @@ fn summary_card(
     destination: SummaryDestination,
     entity: Entity<RootView>,
 ) -> Stateful<Div> {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
+    page_card(theme.palette())
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(true)
@@ -384,8 +383,7 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         graph_cache,
     } = props;
     let samples = series.samples(metric);
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
+    page_card(theme.palette())
         .radius(tokens::card_radius(theme))
         .padding(tokens::SPACE_5)
         .render()

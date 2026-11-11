@@ -8,7 +8,6 @@
 use gpui::{Div, InteractiveElement, ParentElement, Stateful, Styled, div, px};
 use taskmanager_assets::product;
 use taskmanager_ui::icons_binding;
-use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -16,10 +15,11 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui_contract::IconId;
 
+use super::surfaces::page_card;
 use crate::gpui_app::formatting;
 use taskforest_core::core::SystemSnapshot;
 use taskmanager_application::i18n;
-use taskmanager_theme::{Color, GlassTier, Theme};
+use taskmanager_theme::{Color, Theme};
 
 use super::readouts::cpu_summary_readout;
 use taskforest_core::core::percent::percent_text;
@@ -41,8 +41,7 @@ fn metric_card(
     color: Color,
     icon: IconId,
 ) -> Stateful<Div> {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
+    page_card(theme.palette())
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(true)

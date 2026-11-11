@@ -50,6 +50,11 @@ render-time writable order mirror.
 Dashboard windows and readouts use application-correlated system history.
 Controls and paging stay fixed, all four complete metric cards remain
 reachable, and paint and hover use the selected timeline's actual count.
+Primary Dashboard metric and history cards spend one floating
+`GlassSurfaceRole::PageCard`; compact-widget metric cards reuse that owner.
+The shared Card-tier fill, hairline and radius remain unchanged; this role
+records that these cards belong to the primary page and carry its elevation.
+Geometry and slot budgets are unchanged.
 Durable History shows the shared 1h/24h/7d replay projections; live process
 rings never become its authority. Recorded curves keep gaps and signed ranges
 with separate per-window scrolling.

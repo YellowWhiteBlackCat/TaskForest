@@ -12,6 +12,8 @@ pub enum GlassSurfaceRole {
     Chrome,
     /// A page header already inside the page viewport.
     PageHeader,
+    /// A primary card directly on a page, carrying the page's elevation.
+    PageCard,
     /// An anchored popup, context, or dropdown menu panel.
     Menu,
     /// A transient status receipt card.
@@ -26,9 +28,10 @@ pub enum GlassSurfaceRole {
 
 impl GlassSurfaceRole {
     /// Every semantic role, for exhaustive adapters and behavior checks.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Chrome,
         Self::PageHeader,
+        Self::PageCard,
         Self::Menu,
         Self::Toast,
         Self::Tooltip,
@@ -41,9 +44,12 @@ impl GlassSurfaceRole {
     pub const fn tier(self) -> GlassTier {
         match self {
             Self::Chrome => GlassTier::Sidebar,
-            Self::Menu | Self::Toast | Self::Tooltip | Self::PageHeader | Self::InlinePlot => {
-                GlassTier::Card
-            }
+            Self::Menu
+            | Self::Toast
+            | Self::Tooltip
+            | Self::PageHeader
+            | Self::PageCard
+            | Self::InlinePlot => GlassTier::Card,
             Self::Dialog => GlassTier::Modal,
         }
     }
@@ -53,7 +59,9 @@ impl GlassSurfaceRole {
     #[must_use]
     pub const fn elevation(self) -> SurfaceElevation {
         match self {
-            Self::Menu | Self::Toast | Self::Tooltip | Self::Dialog => SurfaceElevation::Floating,
+            Self::Menu | Self::Toast | Self::Tooltip | Self::Dialog | Self::PageCard => {
+                SurfaceElevation::Floating
+            }
             Self::Chrome | Self::PageHeader | Self::InlinePlot => SurfaceElevation::Inset,
         }
     }

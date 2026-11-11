@@ -14,6 +14,7 @@ use taskmanager_application::system_timeline::{
 mod panels;
 pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
 mod readouts;
+mod surfaces;
 use taskmanager_shell::saved_views::{
     SavedViewPreset, SavedViewTransferFeedback, default_built_in_presets,
 };

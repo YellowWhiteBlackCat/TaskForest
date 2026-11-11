@@ -15,6 +15,11 @@ fn every_surface_role_resolves_its_shared_tier_and_elevation() {
             SurfaceElevation::Inset,
         ),
         (
+            GlassSurfaceRole::PageCard,
+            GlassTier::Card,
+            SurfaceElevation::Floating,
+        ),
+        (
             GlassSurfaceRole::Menu,
             GlassTier::Card,
             SurfaceElevation::Floating,

@@ -3,7 +3,6 @@
 use gpui::{Div, Entity, ParentElement, SharedString, Styled, div};
 use std::collections::HashSet;
 use std::time::Duration;
-use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -18,8 +17,8 @@ use taskforest_core::core::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_theme::Length;
-use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_theme::{GlassTier, Theme, tokens};
+use taskmanager_ui::primitives::card_surface::CardSurface;
 
 mod transfer;
 use transfer::render_transfer_actions;

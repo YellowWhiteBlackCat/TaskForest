@@ -60,6 +60,29 @@ pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
         window.set_window_title(product::GPUI_NAME);
         let entity: Entity<RootView> = cx.new(|cx| RootView::new_demo(theme, cx));
         let weak = entity.downgrade();
+        if entity.read(cx).capture_evidence.is_enabled() {
+            let capture_weak = weak.clone();
+            window.on_next_frame(move |_window, cx| {
+                let _ = capture_weak.update(cx, |view, cx| {
+                    view.prepare_dashboard_capture_history();
+                    let timestamp_ms =
+                        taskforest_core::core::time::unix_millis(std::time::SystemTime::now());
+                    let panel = view.capture_evidence.on_dashboard_state(
+                        &mut view.dashboard,
+                        &view.telemetry.system_history,
+                        &view.telemetry_ingestor,
+                        timestamp_ms,
+                    );
+                    if let Some(events) = view.capture_evidence.take_event_history_fixture() {
+                        view.shell.replace_alert_event_history(events);
+                    }
+                    if let Some(panel) = panel {
+                        view.show_dashboard_panel(panel);
+                    }
+                    cx.notify();
+                });
+            });
+        }
         cx.spawn(async move |cx: &mut gpui::AsyncApp| {
             loop {
                 cx.background_executor()
