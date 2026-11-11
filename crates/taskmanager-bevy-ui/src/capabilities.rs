@@ -65,15 +65,7 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         // `bevy_ui_widgets::Checkbox` behavior primitive drives the toggle
         // and the platform tree publishes the `Switch` role.
         (Switch, Ported),
-        // The alert rule editor mounts the official `bevy_ui_widgets` Slider
-        // for its threshold values; the bounded settings rows still render as
-        // discrete radio choices.
-        (
-            Slider,
-            Divergent {
-                reason: "the alert rule editor mounts the official bevy_ui_widgets Slider for threshold values; bounded settings rows still render as discrete radio choices",
-            },
-        ),
+        (Slider, Ported),
         // These are semantic-contract capabilities. Bevy composes the
         // checkbox contract with its official Checkbox behavior primitive.
         (Checkbox, Ported),

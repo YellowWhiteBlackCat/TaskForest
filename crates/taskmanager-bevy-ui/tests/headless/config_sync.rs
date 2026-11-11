@@ -13,6 +13,7 @@ use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::Assets;
 use bevy::ecs::entity::Entity;
+use bevy::ecs::query::With;
 use bevy::text::Font;
 use taskforest_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
@@ -26,7 +27,7 @@ use taskmanager_application::{
 use taskmanager_theme::{LightDark, Skin, Theme};
 
 use super::{
-    SettingsChoice, SettingsField, ThemePreferences, patch_persisted_config,
+    RefreshSlider, SettingsChoice, SettingsField, ThemePreferences, patch_persisted_config,
     restore_persisted_preferences,
 };
 use crate::app::{FrontendTrack, Page, PageContent, Route, SharedRuntimeHandle};
@@ -149,6 +150,25 @@ fn activate(app: &mut App, entity: Entity) {
     app.update();
 }
 
+fn refresh_slider_entity(world: &mut bevy::ecs::world::World) -> Entity {
+    world
+        .query_filtered::<Entity, With<RefreshSlider>>()
+        .single(world)
+        .expect("the settings page mounts one continuous refresh slider")
+}
+
+fn set_refresh_seconds(app: &mut App, seconds: f32) {
+    let entity = refresh_slider_entity(app.world_mut());
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::ValueChange::<f32> {
+            source: entity,
+            value: seconds,
+            is_final: true,
+        });
+    app.update();
+}
+
 fn wait_for_config_sync(runtime: &'static SharedRuntime) {
     let guard = runtime.lock_config();
     if let Some(client) = guard.as_ref() {
@@ -235,12 +255,8 @@ fn telemetry_cadence_and_history_capacity_persist() {
     let runtime = scripted_runtime_with_config(client);
     let mut app = headless_settings_app(runtime);
 
-    // 1. Set refresh interval to 2000 ms
-    let two_sec = choice_entity(
-        app.world_mut(),
-        &SettingsField::Refresh(TelemetryInterval::clamped(Duration::from_millis(2000))),
-    );
-    activate(&mut app, two_sec);
+    // 1. Set the continuous refresh slider to 2.0 s.
+    set_refresh_seconds(&mut app, 2.0);
     wait_for_config_sync(runtime);
 
     let store = ConfigStore::new(&path);
@@ -294,12 +310,8 @@ fn cross_session_configuration_persistence_round_trip() {
         let hc_entity = choice_entity(app.world_mut(), &SettingsField::HighContrast(true));
         activate(&mut app, hc_entity);
 
-        // Modify refresh interval to 500ms
-        let half_sec = choice_entity(
-            app.world_mut(),
-            &SettingsField::Refresh(TelemetryInterval::clamped(Duration::from_millis(500))),
-        );
-        activate(&mut app, half_sec);
+        // Move the continuous refresh slider to 0.5 s.
+        set_refresh_seconds(&mut app, 0.5);
 
         let gray = choice_entity(app.world_mut(), &SettingsField::GrayZeroValues(true));
         activate(&mut app, gray);

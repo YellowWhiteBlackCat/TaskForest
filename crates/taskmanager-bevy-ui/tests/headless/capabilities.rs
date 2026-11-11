@@ -268,8 +268,9 @@ fn capability_declaration_is_complete_and_pinned() {
         // Boolean rows ride the official Checkbox behavior behind the
         // product's own sliding switch.
         (Switch, Kind::Ported),
-        // Bounded settings are discrete radio choices.
-        (Slider, Kind::Divergent),
+        // Both alert thresholds and the Settings refresh cadence mount the
+        // official Slider behind the same continuous-control semantics.
+        (Slider, Kind::Ported),
         // Both are semantic-contract capabilities, so Bevy's local
         // composition remains Ported even when it uses official widgets.
         (Checkbox, Kind::Ported),
@@ -359,10 +360,13 @@ fn declared_cells_match_the_mounted_page_surface() {
     let declaration = crate::capabilities::capability_declaration();
     assert_eq!(
         totals.official_slider > 0,
-        declares_official(
-            &declaration,
-            ComponentCapability::Slider,
-            &["bevy_ui_widgets Slider"]
+        matches!(
+            declaration
+                .entries
+                .iter()
+                .find(|entry| entry.capability == ComponentCapability::Slider)
+                .map(|entry| entry.support),
+            Some(CapabilitySupport::Ported)
         ),
         "the Slider cell and the mounted slider surface must agree: {totals:?}"
     );
@@ -403,7 +407,11 @@ fn declared_cells_match_the_mounted_page_surface() {
     );
     assert!(
         settings.official_radio_group >= 1 && settings.official_radio_button >= 1,
-        "Select is composed from official RadioGroup/RadioButton; bounded settings also use those discrete choices for the Slider adaptation: {settings:?}"
+        "Select is composed from official RadioGroup/RadioButton, and the remaining discrete settings choices still use them: {settings:?}"
+    );
+    assert!(
+        settings.official_slider >= 1,
+        "the Settings refresh cadence mounts the official continuous Slider: {settings:?}"
     );
     assert!(
         of(Page::Performance).scroll_areas >= 1,

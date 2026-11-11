@@ -48,11 +48,13 @@ use taskmanager_ui_contract::InputModality;
 
 use crate::app::{Page, PageContent, Route};
 use crate::focus_visible::FocusRing;
-use crate::pages::settings::{SettingsChoice, SettingsField};
+use crate::pages::settings::SettingsBody;
+use crate::pages::settings::{RefreshSlider, RefreshSliderValue, SettingsChoice, SettingsField};
 use crate::palette::{composite_over, ui_palette};
 use crate::tooltip::{TooltipOverlay, TooltipState, TooltipText, resolve_placement};
 use crate::widgets::focus_ring::{FocusRingHalo, focus_ring_layers};
 use crate::widgets::scrollbar::ProductScrollbar;
+use crate::widgets::slider::{SliderPart, SliderPartOwner};
 use crate::widgets::switch::{SwitchId, SwitchSlide, SwitchThumb};
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
@@ -62,6 +64,10 @@ use crate::window::{FrontendWindowPlugin, WindowPalette};
 const FRAME: (u32, u32) = (1280, 720);
 
 fn headless_shell_app() -> App {
+    headless_shell_app_at(FRAME)
+}
+
+fn headless_shell_app_at(frame: (u32, u32)) -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(HeadlessFrontendPlugins);
@@ -82,7 +88,7 @@ fn headless_shell_app() -> App {
         bevy::ui::UiPlugin,
     ));
     app.init_resource::<Assets<TextureAtlasLayout>>();
-    let (width, height) = FRAME;
+    let (width, height) = frame;
     let size = UVec2::new(width, height);
     app.world_mut().spawn((
         Window {
@@ -142,6 +148,61 @@ fn measured_width(world: &mut World, entity: Entity) -> f32 {
     let (node, transform) = query.get(world, entity).expect("the node is measured");
     let _ = transform;
     node.size().x * node.inverse_scale_factor
+}
+
+// ---- GPUI reference: continuous refresh cadence ----------------------------
+
+#[test]
+fn the_refresh_slider_fits_the_measured_settings_viewport() {
+    for frame in [FRAME, (720, 480)] {
+        let mut app = headless_shell_app_at(frame);
+        let (width, _) = frame;
+        mount_settings(&mut app);
+        for _ in 0..3 {
+            app.update();
+        }
+
+        let world = app.world_mut();
+        let body_node = world
+            .query_filtered::<&ComputedNode, With<SettingsBody>>()
+            .single(world)
+            .expect("the settings scroll owner is measured");
+        let body = body_node.size() * body_node.inverse_scale_factor();
+        let slider = world
+            .query_filtered::<Entity, With<RefreshSlider>>()
+            .single(world)
+            .expect("the continuous refresh slider is mounted");
+        let (node, transform) = world
+            .query::<(&ComputedNode, &UiGlobalTransform)>()
+            .get(world, slider)
+            .expect("the slider is measured");
+        let half = node.size() * node.inverse_scale_factor() * 0.5;
+        assert!(
+            transform.translation.x + half.x <= width as f32 + 0.5,
+            "the slider keeps its right edge inside {frame:?}"
+        );
+        assert!(
+            transform.translation.y - half.y >= -body.y - 0.5,
+            "the slider stays a whole group inside the scrollable content at {frame:?}"
+        );
+        assert!(node.size().x > 0.0, "the slider retains a usable track");
+        assert!(
+            world
+                .query_filtered::<&Text, With<RefreshSliderValue>>()
+                .single(world)
+                .is_ok(),
+            "one bounded live readout accompanies the slider"
+        );
+        assert_eq!(
+            world
+                .query_filtered::<(&SliderPart, &SliderPartOwner), ()>()
+                .iter(world)
+                .filter(|(_, owner)| owner.0 == "settings.refresh")
+                .count(),
+            2,
+            "the shared slider skin paints exactly one fill and thumb for Settings"
+        );
+    }
 }
 
 // ---- BEVY-175: the scrollbar rail -----------------------------------------

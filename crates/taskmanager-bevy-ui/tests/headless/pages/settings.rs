@@ -2,10 +2,10 @@
 //!
 //! Settings-page tests:
 //!
-//! - the choice ladders project the live authorities exactly (never the
-//!   nearest step), and writes round-trip through the shell's public
-//!   entries — interval, clamped capacity — so a mutation in the projection
-//!   or the write path fails here without a world;
+//! - the discrete capacity ladder projects its live authority exactly (never
+//!   the nearest step), and continuous refresh/capacity writes round-trip
+//!   through the shell's public entries so a mutation in the projection or
+//!   the write path fails here without a world;
 //! - the two switchable theme modes resolve and read back from the palette
 //!   authority, and a foreign mode combination is never claimed as one of
 //!   them;
@@ -26,6 +26,7 @@ use bevy::ecs::query::{Has, With};
 use bevy::ecs::world::World;
 use bevy::text::Font;
 use bevy::ui::Checked;
+use bevy::ui::Val;
 use bevy::ui::widget::Text;
 use taskforest_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
@@ -41,14 +42,16 @@ use taskmanager_shell::ShellApp;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use super::{
-    CAPACITY_CHOICES, REFRESH_CHOICES_MS, SettingsChoice, SettingsField, capacity_choice_index,
-    palette_mode, refresh_choice_index, theme_for_mode,
+    CAPACITY_CHOICES, RefreshSlider, RefreshSliderValue, SettingsChoice, SettingsField,
+    capacity_choice_index, interval_from_seconds, palette_mode, refresh_readout, refresh_seconds,
+    theme_for_mode,
 };
 use crate::app::{FrontendTrack, Page, PageContent, Route};
 use crate::input::PendingEffects;
 use crate::pages::settings::privilege_center::PrivilegeControl;
 use crate::pages::settings::{SettingsBody, SettingsFooter, SettingsHeading};
 use crate::palette::ui_palette;
+use crate::widgets::slider::{SliderPart, SliderPartOwner};
 use crate::window::tests::HeadlessFrontendPlugins;
 use crate::window::{FrontendWindowPlugin, WindowPalette};
 use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
@@ -309,6 +312,41 @@ fn activate(app: &mut App, entity: Entity) {
     app.update();
 }
 
+fn refresh_slider_entity(world: &mut World) -> Entity {
+    world
+        .query_filtered::<Entity, With<RefreshSlider>>()
+        .single(world)
+        .expect("the settings page mounts one continuous refresh slider")
+}
+
+fn set_refresh_seconds(app: &mut App, seconds: f32, is_final: bool) {
+    let entity = refresh_slider_entity(app.world_mut());
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::ValueChange::<f32> {
+            source: entity,
+            value: seconds,
+            is_final,
+        });
+    app.update();
+}
+
+fn refresh_texts(app: &mut App) -> Vec<String> {
+    app.world_mut()
+        .query_filtered::<&Text, With<RefreshSliderValue>>()
+        .iter(app.world())
+        .map(|text| text.0.clone())
+        .collect()
+}
+
+fn refresh_texts_from_world(world: &mut World) -> Vec<String> {
+    world
+        .query_filtered::<&Text, With<RefreshSliderValue>>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .collect()
+}
+
 #[test]
 fn zero_value_checkbox_changes_real_cells_without_dimming_missing_values() {
     use crate::pages::settings::ThemePreferences;
@@ -365,32 +403,31 @@ fn zero_value_checkbox_changes_real_cells_without_dimming_missing_values() {
 // ---- pure projections of the authorities ----
 
 #[test]
-fn refresh_choices_project_the_live_interval_exactly() {
-    let shell = ShellApp::new();
-    assert_eq!(
-        refresh_choice_index(shell.telemetry_interval()),
-        Some(1),
-        "the default cadence (1 s) is one of the offered steps"
-    );
-    // A cadence between steps is never reported as a nearby step.
-    let between = TelemetryInterval::clamped(Duration::from_millis(750));
-    assert_eq!(
-        refresh_choice_index(between),
-        None,
-        "no fabricated selection for a cadence the ladder does not offer"
-    );
-}
-
-#[test]
-fn refresh_and_capacity_writes_round_trip_through_the_shell_entries() {
+fn continuous_refresh_and_capacity_writes_round_trip_through_the_shell_entries() {
     let mut shell = ShellApp::new();
-    let two_seconds = TelemetryInterval::clamped(Duration::from_millis(REFRESH_CHOICES_MS[2]));
+    let two_seconds = interval_from_seconds(2.0);
     shell.set_telemetry_interval(two_seconds);
     assert_eq!(shell.telemetry_interval(), two_seconds);
     assert_eq!(
-        refresh_choice_index(shell.telemetry_interval()),
-        Some(2),
-        "the written cadence projects back onto its step"
+        refresh_readout(shell.telemetry_interval()),
+        "2.0 s",
+        "the continuous readout follows the accepted cadence"
+    );
+    let between = TelemetryInterval::clamped(Duration::from_millis(750));
+    assert_eq!(
+        refresh_seconds(between),
+        0.75,
+        "an off-step cadence keeps its measured value"
+    );
+    assert_eq!(
+        interval_from_seconds(-4.0),
+        TelemetryInterval::clamped(Duration::from_millis(100)),
+        "the shared policy clamps a non-positive slider request"
+    );
+    assert_eq!(
+        interval_from_seconds(f32::NAN),
+        TelemetryInterval::clamped(Duration::from_millis(100)),
+        "an unmeasurable slider request stays typed and bounded"
     );
 
     let capacity = CAPACITY_CHOICES[2];
@@ -483,7 +520,7 @@ fn settings_page_projects_the_live_authorities_into_rows() {
         );
     }
     assert!(
-        texts.iter().any(|text| text == "1000 ms"),
+        texts.iter().any(|text| text == "1.0 s"),
         "the live cadence value renders: {texts:?}"
     );
     assert!(
@@ -496,24 +533,19 @@ fn settings_page_projects_the_live_authorities_into_rows() {
             .any(|text| text.contains("apply live") && text.contains("persist across sessions")),
         "the footer is honest: choices apply live and persist across sessions"
     );
-    // The default selections mirror the authorities: 1 s cadence checked,
-    // the other steps unchecked; the store default capacity (64) selects no
-    // step at all.
-    let one_second = choice_entity(
-        world,
-        &SettingsField::Refresh(TelemetryInterval::clamped(Duration::from_millis(1000))),
+    // The default cadence is the continuous slider's exact value; the store
+    // default capacity (64) still selects no discrete step at all.
+    assert_eq!(
+        refresh_texts_from_world(world),
+        vec!["1.0 s".to_owned()],
+        "the live cadence renders through the slider readout"
     );
     assert!(
-        is_checked(world, one_second),
-        "the live cadence is selected"
-    );
-    let half_second = choice_entity(
-        world,
-        &SettingsField::Refresh(TelemetryInterval::clamped(Duration::from_millis(500))),
-    );
-    assert!(
-        !is_checked(world, half_second),
-        "an unselected step is clear"
+        world
+            .query_filtered::<&bevy::ui_widgets::SliderValue, With<RefreshSlider>>()
+            .single(world)
+            .is_ok(),
+        "the settings page mounts the official continuous slider"
     );
     for capacity in CAPACITY_CHOICES {
         let entity = choice_entity(world, &SettingsField::HistoryCapacity(capacity));
@@ -532,17 +564,14 @@ fn shell_preference_activations_write_the_shell_and_remount_fresh_rows() {
     mount_settings(&mut app);
     let before = mounted_page_entity(app.world_mut());
 
-    let two_seconds =
-        SettingsField::Refresh(TelemetryInterval::clamped(Duration::from_millis(2000)));
-    let two_second_radio = choice_entity(app.world_mut(), &two_seconds);
-    activate(&mut app, two_second_radio);
+    set_refresh_seconds(&mut app, 2.0, true);
     assert_eq!(
         app.world()
             .non_send::<FrontendTrack>()
             .shell
             .telemetry_interval(),
         TelemetryInterval::clamped(Duration::from_millis(2000)),
-        "the cadence activation wrote the shell entry"
+        "the slider activation wrote the shell entry"
     );
     assert_ne!(
         mounted_page_entity(app.world_mut()),
@@ -577,12 +606,57 @@ fn shell_preference_activations_write_the_shell_and_remount_fresh_rows() {
         app.world().non_send::<FrontendTrack>().shell.paused(),
         "the pause activation ran the shared TogglePause reducer"
     );
-    // The remounted tree mirrors the new values: the 2 s radio is checked.
-    let two_second_radio = choice_entity(app.world_mut(), &two_seconds);
-    assert!(
-        is_checked(app.world_mut(), two_second_radio),
-        "the fresh tree mirrors the applied cadence"
+    // The remounted tree mirrors the accepted value in the live readout.
+    assert_eq!(refresh_texts(&mut app), vec!["2.0 s".to_owned()]);
+}
+
+#[test]
+fn an_intermediate_refresh_drag_updates_the_readout_without_remounting() {
+    let mut app = headless_shell_app();
+    mount_settings(&mut app);
+    let before = mounted_page_entity(app.world_mut());
+    let slider = refresh_slider_entity(app.world_mut());
+
+    set_refresh_seconds(&mut app, 3.7, false);
+    assert_eq!(refresh_texts(&mut app), vec!["3.7 s".to_owned()]);
+    assert_eq!(
+        mounted_page_entity(app.world_mut()),
+        before,
+        "a held drag does not rebuild the page under the pointer"
     );
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .telemetry_interval(),
+        TelemetryInterval::clamped(Duration::from_millis(3700)),
+        "the intermediate value reaches the shell authority"
+    );
+    for (part, owner, node) in app
+        .world_mut()
+        .query::<(&SliderPart, &SliderPartOwner, &bevy::ui::Node)>()
+        .iter(app.world())
+    {
+        assert_eq!(owner.0, "settings.refresh");
+        let expected = Val::Percent((3.7 - 0.5) / (5.0 - 0.5) * 100.0);
+        assert_eq!(
+            match part {
+                SliderPart::Fill => node.width,
+                SliderPart::Thumb => node.left,
+            },
+            expected,
+            "the fill and thumb follow the accepted value"
+        );
+    }
+    assert_eq!(refresh_slider_entity(app.world_mut()), slider);
+
+    set_refresh_seconds(&mut app, 4.0, true);
+    assert_ne!(
+        mounted_page_entity(app.world_mut()),
+        before,
+        "the final drag value remounts the fresh projection"
+    );
+    assert_eq!(refresh_texts(&mut app), vec!["4.0 s".to_owned()]);
 }
 
 #[test]

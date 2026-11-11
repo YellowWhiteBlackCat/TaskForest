@@ -4,6 +4,7 @@ use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::{UiPalette, space_4, space_8};
 use crate::text_selection::ClipboardPort;
 use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::widgets::slider::{SliderAxis, SliderPart, SliderPartOwner, fill_percent, slider_scene};
 use crate::window::{Role, TextRole};
 use bevy::app::{App, PreUpdate};
 use bevy::clipboard::{Clipboard, ClipboardRead};
@@ -20,12 +21,9 @@ use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::widget::Text;
 use bevy::ui::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, Checked, FlexDirection,
-    FlexWrap, Node, PositionType, UiRect, Val, percent, px, rem,
+    FlexWrap, Node, UiRect, Val, percent, px, rem,
 };
-use bevy::ui_widgets::{
-    Activate, Button, Checkbox, Slider, SliderOrientation, SliderPrecision, SliderRange,
-    SliderStep, SliderThumb, SliderValue, TrackClick, ValueChange,
-};
+use bevy::ui_widgets::{Activate, Button, Checkbox, ValueChange};
 use std::time::Duration;
 use taskforest_core::core::alerts::{
     AlertMetric, AlertRule, AlertRuleConflictPolicy, AlertRuleId, AlertRuleTransferEntry,
@@ -35,11 +33,6 @@ use taskmanager_application::i18n;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
-use zhuge_ui_core::value::interval_fraction;
-
-// A threshold range that cannot travel puts the handle at the axis start.
-const FLAT_HANDLE_AT_START: f32 = 0.0;
-
 #[derive(Component, Clone, Debug, Default, PartialEq)]
 pub(crate) enum RuleControl {
     #[default]
@@ -73,33 +66,20 @@ pub(crate) struct RuleButton(pub(crate) RuleControl);
 #[derive(Component, Clone, Debug, Default)]
 pub(crate) struct ThresholdSlider(pub(crate) Option<AlertRuleId>);
 
+/// The shared slider skin's page-scoped owner for one threshold rule.
+#[must_use]
+pub(crate) fn threshold_slider_owner(rule_id: &AlertRuleId) -> String {
+    format!("alerts.threshold.{rule_id}")
+}
+
 /// The row's threshold value text. The slider's observer rewrites it in
 /// place so a drag reads its own value without a page remount.
 #[derive(Component, Clone, Debug, Default)]
 pub(crate) struct ThresholdValue(pub(crate) Option<AlertRuleId>);
 
-/// Which part of the threshold slider a node is.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ThresholdKind {
-    /// The filled portion of the track — its width is the live fraction.
-    Fill,
-    /// The thumb — its offset is the live fraction.
-    Thumb,
-}
-
 /// One movable part of the threshold slider: the rule it belongs to and
-/// which part it is. Both parts write the `Node` component, so they share
+/// the shared skin part. Both parts write the `Node` component, so they share
 /// one exclusive query instead of two conflicting ones.
-#[derive(Component, Clone, Debug)]
-pub(crate) struct ThresholdPart(pub(crate) Option<AlertRuleId>, pub(crate) ThresholdKind);
-
-impl Default for ThresholdPart {
-    /// The bsn! template seed only: a spawned part always carries its rule.
-    fn default() -> Self {
-        Self(None, ThresholdKind::Fill)
-    }
-}
-
 /// The canonical edit that moves one rule's threshold to `value`.
 fn threshold_edit(
     shell: &ShellApp,
@@ -349,7 +329,7 @@ pub(super) fn threshold_slider_observer(
     change: On<ValueChange<f32>>,
     sliders: Query<&ThresholdSlider>,
     mut values: Query<(&ThresholdValue, &mut Text)>,
-    mut parts: Query<(&ThresholdPart, &mut Node)>,
+    mut parts: Query<(&SliderPart, &SliderPartOwner, &mut Node)>,
     mut track: NonSendMut<FrontendTrack>,
     mut commands: Commands,
 ) {
@@ -385,14 +365,14 @@ pub(super) fn threshold_slider_observer(
     let Some((min, max, _)) = metric.threshold_range() else {
         return;
     };
-    let ratio = interval_fraction(threshold, min, max, FLAT_HANDLE_AT_START);
-    for (target, mut node) in &mut parts {
-        if target.0.as_ref() != Some(&rule_id) {
+    let filled = fill_percent(threshold, min, max);
+    for (part, owner, mut node) in &mut parts {
+        if owner.0 != threshold_slider_owner(&rule_id) {
             continue;
         }
-        match target.1 {
-            ThresholdKind::Fill => node.width = Val::Percent(ratio * 100.0),
-            ThresholdKind::Thumb => node.left = Val::Percent(ratio * 100.0),
+        match part {
+            SliderPart::Fill => node.width = Val::Percent(filled),
+            SliderPart::Thumb => node.left = Val::Percent(filled),
         }
     }
     if change.event().is_final {
@@ -454,52 +434,21 @@ fn threshold_slider(managed: &ManagedAlertRule, palette: &UiPalette) -> Box<dyn 
     };
     let id = managed.rule.id.clone();
     let value = managed.rule.threshold.clamp(min, max);
-    let ratio = interval_fraction(value, min, max, FLAT_HANDLE_AT_START);
-    let filled = ratio * 100.0;
-    let track_rem = palette.control_height_rem * 4.0;
-    let thumb_rem = palette.icon_rem * 0.6;
-    let range = SliderRange::new(min, max);
+    let scene = slider_scene(
+        SliderAxis {
+            value,
+            min,
+            max,
+            step,
+            precision: 1,
+            width: rem(palette.control_height_rem * 6.0),
+            owner: threshold_slider_owner(&id),
+        },
+        palette,
+    );
     Box::new(bsn! {
-        Node {
-            width: rem(track_rem),
-            height: rem(thumb_rem),
-            position_type: PositionType::Relative,
-            margin: UiRect::horizontal(rem(thumb_rem / 2.0)),
-            flex_shrink: 0.0,
-        }
-        SliderValue({ value })
-        SliderRange { ..range }
-        SliderStep({ step })
-        SliderPrecision(1)
-        Slider { track_click: TrackClick::Snap, orientation: SliderOrientation::Horizontal }
+        @{ scene }
         ThresholdSlider(Option::Some({ id.clone() }))
-        Children [
-             Node { width: percent(100), height: percent(100), border_radius: BorderRadius::all(Val::Percent(50.0)) }
-             BackgroundColor({ palette.panel_fill }) --
-             Node {
-                position_type: PositionType::Absolute,
-                left: px(0.0),
-                top: px(0.0),
-                bottom: px(0.0),
-                width: percent(filled),
-                height: percent(100),
-                border_radius: BorderRadius::all(Val::Percent(50.0)),
-             }
-             BackgroundColor({ palette.accent })
-             ThresholdPart(Option::Some({ id.clone() }), ThresholdKind::Fill) --
-             Node {
-                position_type: PositionType::Absolute,
-                left: percent(filled),
-                top: percent(50.0),
-                width: rem(thumb_rem),
-                height: rem(thumb_rem),
-                margin: UiRect::left(rem(-thumb_rem / 2.0)),
-                border_radius: BorderRadius::all(Val::Percent(50.0)),
-             }
-             BackgroundColor({ palette.accent })
-             SliderThumb
-             ThresholdPart(Option::Some({ id.clone() }), ThresholdKind::Thumb)
-        ]
     })
 }
 

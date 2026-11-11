@@ -13,10 +13,14 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   `tests/headless/menu_popover_tests.rs`, and
   `tests/headless/pages/settings_widgets_parity.rs` cover those seams.
 - **Settings controls**: the settings page projects the shared shell entries
-  into switches, radio choices, theme/language/refresh/capacity controls, the
-  permission center, and keyboard focus rings. `tests/headless/pages/settings.rs`
-  and `settings_widgets_parity.rs` prove activation, read-back, rem scaling,
-  high contrast, unavailable permission data, and the focused switch.
+  into switches, discrete radio choices, a continuous refresh-cadence slider,
+  the permission center, and keyboard focus rings. The slider matches GPUI's
+  0.5–5.0 s / 0.1 s reference row, writes the shared shell and config
+  authorities, binds the same shared slider skin as alert thresholds, and
+  keeps drag updates in place until the final value.
+  `tests/headless/pages/settings.rs` and `settings_widgets_parity.rs` prove
+  activation, read-back, rem scaling, high contrast, unavailable permission
+  data, and the focused switch.
 - **Process details**: `pages/processes/details.rs` consumes
   `taskmanager_application::process_details_vm`; the effect observer queues
   refresh/network/escalation commands through the shell. The detail tests

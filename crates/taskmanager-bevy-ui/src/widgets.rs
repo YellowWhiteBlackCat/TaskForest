@@ -26,6 +26,7 @@ pub(crate) mod layout_budget;
 pub mod menu;
 pub(crate) mod scene_paint;
 pub mod scrollbar;
+pub(crate) mod slider;
 pub mod switch;
 pub mod table;
 

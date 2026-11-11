@@ -16,7 +16,9 @@ inventory tables (services/startup/sessions), settings, and the alert center.
   beneath fixed page actions; edits always reduce through the shared shell.
   The threshold value rides a real `bevy_ui_widgets` slider whose typed value
   change reduces through the canonical rule edit, and a successful export
-  raises one clipboard-success toast.
+  raises one clipboard-success toast. The Settings refresh cadence and every
+  alert threshold bind the same product-owned slider skin in `widgets/slider`;
+  only their typed value identities and shell effects remain page-local.
 - The alert center paints severity through the theme's own severity palette
   (the frontend resolves the owner's palette, it never assembles a severity
   table), and the firing rule's banner opens through a spring reveal. A paused

@@ -7,9 +7,9 @@
 //!
 //! The boolean rows own a real **switch** (the product's sliding control,
 //! [`crate::widgets::switch`]); the discrete rows keep the official
-//! `RadioButton` group. Both carry the page's typed choice on the same
-//! entity as the widget, so one activation resolves to exactly one
-//! preference.
+//! `RadioButton` group, and the continuous cadence row binds the shared
+//! [`crate::widgets::slider`] skin. Each choice carries the page's typed
+//! identity on the same entity as its widget.
 
 use bevy::a11y::AccessibilityNode;
 use bevy::ecs::hierarchy::Children;
@@ -17,14 +17,14 @@ use bevy::scene::{Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, PositionType, Val,
-    percent, rem,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    PositionType, Val, percent, px, rem,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup};
 
-use crate::pages::settings::{SettingsChoice, SettingsField};
-use crate::palette::{UiPalette, space_8};
+use crate::pages::settings::{RefreshSliderValue, SettingsChoice, SettingsField};
+use crate::palette::{UiPalette, space_2, space_8};
 use crate::widgets::switch;
 use crate::window::{Role, TextRole};
 
@@ -60,7 +60,6 @@ fn switch_key(field: &SettingsField) -> String {
         SettingsField::SystemMode => "system_mode".to_owned(),
         SettingsField::HighContrast(_) => "high_contrast".to_owned(),
         SettingsField::Language(_) => "language".to_owned(),
-        SettingsField::Refresh(_) => "refresh".to_owned(),
         SettingsField::HistoryCapacity(_) => "history_capacity".to_owned(),
         SettingsField::HistoryPersistence(_) => "history_persistence".to_owned(),
         SettingsField::GrayZeroValues(_) => "gray_zero_values".to_owned(),
@@ -132,6 +131,45 @@ pub(crate) fn toggle_row(
              { choice_widgets(vec![entry], palette) } --
              Node { overflow: Overflow::clip_x() }
              Children [ Text(value) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap } ]
+        ]
+    })
+}
+
+/// A continuous settings row: bounded label, viewport-fit control and a live
+/// readout that never pushes the trailing edge out of the page slot.
+pub(crate) fn slider_row(label: &str, value: &str, slider: Box<dyn Scene>) -> Box<dyn Scene> {
+    let label = label.to_owned();
+    let value = value.to_owned();
+    Box::new(bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_2()),
+            min_width: px(0.0),
+        }
+        Children [
+            Node {
+                width: percent(100),
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::SpaceBetween,
+                column_gap: Val::Px(space_8()),
+                min_width: px(0.0),
+            }
+            Children [
+                Node { min_width: px(0.0), flex_shrink: 1.0, overflow: Overflow::clip_x() }
+                Children [
+                    Text(label) TextRole(Role::Caption) TextLayout { linebreak: LineBreak::NoWrap }
+                ] --
+                Node { flex_shrink: 0.0, overflow: Overflow::clip_x() }
+                Children [
+                    Text(value) TextRole(Role::Caption) RefreshSliderValue
+                    TextLayout { linebreak: LineBreak::NoWrap }
+                ]
+            ] --
+            Node { width: percent(100), min_width: px(0.0), flex_shrink: 1.0 }
+            Children [ @{ slider } ]
         ]
     })
 }

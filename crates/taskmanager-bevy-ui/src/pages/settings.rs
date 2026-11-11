@@ -21,8 +21,8 @@
 //!   `AppAction::TogglePause` reducer writes.
 //!
 //! **Widgets.** Choice rows use the official `bevy_ui_widgets` primitives —
-//! `RadioButton` for the discrete selects (theme/language/cadence/capacity)
-//! and `Checkbox` for the pause boolean — with `Checked` as the state
+//! `RadioButton` for the discrete selects, `Slider` for the continuous refresh
+//! cadence, and `Checkbox` for the pause boolean — with `Checked` as the state
 //! marker. The widget package's pointer/focus observers ride the windowed
 //! composition; the page's activation observer (`settings_choice_observer`)
 //! resolves the `ValueChange` activations back to their typed choices and
@@ -62,6 +62,7 @@ use taskmanager_theme::{
 use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
 use crate::palette::{UiPalette, space_8, ui_palette};
+use crate::widgets::slider::{SliderAxis, SliderPart, SliderPartOwner, fill_percent, slider_scene};
 use crate::window::{Role, TextRole, WindowPalette};
 use taskforest_core::core::appearance::DesktopAppearance;
 use taskforest_core::core::appearance::PreferredColorScheme;
@@ -70,16 +71,13 @@ use taskmanager_application::ConfigSubmitError;
 use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 
 mod choices;
-use choices::{
-    capacity_entries, language_entries, refresh_entries, theme_entries, ui_size_entries,
-    ui_size_label,
-};
+use choices::{capacity_entries, language_entries, theme_entries, ui_size_entries, ui_size_label};
 
 mod privilege_center;
 use privilege_center::privileges_section_scene;
 
 mod rows;
-use rows::{ChoiceEntry, radio_row, toggle_row};
+use rows::{ChoiceEntry, radio_row, slider_row, toggle_row};
 
 #[derive(Component, Clone, Default)]
 pub(crate) struct SettingsHeading;
@@ -88,11 +86,16 @@ pub(crate) struct SettingsBody;
 #[derive(Component, Clone, Default)]
 pub(crate) struct SettingsFooter;
 
-/// The telemetry refresh-cadence choices (ms), in display order — the same
-/// four steps the TUI settings form exposes.
-use taskmanager_ui_contract::presentation::settings::{
-    CAPACITY_CHOICES, REFRESH_CHOICES_MS, capacity_choice_index, refresh_choice_index,
+pub(crate) use taskmanager_ui_contract::presentation::settings::{
+    CAPACITY_CHOICES, capacity_choice_index,
 };
+
+/// The continuous refresh-cadence control's seconds axis, matching GPUI's
+/// reference row. The shared `TelemetryInterval` policy owns the wider clamp.
+const REFRESH_MIN_SECONDS: f32 = 0.5;
+const REFRESH_MAX_SECONDS: f32 = 5.0;
+const REFRESH_STEP_SECONDS: f32 = 0.1;
+const REFRESH_SLIDER_OWNER: &str = "settings.refresh";
 
 /// One of the two switchable theme modes resolved from the same token
 /// combination as the cold start (GNOME skin, no high contrast, system
@@ -200,13 +203,22 @@ pub(crate) fn palette_mode(palette: &UiPalette) -> Option<LightDark> {
     matches!(palette.mode, LightDark::Light | LightDark::Dark).then_some(palette.mode)
 }
 
-/// Identity of one interactive settings widget, carried by the widget entity
+/// Identity of one discrete settings widget, carried by the widget entity
 /// so the activation observer can resolve a `bevy_ui_widgets` `ValueChange`
-/// back to the preference it owns. The struct wrapper + enum payload is the
-/// bsn! template shape (one tuple field patched with a value, like the nav
-/// rail's `NavTarget`); the `Default` seed exists for the template mechanism.
+/// back to the preference it owns. The continuous refresh slider carries its
+/// own marker because the widget emits an `f32` change instead of a `bool`.
 #[derive(Clone, Default, Component)]
 pub(crate) struct SettingsChoice(pub(crate) SettingsField);
+
+/// One mounted continuous refresh-cadence slider. The marker keeps the
+/// observer scoped to the settings row even when another page's slider is
+/// mounted in the same world.
+#[derive(Clone, Copy, Debug, Default, Component)]
+pub(crate) struct RefreshSlider;
+
+/// The live readout of the refresh slider, rewritten in place during a drag.
+#[derive(Clone, Copy, Debug, Default, Component)]
+pub(crate) struct RefreshSliderValue;
 
 /// The typed preference one widget owns.
 #[derive(Clone, Default, PartialEq, Debug)]
@@ -215,13 +227,98 @@ pub(crate) enum SettingsField {
     SystemMode,
     HighContrast(bool),
     Language(Language),
-    Refresh(TelemetryInterval),
     HistoryCapacity(usize),
     HistoryPersistence(bool),
     GrayZeroValues(bool),
     UiSize(UiSize),
     #[default]
     PauseTelemetry,
+}
+
+#[must_use]
+pub(crate) const fn refresh_seconds(interval: TelemetryInterval) -> f32 {
+    interval.duration().as_millis() as f32 / 1000.0
+}
+
+#[must_use]
+pub(crate) fn interval_from_seconds(seconds: f32) -> TelemetryInterval {
+    let millis = (seconds * 1000.0).round().max(50.0);
+    let whole_millis = if millis.is_finite() && millis >= 0.0 && millis <= u64::MAX as f32 {
+        millis as u64
+    } else {
+        u64::MAX
+    };
+    TelemetryInterval::clamped(Duration::from_millis(whole_millis))
+}
+
+#[must_use]
+pub(crate) fn refresh_readout(interval: TelemetryInterval) -> String {
+    format!("{:.1} s", refresh_seconds(interval))
+}
+
+/// Apply one typed slider value through the shell and persisted-config seams.
+/// A drag's intermediate values stay in place; only `is_final` asks for the
+/// page remount, so the widget never disappears under the pointer.
+fn apply_refresh_seconds(
+    seconds: f32,
+    is_final: bool,
+    track: &mut FrontendTrack,
+    runtime: Option<&SharedRuntimeHandle>,
+    values: &mut Query<&mut Text, bevy::ecs::query::With<RefreshSliderValue>>,
+    parts: &mut Query<(&SliderPart, &SliderPartOwner, &mut Node)>,
+    commands: &mut Commands,
+) {
+    let interval = interval_from_seconds(seconds);
+    track.shell.set_telemetry_interval(interval);
+    let _ = patch_persisted_config(runtime, |cfg| {
+        cfg.refresh_ms = u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX);
+    });
+    let readout = refresh_readout(interval);
+    for mut text in values.iter_mut() {
+        text.0 = readout.clone();
+    }
+    let filled = fill_percent(
+        refresh_seconds(interval),
+        REFRESH_MIN_SECONDS,
+        REFRESH_MAX_SECONDS,
+    );
+    for (part, owner, mut node) in parts.iter_mut() {
+        if owner.0 != REFRESH_SLIDER_OWNER {
+            continue;
+        }
+        match part {
+            SliderPart::Fill => node.width = Val::Percent(filled),
+            SliderPart::Thumb => node.left = Val::Percent(filled),
+        }
+    }
+    if is_final {
+        commands.trigger(RouteChanged);
+    }
+}
+
+/// The settings refresh slider's typed `f32` observer. It reads the shell's
+/// accepted value back instead of trusting the widget's requested position.
+fn refresh_slider_observer(
+    change: On<ValueChange<f32>>,
+    sliders: Query<&RefreshSlider>,
+    mut values: Query<&mut Text, bevy::ecs::query::With<RefreshSliderValue>>,
+    mut parts: Query<(&SliderPart, &SliderPartOwner, &mut Node)>,
+    mut track: NonSendMut<FrontendTrack>,
+    runtime: Option<Res<SharedRuntimeHandle>>,
+    mut commands: Commands,
+) {
+    if sliders.get(change.event().source).is_err() {
+        return;
+    }
+    apply_refresh_seconds(
+        change.event().value,
+        change.event().is_final,
+        &mut track,
+        runtime.as_deref(),
+        &mut values,
+        &mut parts,
+        &mut commands,
+    );
 }
 
 /// The activation applier: resolve the widget's typed choice, write it
@@ -433,12 +530,6 @@ fn settings_choice_observer(
                 cfg.language = Some(language.code().to_string());
             });
         }
-        SettingsField::Refresh(interval) => {
-            track.shell.set_telemetry_interval(interval);
-            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
-                cfg.refresh_ms = u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX);
-            });
-        }
         SettingsField::HistoryCapacity(capacity) => {
             track.shell.set_history_capacity(capacity);
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
@@ -500,6 +591,24 @@ fn settings_choice_observer(
         }
     }
     commands.trigger(RouteChanged);
+}
+
+/// Bind the shared slider skin to the Settings page's refresh identity.
+fn refresh_slider_scene(interval: TelemetryInterval, palette: &UiPalette) -> Box<dyn Scene> {
+    let seconds = refresh_seconds(interval).clamp(REFRESH_MIN_SECONDS, REFRESH_MAX_SECONDS);
+    let scene = slider_scene(
+        SliderAxis {
+            value: seconds,
+            min: REFRESH_MIN_SECONDS,
+            max: REFRESH_MAX_SECONDS,
+            step: REFRESH_STEP_SECONDS,
+            precision: 1,
+            width: percent(100),
+            owner: REFRESH_SLIDER_OWNER.to_owned(),
+        },
+        palette,
+    );
+    Box::new(bsn! { @{ scene } RefreshSlider })
 }
 
 /// Apply resolved theme preferences to the palette resource and clear color.
@@ -590,14 +699,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             ui_size_label(context.palette.ui_size),
             context.palette,
         ),
-        radio_row(
+        slider_row(
             t("settings.refresh_interval"),
-            refresh_entries(interval),
-            &format!(
-                "{} ms",
-                u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX)
-            ),
-            context.palette,
+            &refresh_readout(interval),
+            refresh_slider_scene(interval, context.palette),
         ),
         radio_row(
             t("settings.history_capacity"),
@@ -691,7 +796,8 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
                 ]
             --
             { EntityScene(page_observer(request_projection_refresh)) }--
-            { EntityScene(page_observer(settings_choice_observer)) }
+            { EntityScene(page_observer(settings_choice_observer)) }--
+            { EntityScene(page_observer(refresh_slider_observer)) }
         ]
     }
 }
