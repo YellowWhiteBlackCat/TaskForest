@@ -13,8 +13,8 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
-use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 use crate::ui::components::IcedElement;
+use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 
 /// One bounded horizontal viewport around complete action groups.
 ///

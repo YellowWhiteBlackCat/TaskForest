@@ -47,6 +47,7 @@ EXPECTED_OWNER_RESOLVERS = (
     "pub fn startup_control_policy_label(",
     "pub fn more_rows_label(",
     "pub fn process_details_section_label(",
+    "pub fn device_visibility_label(",
 )
 
 # A frontend-local vocabulary: the enum, its catalog keys, and every call

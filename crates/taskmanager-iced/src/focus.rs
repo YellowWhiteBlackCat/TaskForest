@@ -423,7 +423,14 @@ pub(crate) fn choice_pill<'a>(
     } else {
         crate::ui::components::ButtonTone::Secondary
     };
-    crate::ui::components::focusable_control_button_intrinsic(theme_snapshot, target, label, on_press, tone, true)
+    crate::ui::components::focusable_control_button_intrinsic(
+        theme_snapshot,
+        target,
+        label,
+        on_press,
+        tone,
+        true,
+    )
 }
 
 /// A selection pill with a semantic SVG icon, used by the page navigation

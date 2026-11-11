@@ -324,9 +324,9 @@ fn stats_rail<'a>(theme_snapshot: &'a Theme, rail: StatsRail<'a>) -> Elem<'a> {
             crate::ui::components::ScrollAxis::Vertical,
             crate::ui::components::ScrollScale::Compact,
         )
-            .id(Id::new(PERFORMANCE_STATS_RAIL_SCROLL_ID))
-            .width(content_width)
-            .height(Length::Fill),
+        .id(Id::new(PERFORMANCE_STATS_RAIL_SCROLL_ID))
+        .width(content_width)
+        .height(Length::Fill),
     )
     .width(content_width)
     .height(Length::Fill)

@@ -26,6 +26,7 @@ use taskmanager_application::i18n::Language;
 use super::components::IcedElement;
 use super::components::{label, section_header, segmented, select, slider, switch};
 use super::overlays::modal_overlay;
+use taskmanager_application::i18n::device_visibility_label;
 use taskmanager_application::i18n::t;
 
 mod controls;
@@ -358,7 +359,7 @@ fn system_group<'a>(theme_snapshot: &'a Theme, prefs: &PresentationPreferences) 
     rows.push(label(theme_snapshot, t("settings.devices"), true));
     for kind in DeviceVisibilityKey::ALL {
         rows.push(setting_row(
-            t(kind.i18n_key()),
+            device_visibility_label(kind),
             switch(
                 *theme_snapshot,
                 target(kind.stable_id()),

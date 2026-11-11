@@ -106,9 +106,10 @@ fn render_page(size: Size) -> PageTrees {
     let renderer = renderer();
     let mut element: TestElement<'_> = applications_page(&app);
     let mut tree = Tree::new(&element);
-    let node: Node = element
-        .as_widget_mut()
-        .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+    let node: Node =
+        element
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
     let mut base = PageWidgets::default();
     element
         .as_widget_mut()
@@ -152,7 +153,8 @@ fn the_priority_preset_rides_the_shared_select_component() {
         "the shared select must own a real, visible rectangle: {bounds:?}"
     );
     assert!(
-        page.base.scroll_viewports
+        page.base
+            .scroll_viewports
             .iter()
             .any(|(viewport, _)| viewport.height >= extent - 0.001),
         "the action strip must own the shared ControlRole extent: {extent} vs {:?}",
@@ -164,7 +166,8 @@ fn the_priority_preset_rides_the_shared_select_component() {
         "the priority trigger must keep its measured caption+placeholder slot: {bounds:?} vs {priority_group_width}"
     );
     assert!(
-        page.base.scroll_viewports
+        page.base
+            .scroll_viewports
             .iter()
             .any(|(viewport, content)| content.width > viewport.width
                 && content.width >= bounds.x + bounds.width - viewport.x),
@@ -224,7 +227,8 @@ fn the_priority_preset_stays_reachable_in_the_compact_frame() {
         "the compact frame must keep the shared select measurable: {bounds:?}"
     );
     assert!(
-        page.base.scroll_viewports
+        page.base
+            .scroll_viewports
             .iter()
             .any(|(viewport, content)| content.width > viewport.width),
         "the compact frame must keep the action strip horizontally scrollable: {:?}",

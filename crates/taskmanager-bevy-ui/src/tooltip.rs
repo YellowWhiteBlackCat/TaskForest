@@ -57,8 +57,8 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
-    ComputedUiRenderTargetInfo, FixedNode, JustifyContent, Node, UiGlobalTransform, UiRect, Val,
-    px,
+    ComputedUiRenderTargetInfo, FixedNode, GlobalZIndex, JustifyContent, Node, UiGlobalTransform,
+    UiRect, Val, px,
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
@@ -261,6 +261,7 @@ pub(crate) fn tooltip_card_scene(
             justify_content: JustifyContent::Center,
         }
         FixedNode
+        GlobalZIndex({ 100 })
         BackgroundColor({ fill })
         BorderColor::all(edge)
         BoxShadow({ shadows })

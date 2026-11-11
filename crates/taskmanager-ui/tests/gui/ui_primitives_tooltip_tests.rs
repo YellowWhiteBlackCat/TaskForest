@@ -190,3 +190,34 @@ fn tooltip_content_wears_the_card_glass_tier() {
     );
     assert!(layer.edge.a > 0.0, "the Card tier carries an edge");
 }
+
+/// The painted tooltip card consumes the shared floating Tooltip role, so
+/// its gradient fill and layered shadow cannot drift into a private recipe.
+#[test]
+fn the_tooltip_paints_the_shared_surface_contract() {
+    use crate::primitives::card_surface::GlassSurfaceRole;
+    use crate::theme_binding::{glass_fill, glass_shadow};
+
+    let theme = Theme::dark();
+    let mut owned = crate::primitives::card_surface::CardSurface::unpadded_for_role(
+        theme.palette(),
+        GlassSurfaceRole::Tooltip,
+    )
+    .radius(theme.palette().control_radius)
+    .render();
+    assert_eq!(
+        owned.style().background.as_ref(),
+        Some(&glass_fill(&theme, GlassSurfaceRole::Tooltip.tier()))
+    );
+    assert_eq!(
+        owned.style().box_shadow.as_ref(),
+        Some(&glass_shadow(&theme, GlassSurfaceRole::Tooltip.tier()))
+    );
+    assert_eq!(
+        owned.style().border_widths.top,
+        Some(gpui::AbsoluteLength::Rems(gpui::Rems(
+            GlassSurfaceRole::Tooltip.tier().edge_width_rem()
+        ))),
+        "the tooltip keeps the shared Card-tier hairline"
+    );
+}

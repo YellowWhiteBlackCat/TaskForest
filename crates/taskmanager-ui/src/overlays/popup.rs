@@ -17,11 +17,12 @@ use gpui::{
     App, AppContext, ClickEvent, Context, DismissEvent, ElementId, Entity, EventEmitter,
     FocusHandle, Focusable, InteractiveElement, IntoElement, KeyBinding, MouseDownEvent,
     ParentElement, Pixels, Point, Render, ScrollHandle, SharedString, StatefulInteractiveElement,
-    Styled, Window, actions, anchored, deferred, div, px, rems,
+    Styled, Window, actions, anchored, deferred, div, px,
 };
 use taskmanager_theme::{Palette, Theme};
 use taskmanager_ui_contract::IconId;
 
+use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use crate::primitives::scrollbar::{SCROLLBAR_WIDTH, Scrollbar, ScrollbarShow};
 use crate::theme_binding::glass_shadow;
 use taskmanager_theme::GlassTier;
@@ -32,7 +33,7 @@ use taskmanager_theme::GlassTier;
 /// surface it used to paint.
 #[must_use]
 pub fn menu_panel_tier() -> GlassTier {
-    GlassTier::Card
+    GlassSurfaceRole::Menu.tier()
 }
 
 /// The menu panel's two-layer depth. Before GLASS-01 the panel used a
@@ -41,6 +42,15 @@ pub fn menu_panel_tier() -> GlassTier {
 #[must_use]
 pub fn menu_panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
     glass_shadow(theme, menu_panel_tier())
+}
+
+/// Build the menu panel's shared glass material. The role owns the
+/// tier/elevation pair; the body and scroll rail stay caller-owned slots.
+#[must_use]
+pub fn menu_panel_surface(palette: Palette) -> gpui::Div {
+    CardSurface::unpadded_for_role(palette, GlassSurfaceRole::Menu)
+        .radius(palette.panel_radius)
+        .render()
 }
 
 /// The popup key context (navigation bindings live under it).
@@ -536,19 +546,11 @@ impl Render for PopupMenuState {
             };
         }
 
-        let container = div()
+        let container = menu_panel_surface(palette)
             .id(id)
             .debug_selector(|| "tm-popup".into())
             .relative()
             .min_w(px(self.min_width))
-            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
-            .bg(crate::theme_binding::glass_fill(
-                &palette.theme,
-                GlassTier::Card,
-            ))
-            .border(rems(menu_panel_tier().edge_width_rem()))
-            .border_color(crate::theme_binding::hsla(palette.theme.glass_card().edge))
-            .shadow(menu_panel_shadow(&palette.theme))
             .child(body)
             .child(
                 div()

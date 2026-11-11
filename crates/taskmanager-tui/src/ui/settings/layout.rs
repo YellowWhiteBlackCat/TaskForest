@@ -7,6 +7,7 @@
 use ratatui::layout::Rect;
 use ratatui::text::Line;
 use taskforest_core::core::config::DeviceVisibilityKey;
+use taskmanager_application::i18n::device_visibility_label;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::privilege_center::PrivilegeCenterInputs;
 use taskmanager_theme::{FontRole, Skin};
@@ -82,7 +83,7 @@ pub(super) fn settings_field_rows(app: &crate::TuiApp) -> Vec<SettingsFieldRow> 
     for (index, key) in DeviceVisibilityKey::ALL.into_iter().enumerate() {
         rows.push(SettingsFieldRow {
             field: 8 + index,
-            label: t(key.i18n_key()).to_owned(),
+            label: device_visibility_label(key).to_owned(),
             value: if form.show[index] {
                 t("settings.on").to_owned()
             } else {

@@ -6,14 +6,14 @@ use std::time::Duration;
 
 use crate::OptCallback;
 use crate::icons_binding::icon;
+use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, FocusHandle, InteractiveElement,
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
-    Styled, Task, Window, div, px, rems,
+    Styled, Task, Window, div, px,
 };
-use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Palette};
+use taskmanager_theme::{Palette, tokens};
 use taskmanager_ui_contract::IconId;
 use zhuge_ui_tokens::{StatusColors, StatusKind};
 
@@ -159,7 +159,9 @@ impl RenderOnce for Toast {
 
         // Mission-Center-style entrance: the toast fades in and rises 4/14 REM as
         // it mounts (a fresh toast always replays the animation).
-        div()
+        CardSurface::unpadded_for_role(palette, GlassSurfaceRole::Toast)
+            .radius(palette.panel_radius)
+            .render()
             .debug_selector(|| "tm-toast-card".to_string())
             .flex()
             .flex_row()
@@ -171,17 +173,6 @@ impl RenderOnce for Toast {
             .when(single_line, |card| {
                 card.py(crate::theme_binding::rem_length(tokens::SPACE_4))
             })
-            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
-            .bg(crate::theme_binding::glass_fill(
-                &palette.theme,
-                GlassTier::Card,
-            ))
-            .border(rems(GlassTier::Card.edge_width_rem()))
-            .border_color(crate::theme_binding::hsla(palette.theme.glass_card().edge))
-            .shadow(crate::theme_binding::glass_shadow(
-                &palette.theme,
-                GlassTier::Card,
-            ))
             .text_sm()
             .text_color(crate::theme_binding::hsla(palette.fg))
             .child(

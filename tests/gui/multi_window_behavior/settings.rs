@@ -2,12 +2,13 @@
 //! (refresh slider, Startup-page select, text-rendering pills, switches).
 
 use gpui::{Entity, Keystroke, TestAppContext, VisualTestContext, WindowHandle, point, px};
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskforest_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_PLATFORM_DEFAULT,
 };
-use taskmanager_gpui::gpui_app::root::{DevicePreference, RootView, TopPage};
+use taskmanager_gpui::gpui_app::root::{RootView, TopPage};
 use taskmanager_theme::LightDark;
 
 use super::{draw, wrapped_root};
@@ -405,14 +406,14 @@ async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
     assert!(
         !view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Cpu)
+                .device_visible(DeviceVisibilityKey::Cpu)
         }),
         "Enter on B's focused device-cpu switch must hide B's CPU row"
     );
     assert!(
         view_a.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Cpu)
+                .device_visible(DeviceVisibilityKey::Cpu)
         }),
         "B's cpu toggle must never change A's visibility flags"
     );
@@ -425,21 +426,21 @@ async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
     assert!(
         !view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::NetworkVpn)
+                .device_visible(DeviceVisibilityKey::NetworkVpn)
         }),
         "B's VPN category switch must hide only B's VPN adapters"
     );
     assert!(
         view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::NetworkWireless)
+                .device_visible(DeviceVisibilityKey::NetworkWireless)
         }),
         "B's VPN category switch must not change B's wireless category"
     );
     assert!(
         view_a.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::NetworkVpn)
+                .device_visible(DeviceVisibilityKey::NetworkVpn)
         }),
         "B's VPN category switch must never change A's visibility policy"
     );
@@ -448,21 +449,21 @@ async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
     assert!(
         !view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Network)
+                .device_visible(DeviceVisibilityKey::Network)
         }),
         "B's master network switch must hide all network categories in B"
     );
     assert!(
         view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::NetworkWireless)
+                .device_visible(DeviceVisibilityKey::NetworkWireless)
         }),
         "the master switch must preserve child category preferences"
     );
     assert!(
         view_a.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Network)
+                .device_visible(DeviceVisibilityKey::Network)
         }),
         "B's master network switch must never change A"
     );
@@ -484,14 +485,14 @@ async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
     assert!(
         !view_a.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Cpu)
+                .device_visible(DeviceVisibilityKey::Cpu)
         }),
         "A's own device-cpu toggle must flip A's flag"
     );
     assert!(
         !view_b.read_with(cx, |v, _| {
             v.presentation_snapshot()
-                .device_visible(DevicePreference::Cpu)
+                .device_visible(DeviceVisibilityKey::Cpu)
         }),
         "A's toggle must never resurrect B's cpu row"
     );

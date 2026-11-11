@@ -472,18 +472,35 @@ pub fn render_services(
             .map(|service| service.name.as_str())
     });
 
-    let header = action_bar(
-        ActionBarProps {
-            theme: &theme,
-            selected: selected.as_ref(),
-            selected_name,
-            hovered: hovered.as_ref(),
-            feedback,
+    // The header is two whole bands, not one wrapping row: the command band
+    // (buttons + status line) and the controls band (filter cluster + search
+    // box). A single wrapping toolbar would strand the search box mid-line
+    // and leave the right edge dead — the same defect the shared controls
+    // band now owns for every list page.
+    let header = div()
+        .debug_selector(|| "tm-svc-chrome".to_string())
+        .flex()
+        .flex_col()
+        .gap(definite_length(tokens::SPACE_8))
+        .child(action_bar(
+            ActionBarProps {
+                theme: &theme,
+                selected: selected.as_ref(),
+                selected_name,
+                hovered: hovered.as_ref(),
+                feedback,
+            },
+            cx,
+        ))
+        .child(list_view::controls_band(
+            &theme,
+            &ServiceFilter::ALL,
             filter,
-            search_entity: &search_entity,
-        },
-        cx,
-    );
+            hovered.as_ref(),
+            &cx.entity(),
+            |f, v| v.services_state.filter = f,
+            &search_entity,
+        ));
     let body = if sorted.is_empty() {
         // EMPTY-STATE: 0 rows → a centered hint. An empty list caused by a
         // failed source (systemctl missing / permissions / init not
@@ -556,8 +573,6 @@ struct ActionBarProps<'a> {
     selected_name: Option<&'a str>,
     hovered: Option<&'a Hover>,
     feedback: Option<ActionFeedback>,
-    filter: ServiceFilter,
-    search_entity: &'a Entity<TextInputState>,
 }
 
 fn action_bar(props: ActionBarProps<'_>, cx: &mut Context<RootView>) -> Div {
@@ -567,8 +582,6 @@ fn action_bar(props: ActionBarProps<'_>, cx: &mut Context<RootView>) -> Div {
         selected_name,
         hovered,
         feedback,
-        filter,
-        search_entity,
     } = props;
     // Transient action feedback (folded at render time from the shell-owned
     // typed outcome by `RootView::services_feedback`); when present it takes
@@ -793,16 +806,6 @@ fn action_bar(props: ActionBarProps<'_>, cx: &mut Context<RootView>) -> Div {
             feedback.as_ref(),
             &hint,
         ))
-        .child(div().flex_1())
-        .child(list_view::filter_pill_row(
-            theme,
-            &ServiceFilter::ALL,
-            filter,
-            hovered,
-            &entity,
-            |f, v| v.services_state.filter = f,
-        ))
-        .child(list_view::search_box(&theme.palette(), search_entity))
         .render()
 }
 

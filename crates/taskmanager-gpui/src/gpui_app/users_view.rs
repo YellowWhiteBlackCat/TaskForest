@@ -433,6 +433,7 @@ pub fn render_users(
     });
 
     let header = div()
+        .debug_selector(|| "tm-users-header".to_string())
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_8))

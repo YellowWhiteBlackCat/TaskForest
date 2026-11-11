@@ -13,6 +13,50 @@ use gpui::{
 };
 use taskmanager_theme::{Color, GlassTier, Length, Palette, tokens};
 
+/// The glass role a shared overlay surface plays.
+///
+/// Product roles, not a second elevation ladder: each variant resolves to
+/// exactly one [`GlassTier`] and one [`SurfaceElevation`], so a menu, a toast,
+/// a tooltip and a modal cannot each re-derive its own tier/elevation pair.
+/// Floating roles cast the tier's shared two-layer shadow; the inset chart
+/// hint keeps the same material without a second elevation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GlassSurfaceRole {
+    /// Persistent side navigation or titlebar chrome.
+    Chrome,
+    /// Anchored popup / context / dropdown menu panel.
+    Menu,
+    /// Transient status receipt card.
+    Toast,
+    /// Hover or keyboard hint card.
+    Tooltip,
+    /// True modal dialog panel.
+    Dialog,
+    /// Inline timeline / plot bar inside an already-elevated card.
+    InlinePlot,
+}
+
+impl GlassSurfaceRole {
+    /// The single glass tier for this role (ADR-061).
+    #[must_use]
+    pub const fn tier(self) -> GlassTier {
+        match self {
+            Self::Chrome => GlassTier::Sidebar,
+            Self::Menu | Self::Toast | Self::Tooltip | Self::InlinePlot => GlassTier::Card,
+            Self::Dialog => GlassTier::Modal,
+        }
+    }
+
+    /// The single elevation contract for this role.
+    #[must_use]
+    pub const fn elevation(self) -> SurfaceElevation {
+        match self {
+            Self::Menu | Self::Toast | Self::Tooltip | Self::Dialog => SurfaceElevation::Floating,
+            Self::Chrome | Self::InlinePlot => SurfaceElevation::Inset,
+        }
+    }
+}
+
 /// How a glass surface carries elevation.
 ///
 /// A surface that floats above its backdrop casts the tier's two-layer soft
@@ -37,6 +81,8 @@ pub struct CardSurface {
     padding: Length,
     radius: Length,
     bordered: bool,
+    /// Chrome strips paint only a bottom hairline instead of a full rim.
+    border_bottom_only: bool,
     /// How this surface carries elevation. A glass surface is floating by
     /// default; a nested control track opts into the inset form.
     elevation: SurfaceElevation,
@@ -55,6 +101,7 @@ impl CardSurface {
             padding: tokens::SPACE_12,
             radius: palette.panel_radius,
             bordered: true,
+            border_bottom_only: false,
             elevation: SurfaceElevation::Floating,
             palette,
             glass: Some(GlassTier::Card),
@@ -123,6 +170,15 @@ impl CardSurface {
         self
     }
 
+    /// Paint only the bottom hairline (persistent titlebar chrome). The
+    /// material and radius stay shared; only the edge mask is a chrome fact.
+    #[must_use]
+    pub fn border_bottom_only(mut self) -> Self {
+        self.border_bottom_only = true;
+        self.bordered = true;
+        self
+    }
+
     /// Paint this surface as a nested (inset) one: the shared glass material
     /// and hairline edge, without a second elevation shadow.
     ///
@@ -140,6 +196,43 @@ impl CardSurface {
     pub fn glass(mut self, tier: GlassTier) -> Self {
         self.glass = Some(tier);
         self
+    }
+
+    /// Build the shared surface for one overlay role.
+    ///
+    /// The role owns the tier/elevation mapping; callers supply only the
+    /// palette, padding and radius. This is the one place a menu, toast,
+    /// tooltip or dialog resolves its glass depth, so no frontend keeps a
+    /// private `GlassTier` + `Elevation` table.
+    #[must_use]
+    pub fn for_role(palette: Palette, role: GlassSurfaceRole) -> Self {
+        let mut surface = Self::new(palette).glass(role.tier());
+        if role.elevation() == SurfaceElevation::Inset {
+            surface = surface.inset();
+        }
+        surface
+    }
+
+    /// Build the shared surface for one overlay role with no inner padding:
+    /// the caller owns the content inset.
+    ///
+    /// The role still owns the tier/elevation pair; only the content inset
+    /// is the caller's.
+    #[must_use]
+    pub fn unpadded_for_role(palette: Palette, role: GlassSurfaceRole) -> Self {
+        Self::for_role(palette, role).padding(Length(0.0))
+    }
+
+    /// The resolved glass tier painted by this surface.
+    #[must_use]
+    pub const fn tier(&self) -> Option<GlassTier> {
+        self.glass
+    }
+
+    /// The resolved elevation contract of this surface.
+    #[must_use]
+    pub const fn elevation(&self) -> SurfaceElevation {
+        self.elevation
     }
 
     /// The effective fill after applying the explicit-fill/glass precedence.
@@ -177,10 +270,17 @@ impl CardSurface {
             .bg(background)
             .children(self.children);
         if self.bordered {
-            surface = if let Some(tier) = self.glass {
-                surface.border(rems(tier.edge_width_rem()))
+            surface = if self.border_bottom_only {
+                let width: AbsoluteLength = self.glass.map_or(gpui::px(1.0).into(), |tier| {
+                    rems(tier.edge_width_rem()).into()
+                });
+                surface.border_b(width)
             } else {
-                surface.border_1()
+                if let Some(tier) = self.glass {
+                    surface.border(rems(tier.edge_width_rem()))
+                } else {
+                    surface.border_1()
+                }
             };
             surface = surface.border_color(crate::theme_binding::hsla(
                 glass.map_or(self.palette.border, |layer| layer.edge),

@@ -12,7 +12,6 @@ use super::{Hover, RootView};
 use crate::gpui_app::process_insights::view::ProcessInsightsViewProps;
 use gpui::{
     Context, Div, Entity, InteractiveElement, MouseButton, ParentElement, Rgba, Styled, div, px,
-    rems,
 };
 use taskforest_core::core::time::LocalTimeRulesObservation;
 use taskmanager_application::NetworkEscalationState;
@@ -26,7 +25,6 @@ use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui::theme_binding::rem_value;
@@ -49,9 +47,10 @@ use taskmanager_application::process_details_vm::{
 };
 use taskmanager_assets::product;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme, WindowControls, WindowCorner};
+use taskmanager_theme::{Theme, WindowControls, WindowCorner};
 use taskmanager_ui::brand_logo_image;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
+use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 
 /// The CSD titlebar: drag handle + centered window title + per-platform window
 /// controls. macOS puts traffic-lights on the left; GNOME/KDE/Windows put
@@ -84,15 +83,19 @@ pub fn top_bar(
         })
         .unwrap_or(true);
 
-    let mut bar = div()
+    let mut bar = CardSurface::unpadded_for_role(t.palette(), GlassSurfaceRole::Chrome)
+        .radius(Length(0.0))
+        .border_bottom_only()
+        .render()
         .debug_selector(|| "tm-feedback-titlebar".to_string())
         .h(px(chrome::titlebar_height(t)))
         .flex()
         .flex_row()
         .items_center()
-        .bg(glass_fill(t, GlassTier::Sidebar))
-        .border_b(rems(GlassTier::Sidebar.edge_width_rem()))
-        .border_color(elements::titlebar_border(t, window_active))
+        .border_color(gpui::Hsla::from(elements::titlebar_border(
+            t,
+            window_active,
+        )))
         // Round the titlebar's two TOP corners: it spans the full window width
         // and would otherwise paint square pixels into the transparent CSD
         // corners (bottom corners sit inside the window, no rounding needed).

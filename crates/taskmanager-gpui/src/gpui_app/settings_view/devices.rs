@@ -14,7 +14,7 @@ use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 use crate::gpui_app::root::RootView;
 use taskforest_core::core::config::{DeviceVisibilityKey, DeviceVisibilityPreferences};
-use taskmanager_application::i18n;
+use taskmanager_application::i18n::device_visibility_label;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -47,7 +47,7 @@ pub(super) fn devices_row(
             DeviceToggleSpec {
                 id: DeviceVisibilityKey::Cpu.stable_id(),
                 device: DeviceVisibilityKey::Cpu,
-                label: i18n::t(DeviceVisibilityKey::Cpu.i18n_key()),
+                label: device_visibility_label(DeviceVisibilityKey::Cpu),
                 on: visibility.visible(DeviceVisibilityKey::Cpu),
             },
             switches,
@@ -59,7 +59,7 @@ pub(super) fn devices_row(
             DeviceToggleSpec {
                 id: DeviceVisibilityKey::Memory.stable_id(),
                 device: DeviceVisibilityKey::Memory,
-                label: i18n::t(DeviceVisibilityKey::Memory.i18n_key()),
+                label: device_visibility_label(DeviceVisibilityKey::Memory),
                 on: visibility.visible(DeviceVisibilityKey::Memory),
             },
             switches,
@@ -71,7 +71,7 @@ pub(super) fn devices_row(
             DeviceToggleSpec {
                 id: DeviceVisibilityKey::Disks.stable_id(),
                 device: DeviceVisibilityKey::Disks,
-                label: i18n::t(DeviceVisibilityKey::Disks.i18n_key()),
+                label: device_visibility_label(DeviceVisibilityKey::Disks),
                 on: visibility.visible(DeviceVisibilityKey::Disks),
             },
             switches,
@@ -90,7 +90,7 @@ pub(super) fn devices_row(
             DeviceToggleSpec {
                 id: DeviceVisibilityKey::Gpus.stable_id(),
                 device: DeviceVisibilityKey::Gpus,
-                label: i18n::t(DeviceVisibilityKey::Gpus.i18n_key()),
+                label: device_visibility_label(DeviceVisibilityKey::Gpus),
                 on: visibility.visible(DeviceVisibilityKey::Gpus),
             },
             switches,
@@ -115,7 +115,7 @@ fn network_visibility_group(
             DeviceToggleSpec {
                 id: DeviceVisibilityKey::Network.stable_id(),
                 device: DeviceVisibilityKey::Network,
-                label: i18n::t(DeviceVisibilityKey::Network.i18n_key()),
+                label: device_visibility_label(DeviceVisibilityKey::Network),
                 on: visibility.visible(DeviceVisibilityKey::Network),
             },
             switches,
@@ -133,7 +133,7 @@ fn network_visibility_group(
                             DeviceToggleSpec {
                                 id: device.stable_id(),
                                 device,
-                                label: i18n::t(device.i18n_key()),
+                                label: device_visibility_label(device),
                                 on: visibility.visible(device),
                             },
                             switches,

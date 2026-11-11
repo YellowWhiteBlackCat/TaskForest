@@ -1,10 +1,36 @@
 use super::{Dialog, panel_shadow};
 
+use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::theme_binding::{glass_fill, glass_shadow};
+use gpui::Styled;
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::HighContrast;
 use taskmanager_theme::LightDark;
 use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::Skin;
 use taskmanager_theme::Theme;
+
+/// The dialog panel resolves its material through the shared role contract:
+/// Modal tier, floating elevation, one hairline edge.
+#[test]
+fn the_dialog_panel_uses_the_shared_modal_surface_contract() {
+    let theme = Theme::dark();
+    let mut owned = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::Dialog)
+        .radius(theme.palette().panel_radius)
+        .render();
+    assert_eq!(
+        owned.style().background.as_ref(),
+        Some(&glass_fill(&theme, GlassTier::Modal))
+    );
+    assert_eq!(
+        owned.style().box_shadow.as_ref(),
+        Some(&glass_shadow(&theme, GlassTier::Modal))
+    );
+    assert_eq!(
+        owned.style().box_shadow.as_ref(),
+        Some(&panel_shadow(&theme))
+    );
+}
 #[test]
 fn dialog_confirm_preset_disables_mask_close_and_close_button() {
     let dialog = Dialog::new().confirm();

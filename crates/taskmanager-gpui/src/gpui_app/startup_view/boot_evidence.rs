@@ -9,12 +9,11 @@
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
 use taskforest_core::core::BootSegmentDelta;
 use taskforest_core::core::segment_deltas;
-use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
 
@@ -25,9 +24,9 @@ use taskforest_core::core::startup::{
 };
 use taskmanager_application::i18n;
 use taskmanager_application::{critical_chain_summary, failed_units_summary};
+use taskmanager_theme::Color;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier};
 
 // ── boot evidence strip: failed units + critical chain ──────────────────────
 //
@@ -57,10 +56,8 @@ pub(super) fn boot_evidence_strip(
         theme.danger
     };
     let pill = |id: &'static str, label: &str, value: &str, value_color: Color| {
-        CardSurface::unpadded(theme.palette())
-            .glass(GlassTier::Card)
+        CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
             .radius(tokens::card_radius(theme))
-            .inset()
             .render()
             .id(id)
             .debug_selector(move || id.to_string())
@@ -117,6 +114,18 @@ pub(super) fn boot_evidence_strip(
 
 /// Minimum visible bar width so a 0-duration activation is still a mark.
 const TIMELINE_MIN_BAR_PX: f32 = 2.0;
+
+/// The inline waterfall bar track: the shared Card-tier inset surface paints
+/// the same glass material without a second floating elevation. A filled bar
+/// overlays it, so the track itself owns no layout or progress geometry.
+fn inline_plot_surface(theme: &Theme) -> Div {
+    CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
+        .radius(tokens::control_radius(theme))
+        .bordered(false)
+        .render()
+        .absolute()
+        .inset_0()
+}
 
 /// Pure value rows for the waterfall; `None` means the block renders nothing.
 fn boot_timeline_rows(evidence: &StartupBootEvidenceSnapshot) -> Option<BootTimeline> {
@@ -185,7 +194,8 @@ pub(super) fn boot_timeline_block(
                         .h(px(8.0))
                         .rounded_full()
                         .overflow_hidden()
-                        .bg(glass_fill(theme, GlassTier::Card))
+                        .relative()
+                        .child(inline_plot_surface(theme))
                         .child(
                             div()
                                 .w(relative(fraction.clamp(0.0, 1.0)))
@@ -264,10 +274,8 @@ pub(super) fn boot_timeline_block(
         );
     }
     Some(
-        CardSurface::unpadded(theme.palette())
-            .glass(GlassTier::Card)
+        CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
             .radius(tokens::card_radius(theme))
-            .inset()
             .render()
             .debug_selector(|| "boot-timeline".to_string())
             .flex()

@@ -23,6 +23,16 @@ if a registry entry points at a component that does not exist.
 - `overlays/` — layer_stack, dialog, popup, context_menu, dropdown_menu, toast
 - `styled.rs` — palette-driven style helpers (no hand-written colors)
 
+`primitives/card_surface.rs` owns the shared glass material: the theme's
+translucent gradient fill, the hairline edge and the tier's two-layer soft
+shadow. `GlassSurfaceRole` is the one tier/elevation map — `Chrome` (Sidebar
+tier, inset), `Menu` / `Toast` / `Tooltip` / `InlinePlot` (Card tier) and
+`Dialog` (Modal tier, floating) — so an overlay resolves its depth through
+`CardSurface::for_role` instead of hand-assembling fill + edge + shadow. The
+focus ring is deliberately NOT part of this ladder: it is a keyboard-focus
+affordance with its own geometry, owned by the GPUI product's
+`elements::focus_ring`.
+
 ## Boundary
 
 This crate owns reusable GPUI presentation only; page-specific state remains in

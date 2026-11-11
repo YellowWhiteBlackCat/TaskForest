@@ -11,7 +11,7 @@ use crate::pages::performance::{PerformanceDeviceFocus, PerformanceFocus};
 use crate::pages::processes::card_lane::ProcessViewMode;
 use crate::pages::system::dashboard::SystemDashboardState;
 use crate::window_surface::WindowSurfaceCommand;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use taskmanager_application::system_timeline::{SystemHistoryWindow, SystemPageSection};
 use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
 use taskmanager_shell::fixture::process_tree::seed_shell_process_tree_with_partial_aggregate;
@@ -24,14 +24,20 @@ pub(super) fn is_production(demo: Option<Res<DemoMode>>) -> bool {
 pub(super) fn is_demo(demo: Option<Res<DemoMode>>) -> bool {
     demo.is_some()
 }
+/// The mutable presentation resources one capture startup seeds.
+#[derive(SystemParam)]
+pub(super) struct CapturePresentationState<'w> {
+    dashboard: ResMut<'w, SystemDashboardState>,
+    preferences: ResMut<'w, ThemePreferences>,
+    device_focus: ResMut<'w, PerformanceDeviceFocus>,
+    curve_focus: ResMut<'w, PerformanceFocus>,
+    process_view_mode: ResMut<'w, ProcessViewMode>,
+}
+
 pub(super) fn initialize_capture_state(
     demo: Option<Res<DemoMode>>,
     mut track: NonSendMut<FrontendTrack>,
-    mut dashboard: ResMut<SystemDashboardState>,
-    mut preferences: ResMut<ThemePreferences>,
-    mut device_focus: ResMut<PerformanceDeviceFocus>,
-    mut curve_focus: ResMut<PerformanceFocus>,
-    mut process_view_mode: ResMut<ProcessViewMode>,
+    mut state: CapturePresentationState,
     mut commands: Commands,
 ) {
     if demo.is_none() {
@@ -44,9 +50,9 @@ pub(super) fn initialize_capture_state(
     seed_capture_confirmation_fixture(&mut shell);
     if let Some(target) = capture_perf_device_target(&shell) {
         if let Some(curve) = target.curve() {
-            curve_focus.0 = curve;
+            state.curve_focus.0 = curve;
         }
-        device_focus.0 = target;
+        state.device_focus.0 = target;
     }
     if matches!(
         capture_scenario_target(),
@@ -61,8 +67,8 @@ pub(super) fn initialize_capture_state(
         capture_scenario_target(),
         Some("storage-health" | "sensor-center")
     ) {
-        dashboard.section = SystemPageSection::Health;
-        dashboard.health_section = if capture_scenario_target() == Some("sensor-center") {
+        state.dashboard.section = SystemPageSection::Health;
+        state.dashboard.health_section = if capture_scenario_target() == Some("sensor-center") {
             HealthReviewSection::Sensors
         } else {
             HealthReviewSection::Storage
@@ -79,13 +85,13 @@ pub(super) fn initialize_capture_state(
         capture_scenario_target(),
         Some("process-context-menu" | "process-selection" | "process-force-kill")
     ) {
-        *process_view_mode = ProcessViewMode::Dense;
+        *state.process_view_mode = ProcessViewMode::Dense;
     }
     track.shell = shell;
     track.initial_refresh_submitted = true;
     if let Some(target @ ("system-dashboard" | "history-60m")) = capture_scenario_target() {
-        dashboard.section = SystemPageSection::Dashboard;
-        dashboard.window = if target == "history-60m" {
+        state.dashboard.section = SystemPageSection::Dashboard;
+        state.dashboard.window = if target == "history-60m" {
             SystemHistoryWindow::SixtyMinutes
         } else {
             SystemHistoryWindow::FifteenMinutes
@@ -95,7 +101,7 @@ pub(super) fn initialize_capture_state(
         capture_scenario_target(),
         Some("settings-zero-gray" | "apps-zero-gray")
     ) {
-        preferences.gray_zero_values = true;
+        state.preferences.gray_zero_values = true;
     }
     commands.trigger(crate::input::ShellInteractionApplied);
     if capture_scenario_target() == Some("apps-group-expanded") {

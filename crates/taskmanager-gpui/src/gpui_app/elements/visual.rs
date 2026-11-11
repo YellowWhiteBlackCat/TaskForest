@@ -45,6 +45,15 @@ pub fn titlebar_border(t: &Theme, active: bool) -> gpui::Rgba {
 }
 
 // ── focus ring (WCAG 2.4.7 Focus Visible) ──────────────────────────────────
+// Boundary (ADR-061): the focus ring is a keyboard-focus affordance, NOT a
+// glass surface. It reads `Theme::accent` at a fixed 0.6 alpha with zero blur,
+// zero offset and a +2px outset spread, gated by `Theme::focus_visible()`.
+// It therefore has no `GlassTier`, no `GlassShadowProjection::Layered` and no
+// `single_quad_elevation()` opacity: folding it into the glass ladder would
+// make a focus indicator change depth with the panel material. The glass
+// ladder stays owned by `theme::GlassTier` → `theme_binding::glass_shadow` →
+// `CardSurface`; this ring stays a separate, non-glass shadow contract.
+//
 // The pinned GPUI element focus API provides:
 //   * `.id(..)` on a `Div` → `Stateful<Div>`, which implements BOTH
 //     `InteractiveElement` (the `.focus(|s| ..)` stateful style hook) and

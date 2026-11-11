@@ -115,10 +115,21 @@ fn tier_offer(code: &str) -> Vec<&'static str> {
         .collect()
 }
 
+/// A frontend that spends the one core-owned set (`PriorityTier::ALL`)
+/// offers every tier by construction. Restating the three variant tokens
+/// locally would be a second vocabulary, so the shared-set binding is the
+/// preferred offer shape, not a missing capability.
+fn offers_core_tier_set(code: &str) -> bool {
+    code.contains("PriorityTier::ALL")
+}
+
 /// Tier parity (§8.1 语义平价律): each designated priority surface offers
 /// EXACTLY the neutral `PriorityTier` set {High, Normal, Low} — a frontend
 /// that drops a tier or invents one makes the same control command mean
 /// different things per frontend, which is a parity bug, not a style choice.
+/// A surface may either pin its three typed references explicitly or spend
+/// `PriorityTier::ALL`; the latter is the one-owner form and is checked
+/// against the core owner's own set.
 /// The platform adapter owns tier→native; nothing here may widen to raw
 /// numbers (that negative side is `control_vocabulary_boundary`). Bevy is
 /// not designated yet — a surface must exist before it can be pinned.
@@ -127,13 +138,22 @@ fn the_designated_surfaces_offer_exactly_the_high_normal_low_priority_tiers() {
     for (frontend, rel_path) in TIER_OFFER_FILES {
         let code = read_stripped(rel_path);
         let offered = tier_offer(&code);
-        assert_eq!(
-            offered, TIERS,
-            "{frontend} priority offer drifted: found {offered:?} in {rel_path}, expected \
-             exactly [High, Normal, Low] (ARCH.md §8.1 语义平价律: every frontend must \
-             offer the same tier set; a missing tier is a dropped capability, an extra tier \
-             is a private vocabulary)."
-        );
+        let spends_core_set = offers_core_tier_set(&code);
+        if spends_core_set {
+            assert!(
+                !code.contains("enum PriorityChoice"),
+                "{frontend} both spends PriorityTier::ALL and declares a private \
+                 PriorityChoice vocabulary in {rel_path}"
+            );
+        } else {
+            assert_eq!(
+                offered, TIERS,
+                "{frontend} priority offer drifted: found {offered:?} in {rel_path}, expected \
+                 exactly [High, Normal, Low] (ARCH.md §8.1 语义平价律: every frontend must \
+                 offer the same tier set; a missing tier is a dropped capability, an extra tier \
+                 is a private vocabulary)."
+            );
+        }
 
         match frontend {
             // GPUI's presets submit the typed batch action from two lanes
@@ -174,23 +194,20 @@ fn the_designated_surfaces_offer_exactly_the_high_normal_low_priority_tiers() {
                     );
                 }
             }
-            // Iced's pick_list renders PriorityChoice::ALL, so the enum's
-            // variant count is the offer count.
+            // Iced's pick_list carries the core tier as its payload and
+            // spends `PriorityTier::ALL`; it declares no second vocabulary.
             "Iced" => {
                 assert!(
-                    code.contains("enum PriorityChoice"),
-                    "{frontend} lost the PriorityChoice pick_list model in {rel_path}"
-                );
-                assert!(
-                    code.contains("const ALL: [Self; 3]"),
-                    "{frontend} PriorityChoice::ALL is no longer exactly three variants \
-                     in {rel_path}"
+                    code.contains("struct PriorityOption") || code.contains("enum PriorityChoice"),
+                    "{frontend} lost its pick_list row model in {rel_path}"
                 );
                 for tier in TIERS {
-                    assert!(
-                        code.contains(&format!("Self::{tier} =>")),
-                        "{frontend} PriorityChoice lost its {tier} arm in {rel_path}"
-                    );
+                    if !spends_core_set {
+                        assert!(
+                            code.contains(&format!("Self::{tier} =>")),
+                            "{frontend} PriorityChoice lost its {tier} arm in {rel_path}"
+                        );
+                    }
                 }
             }
             _ => unreachable!("TIER_OFFER_FILES names only the four frontends"),
@@ -306,6 +323,8 @@ fn the_priority_tier_label_fold_is_single_sourced_and_read_by_every_frontend() {
             };
             let code = strip_line_comments(&source);
             let references_fold = code.contains("presentation::priority_tier_label")
+                || (code.contains("priority_tier_label")
+                    && code.contains("taskmanager_shell::presentation"))
                 || (code.contains("i18n_key()") && code.contains("PriorityTier"));
             if references_fold {
                 referencing_files += 1;

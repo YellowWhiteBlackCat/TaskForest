@@ -3,11 +3,11 @@ use super::components::IcedElement;
 use super::{
     alerts, current_window_capture_btn, page_icon, responsive::chrome_presentation_for_width,
 };
+use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 use crate::{
     app::{FocusTarget, Message},
     focus, theme,
 };
-use crate::ui::components::{ScrollAxis, ScrollScale, scrollable};
 use iced::Element;
 use iced::widget::{column, container, row};
 use taskmanager_application::i18n::t;
@@ -115,9 +115,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
             ScrollAxis::Horizontal,
             ScrollScale::Standard,
         )
-            .height(iced::Length::Fixed(36.0))
-            .width(iced::Length::Fill)
-            .into()
+        .height(iced::Length::Fixed(36.0))
+        .width(iced::Length::Fill)
+        .into()
     } else if wrapped_chrome {
         // Keep the action band to one bounded row. A wrapped action grid made
         // the 1180px capture spend a third row on About, pushing the actual
@@ -128,9 +128,9 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
             ScrollAxis::Horizontal,
             ScrollScale::Standard,
         )
-            .height(iced::Length::Fixed(36.0))
-            .width(iced::Length::Fill)
-            .into()
+        .height(iced::Length::Fixed(36.0))
+        .width(iced::Length::Fill)
+        .into()
     } else {
         row(toolbar_items).spacing(4).into()
     };
@@ -140,15 +140,14 @@ pub(super) fn render(app: &crate::IcedApp) -> NavigationChrome<'_> {
     // one horizontal scroller made the first screenshot look like controls
     // had disappeared behind the right edge even though they were reachable.
     if app.nav_orientation == NavOrientation::Vertical {
-        let rail: Element<'_, Message, iced::Theme, iced::Renderer> =
-            scrollable(
-                column(page_tabs).spacing(6),
-                ScrollAxis::Vertical,
-                ScrollScale::Standard,
-            )
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .into();
+        let rail: Element<'_, Message, iced::Theme, iced::Renderer> = scrollable(
+            column(page_tabs).spacing(6),
+            ScrollAxis::Vertical,
+            ScrollScale::Standard,
+        )
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .into();
         let rail = container(rail)
             .style(move |_| theme::chrome_style(theme_snapshot))
             .width(iced::Length::Fixed(app.navigation_rail_width()))

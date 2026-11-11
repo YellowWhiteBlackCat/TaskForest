@@ -7,10 +7,11 @@
 //! The native Iced button keeps its own pointer state; the focus shell keeps
 //! keyboard activation and the keyboard-only ring.
 
+use iced::Length;
 use iced::advanced::text::IntoFragment;
 use iced::widget::{button, text};
-use iced::Length;
 use taskmanager_theme::{Theme, tokens};
+use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use crate::app::{FocusTarget, Message};
@@ -63,9 +64,7 @@ pub(crate) fn focusable_control_button<'a>(
     let extent = crate::theme::control_extent(theme_snapshot, ControlRole::Button);
     let inner = control_button(
         *theme_snapshot,
-        text(label)
-            .size(f32::from(tokens::FONT_13))
-            .into(),
+        text(label).size(f32::from(tokens::FONT_13)).into(),
         ControlRole::Button,
         tone,
         enabled.then_some(on_press.clone()),
@@ -98,9 +97,7 @@ pub(crate) fn focusable_control_button_intrinsic<'a>(
 ) -> IcedElement<'a> {
     let inner = control_button(
         *theme_snapshot,
-        text(label)
-            .size(f32::from(tokens::FONT_13))
-            .into(),
+        text(label).size(f32::from(tokens::FONT_13)).into(),
         ControlRole::Button,
         tone,
         enabled.then_some(on_press.clone()),
@@ -129,10 +126,7 @@ fn focus_shell<'a>(
         on_press,
         target,
         crate::theme::focus_ring_color(theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(
-            theme_snapshot,
-            theme_snapshot.palette().control_radius,
-        ),
+        crate::theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
         false,
     )
     .with_enabled(enabled)
@@ -163,10 +157,7 @@ pub(crate) fn focusable_control_button_owned(
         on_press,
         target,
         crate::theme::focus_ring_color(&theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(
-            &theme_snapshot,
-            theme_snapshot.palette().control_radius,
-        ),
+        crate::theme::scaled_radius(&theme_snapshot, theme_snapshot.palette().control_radius),
         false,
     )
     .with_enabled(enabled)
@@ -180,7 +171,7 @@ pub(crate) fn focusable_control_button_owned(
 pub(crate) fn focusable_icon_label_button_intrinsic<'a>(
     theme_snapshot: &'a Theme,
     target: FocusTarget,
-    icon_id: taskmanager_ui_contract::IconId,
+    icon_id: IconId,
     label: impl IntoFragment<'a>,
     on_press: Message,
     tone: ButtonTone,
@@ -203,10 +194,7 @@ pub(crate) fn focusable_icon_label_button_intrinsic<'a>(
         on_press,
         target,
         crate::theme::focus_ring_color(theme_snapshot, tone == ButtonTone::Danger),
-        crate::theme::scaled_radius(
-            theme_snapshot,
-            theme_snapshot.palette().control_radius,
-        ),
+        crate::theme::scaled_radius(theme_snapshot, theme_snapshot.palette().control_radius),
         false,
     )
     .with_enabled(enabled)

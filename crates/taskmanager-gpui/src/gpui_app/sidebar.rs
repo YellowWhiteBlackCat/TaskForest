@@ -14,10 +14,10 @@ use taskmanager_shell::presentation::effective_smart_status;
 use taskmanager_shell::presentation::smart::smart_section_visible;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui::icons_binding::icon;
+use taskmanager_ui::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::fill;
 use taskmanager_ui::theme_binding::font_weight;
-use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::{COLUMN_WIDTH_KEYBOARD_STEP, IconId};
@@ -32,9 +32,9 @@ use crate::gpui_app::root::{Hover, RootView, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDT
 use taskforest_core::core::metrics::SystemSnapshot;
 use taskforest_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme};
 use taskmanager_ui::layout::scroll_region_with_overlay_rail;
 
 mod captions;
@@ -611,29 +611,32 @@ pub(crate) fn render_sidebar(
     // the shrinkable viewport; the sidebar keeps only its width/background and
     // CSD-corner responsibilities here.
     let content_width = (width - SIDEBAR_RESIZE_GUTTER).max(px(0.0));
-    let col = scroll_region_with_overlay_rail(
-        "sidebar-list",
-        "tm-sidebar-scroll",
-        "sidebar-scrollbar",
-        "tm-sidebar-scrollbar",
-        scroll.clone(),
-        theme.palette(),
-        body,
-    )
-    .flex_none()
-    .w(content_width)
-    .min_w(content_width)
-    .max_w(content_width)
-    .h_full()
-    .bg(glass_fill(theme, GlassTier::Sidebar))
-    .rounded(rem_length(tokens::card_radius(theme)))
-    // The panel corner must also clear a larger transparent CSD corner.
-    .rounded_bl(px((f32::from(tokens::card_radius(theme))
-        * theme.root_rem_size
-        / STANDARD_ROOT_REM_SIZE)
-        .max(
-            theme.window_corner_radius(WindowCorner::BottomLeft) * corner_factor,
-        )));
+    let col = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::Chrome)
+        .radius(tokens::card_radius(theme))
+        .bordered(false)
+        .render()
+        .child(scroll_region_with_overlay_rail(
+            "sidebar-list",
+            "tm-sidebar-scroll",
+            "sidebar-scrollbar",
+            "tm-sidebar-scrollbar",
+            scroll.clone(),
+            theme.palette(),
+            body,
+        ))
+        .flex_none()
+        .w(content_width)
+        .min_w(content_width)
+        .max_w(content_width)
+        .h_full()
+        .rounded(rem_length(tokens::card_radius(theme)))
+        // The panel corner must also clear a larger transparent CSD corner.
+        .rounded_bl(px((f32::from(tokens::card_radius(theme))
+            * theme.root_rem_size
+            / STANDARD_ROOT_REM_SIZE)
+            .max(
+                theme.window_corner_radius(WindowCorner::BottomLeft) * corner_factor,
+            )));
 
     // The outer slot remains the sole width authority. Its final gutter is
     // reserved for resizing; the scroll viewport and rail end before it.

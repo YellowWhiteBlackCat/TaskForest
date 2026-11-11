@@ -11,6 +11,41 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_theme::{GlassTier, Theme};
 
+/// The menu panel's material comes from the shared surface primitive, so the
+/// panel can never drift into a private fill/edge/shadow recipe.
+#[test]
+fn the_menu_panel_paints_the_shared_surface_contract() {
+    use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+    use crate::theme_binding::glass_fill;
+
+    let theme = Theme::dark();
+    let mut panel = super::menu_panel_surface(theme.palette());
+    assert_eq!(
+        panel.style().background.as_ref(),
+        Some(&glass_fill(&theme, GlassTier::Card)),
+        "the menu panel fills with the shared Card-tier glass gradient"
+    );
+    assert_eq!(
+        panel.style().box_shadow.as_ref(),
+        Some(&menu_panel_shadow(&theme)),
+        "the menu panel casts the shared two-layer shadow"
+    );
+    let expected_border = gpui::AbsoluteLength::Rems(gpui::Rems(GlassTier::Card.edge_width_rem()));
+    assert_eq!(
+        panel.style().border_widths.top,
+        Some(expected_border),
+        "the menu panel keeps the shared hairline edge"
+    );
+    let mut owned = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::Menu)
+        .radius(theme.palette().panel_radius)
+        .render();
+    assert_eq!(
+        panel.style().box_shadow.as_ref(),
+        owned.style().box_shadow.as_ref(),
+        "the panel and the shared surface paint the same elevation"
+    );
+}
+
 /// GLASS-01: the menu panel is a floating card. It must read the theme's Card
 /// glass tier (fill/edge/shadow) — the same material Iced's menus and Bevy's
 /// `menu_scene` paint — rather than the opaque page surface plus a hardcoded

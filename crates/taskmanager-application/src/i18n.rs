@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU8, Ordering};
 use taskforest_core::core::alerts::{AlertMetric, AlertSeverity};
+use taskforest_core::core::config::DeviceVisibilityKey;
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::history::HistoryWindow;
 use taskforest_core::core::npu::NpuEngineKind;
@@ -395,6 +396,16 @@ pub fn history_window_label(window: HistoryWindow) -> &'static str {
 #[must_use]
 pub fn process_details_section_label(section: ProcessDetailsSection) -> &'static str {
     t(section.i18n_key())
+}
+
+/// The one localized label for a device-visibility category.
+///
+/// `DeviceVisibilityKey` owns the key vocabulary (a pure core fact); this is
+/// the only place a key meets the active language, so GPUI, Iced, TUI and
+/// Bevy cannot fork the Settings wording.
+#[must_use]
+pub fn device_visibility_label(key: DeviceVisibilityKey) -> &'static str {
+    t(key.i18n_key())
 }
 
 /// The one localized reason for a typed control failure. `FailureKind` owns

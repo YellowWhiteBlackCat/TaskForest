@@ -31,14 +31,7 @@ pub(crate) fn glass_button<'a>(
     tone: ButtonTone,
     enabled: bool,
 ) -> IcedElement<'a> {
-    focusable_control_button(
-        theme_snapshot,
-        target,
-        label,
-        on_press,
-        tone,
-        enabled,
-    )
+    focusable_control_button(theme_snapshot, target, label, on_press, tone, enabled)
 }
 
 /// An icon-only action. The shared `label` is exposed through the same

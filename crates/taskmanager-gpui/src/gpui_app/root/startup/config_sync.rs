@@ -52,7 +52,7 @@ pub(super) fn apply_root_persisted_projection(
     );
     next.window_decorations = SharedString::from(decorations_pref.config_token());
     view.window_decorations_pref = decorations_pref;
-    next.devices = DeviceVisibilityPreferences::from_config(&cfg);
+    next.devices = DeviceVisibilityPreferences::from_config(cfg);
     next.units = UnitPreferences {
         memory_use_bytes: cfg.memory_use_bytes,
         memory_use_base2: cfg.memory_use_base2,

@@ -51,7 +51,9 @@ pub(super) const PRIORITY_OPTIONS: [PriorityOption; 3] = PriorityOption::all();
 impl PriorityOption {
     /// The options the core owner publishes, in the core's order.
     pub(super) const fn all() -> [Self; 3] {
-        let mut options = [Self { tier: PriorityTier::Normal }; 3];
+        let mut options = [Self {
+            tier: PriorityTier::Normal,
+        }; 3];
         let mut index = 0;
         while index < PriorityTier::ALL.len() {
             options[index] = Self {

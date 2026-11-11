@@ -27,7 +27,9 @@ use crate::glass::{GlassPanelMaterial, card_material};
 use crate::palette::ui_palette;
 use crate::window::FrontendWindowPlugin;
 use bevy::scene::WorldSceneExt;
-use bevy::ui::prelude::{BackgroundColor, BorderColor, BorderRadius, BoxShadow, Node, UiRect, Val};
+use bevy::ui::prelude::{
+    BackgroundColor, BorderColor, BorderRadius, BoxShadow, GlobalZIndex, Node, UiRect, Val,
+};
 
 #[test]
 fn tooltip_state_transitions_are_explicit_and_discrete() {
@@ -377,4 +379,9 @@ fn tooltip_card_scene_carries_the_card_glass_material() {
     let node = app.world().get::<Node>(root).expect("the card is a Node");
     assert_eq!(node.border, UiRect::all(Val::Rem(edge_width_rem)));
     assert_eq!(node.border_radius, BorderRadius::all(Val::Rem(radius_rem)));
+    assert_eq!(
+        app.world().get::<GlobalZIndex>(root),
+        Some(&GlobalZIndex(100)),
+        "the viewport-fixed card paints above the page's optical surfaces"
+    );
 }

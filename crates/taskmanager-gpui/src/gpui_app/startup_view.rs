@@ -658,22 +658,18 @@ fn controls_row(
     search_entity: &Entity<TextInputState>,
     entity: &Entity<RootView>,
 ) -> Div {
-    Toolbar::new()
-        // Status-filter pill cluster + the search box both come from [`list_view`]
-        // (shared with services_view); only the per-view `on_select` — which
-        // `RootView` field the chosen filter writes into — is wired here.
-        .child(list_view::filter_pill_row(
-            theme,
-            &StartupFilter::ALL,
-            filter,
-            hovered,
-            entity,
-            |f, v| v.startup_state.filter = f,
-        ))
-        // Flex spacer: pushes the search box to the right edge.
-        .child(div().flex_1())
-        .child(list_view::search_box(&theme.palette(), search_entity))
-        .render()
+    // The band itself is shared with Services (`list_view::controls_band`):
+    // only the per-view `on_select` — which `RootView` field the chosen
+    // filter writes into — is wired here.
+    list_view::controls_band(
+        theme,
+        &StartupFilter::ALL,
+        filter,
+        hovered,
+        entity,
+        |f, v| v.startup_state.filter = f,
+        search_entity,
+    )
 }
 
 // ── action bar (Enable / Disable) ────────────────────────────────────────────

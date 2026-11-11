@@ -269,6 +269,7 @@ pub fn filter_pill_row<F: FilterSpec>(
     on_select: impl Fn(F, &mut RootView) + Clone + 'static,
 ) -> Div {
     div()
+        .debug_selector(|| "tm-filter-pill-row".to_string())
         .flex()
         .flex_row()
         .items_center()
@@ -397,6 +398,43 @@ pub fn search_box_sized(
                 .min_w(px(0.0))
                 .child(TextInput::new(search_entity.clone(), *palette).height(24.0)),
         )
+}
+
+// ── controls band (filter cluster + search) ───────────────────────────────
+
+/// The shared list-page controls band: the status-filter pill cluster on the
+/// left, the search box flush against the right edge.
+///
+/// Both list pages (Services, Startup) mount this ONE band instead of
+/// composing their own. The band is a single non-wrapping row, and that is
+/// the whole point: a wrapping toolbar strands the search box mid-line and
+/// leaves the right edge dead, while the pill cluster and the search box are
+/// one admission group that must stay whole. The pill cluster keeps its
+/// intrinsic width, the flexible spacer absorbs the slack, and the search box
+/// owns the right edge.
+pub fn controls_band<F: FilterSpec>(
+    theme: &Theme,
+    pills: &[F],
+    active: F,
+    hovered: Option<&Hover>,
+    entity: &Entity<RootView>,
+    on_select: impl Fn(F, &mut RootView) + Clone + 'static,
+    search_entity: &Entity<TextInputState>,
+) -> Div {
+    div()
+        .debug_selector(|| "tm-list-controls-band".to_string())
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(definite_length(tokens::SPACE_8))
+        .w_full()
+        .min_w(px(0.0))
+        .child(filter_pill_row(
+            theme, pills, active, hovered, entity, on_select,
+        ))
+        // Flexible spacer: pushes the search box to the right edge.
+        .child(div().flex_1().min_w(px(0.0)))
+        .child(search_box(&theme.palette(), search_entity))
 }
 
 // ── empty state ──────────────────────────────────────────────────────────────
@@ -703,6 +741,10 @@ pub fn feedback_status_line(
         None => (selected_hint.to_string(), theme.fg_dim),
     };
     div()
+        .debug_selector(|| "tm-feedback-status-line".to_string())
+        .min_w(px(0.0))
+        .flex_shrink(1.0)
+        .truncate()
         .text_size(font_size(tokens::FONT_12))
         .text_color(hsla(color))
         .child(text)
@@ -711,3 +753,7 @@ pub fn feedback_status_line(
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_gpui_app_list_view_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/list_page_action_bar_bounds_tests.rs"]
+mod action_bar_bounds_tests;

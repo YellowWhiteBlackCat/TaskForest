@@ -21,9 +21,10 @@
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::setup::SetupScriptInfo;
+use taskforest_core::core::units::QuantityFamily;
 use taskmanager_application::first_run::{FirstRunController, FirstRunPhase};
 use taskmanager_application::system_timeline::SystemPageSection;
-use taskmanager_gpui::gpui_app::root::{RootView, TopPage, UnitFamily, WindowSurfaceKind};
+use taskmanager_gpui::gpui_app::root::{RootView, TopPage, WindowSurfaceKind};
 use taskmanager_gpui::gpui_app::sidebar::SelectedDevice;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::RowDensity;
@@ -216,7 +217,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         win.read_with(cx, |view, _cx| {
             !view
                 .presentation_snapshot()
-                .unit_choices(UnitFamily::Memory)
+                .unit_choices(QuantityFamily::Memory)
                 .0
         })
         .unwrap()
@@ -224,7 +225,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
     assert!(
         win.read_with(cx, |view, _cx| {
             view.presentation_snapshot()
-                .unit_choices(UnitFamily::Memory)
+                .unit_choices(QuantityFamily::Memory)
                 .1
         })
         .unwrap()
@@ -241,7 +242,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
     assert!(
         win.read_with(cx, |view, _cx| {
             view.presentation_snapshot()
-                .unit_choices(UnitFamily::Network)
+                .unit_choices(QuantityFamily::Network)
                 .1
         })
         .unwrap()
@@ -250,7 +251,7 @@ async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
         win.read_with(cx, |view, _cx| {
             !view
                 .presentation_snapshot()
-                .unit_choices(UnitFamily::Network)
+                .unit_choices(QuantityFamily::Network)
                 .0
         })
         .unwrap()

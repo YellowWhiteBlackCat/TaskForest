@@ -137,7 +137,7 @@ impl TuiApp {
                 .iter()
                 .position(|ms| *ms == config.refresh_ms)
                 .unwrap_or(1);
-            self.settings_form.show = DeviceVisibilityPreferences::from_config(&config).to_array();
+            self.settings_form.show = DeviceVisibilityPreferences::from_config(config).to_array();
             self.settings_form.units = [
                 config.memory_use_bytes,
                 config.memory_use_base2,
@@ -164,7 +164,7 @@ impl TuiApp {
             }
         }
         self.prefs = AppliedPrefs {
-            show: DeviceVisibilityPreferences::from_config(&config).to_array(),
+            show: DeviceVisibilityPreferences::from_config(config).to_array(),
             units: [
                 config.memory_use_bytes,
                 config.memory_use_base2,

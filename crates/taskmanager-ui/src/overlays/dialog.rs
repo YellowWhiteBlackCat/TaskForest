@@ -12,7 +12,7 @@ use std::rc::Rc;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, App, ElementId, InteractiveElement, IntoElement, KeyBinding, MouseDownEvent,
-    ParentElement, SharedString, Styled, Window, actions, div, rems,
+    ParentElement, SharedString, Styled, Window, actions, div,
 };
 use taskmanager_theme::Palette;
 use taskmanager_ui_contract::IconId;
@@ -20,10 +20,11 @@ use taskmanager_ui_contract::IconId;
 use crate::focus::trap_modal;
 use crate::overlays::layer_stack::{LayerBackfill, ModalSpec, PaletteScrim};
 use crate::primitives::button::ButtonVariant;
+use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use crate::primitives::icon_button::{IconButton, IconButtonState};
 use crate::{BackfillBuilder, ElementBuilder, OptBoolCallback, OptCallback};
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme};
 
 /// The dialog key context (Escape/Enter bindings live under it).
 pub const DIALOG_CONTEXT: &str = "TaskManagerDialog";
@@ -82,12 +83,12 @@ pub type FooterFn =
     Box<dyn Fn(RenderButtonFn, RenderButtonFn, &mut Window, &mut App) -> Vec<AnyElement>>;
 type RenderButtonFn = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 
-/// The dialog panel's drop shadow: the Mission Center two-layer pair — a
-/// wide, low-opacity ambient blur plus a tight, high-opacity edge blur —
-/// both painted in the palette's single `card_shadow` ink (the edge layer
-/// carries the full ink alpha, the ambient layer 60% of it).
-fn panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
-    crate::theme_binding::glass_shadow(theme, GlassTier::Modal)
+/// The dialog panel's drop shadow is the Modal tier's shared two-layer
+/// projection: a wide, low-opacity ambient blur plus a tight, high-opacity
+/// edge blur, both painted in the palette's single glass shadow ink (the
+/// edge layer carries the full ink alpha, the ambient layer 60% of it).
+pub fn panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
+    crate::theme_binding::glass_shadow(theme, GlassSurfaceRole::Dialog.tier())
 }
 
 /// Builder for one modal dialog.
@@ -319,7 +320,9 @@ impl Dialog {
             }
         };
 
-        let mut panel = div()
+        let mut panel = CardSurface::unpadded_for_role(palette, GlassSurfaceRole::Dialog)
+            .radius(palette.panel_radius)
+            .render()
             .id(ElementId::NamedInteger(
                 "tm-dialog".into(),
                 backfill.layer_ix as u64,
@@ -328,14 +331,6 @@ impl Dialog {
             .when_some(self.max_width, |el, max| {
                 el.max_w(crate::theme_binding::rem_value(max))
             })
-            .rounded(crate::theme_binding::rem_length(palette.panel_radius))
-            .bg(crate::theme_binding::glass_fill(
-                &palette.theme,
-                GlassTier::Modal,
-            ))
-            .border(rems(GlassTier::Modal.edge_width_rem()))
-            .border_color(crate::theme_binding::hsla(palette.theme.glass_modal().edge))
-            .shadow(panel_shadow(&palette.theme))
             .flex()
             .flex_col()
             .overflow_hidden()

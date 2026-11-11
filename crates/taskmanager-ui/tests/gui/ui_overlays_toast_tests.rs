@@ -1,4 +1,6 @@
 use super::{Toast, ToastEvent, ToastState};
+use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
+use crate::theme_binding::{glass_fill, glass_shadow};
 use gpui::{
     AppContext, Context, Entity, InteractiveElement, IntoElement, Modifiers, ParentElement, Render,
     Styled, TestAppContext, Window, div, px, size,
@@ -6,8 +8,27 @@ use gpui::{
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
+use taskmanager_theme::GlassTier;
 use taskmanager_theme::Theme;
 use zhuge_ui_tokens::{StatusColors, StatusKind};
+
+/// The toast card's material is the shared floating Card-tier surface, not a
+/// local fill + border + shadow recipe.
+#[test]
+fn the_toast_card_paints_the_shared_surface_contract() {
+    let theme = Theme::dark();
+    let mut owned = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::Toast)
+        .radius(theme.palette().panel_radius)
+        .render();
+    assert_eq!(
+        owned.style().background.as_ref(),
+        Some(&glass_fill(&theme, GlassTier::Card))
+    );
+    assert_eq!(
+        owned.style().box_shadow.as_ref(),
+        Some(&glass_shadow(&theme, GlassTier::Card))
+    );
+}
 
 #[test]
 fn toast_kind_colors_are_palette_derived() {
