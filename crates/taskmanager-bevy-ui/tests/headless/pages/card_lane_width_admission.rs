@@ -7,6 +7,7 @@
 //! and a truncated bucket's overflow header must not bypass that cap.
 
 use taskmanager_theme::{Theme, tokens::UiSize};
+use taskmanager_ui_contract::presentation::card_flow::CardFlowAdmission;
 use taskmanager_ui_contract::presentation::card_width::{
     CardRowWidthBudget, admit_card_row_width_budget, card_row_columns,
 };
@@ -52,7 +53,7 @@ fn the_measured_budget_and_the_plan_bind_the_same_shared_cap() {
     let metrics = metrics();
     let spec = metrics.width_spec();
     let width = 3_000.0;
-    let flow = card_flow_budget(width, 620.0, &palette());
+    let flow = card_flow_budget(width, 620.0, 0.0, &palette());
     assert_eq!(flow.columns, metrics.max_columns);
     assert_eq!(flow.row_width.content_width, spec.content_width_cap);
     assert_eq!(flow.row_width.card_width, metrics.card_max_width_px);
@@ -73,8 +74,11 @@ fn the_measured_budget_and_the_plan_bind_the_same_shared_cap() {
 fn a_narrow_slot_degrades_the_whole_group_to_one_bounded_card() {
     let metrics = metrics();
     let width = metrics.card_min_width_px + metrics.group_gap_px * 2.0;
-    let flow = card_flow_budget(width, 600.0, &palette());
-    assert!(flow.groups >= 1, "the height verdict admits whole groups");
+    let flow = card_flow_budget(width, 600.0, 0.0, &palette());
+    assert!(
+        flow.group_count() >= 1,
+        "the height verdict admits whole groups"
+    );
     let admitted = budget(width, 2, false);
     assert_eq!(admitted.columns, 1);
     assert_eq!(admitted.content_width, width);
@@ -116,7 +120,7 @@ fn an_overflow_header_reserves_its_own_bounded_group_slot() {
 fn a_truncated_bucket_keeps_its_measured_wide_grid() {
     let palette = palette();
     let width = 1180.0 - space_8() * 2.0;
-    let flow = card_flow_budget(width, 620.0, &palette);
+    let flow = card_flow_budget(width, 620.0, 0.0, &palette);
     assert!(flow.columns >= 3, "a 1180px window admits a wide card grid");
     assert_eq!(
         flow.width_columns(flow.columns + 1, true),
@@ -145,4 +149,44 @@ fn a_slot_too_narrow_for_one_card_degrades_the_whole_lane() {
         "an unmeasured slot never fabricates a card row"
     );
     assert!(!CardRowWidthBudget::degraded().is_admitted());
+}
+
+#[test]
+fn the_focus_rung_requires_a_whole_width_admitted_card() {
+    let metrics = metrics();
+    let palette = palette();
+    let focus_height =
+        metrics.control_height_px + metrics.group_gap_px + metrics.focus_card_height_px;
+    let dashboard_height = metrics.card_max_width_px;
+
+    let below_width_floor = card_flow_budget(
+        metrics.card_min_width_px - 1.0,
+        focus_height,
+        dashboard_height,
+        &palette,
+    );
+    assert_eq!(
+        below_width_floor.row_width,
+        CardRowWidthBudget::degraded(),
+        "the compact rung has no complete horizontal card budget"
+    );
+    assert_eq!(
+        below_width_floor.admission,
+        CardFlowAdmission::Dense,
+        "vertical room cannot admit a card below its measured width floor"
+    );
+
+    let at_width_floor = card_flow_budget(
+        metrics.card_min_width_px,
+        focus_height,
+        dashboard_height,
+        &palette,
+    );
+    assert_eq!(
+        at_width_floor.admission,
+        CardFlowAdmission::FocusCard {
+            card_height: metrics.focus_card_height_px,
+        },
+        "one whole focus card is admitted exactly at both measured floors"
+    );
 }

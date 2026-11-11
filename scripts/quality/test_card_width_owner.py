@@ -221,8 +221,11 @@ class CardWidthOwnerTests(unittest.TestCase):
         for symbol in (
             "flex_grow: 0.0",
             "flex_shrink: 0.0",
-            "flex_basis: rem(row_width.card_width_rem)",
+            "flex_basis: card_basis",
             "max_width: rem(row_width.card_width_rem)",
+            "let card_basis = if compact_focus",
+            "px(card_height_px)",
+            "rem(row_width.card_width_rem)",
         ):
             with self.subTest(symbol=symbol):
                 self.assertIn(

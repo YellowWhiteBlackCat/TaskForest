@@ -45,13 +45,14 @@ by a second count.
 paints cards instead of rows: how many COMPLETE groups fit in a measured
 slot, and how tall one card may become inside it. A group is admitted only
 when the whole group fits; an admitted group's height is the leftover space
-shared out and clamped into the card's own floor and ceiling; when even one
-group does not fit, the answer is zero groups and the caller degrades to its
-dense form. The shape measures its own slot and its own card footprint (its
-control height, its padding, its gap) and spends the verdict — it never
-re-derives the ladder. A shape that caps the group count (a page that shows
-at most four metrics) says so with `admit_card_groups_capped`; the cap is
-product content, not a layout fact.
+shared out and clamped into the card's own floor and ceiling. Shapes with a
+compact focus presentation use `admit_card_flow`: after whole groups stop
+fitting, it admits one complete focus card only when that card's own floor
+fits; otherwise the caller degrades to its dense form. The shape supplies its
+measured adaptive slot, optional leading chrome, and card footprints. The
+contract owns the rung order and never squeezes a card. A shape that caps the
+group count (a page that shows at most four metrics) says so with
+`admit_card_groups_capped`; the cap is product content, not a layout fact.
 
 ## Card width is the same whole-group law on the other axis
 

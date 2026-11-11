@@ -215,7 +215,7 @@ pub struct GlassShadow {
 /// The renderer's declared projection of the shared glass shadow contract.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GlassShadowProjection {
-    /// Paint both shared layers with their resolved token ink.
+    /// Paint both shared layers within the theme's total shadow-ink opacity.
     Layered,
     /// Fold both layers into one alpha-weighted quad with the tier's
     /// elevation opacity, for a renderer that paints only one shadow.
@@ -300,7 +300,9 @@ impl GlassTier {
         }
     }
 
-    /// Both shadow layers with the theme's resolved ink and alpha weights.
+    /// The two source layers with the theme's resolved ink and alpha weights.
+    ///
+    /// Use [`Self::projected_shadow`] when sending these layers to a renderer.
     #[must_use]
     pub fn shadow(self, theme: &Theme) -> GlassShadow {
         let ink = theme.glass_layer(self).shadow;
@@ -308,7 +310,7 @@ impl GlassTier {
         let (contact_y, contact_blur) = self.contact_shadow_rem();
         GlassShadow {
             ambient: GlassShadowLayer {
-                color: ink.with_alpha(ink.a * 0.6),
+                color: ink.with_alpha(ink.a * AMBIENT_SHADOW_ALPHA_WEIGHT),
                 offset_y: ambient_y,
                 blur_radius: ambient_blur,
             },
@@ -321,19 +323,28 @@ impl GlassTier {
     }
 
     /// The shared shadow layers after a renderer's declared projection.
+    ///
+    /// The layered projection apportions the ink's alpha in optical depth so
+    /// overlapping same-ink shadows stay within the theme's opacity budget.
+    /// Single-quad renderers keep their tier-specific elevation reduction.
     #[must_use]
     pub fn projected_shadow(self, theme: &Theme, projection: GlassShadowProjection) -> GlassShadow {
         let mut shadow = self.shadow(theme);
-        if projection == GlassShadowProjection::SingleQuad {
-            let elevation = self.single_quad_elevation().opacity();
-            shadow.ambient.color = shadow
-                .ambient
-                .color
-                .with_alpha(shadow.ambient.color.a * elevation);
-            shadow.contact.color = shadow
-                .contact
-                .color
-                .with_alpha(shadow.contact.color.a * elevation);
+        match projection {
+            GlassShadowProjection::Layered => {
+                shadow = layered_shadow_alpha_budget(shadow, theme.glass_layer(self).shadow.a);
+            }
+            GlassShadowProjection::SingleQuad => {
+                let elevation = self.single_quad_elevation().opacity();
+                shadow.ambient.color = shadow
+                    .ambient
+                    .color
+                    .with_alpha(shadow.ambient.color.a * elevation);
+                shadow.contact.color = shadow
+                    .contact
+                    .color
+                    .with_alpha(shadow.contact.color.a * elevation);
+            }
         }
         shadow
     }
@@ -364,6 +375,28 @@ impl GlassTier {
     pub fn layer(self, theme: &Theme) -> GlassLayer {
         theme.glass_layer(self)
     }
+}
+
+const AMBIENT_SHADOW_ALPHA_WEIGHT: f32 = 0.6;
+
+fn layered_shadow_alpha_budget(mut shadow: GlassShadow, target_alpha: f32) -> GlassShadow {
+    let ambient_depth = -(1.0 - shadow.ambient.color.a).ln();
+    let contact_depth = -(1.0 - shadow.contact.color.a).ln();
+    let source_depth = ambient_depth + contact_depth;
+    if source_depth <= f32::EPSILON {
+        return shadow;
+    }
+
+    let depth_scale = -(1.0 - target_alpha).ln() / source_depth;
+    shadow.ambient.color = shadow
+        .ambient
+        .color
+        .with_alpha(1.0 - (-ambient_depth * depth_scale).exp());
+    shadow.contact.color = shadow
+        .contact
+        .color
+        .with_alpha(1.0 - (-contact_depth * depth_scale).exp());
+    shadow
 }
 
 impl Theme {
@@ -762,7 +795,8 @@ impl Theme {
     /// translucent BLACK shadow (raised cards read against dark chrome),
     /// light skins darken `shade` 55% toward black at 16% alpha (grey ink
     /// reads softer than pure black on light surfaces). Always translucent —
-    /// the two-layer shadow helper scales this ink by layer.
+    /// the layered shadow projection apportions this alpha across both layers
+    /// so source-over compositing stays within the token's opacity budget.
     pub const fn card_shadow(self) -> Color {
         if self.dark {
             Color::BLACK.with_alpha(0.18)

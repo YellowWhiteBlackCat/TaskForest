@@ -41,6 +41,53 @@ fn gaps_are_charged_before_any_card_grows() {
 }
 
 #[test]
+fn card_flow_degrades_from_whole_groups_to_one_whole_focus_card() {
+    let spec = CardFlowSpec::new(112.0, 112.0).with_gap(8.0);
+    let grouped = admit_card_flow(224.0, 80.0, 2, spec, 72.0);
+    assert_eq!(
+        grouped,
+        CardFlowAdmission::Groups(CardFlowBudget {
+            columns: 2,
+            groups: 1,
+            card_height: 112.0,
+        }),
+        "group admission reserves the complete leading chrome first"
+    );
+
+    let focus = admit_card_flow(151.0, 80.0, 2, spec, 72.0);
+    assert_eq!(
+        focus,
+        CardFlowAdmission::FocusCard { card_height: 72.0 },
+        "one complete focus card survives after the group floor stops fitting"
+    );
+
+    assert_eq!(
+        admit_card_flow(71.0, 80.0, 2, spec, 72.0),
+        CardFlowAdmission::Dense,
+        "the final rung yields when the whole focus card floor does not fit"
+    );
+    assert_eq!(
+        admit_card_flow(400.0, 0.0, 0, spec, 72.0),
+        CardFlowAdmission::Dense,
+        "vertical room cannot override a width verdict that admits no complete card"
+    );
+}
+
+#[test]
+fn card_flow_never_turns_an_invalid_focus_floor_into_a_card() {
+    let spec = CardFlowSpec::new(112.0, 112.0).with_gap(8.0);
+    assert_eq!(
+        admit_card_flow(400.0, 500.0, 1, spec, f32::NAN),
+        CardFlowAdmission::Dense
+    );
+    assert_eq!(
+        admit_card_flow(72.0, 0.0, 1, spec, 72.0),
+        CardFlowAdmission::FocusCard { card_height: 72.0 },
+        "the exact focus-card floor is admitted"
+    );
+}
+
+#[test]
 fn degenerate_and_inverted_footprints_fail_closed() {
     for (floor, ceiling) in [(0.0, 10.0), (-4.0, 10.0), (120.0, 80.0)] {
         let spec = CardFlowSpec::new(floor, ceiling).with_gap(8.0);

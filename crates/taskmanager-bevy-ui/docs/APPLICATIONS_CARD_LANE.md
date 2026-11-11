@@ -17,11 +17,12 @@ projection:
 
 - `ShellApp` owns every row fact: query, status filter, sort, visible row
   window, selection, semantic identity, and typed availability.
-- `taskmanager-ui-contract::presentation::card_flow` owns whole-group
-  admission and the card-height clamp. `presentation::card_width` owns the
-  measured card/content caps, whole-column admission, bounded lower content
-  width and residual lane space. Bevy supplies only its own measured control
-  ladder, group header height, group gap, card ceiling, and column ceiling.
+- `taskmanager-ui-contract::presentation::card_flow` owns the rung order,
+  whole-group admission and card-height clamp. `presentation::card_width`
+  owns the measured card/content caps, whole-column admission, bounded lower
+  content width and residual lane space. Bevy supplies only its own measured
+  control ladder, optional dashboard height, group header height, group gap,
+  card floors and column ceiling.
 - `taskmanager-theme` owns design tokens; the Bevy card hero consumes
   `GlassTier::Card` through the palette and the shared shadow contract.
 - The focus dashboard and the atomic cards are ALL marked for real optical
@@ -41,13 +42,15 @@ projection:
 
 ## Layout contract
 
-- The bounded `ProcessCardFlow` viewport is measured once. The mode row,
-  dashboard, title and toolbar have already spent their height before that
-  node is laid out, so Bevy subtracts only the flow's own group gap and
-  spends the shared `admit_card_groups` verdict: complete groups only, a
-  clamped card height, and zero groups when the floor does not fit.
-- Zero groups degrade to the dense table; a compact viewport therefore never
-  paints a half group or a clipped last card.
+- The bounded adaptive lane below the fixed mode row is measured once. The
+  shared `admit_card_flow` fold spends its remaining height in order:
+  complete status groups with the dashboard, one complete selected-process
+  focus card with the optional dashboard removed, then the dense table.
+- The focus-card rung also spends `card_width` for one complete column. It
+  preserves the selected row's full name/status and PID/CPU/memory lines,
+  semantic address, accessibility node and activation seams. If either
+  measured floor fails, the lane yields to the table; it never paints a
+  partial card, row or group header.
 - A bucket's whole size is stated in its header. The page chrome's canonical
   status pills are the SIX shared filters; the lane paints no second chip row
   because the buckets and the pills classify by the same provider state.
@@ -75,8 +78,9 @@ projection:
   OUTSIDE the card instead of inflating it into an empty panel.
 - The lower card flow is a bounded `Overflow::clip_y()` viewport. Its right and
   bottom edges are headlessly asserted at 1180×780, a wide 1600×900 measured
-  composition asserts the shared cap and its residual, and the compact
-  720×480 degradation is asserted through the zero-group verdict.
+  composition asserts the shared cap and its residual, and the 720×480
+  composition admits one complete selected focus card between the card and
+  group floors.
 - Atom cards keep the same `ProcessRowLink`, semantic address, AccessKit node,
   official `Button`, pointer activation, and secondary-press seam as dense
   rows. Keyboard/focus routing remains the shell's single authority. The
@@ -86,9 +90,9 @@ projection:
 ## Evidence and boundaries
 
 - `tests/headless/pages/process_card_lane.rs` covers shared status pills,
-  whole-group admission, focus facts, dense-mode seams, zero-group
-  degradation, measured bounds, overflow activation, and the typed painted
-  fallback without an adapter.
+  whole-group and focus-card admission, focus facts, dense-mode seams,
+  compact selected-card bounds, measured bounds, overflow activation, and the
+  typed painted fallback without an adapter.
 - `tests/headless/pages/card_lane_width_admission.rs` asserts the capped
   right-edge verdict before the renderer spends it: whole group width
   admission, the measured card/content cap and residual, a narrow slot's

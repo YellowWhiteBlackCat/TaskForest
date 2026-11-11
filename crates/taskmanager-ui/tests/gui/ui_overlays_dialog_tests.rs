@@ -3,12 +3,12 @@ use super::{Dialog, panel_shadow};
 use crate::primitives::card_surface::{CardSurface, GlassSurfaceRole};
 use crate::theme_binding::{glass_fill, glass_shadow};
 use gpui::Styled;
-use taskmanager_theme::GlassTier;
 use taskmanager_theme::HighContrast;
 use taskmanager_theme::LightDark;
 use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::Skin;
 use taskmanager_theme::Theme;
+use taskmanager_theme::theme::{GlassShadowProjection, GlassTier};
 
 /// The dialog panel resolves its material through the shared role contract:
 /// Modal tier, floating elevation, one hairline edge.
@@ -67,7 +67,7 @@ fn default_mask_is_palette_scrim() {
 
 /// The panel shadow is the Mission Center two-layer pair in the palette's
 /// own ink: an ambient layer that is wider AND weaker than the edge layer,
-/// and the edge layer carrying the token color verbatim.
+/// while both layers share one bounded optical-depth alpha budget.
 #[test]
 fn panel_shadow_is_two_layer_token_ink() {
     for mode in [LightDark::Light, LightDark::Dark] {
@@ -79,17 +79,22 @@ fn panel_shadow_is_two_layer_token_ink() {
         );
         let shadow = panel_shadow(&theme);
         assert_eq!(shadow.len(), 2, "panel shadow must have two layers");
-        let ink: gpui::Hsla = crate::theme_binding::hsla(theme.glass_modal().shadow);
-        let ambient: gpui::Hsla = crate::theme_binding::hsla(
-            theme
-                .glass_modal()
-                .shadow
-                .with_alpha(theme.glass_modal().shadow.a * 0.6),
-        );
-        assert_eq!(shadow[1].color, ink, "edge layer carries the token ink");
+        let layered = GlassTier::Modal.projected_shadow(&theme, GlassShadowProjection::Layered);
         assert_eq!(
-            shadow[0].color, ambient,
-            "ambient layer scales the ink alpha"
+            shadow[1].color,
+            crate::theme_binding::hsla(layered.contact.color),
+            "edge layer carries the shared contact projection"
+        );
+        assert_eq!(
+            shadow[0].color,
+            crate::theme_binding::hsla(layered.ambient.color),
+            "ambient layer carries the shared ambient projection"
+        );
+        let ink = theme.glass_modal().shadow;
+        let combined = 1.0 - (1.0 - layered.ambient.color.a) * (1.0 - layered.contact.color.a);
+        assert!(
+            (combined - ink.a).abs() < 1e-4,
+            "the two layers stay within one token alpha budget: {combined} vs {ink:?}"
         );
         assert!(
             shadow[0].blur_radius > shadow[1].blur_radius,

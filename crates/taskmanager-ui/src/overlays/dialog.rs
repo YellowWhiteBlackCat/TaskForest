@@ -85,8 +85,8 @@ type RenderButtonFn = Box<dyn FnOnce(&mut Window, &mut App) -> AnyElement>;
 
 /// The dialog panel's drop shadow is the Modal tier's shared two-layer
 /// projection: a wide, low-opacity ambient blur plus a tight, high-opacity
-/// edge blur, both painted in the palette's single glass shadow ink (the
-/// edge layer carries the full ink alpha, the ambient layer 60% of it).
+/// edge blur, both painted in the palette's single glass shadow ink and
+/// apportioned by the shared layered optical-depth projection.
 pub fn panel_shadow(theme: &Theme) -> Vec<gpui::BoxShadow> {
     crate::theme_binding::glass_shadow(theme, GlassSurfaceRole::Dialog.tier())
 }

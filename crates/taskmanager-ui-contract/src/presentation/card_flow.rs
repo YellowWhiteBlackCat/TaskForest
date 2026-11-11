@@ -14,8 +14,9 @@
 //! - an admitted group's height is the leftover space shared out, clamped
 //!   into the card's own floor and ceiling, so a card never shrinks below
 //!   its readable floor and never grows past its ceiling;
-//! - when even one group does not fit, the answer is ZERO groups: the
-//!   caller degrades to its dense/table form instead of squeezing a card.
+//! - when even one group does not fit, a caller may admit one complete
+//!   focus card if its own floor fits; otherwise the answer degrades to the
+//!   dense/table form instead of squeezing a card.
 
 /// One card's own footprint budget: the height floor it must keep, the
 /// ceiling it may grow to, and the gap between two cards in a group.
@@ -135,6 +136,65 @@ pub fn admit_card_groups(
         groups,
         card_height: share,
     }
+}
+
+/// The typed degradation rung for a card presentation.
+///
+/// A focus card is one complete selected item without a group header. It is
+/// admitted only after whole groups fail and only when its complete measured
+/// card floor fits. `Dense` means even that card must yield.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CardFlowAdmission {
+    /// One or more complete group blocks fit.
+    Groups(CardFlowBudget),
+    /// One complete focus card fits after optional leading chrome is removed.
+    FocusCard {
+        /// The card's complete height, already at or above its measured floor.
+        card_height: f32,
+    },
+    /// Neither a complete group nor one complete focus card fits.
+    Dense,
+}
+
+/// Admit whole groups first, then one whole focus card, then the dense rung.
+///
+/// `available_height` is the complete adaptive lane below its fixed mode row.
+/// `leading_height` is optional chrome shown with the group presentation
+/// (for example, a dashboard); the caller removes that chrome when the
+/// `FocusCard` rung is selected. The focus card is therefore checked against
+/// the full adaptive lane, while groups are checked after reserving the
+/// leading chrome. A non-finite or negative measurement admits no card.
+#[must_use]
+pub fn admit_card_flow(
+    available_height: f32,
+    leading_height: f32,
+    columns: usize,
+    spec: CardFlowSpec,
+    focus_card_floor: f32,
+) -> CardFlowAdmission {
+    if columns == 0 {
+        return CardFlowAdmission::Dense;
+    }
+    let available = if available_height.is_finite() && available_height > 0.0 {
+        available_height
+    } else {
+        0.0
+    };
+    let leading = if leading_height.is_finite() && leading_height > 0.0 {
+        leading_height
+    } else {
+        0.0
+    };
+    let groups = admit_card_groups((available - leading).max(0.0), columns, spec);
+    if groups.groups > 0 {
+        return CardFlowAdmission::Groups(groups);
+    }
+    if focus_card_floor.is_finite() && focus_card_floor > 0.0 && available >= focus_card_floor {
+        return CardFlowAdmission::FocusCard {
+            card_height: focus_card_floor,
+        };
+    }
+    CardFlowAdmission::Dense
 }
 
 /// Admit whole card groups and cap the group count.

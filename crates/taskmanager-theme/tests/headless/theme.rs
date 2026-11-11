@@ -94,6 +94,37 @@ fn glass_shadow_layers_share_one_resolved_contract() {
 }
 
 #[test]
+fn layered_shadow_stays_within_ink_alpha_and_preserves_rem_geometry() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            for contrast in [HighContrast::Off, HighContrast::On] {
+                let theme = Theme::build(skin, mode, contrast, ResolvedFonts::system_for(skin));
+                for tier in GlassTier::ALL {
+                    let raw = tier.shadow(&theme);
+                    let layered = tier.projected_shadow(&theme, GlassShadowProjection::Layered);
+                    let ink = theme.glass_layer(tier).shadow;
+                    let combined_alpha =
+                        1.0 - (1.0 - layered.ambient.color.a) * (1.0 - layered.contact.color.a);
+
+                    assert!(
+                        (combined_alpha - ink.a).abs() < 1e-6,
+                        "{skin:?}/{mode:?}/{contrast:?}/{tier:?}: layered alpha {combined_alpha} \
+                         must use the theme ink budget {}",
+                        ink.a
+                    );
+                    assert_eq!(layered.ambient.offset_y, raw.ambient.offset_y);
+                    assert_eq!(layered.ambient.blur_radius, raw.ambient.blur_radius);
+                    assert_eq!(layered.contact.offset_y, raw.contact.offset_y);
+                    assert_eq!(layered.contact.blur_radius, raw.contact.blur_radius);
+                    assert_eq!(layered.ambient.color.with_alpha(1.0), ink.with_alpha(1.0));
+                    assert_eq!(layered.contact.color.with_alpha(1.0), ink.with_alpha(1.0));
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn glass_layers_stay_translucent_with_specular_edges_and_shadow() {
     for skin in Skin::ALL {
         for mode in LightDark::ALL {

@@ -166,6 +166,11 @@ fn every_glass_tier_paints_through_the_shared_contract() {
             &glass_shadow(&theme, tier),
             "the {tier:?} tier must not own a private shadow ladder"
         );
+        let combined_alpha = 1.0 - (1.0 - painted[0].color.a) * (1.0 - painted[1].color.a);
+        assert!(
+            (combined_alpha - theme.glass_layer(tier).shadow.a).abs() < 1e-5,
+            "the {tier:?} CardSurface shadow must stay within its theme ink opacity"
+        );
     }
 }
 

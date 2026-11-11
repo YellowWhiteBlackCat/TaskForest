@@ -9,6 +9,7 @@ use gpui::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskmanager_theme::theme::GlassShadowProjection;
 use taskmanager_theme::{GlassTier, Theme};
 
 /// The menu panel's material comes from the shared surface primitive, so the
@@ -57,15 +58,23 @@ fn menu_panel_wears_the_card_glass_tier() {
 
     let shadow = menu_panel_shadow(&theme);
     assert_eq!(shadow.len(), 2, "the glass shadow keeps its two layers");
-    let ink = crate::theme_binding::hsla(theme.glass_card().shadow);
-    assert_eq!(shadow[1].color, ink, "the contact layer carries the ink");
-    let ambient: gpui::Hsla = crate::theme_binding::hsla(
-        theme
-            .glass_card()
-            .shadow
-            .with_alpha(theme.glass_card().shadow.a * 0.6),
+    let layered = GlassTier::Card.projected_shadow(&theme, GlassShadowProjection::Layered);
+    assert_eq!(
+        shadow[1].color,
+        crate::theme_binding::hsla(layered.contact.color),
+        "the contact layer carries the shared contact projection"
     );
-    assert_eq!(shadow[0].color, ambient, "the ambient layer is 60% ink");
+    assert_eq!(
+        shadow[0].color,
+        crate::theme_binding::hsla(layered.ambient.color),
+        "the ambient layer carries the shared ambient projection"
+    );
+    let ink = theme.glass_card().shadow;
+    let combined = 1.0 - (1.0 - layered.ambient.color.a) * (1.0 - layered.contact.color.a);
+    assert!(
+        (combined - ink.a).abs() < 1e-4,
+        "the two layers share one token alpha budget: {combined} vs {ink:?}"
+    );
     // The old `shadow_md` pair was a fixed black wash; the glass ink is the
     // skin's own shadow token, so a dark skin must not resolve to plain black.
     assert_ne!(

@@ -6,45 +6,37 @@
 //! protected, a headless renderer keeps the typed painted fallback, and the
 //! dense table keeps every row/menu/keyboard seam.
 
-use crate::pages::processes::details::ProcessDetailsRow;
 use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ecs::system::RunSystemOnce;
-use bevy::math::Vec2;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::prelude::{ComputedNode, Display, Node, Val};
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::ScrollArea;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, fixture};
 use taskmanager_theme::{Theme, tokens::UiSize};
+use taskmanager_ui_contract::presentation::card_flow::{self, CardFlowAdmission};
 
 use crate::app::{FrontendTrack, Page, PageContext, Route};
 use crate::drain::ShellProjectionFolded;
-use crate::input::ShellInteractionApplied;
 use crate::pages::processes::card_lane::{
     CardFlowBudget, CardFlowMetrics, CardFlowWindow, CardGroup, ProcessAtomicCard, ProcessCardFlow,
-    ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode, ProcessViewModeButton,
-    card_flow_budget, card_flow_plan, focus_projection,
-};
-use crate::pages::processes::details::scroll::whole_row_scroll_offset;
-use crate::pages::processes::details::{
-    ProcessDetailsRoot, detail_row_slots, details_bottom_inset_px,
+    ProcessCardGroup, ProcessCardLaneViewport, ProcessFocusDashboard, ProcessViewMode,
+    ProcessViewModeButton, card_flow_budget, card_flow_plan, focus_projection,
 };
 use crate::pages::processes::{
-    ProcessCountLine, ProcessDetailsContainer, ProcessPageRoot, ProcessRowLink, ProcessRowsRoot,
-    ProcessTableArtifact, ProcessTableContainer, content,
+    ProcessCountLine, ProcessRowLink, ProcessRowsRoot, ProcessTableArtifact, ProcessTableContainer,
+    content,
 };
 use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
-use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 
 // ---- fixtures -----------------------------------------------------------
 
@@ -89,9 +81,12 @@ fn card_lane_app(shell: ShellApp, palette: UiPalette) -> App {
     // fallback; the measured suite below proves the admitted card geometry.
     app.insert_resource(CardFlowBudget {
         measured: true,
-        groups: 1,
+        admission: CardFlowAdmission::Groups(card_flow::CardFlowBudget {
+            columns: 2,
+            groups: 1,
+            card_height: 200.0,
+        }),
         columns: 2,
-        group_height_px: 200.0,
         ..Default::default()
     });
     // The page seams read the route resource; the window composition owns it
@@ -132,6 +127,10 @@ fn card_links(app: &mut App) -> Vec<(Entity, usize)> {
 /// The measured composition: the real window plugins, a UI layout pass, and a
 /// camera viewport, so the card geometry is the product's own.
 fn measured_app(width: u32, height: u32) -> App {
+    measured_app_at_scale(width, height, 1.0)
+}
+
+fn measured_app_at_scale(width: u32, height: u32, scale_factor: f32) -> App {
     use bevy::camera::{Camera, Camera2d, ComputedCameraValues, RenderTargetInfo, Viewport};
     use bevy::image::TextureAtlasLayout;
     use bevy::math::UVec2;
@@ -162,10 +161,14 @@ fn measured_app(width: u32, height: u32) -> App {
         UiPlugin,
     ));
     app.init_resource::<Assets<TextureAtlasLayout>>();
-    let size = UVec2::new(width, height);
+    let size = UVec2::new(
+        (width as f32 * scale_factor).round() as u32,
+        (height as f32 * scale_factor).round() as u32,
+    );
     app.world_mut().spawn((
         Window {
-            resolution: (width, height).into(),
+            resolution: bevy::window::WindowResolution::new(size.x, size.y)
+                .with_scale_factor_override(scale_factor),
             ..Default::default()
         },
         PrimaryWindow,
@@ -176,7 +179,7 @@ fn measured_app(width: u32, height: u32) -> App {
             computed: ComputedCameraValues {
                 target_info: Some(RenderTargetInfo {
                     physical_size: size,
-                    scale_factor: 1.0,
+                    scale_factor,
                 }),
                 ..Default::default()
             },
@@ -192,6 +195,11 @@ fn measured_app(width: u32, height: u32) -> App {
 
 fn measured_process_app(width: u32, height: u32, items: Vec<ProcessItem>) -> App {
     let mut app = measured_app(width, height);
+    seed_measured_process_app(&mut app, items);
+    app
+}
+
+fn seed_measured_process_app(app: &mut App, items: Vec<ProcessItem>) {
     {
         let world = app.world_mut();
         let mut track = world.non_send_mut::<FrontendTrack>();
@@ -205,7 +213,6 @@ fn measured_process_app(width: u32, height: u32, items: Vec<ProcessItem>) -> App
     for _ in 0..8 {
         app.update();
     }
-    app
 }
 
 fn group_filters(app: &mut App) -> Vec<ProcessStatusFilter> {
@@ -296,7 +303,7 @@ fn a_wide_measured_card_never_exceeds_the_shared_cap_or_the_right_edge() {
     let palette = palette();
     let metrics = CardFlowMetrics::from_palette(&palette);
     let spec = metrics.width_spec();
-    let row_budget = card_flow_budget(1600.0, 900.0, &palette).row_width;
+    let row_budget = card_flow_budget(1600.0, 900.0, 0.0, &palette).row_width;
     let world = app.world_mut();
     let mut flows =
         world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessCardFlow>>();
@@ -348,43 +355,121 @@ fn a_wide_measured_card_never_exceeds_the_shared_cap_or_the_right_edge() {
 }
 
 #[test]
-fn a_slot_too_short_for_one_group_degrades_to_the_dense_table() {
-    // The shared contract answers ZERO groups when not even one complete
-    // group fits; the lane then steps aside instead of squeezing a card.
-    let palette = palette();
-    let metrics = CardFlowMetrics::from_palette(&palette);
-    let floor = metrics.header_height_px + metrics.card_height_px;
-    let compact = card_flow_budget(720.0, metrics.group_gap_px, &palette);
-    assert_eq!(compact.groups, 0, "a compact slot admits no half group");
-    assert!(compact.group_height_px < floor, "no card is squeezed");
+fn a_720x480_lane_keeps_one_complete_selected_focus_card() {
+    use bevy::ui::UiGlobalTransform;
 
-    let items: Vec<ProcessItem> = (0..24).map(|pid| process(pid, "p", "Running")).collect();
+    let items: Vec<ProcessItem> = (0..24)
+        .map(|pid| process(pid, "compact-process", "Running"))
+        .collect();
     let mut app = measured_process_app(720, 480, items);
-    app.insert_resource(compact);
-    app.insert_resource(ProcessViewMode::Dense);
-    app.world_mut().commands().trigger(ShellInteractionApplied);
     for _ in 0..4 {
         app.update();
     }
+
+    let budget = *app.world().resource::<CardFlowBudget>();
+    let admission = budget.admission;
+    assert!(
+        matches!(admission, CardFlowAdmission::FocusCard { .. }),
+        "the measured compact lane admits the focus rung when no whole group fits: {admission:?}"
+    );
+    let selected = app.world().non_send::<FrontendTrack>().shell.selected;
     let world = app.world_mut();
-    let cards = world
-        .query_filtered::<Entity, With<ProcessAtomicCard>>()
+    let cards: Vec<_> = world
+        .query_filtered::<(&ProcessAtomicCard, &ComputedNode, &UiGlobalTransform), ()>()
+        .iter(world)
+        .map(|(card, node, transform)| (card.0, *node, *transform))
+        .collect();
+    assert_eq!(
+        cards.len(),
+        1,
+        "the rung paints exactly one whole focus card"
+    );
+    assert_eq!(
+        cards[0].0, selected,
+        "the compact card follows the shell's selected row"
+    );
+    let metrics = CardFlowMetrics::from_palette(&palette());
+    let card_node = world
+        .query_filtered::<&bevy::ui::prelude::Node, With<ProcessAtomicCard>>()
+        .iter(world)
+        .next()
+        .expect("the measured focus card keeps its typed layout");
+    assert_eq!(
+        card_node.flex_basis,
+        Val::Px(metrics.focus_card_height_px),
+        "the column flow's basis is the card height, not its width"
+    );
+    assert_eq!(
+        card_node.height,
+        Val::Px(metrics.focus_card_height_px),
+        "the card's complete floor is an exact logical-pixel height"
+    );
+    assert!(
+        (cards[0].1.size().y - metrics.focus_card_height_px).abs() <= 0.5,
+        "the focus card keeps its complete measured floor: actual={}, floor={}, card={:?}",
+        cards[0].1.size().y,
+        metrics.focus_card_height_px,
+        admission
+    );
+    assert!(
+        cards[0].1.size().y < metrics.header_height_px + metrics.card_floor_px,
+        "the compact rung needs less height than a group header and regular card"
+    );
+    let groups = world
+        .query_filtered::<Entity, With<ProcessCardGroup>>()
         .iter(world)
         .count();
     assert_eq!(
-        cards, 0,
-        "the injected zero-group verdict paints no half card"
+        groups, 0,
+        "the single focus card has no partial group header"
+    );
+    let dashboard = world
+        .query_filtered::<&bevy::ui::prelude::Node, With<ProcessFocusDashboard>>()
+        .iter(world)
+        .next()
+        .expect("the focus dashboard remains mounted for the full rung");
+    assert_eq!(
+        dashboard.display,
+        Display::None,
+        "the selected-card rung frees the optional dashboard slot"
     );
     let table = world
         .query_filtered::<&bevy::ui::prelude::Node, With<ProcessTableContainer>>()
         .iter(world)
         .next()
-        .expect("the dense table container is mounted");
-    assert_eq!(
-        table.display,
-        Display::Flex,
-        "the dense table answers when no whole group fits"
+        .expect("the dense table remains available as the final rung");
+    assert_eq!(table.display, Display::None);
+    assert!(budget.dashboard_height_px > 0.0);
+    let lane = world
+        .query_filtered::<&ComputedNode, With<ProcessCardLaneViewport>>()
+        .iter(world)
+        .next()
+        .expect("the full adaptive lane is measured");
+    let available = lane.size().y * lane.inverse_scale_factor()
+        - metrics.control_height_px
+        - metrics.group_gap_px;
+    assert!(
+        available >= metrics.focus_card_height_px,
+        "the compact slot admits the complete focus-card floor"
     );
+    assert!(
+        available - budget.dashboard_height_px - metrics.group_gap_px
+            < metrics.header_height_px + metrics.card_floor_px,
+        "the same slot cannot admit a dashboard, group header, and regular card"
+    );
+    let (flow_node, flow_transform) = world
+        .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessCardFlow>>()
+        .iter(world)
+        .next()
+        .expect("the compact card is inside the bounded lane");
+    let flow_half = flow_node.size() / 2.0;
+    let flow_top = flow_transform.translation.y - flow_half.y;
+    let flow_bottom = flow_transform.translation.y + flow_half.y;
+    let card_half = cards[0].1.size() / 2.0;
+    let card_top = cards[0].2.translation.y - card_half.y;
+    let card_bottom = cards[0].2.translation.y + card_half.y;
+    assert!(card_top >= flow_top - 0.5);
+    assert!(card_bottom <= flow_bottom + 0.5);
 }
 
 #[test]
@@ -443,24 +528,41 @@ fn the_card_budget_spends_the_shared_whole_group_admission() {
     let metrics = CardFlowMetrics::from_palette(&palette);
     // A slot too short for one complete group block admits ZERO groups:
     // the lane degrades to its dense form instead of squeezing a card.
-    let too_short = card_flow_budget(1000.0, metrics.group_gap_px, &palette);
-    assert_eq!(too_short.groups, 0, "a half group is never admitted");
+    let too_short = card_flow_budget(
+        1000.0,
+        metrics.control_height_px
+            + metrics.group_gap_px * 2.0
+            + metrics.header_height_px
+            + metrics.card_height_px
+            - 1.0,
+        0.0,
+        &palette,
+    );
+    assert_eq!(too_short.group_count(), 0, "a half group is never admitted");
+    assert!(matches!(
+        too_short.admission,
+        CardFlowAdmission::FocusCard { .. } | CardFlowAdmission::Dense
+    ));
 
     let one_group = card_flow_budget(
         1000.0,
-        metrics.header_height_px + metrics.card_height_px + metrics.group_gap_px * 2.0,
+        metrics.control_height_px
+            + metrics.group_gap_px * 2.0
+            + metrics.header_height_px
+            + metrics.card_height_px,
+        0.0,
         &palette,
     );
-    assert_eq!(one_group.groups, 1);
+    assert_eq!(one_group.group_count(), 1);
     assert!(
-        one_group.group_height_px >= metrics.header_height_px + metrics.card_floor_px,
+        one_group.card_height_px(metrics) >= metrics.card_floor_px,
         "the admitted group keeps its whole floor: {one_group:?}"
     );
 
-    let wide = card_flow_budget(2000.0, 2000.0, &palette);
+    let wide = card_flow_budget(2000.0, 2000.0, 0.0, &palette);
     assert!(wide.columns >= 1);
     assert!(
-        wide.groups * wide.columns <= wide.groups * 4,
+        wide.group_count() * wide.columns <= wide.group_count() * 4,
         "the column count stays inside Bevy's own column ceiling"
     );
 }
@@ -476,8 +578,11 @@ fn the_card_plan_admits_whole_groups_only() {
     let shell = shell_with(items);
     let budget = CardFlowBudget {
         measured: true,
-        groups: 1,
-        group_height_px: 200.0,
+        admission: CardFlowAdmission::Groups(card_flow::CardFlowBudget {
+            columns: 2,
+            groups: 1,
+            card_height: 200.0,
+        }),
         columns: 2,
         metrics: Some(CardFlowMetrics::from_palette(&palette())),
         ..Default::default()
@@ -521,8 +626,11 @@ fn the_card_plan_folds_one_bucket_across_the_whole_page() {
     let shell = shell_with(items);
     let budget = CardFlowBudget {
         measured: true,
-        groups: 2,
-        group_height_px: 200.0,
+        admission: CardFlowAdmission::Groups(card_flow::CardFlowBudget {
+            columns: 4,
+            groups: 2,
+            card_height: 200.0,
+        }),
         columns: 4,
         metrics: Some(CardFlowMetrics::from_palette(&palette())),
         ..Default::default()
@@ -874,194 +982,5 @@ fn the_empty_state_is_distinct_from_a_quiet_platform() {
             .iter()
             .any(|text| text == t("empty.no_processes_reported")),
         "a quiet platform states the honest empty state: {texts:?}"
-    );
-}
-
-#[test]
-fn the_details_rail_is_admitted_as_a_whole_group_by_the_measured_page_slot() {
-    let mut app = card_lane_app(shell_with(Vec::new()), palette());
-    app.update();
-
-    let page_root = app
-        .world_mut()
-        .query_filtered::<Entity, With<ProcessPageRoot>>()
-        .single(app.world())
-        .expect("the page root is mounted");
-    let details_root = app
-        .world_mut()
-        .query_filtered::<Entity, With<ProcessDetailsContainer>>()
-        .single(app.world())
-        .expect("the details container is mounted");
-
-    let set_slot = |app: &mut App, width: f32| {
-        let mut entity = app
-            .world_mut()
-            .get_entity_mut(page_root)
-            .expect("page root entity");
-        entity.insert(ComputedNode {
-            size: Vec2::new(width, 720.0),
-            inverse_scale_factor: 1.0,
-            ..ComputedNode::default()
-        });
-        let _ = app
-            .world_mut()
-            .run_system_once(crate::pages::processes::sync_processes_responsive_layout);
-    };
-
-    set_slot(&mut app, COMPACT_CONTENT_WIDTH - 1.0);
-    let display = app
-        .world()
-        .get::<Node>(details_root)
-        .map(|node| node.display);
-    assert_eq!(
-        display,
-        Some(Display::None),
-        "one pixel below the shared band hides the whole details rail"
-    );
-
-    set_slot(&mut app, COMPACT_CONTENT_WIDTH);
-    let display = app
-        .world()
-        .get::<Node>(details_root)
-        .map(|node| node.display);
-    assert_eq!(
-        display,
-        Some(Display::Flex),
-        "the shared band admits the details rail beside the card lane"
-    );
-}
-
-#[test]
-fn the_details_scroll_area_reserves_a_control_height_bottom_safety_band() {
-    let mut app = card_lane_app(shell_with(Vec::new()), palette());
-    app.update();
-
-    let palette = palette();
-    let node = app
-        .world_mut()
-        .query_filtered::<&Node, (With<ProcessDetailsRoot>, With<ScrollArea>)>()
-        .single(app.world())
-        .expect("the details scroll area is mounted");
-    assert_eq!(
-        node.padding.bottom,
-        Val::Px(details_bottom_inset_px(&palette)),
-        "the scroll content keeps two whole control rows after its final detail row"
-    );
-    assert!(
-        details_bottom_inset_px(&palette) >= palette.control_height_px() * 2.0,
-        "an intermediate scroll position cannot expose a partial final row through the safety band"
-    );
-}
-
-#[test]
-fn intermediate_details_scroll_snaps_the_lower_edge_to_a_whole_row_boundary() {
-    let rows = [(0.0, 28.0), (36.0, 64.0), (72.0, 100.0)];
-    let correction = whole_row_scroll_offset(0.0, 0.0, 80.0, 90.0, 4.0, &rows);
-    assert_eq!(
-        correction, 14.0,
-        "scrolling down reveals the complete row and a four-pixel clear gap"
-    );
-    assert_eq!(
-        whole_row_scroll_offset(0.0, 0.0, 80.0, 100.0, 4.0, &rows),
-        0.0,
-        "an already whole row boundary keeps the official scroll position"
-    );
-    assert_eq!(
-        whole_row_scroll_offset(20.0, 30.0, 80.0, 90.0, 4.0, &rows),
-        -12.0,
-        "scrolling up excludes the partial row without reversing direction"
-    );
-    assert_eq!(
-        whole_row_scroll_offset(0.0, 5.0, 0.0, 15.0, 4.0, &[(0.0, 28.0)]),
-        0.0,
-        "a scroll limit that cannot reach either row edge stays clamped"
-    );
-    assert_eq!(
-        whole_row_scroll_offset(80.0, 80.0, 80.0, 90.0, 4.0, &rows),
-        -22.0,
-        "the maximum scroll boundary selects the reachable whole-row edge"
-    );
-}
-
-#[test]
-fn the_wide_measured_details_viewport_never_exposes_a_partial_final_row() {
-    use bevy::ui::{ScrollPosition, UiGlobalTransform};
-
-    let items: Vec<ProcessItem> = (0..24).map(|pid| process(pid, "p", "Running")).collect();
-    let mut app = measured_process_app(1280, 800, items);
-    app.world_mut().commands().trigger(ShellProjectionFolded);
-    for _ in 0..5 {
-        app.update();
-    }
-    let world = app.world_mut();
-    let maximum = world
-        .query_filtered::<&ComputedNode, With<ProcessDetailsRoot>>()
-        .single(world)
-        .map(|viewport| {
-            let scale = viewport.inverse_scale_factor();
-            (viewport.content_size().y * scale - viewport.size().y * scale).max(0.0)
-        })
-        .expect("the wide details scroll owner is measured");
-    assert!(maximum > 0.0, "the wide details viewport really scrolls");
-
-    for fraction in [0.0, 0.17, 0.41, 0.63, 0.37, 0.0, 1.0] {
-        let world = app.world_mut();
-        world
-            .query_filtered::<&mut ScrollPosition, With<ProcessDetailsRoot>>()
-            .single_mut(world)
-            .expect("the scroll position stays mounted")
-            .0
-            .y = maximum * fraction;
-        app.update();
-        let world = app.world_mut();
-        let (viewport, transform, scroll) = world
-            .query_filtered::<(
-                &ComputedNode,
-                &UiGlobalTransform,
-                &ScrollPosition,
-            ), With<ProcessDetailsRoot>>()
-            .single(world)
-            .expect("the wide details scroll owner stays measured");
-        let visible = viewport.size().y * viewport.inverse_scale_factor();
-        let viewport_bottom = transform.translation.y + visible * 0.5;
-        let applied_scroll = viewport.scroll_position.y * viewport.inverse_scale_factor();
-        assert!(
-            (scroll.0.y - applied_scroll).abs() <= 1.0,
-            "Bevy layout applies and clamps the snapped scroll position"
-        );
-        assert!(
-            scroll.0.y >= 0.0 && scroll.0.y <= maximum + 1.0,
-            "the snapped offset remains inside the ScrollArea range"
-        );
-        let cropped = world
-            .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessDetailsRow>>()
-            .iter(world)
-            .any(|(node, transform)| {
-                let half_height = node.size().y * node.inverse_scale_factor() * 0.5;
-                let top = transform.translation.y - half_height;
-                let bottom = transform.translation.y + half_height;
-                top < viewport_bottom - 0.5 && bottom > viewport_bottom + 0.5
-            });
-        assert!(
-            !cropped,
-            "an intermediate scroll position exposes no partial row at {fraction:.2}"
-        );
-    }
-}
-
-#[test]
-fn a_detail_row_keeps_its_label_and_value_in_separate_bounded_slots() {
-    let slots = detail_row_slots();
-    assert!(
-        slots.label_shrink > 0.0 && slots.label_grow > 0.0,
-        "a long localized label may shrink and grow in its own bounded slot"
-    );
-    assert_eq!(
-        slots.value_shrink, 0.0,
-        "the value never shrinks out of the right edge"
-    );
-    assert!(
-        slots.value_min_width_rem > 0.0,
-        "the value keeps a measured floor in rem"
     );
 }

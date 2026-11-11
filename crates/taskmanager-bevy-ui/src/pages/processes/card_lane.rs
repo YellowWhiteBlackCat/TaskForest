@@ -22,7 +22,9 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 use taskmanager_shell::saved_views::sort_token;
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, SortDir};
-use taskmanager_ui_contract::presentation::card_flow::{CardFlowSpec, admit_card_groups};
+use taskmanager_ui_contract::presentation::card_flow::{
+    self, CardFlowAdmission, CardFlowSpec, admit_card_flow,
+};
 use taskmanager_ui_contract::presentation::card_width::{
     CardRowWidthBudget, CardRowWidthSpec, admit_card_row_width_budget, card_row_columns,
 };
@@ -75,6 +77,12 @@ pub(crate) enum ProcessFocusField {
 /// admitted from a measured slot.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessCardFlow;
+
+/// The full adaptive lane below the process page's fixed toolbar. It is
+/// measured separately from the lower card viewport so optional dashboard
+/// chrome can be removed without changing the shared rung decision.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessCardLaneViewport;
 
 /// One complete state group.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -169,6 +177,8 @@ pub(crate) struct CardFlowMetrics {
     pub(crate) rem_px: f32,
     /// The measured atomic-card height, in logical pixels.
     pub(crate) card_height_px: f32,
+    /// The complete two-line focus card height with compact vertical padding.
+    pub(crate) focus_card_height_px: f32,
     /// The narrowest an atomic card may be, in logical pixels.
     pub(crate) card_min_width_px: f32,
     /// The widest an atomic card may be before it reads as an empty banner.
@@ -214,6 +224,7 @@ impl CardFlowMetrics {
             control_height_px,
             rem_px: palette.rem_px,
             card_height_px,
+            focus_card_height_px: control_height_px * 2.0 + space_4() + space_8(),
             card_min_width_px,
             card_max_width_px,
             header_height_px: control_height_px,
@@ -300,11 +311,8 @@ pub(crate) struct CardFlowBudget {
     /// non-measured resource must not hide the lane with a false zero-group
     /// verdict during the first frames of window composition.
     pub(crate) measured: bool,
-    /// The number of COMPLETE group blocks admitted. Zero means the lane
-    /// degrades to its dense form instead of squeezing a card.
-    pub(crate) groups: usize,
-    /// The clamped height of one admitted group block.
-    pub(crate) group_height_px: f32,
+    /// Shared typed rung: complete groups, one complete focus card, or dense.
+    pub(crate) admission: CardFlowAdmission,
     /// The number of cards one group row holds.
     pub(crate) columns: usize,
     /// The measured width the group rows were admitted against, in logical pixels.
@@ -313,40 +321,64 @@ pub(crate) struct CardFlowBudget {
     pub(crate) metrics: Option<CardFlowMetrics>,
     /// The shared cap fold's bounded row width for this measured slot.
     pub(crate) row_width: CardRowWidthBudget,
+    /// The dashboard's measured height retained while its focus rung is active.
+    pub(crate) dashboard_height_px: f32,
 }
 
 impl Default for CardFlowBudget {
     fn default() -> Self {
         Self {
             measured: false,
-            groups: 0,
-            group_height_px: 0.0,
+            admission: CardFlowAdmission::Groups(card_flow::CardFlowBudget {
+                columns: 1,
+                groups: 0,
+                card_height: 0.0,
+            }),
             columns: 1,
             width_px: 0.0,
             metrics: None,
             row_width: CardRowWidthBudget::degraded(),
+            dashboard_height_px: 0.0,
         }
     }
 }
 
 impl CardFlowBudget {
-    /// The presentation the budget actually admits.
-    ///
-    /// The shared contract's zero-group verdict is the product's degradation
-    /// rule: when not even one COMPLETE group fits, the lane steps aside and
-    /// the dense table answers — no squeezed card, no half group.
+    /// The effective adaptive rung after the user's explicit table choice.
     #[must_use]
-    pub(crate) fn effective_mode(self, mode: ProcessViewMode) -> ProcessViewMode {
+    pub(crate) fn effective_admission(self, mode: ProcessViewMode) -> CardFlowAdmission {
         match mode {
-            ProcessViewMode::Cards if self.measured && self.groups == 0 => ProcessViewMode::Dense,
-            other => other,
+            ProcessViewMode::Dense => CardFlowAdmission::Dense,
+            ProcessViewMode::Cards if !self.measured => {
+                CardFlowAdmission::Groups(card_flow::CardFlowBudget {
+                    columns: self.columns,
+                    groups: 0,
+                    card_height: 0.0,
+                })
+            }
+            ProcessViewMode::Cards => self.admission,
         }
     }
 
     /// The height one atomic card may take inside an admitted group block.
     #[must_use]
     pub(crate) fn card_height_px(self, metrics: CardFlowMetrics) -> f32 {
-        (self.group_height_px - metrics.header_height_px).max(metrics.card_floor_px)
+        match self.admission {
+            CardFlowAdmission::Groups(groups) => {
+                (groups.card_height - metrics.header_height_px).max(metrics.card_floor_px)
+            }
+            CardFlowAdmission::FocusCard { card_height } => card_height,
+            CardFlowAdmission::Dense => 0.0,
+        }
+    }
+
+    /// The number of complete group blocks admitted by the shared verdict.
+    #[must_use]
+    pub(crate) fn group_count(self) -> usize {
+        match self.admission {
+            CardFlowAdmission::Groups(groups) => groups.groups,
+            CardFlowAdmission::FocusCard { .. } | CardFlowAdmission::Dense => 0,
+        }
     }
 
     /// Re-admit one bucket's lower content as WHOLE columns against the slot
@@ -390,6 +422,26 @@ impl CardFlowBudget {
         };
         metrics.width_rem(measured_slot)
     }
+
+    /// One whole selected card, admitted through the shared card-width fold.
+    #[must_use]
+    pub(crate) fn focus_card_width_measurements(self) -> CardRowWidthMeasurements {
+        let Some(metrics) = self.metrics else {
+            return CardRowWidthMeasurements::default();
+        };
+        let measured_slot = if self.measured && self.width_px.is_finite() && self.width_px > 0.0 {
+            self.width_px
+        } else {
+            metrics.width_spec().content_width_cap
+        };
+        let width = admit_card_row_width_budget(measured_slot, 1, metrics.width_spec(), false);
+        let rem = metrics.rem_px.max(1.0);
+        CardRowWidthMeasurements {
+            content_width_rem: width.content_width / rem,
+            card_width_rem: width.card_width / rem,
+            gap_rem: metrics.group_gap_px / rem,
+        }
+    }
 }
 
 /// Derive Bevy's card metrics from the measured card-flow viewport and
@@ -404,6 +456,7 @@ impl CardFlowBudget {
 pub(crate) fn card_flow_budget(
     slot_width_px: f32,
     slot_height_px: f32,
+    dashboard_height_px: f32,
     palette: &UiPalette,
 ) -> CardFlowBudget {
     let metrics = CardFlowMetrics::from_palette(palette);
@@ -411,20 +464,31 @@ pub(crate) fn card_flow_budget(
     let requested_columns = card_row_columns(slot_width_px, width_spec);
     let row_width =
         admit_card_row_width_budget(slot_width_px, requested_columns, width_spec, false);
-    let columns = row_width.columns.max(1);
-    // The measured slot IS the bounded card-flow viewport: the mode row,
-    // dashboard, page title and toolbar already spent their height before
-    // this node was laid out. Only the flow's own group gap remains.
-    let available = (slot_height_px - metrics.group_gap_px).max(0.0);
-    let verdict = admit_card_groups(available, columns, metrics.spec());
+    let columns = row_width.columns;
+    // The measured slot is the full adaptive lane below the fixed mode row.
+    // The dashboard remains reserved for complete groups, but is removed
+    // when the shared contract chooses the single-focus-card rung.
+    let available = (slot_height_px - metrics.control_height_px - metrics.group_gap_px).max(0.0);
+    let leading = dashboard_height_px + metrics.group_gap_px;
+    let admission = admit_card_flow(
+        available,
+        leading,
+        columns,
+        metrics.spec(),
+        metrics.focus_card_height_px,
+    );
+    let group_columns = match admission {
+        CardFlowAdmission::Groups(groups) => groups.columns,
+        CardFlowAdmission::FocusCard { .. } | CardFlowAdmission::Dense => columns,
+    };
     CardFlowBudget {
         measured: true,
-        groups: verdict.groups,
-        group_height_px: verdict.card_height,
-        columns: verdict.columns,
+        admission,
+        columns: group_columns,
         width_px: slot_width_px,
         metrics: Some(metrics),
         row_width,
+        dashboard_height_px,
     }
 }
 
@@ -552,10 +616,11 @@ pub(crate) fn card_flow_plan(
             None => folded.push((group, vec![index])),
         }
     }
-    let start = window.clamped(folded.len(), budget.groups).top;
+    let group_count = budget.group_count();
+    let start = window.clamped(folded.len(), group_count).top;
     let mut groups: Vec<CardGroupPlan> = Vec::new();
     for (group, members) in folded.into_iter().skip(start) {
-        if groups.len() >= budget.groups {
+        if groups.len() >= group_count {
             break;
         }
         let has_overflow = members.len() > budget.columns;
@@ -601,6 +666,6 @@ pub(crate) fn card_bucket_of_selection(shell: &ShellApp) -> Option<usize> {
 }
 
 mod scenes;
-pub(crate) use scenes::{card_lane_scene, empty_card_scene, group_scene};
+pub(crate) use scenes::{atomic_card_scene, card_lane_scene, empty_card_scene, group_scene};
 mod runtime;
 pub(crate) use runtime::register;

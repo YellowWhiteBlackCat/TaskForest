@@ -39,9 +39,9 @@ use crate::window::{Role, TextRole};
 use super::runtime::{on_group_overflow_activated, on_view_mode_activated};
 use super::{
     CardGroupPlan, CardRowWidthMeasurements, FocusProjection, ProcessAtomicCard, ProcessCardFlow,
-    ProcessCardGroup, ProcessCardStateOverlay, ProcessFocusContent, ProcessFocusDashboard,
-    ProcessFocusField, ProcessFocusSortDir, ProcessFocusValue, ProcessGroupOverflow,
-    ProcessViewMode, ProcessViewModeButton, focus_projection,
+    ProcessCardGroup, ProcessCardLaneViewport, ProcessCardStateOverlay, ProcessFocusContent,
+    ProcessFocusDashboard, ProcessFocusField, ProcessFocusSortDir, ProcessFocusValue,
+    ProcessGroupOverflow, ProcessViewMode, ProcessViewModeButton, focus_projection,
 };
 use crate::pages::processes::projection::{self, ProcessRowView};
 use crate::pages::processes::{ProcessRowLink, ProcessTableArtifact, input};
@@ -247,6 +247,7 @@ pub(crate) fn card_lane_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             row_gap: Val::Px(space_8()),
             overflow: Overflow::clip(),
         }
+        ProcessCardLaneViewport
         Children [
             Node {
                 width: percent(100),
@@ -281,7 +282,7 @@ pub(crate) fn group_scene(
     hidden_columns: &[&str],
     query: &str,
     palette: &UiPalette,
-    card_height_rem: f32,
+    card_height_px: f32,
 ) -> Box<dyn Scene> {
     // A truncated row must SAY so: the header states the bucket's whole
     // size, and the overflow action names what the row leaves out.
@@ -306,8 +307,9 @@ pub(crate) fn group_scene(
                     hidden_columns,
                     palette,
                     query,
-                    card_height_rem,
+                    card_height_px,
                     row_width,
+                    false,
                 )
             })
         })
@@ -340,7 +342,7 @@ pub(crate) fn group_scene(
             Node {
                 width: rem(row_width.content_width_rem),
                 max_width: percent(100),
-                height: Val::Rem(card_height_rem),
+                height: px(card_height_px),
                 flex_direction: FlexDirection::Row,
                 column_gap: rem(row_width.gap_rem),
                 flex_shrink: 1.0,
@@ -442,8 +444,9 @@ pub(crate) fn atomic_card_scene(
     hidden_columns: &[&str],
     palette: &UiPalette,
     query: &str,
-    card_height_rem: f32,
+    card_height_px: f32,
     row_width: CardRowWidthMeasurements,
+    compact_focus: bool,
 ) -> Box<dyn Scene> {
     let columns = crate::widgets::table::visible_columns(hidden_columns);
     let status = projection::cell_by_id(row, &columns, "Status");
@@ -460,17 +463,23 @@ pub(crate) fn atomic_card_scene(
     let label = t_label;
     let _ = query;
     let overlay = state_overlay_scene();
+    let vertical_padding = if compact_focus { space_4() } else { space_8() };
+    let card_basis = if compact_focus {
+        px(card_height_px)
+    } else {
+        rem(row_width.card_width_rem)
+    };
     Box::new(bsn! {
         Node {
             width: rem(row_width.card_width_rem),
             max_width: rem(row_width.card_width_rem),
             flex_grow: 0.0,
             flex_shrink: 0.0,
-            flex_basis: rem(row_width.card_width_rem),
-            height: Val::Rem(card_height_rem),
+            flex_basis: card_basis,
+            height: px(card_height_px),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
-            padding: UiRect::all(Val::Px(space_8())),
+            padding: UiRect::axes(Val::Px(space_8()), Val::Px(vertical_padding)),
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
             overflow: Overflow::clip(),
         }

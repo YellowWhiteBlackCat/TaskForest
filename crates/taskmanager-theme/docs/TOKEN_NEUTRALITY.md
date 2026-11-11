@@ -66,6 +66,14 @@ bind these to toolkit units; they never author a number. The gates
 control each. Icon/control geometry such as a column width or an inline `px` box
 stays a layout contract under the px firewall: this charter governs type.
 
+## Layered shadow alpha
+
+The layered glass shadow projection distributes the resolved ink alpha across
+its ambient and contact layers in optical depth. Their source-over overlap
+therefore stays within the theme's single shadow-opacity budget; the tier's
+REM offsets and blur radii remain unchanged. The single-quad projection keeps
+its declared elevation reduction.
+
 ## Optical glass contract
 
 `GlassLayer` remains the painted frosted fallback. `OpticalGlassSpec` is

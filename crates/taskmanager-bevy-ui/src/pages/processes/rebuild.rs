@@ -30,8 +30,11 @@ use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_ui_contract::ProcessColumnSpec;
+use taskmanager_ui_contract::presentation::card_flow::CardFlowAdmission;
 
-use super::card_lane::{ProcessViewMode, card_flow_plan, empty_card_scene, group_scene};
+use super::card_lane::{
+    ProcessViewMode, atomic_card_scene, card_flow_plan, empty_card_scene, group_scene,
+};
 
 /// Selected-row fill: the palette's elevated card surface (the same token the
 /// active nav item uses — one "selected" surface per theme).
@@ -227,27 +230,24 @@ fn rebuild_window_scenes(
         hidden_ids,
     } = input;
     let card_budget = surface.card_budget.as_deref().copied().unwrap_or_default();
-    let mode = card_budget.effective_mode(
+    let admission = card_budget.effective_admission(
         surface
             .mode
             .as_deref()
             .copied()
             .unwrap_or(ProcessViewMode::Dense),
     );
-    let scenes: Vec<Box<dyn Scene>> = match mode {
-        ProcessViewMode::Dense => window_scenes(
+    let scenes: Vec<Box<dyn Scene>> = match admission {
+        CardFlowAdmission::Dense => window_scenes(
             projection,
             columns,
             widths,
             &surface.palette.inner,
             &shell.query,
         ),
-        ProcessViewMode::Cards => {
+        CardFlowAdmission::Groups(_) => {
             let metrics = card_lane::CardFlowMetrics::from_palette(&surface.palette.inner);
-            let card_height_rem = surface
-                .palette
-                .inner
-                .rem_ratio(card_budget.card_height_px(metrics));
+            let card_height_px = card_budget.card_height_px(metrics);
             // The card lane reads the shell's VISIBLE rows. The dense
             // table's measured window collapses to zero rows while the
             // card lane owns the screen, so a window-derived plan would
@@ -275,19 +275,47 @@ fn rebuild_window_scenes(
                             hidden_ids,
                             &shell.query,
                             &surface.palette.inner,
-                            card_height_rem,
+                            card_height_px,
                         )
                     })
                     .collect()
+            }
+        }
+        CardFlowAdmission::FocusCard { card_height } => {
+            if shell.visible_processes().is_empty() {
+                vec![empty_card_scene(
+                    empty_state_text(&shell.query),
+                    &surface.palette.inner,
+                )]
+            } else {
+                let selected_rows =
+                    projection::row_views_for_indices(shell, &[shell.selected], hidden_ids);
+                match selected_rows.first() {
+                    Some(row) => vec![atomic_card_scene(
+                        row,
+                        hidden_ids,
+                        &surface.palette.inner,
+                        &shell.query,
+                        card_height,
+                        card_budget.focus_card_width_measurements(),
+                        true,
+                    )],
+                    None => vec![empty_card_scene(
+                        empty_state_text(&shell.query),
+                        &surface.palette.inner,
+                    )],
+                }
             }
         }
     };
     // The cards live in the card lane's own bounded flow root; the dense rows
     // live in the table's rows root. One window, two presentations, one
     // pinned row page.
-    let target = match mode {
-        ProcessViewMode::Dense => Some(root),
-        ProcessViewMode::Cards => surface.card_flows.iter().next(),
+    let target = match admission {
+        CardFlowAdmission::Dense => Some(root),
+        CardFlowAdmission::Groups(_) | CardFlowAdmission::FocusCard { .. } => {
+            surface.card_flows.iter().next()
+        }
     };
     let Some(target) = target else {
         return;

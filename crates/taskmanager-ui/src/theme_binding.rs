@@ -123,9 +123,9 @@ fn rem_pixels(theme: &Theme, value: f32) -> Pixels {
 ///
 /// GPUI paints every layer of a shadow, so this binding declares the
 /// [`GlassShadowProjection::Layered`] projection explicitly: the shared
-/// contract stays the single owner of the elevation ladder, and a renderer
-/// that can only paint one quad (Iced) declares its own projection instead
-/// of re-deriving the ink here.
+/// contract apportions the token's alpha across both overlapping layers,
+/// and a renderer that can only paint one quad (Iced) declares the
+/// `SingleQuad` projection instead of re-deriving the ink here.
 #[must_use]
 pub fn glass_shadow(theme: &Theme, tier: GlassTier) -> Vec<BoxShadow> {
     let layers = tier.projected_shadow(theme, GlassShadowProjection::Layered);

@@ -20,6 +20,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::card_flow::CardFlowAdmission;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
@@ -135,7 +136,11 @@ fn sync_focus_dashboard(
 /// admission contract. A changed verdict publishes the interaction seam so
 /// the measured window rebuilds once — no polling of hidden card-flow nodes.
 pub(crate) fn sync_card_flow_budget(
-    flows: Query<&ComputedNode, With<super::ProcessCardFlow>>,
+    lanes: Query<&ComputedNode, With<super::ProcessCardLaneViewport>>,
+    mut dashboards: Query<
+        (&ComputedNode, &mut bevy::ui::prelude::Node),
+        With<super::ProcessFocusDashboard>,
+    >,
     mode: Option<Res<ProcessViewMode>>,
     palette: Option<Res<WindowPalette>>,
     mut budget: ResMut<CardFlowBudget>,
@@ -144,24 +149,47 @@ pub(crate) fn sync_card_flow_budget(
     let Some(palette) = palette else {
         return;
     };
-    let Ok(flow) = flows.single() else {
+    let Ok(lane) = lanes.single() else {
         return;
     };
-    let size = flow.size() * flow.inverse_scale_factor();
+    let size = lane.size() * lane.inverse_scale_factor();
     if !size.x.is_finite() || !size.y.is_finite() || size.x <= 0.0 || size.y <= 0.0 {
         return;
     }
-    let next = card_flow_budget(size.x, size.y, &palette.inner);
-    if *budget == next {
+    let Ok((dashboard_geometry, mut dashboard_node)) = dashboards.single_mut() else {
+        return;
+    };
+    let dashboard_size = dashboard_geometry.size().y * dashboard_geometry.inverse_scale_factor();
+    let dashboard_height = if dashboard_size.is_finite() && dashboard_size > 0.0 {
+        dashboard_size
+    } else {
+        budget.dashboard_height_px
+    };
+    if !dashboard_height.is_finite() || dashboard_height <= 0.0 {
         return;
     }
+    let next = card_flow_budget(size.x, size.y, dashboard_height, &palette.inner);
     let view_mode = mode.as_deref().copied().unwrap_or(ProcessViewMode::Dense);
-    let presentation_changed = next.effective_mode(view_mode) != budget.effective_mode(view_mode);
-    *budget = next;
-    if presentation_changed {
+    let previous_admission = budget.effective_admission(view_mode);
+    let next_admission = next.effective_admission(view_mode);
+    let should_hide_dashboard = matches!(next_admission, CardFlowAdmission::FocusCard { .. });
+    let dashboard_display = if should_hide_dashboard {
+        bevy::ui::Display::None
+    } else {
+        bevy::ui::Display::Flex
+    };
+    let dashboard_visibility_changed = dashboard_node.display != dashboard_display;
+    if dashboard_visibility_changed {
+        dashboard_node.display = dashboard_display;
+    }
+    let budget_changed = *budget != next;
+    if budget_changed {
+        *budget = next;
+        commands.trigger(ShellInteractionApplied);
+    }
+    if previous_admission != next_admission || dashboard_visibility_changed {
         commands.trigger(ShellProjectionFolded);
     }
-    commands.trigger(ShellInteractionApplied);
 }
 
 /// Repaint the card's state tint overlay.

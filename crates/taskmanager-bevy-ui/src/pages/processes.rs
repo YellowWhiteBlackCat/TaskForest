@@ -45,6 +45,7 @@ pub(crate) use rebuild::{live_widths, rebuild_table, rows_root_scene};
 
 pub(crate) mod layout;
 use card_lane::{CardFlowBudget, ProcessViewMode};
+use taskmanager_ui_contract::presentation::card_flow::CardFlowAdmission;
 #[derive(Component, Clone, Copy, Default)]
 pub(crate) struct ProcessPageRoot;
 #[derive(Component, Clone, Copy, Default)]
@@ -159,14 +160,16 @@ pub(crate) fn sync_processes_responsive_layout(
         .unwrap_or(0.0);
     let fallback = ProcessViewMode::Dense;
     let view_mode = mode.as_deref().copied().unwrap_or(fallback);
-    let effective_mode = card_budget
+    let effective_admission = card_budget
         .as_deref()
         .copied()
         .unwrap_or_default()
-        .effective_mode(view_mode);
-    let (table_display, lane_visible) = match effective_mode {
-        ProcessViewMode::Cards => (bevy::ui::Display::None, true),
-        ProcessViewMode::Dense => (bevy::ui::Display::Flex, false),
+        .effective_admission(view_mode);
+    let (table_display, lane_visible) = match effective_admission {
+        CardFlowAdmission::Groups(_) | CardFlowAdmission::FocusCard { .. } => {
+            (bevy::ui::Display::None, true)
+        }
+        CardFlowAdmission::Dense => (bevy::ui::Display::Flex, false),
     };
     for mut node in &mut tables {
         if node.width != percent(100) || node.display != table_display {
@@ -474,8 +477,11 @@ fn on_scroll_intent(
         .as_deref()
         .copied()
         .unwrap_or_default()
-        .effective_mode(mode);
-    if effective == ProcessViewMode::Cards {
+        .effective_admission(mode);
+    if matches!(
+        effective,
+        CardFlowAdmission::Groups(_) | CardFlowAdmission::FocusCard { .. }
+    ) {
         // The lane scrolls by WHOLE buckets: a bucket is the lane's atomic
         // block, and a half bucket is the half group the shared admission
         // contract forbids.
@@ -505,7 +511,7 @@ fn reveal_card_window(shell: &ShellApp, surface: &mut TableSurface) {
         .as_deref()
         .copied()
         .unwrap_or_default()
-        .groups
+        .group_count()
         .max(1);
     let top = window.top;
     if bucket >= top && bucket < top + groups {
@@ -661,6 +667,10 @@ mod table_parity_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/process_card_lane.rs"]
 mod card_lane_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/process_details_scroll.rs"]
+mod process_details_scroll_tests;
 
 #[cfg(test)]
 #[path = "../../tests/headless/pages/card_lane_width_admission.rs"]

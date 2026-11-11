@@ -66,16 +66,14 @@ mod card_shadow_tests {
     use crate::gpui_app::graph::{GraphSettings, new_graph_cache};
     use gpui::{Hsla, Styled, div};
     use std::rc::Rc;
-    use taskmanager_theme::GlassTier;
+    use taskmanager_theme::theme::{GlassShadowProjection, GlassTier};
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::theme_binding::glass_shadow;
 
-    const CARD_SHADOW_AMBIENT_ALPHA: f32 = 0.6;
-
     /// The card shadow helper returns the Mission Center two-layer pair in
     /// the theme's own ink: an ambient layer that is wider AND weaker than
-    /// the edge layer, and the edge layer carrying the token color verbatim
-    /// (both layers translucent in every skin × mode).
+    /// the edge layer, and both layers share one optical-depth alpha budget
+    /// from the theme token.
     #[test]
     fn card_shadow_is_two_layer_token_ink() {
         for skin in Skin::ALL {
@@ -94,24 +92,27 @@ mod card_shadow_tests {
                     skin.label(),
                     mode.label()
                 );
-                let ink: Hsla = hsla(theme.card_shadow());
-                let ambient: Hsla = hsla(
-                    theme
-                        .glass_card()
-                        .shadow
-                        .with_alpha(theme.glass_card().shadow.a * CARD_SHADOW_AMBIENT_ALPHA),
-                );
+                let shared =
+                    GlassTier::Card.projected_shadow(&theme, GlassShadowProjection::Layered);
                 assert_eq!(
                     shadow[1].color,
-                    ink,
-                    "{} {} edge layer must carry the token ink",
+                    hsla(shared.contact.color),
+                    "{} {} edge layer must follow the shared contact projection",
                     skin.label(),
                     mode.label(),
                 );
                 assert_eq!(
                     shadow[0].color,
-                    ambient,
-                    "{} {} ambient layer must scale the ink alpha",
+                    hsla(shared.ambient.color),
+                    "{} {} ambient layer must follow the shared ambient projection",
+                    skin.label(),
+                    mode.label(),
+                );
+                let combined =
+                    1.0 - (1.0 - shared.ambient.color.a) * (1.0 - shared.contact.color.a);
+                assert!(
+                    (combined - theme.glass_card().shadow.a).abs() < 1e-4,
+                    "{} {} overlapping layers must stay within one token alpha budget: {combined}",
                     skin.label(),
                     mode.label(),
                 );
@@ -209,7 +210,12 @@ mod card_shadow_tests {
             dark_shadow[1].color, light_shadow[1].color,
             "light and dark cards must cast different shadow ink"
         );
-        let black_ink: Hsla = hsla(Theme::dark().glass_card().shadow);
+        let black_ink: Hsla = hsla(
+            GlassTier::Card
+                .projected_shadow(&dark, GlassShadowProjection::Layered)
+                .contact
+                .color,
+        );
         assert_eq!(
             dark_shadow[1].color, black_ink,
             "dark skins cast the locked black ink"
