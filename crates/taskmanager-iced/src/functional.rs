@@ -73,9 +73,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
             route: "performance.gpu.all-families",
             reason: "Iced renders every available GPU metric family together instead of exposing a selector",
         },
-        ProductIntent::TransientFeedback => SurfaceDecision::AcceptedDifference {
-            route: "footer.activity-line",
-            reason: "transient feedback uses the shared footer activity line instead of a floating toast",
+        ProductIntent::TransientFeedback => SurfaceDecision::Local {
+            route: "root.toast",
         },
     }
 }

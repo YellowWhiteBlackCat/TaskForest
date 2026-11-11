@@ -24,24 +24,15 @@ impl IcedApp {
                 None
             }
             Message::SubmitRunTask if self.run_task_open() => {
-                let command = self.run_task.normalized_command();
-                if command.trim().is_empty() {
+                let draft = self.run_task.command();
+                let Some(request) = CommandLaunchRequest::from_draft(&draft) else {
                     self.run_task.error_msg = Some(t("search.run_command").to_string());
-                    None
-                } else {
-                    // The command leaves through the shared platform request
-                    // path (GPUI `request_run_command` parity): the shell's
-                    // effect dispatch opens the shell-ui-action session, so a
-                    // queued launch is a submitted request and not a silent
-                    // dismissal.
-                    let request = CommandLaunchRequest {
-                        command: command.trim().to_owned(),
-                    };
-                    self.dismiss_local_surface_kind(LocalSurfaceKind::RunTask);
-                    self.run_task.error_msg = None;
-                    self.run_task.clear_command();
-                    Some(PlatformEffect::CommandLaunch(request))
-                }
+                    return None;
+                };
+                self.dismiss_local_surface_kind(LocalSurfaceKind::RunTask);
+                self.run_task.error_msg = None;
+                self.run_task.clear_command();
+                Some(PlatformEffect::CommandLaunch(request))
             }
             _ => None,
         }

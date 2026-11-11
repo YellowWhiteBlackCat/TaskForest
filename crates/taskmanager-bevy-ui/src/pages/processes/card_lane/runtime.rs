@@ -136,6 +136,7 @@ fn sync_focus_dashboard(
 /// the measured window rebuilds once — no polling of hidden card-flow nodes.
 pub(crate) fn sync_card_flow_budget(
     flows: Query<&ComputedNode, With<super::ProcessCardFlow>>,
+    mode: Option<Res<ProcessViewMode>>,
     palette: Option<Res<WindowPalette>>,
     mut budget: ResMut<CardFlowBudget>,
     mut commands: Commands,
@@ -154,7 +155,12 @@ pub(crate) fn sync_card_flow_budget(
     if *budget == next {
         return;
     }
+    let view_mode = mode.as_deref().copied().unwrap_or(ProcessViewMode::Dense);
+    let presentation_changed = next.effective_mode(view_mode) != budget.effective_mode(view_mode);
     *budget = next;
+    if presentation_changed {
+        commands.trigger(ShellProjectionFolded);
+    }
     commands.trigger(ShellInteractionApplied);
 }
 

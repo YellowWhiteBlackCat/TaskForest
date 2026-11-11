@@ -46,10 +46,17 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   paints the selected-process details beside either the card lane or the dense
   table, and a narrower slot hides the rail as one group instead of clipping
   its label/value columns. Its projection, effect and typed-unavailable seams
-  are headlessly proved. The `applications-card-lane-details-wide` and
-  `applications-card-lane-details-compact` scenarios make both whole-group
-  decisions reviewable in a real window; their results are not yet reviewed
-  by eye on the current tree.
+  are headlessly proved. Targeted `applications-card-lane-details-wide` and
+  `applications-card-lane-details-compact` real-window scenarios were reviewed
+  by eye: the wide rail has bounded label/value rows and the compact rail is
+  hidden with no clipped detail content. The compact frame exposed a blank
+  lower canvas where the zero-group verdict should degrade to the dense
+  table; a post-layout fold trigger now rebuilds the active presentation, and
+  the fresh reviewed compact screenshot shows whole dense-table rows filling
+  that lower slot. The wide rail's bottom still uses a bounded scroll area;
+  its rail lane now reserves one control-height bottom safety band. A capture
+  made between row-aligned scroll positions can still show a partial row at
+  the viewport edge; the screenshot does not prove a whole-row snap.
 - The `tooltip-overlay` capture is a real tooltip above the Applications
   optical hero; the window uses a software renderer in the capture harness, so
   it proves placement, content and bounds, not hardware WESL refraction.

@@ -11,13 +11,36 @@ use taskmanager_ui_contract::presentation::budget::PageLayoutBudget;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 use taskmanager_ui_contract::presentation::vocabulary::{BOTTOM_SAFETY_BAND, VerticalSpace};
 
+/// The one shared rhythm charged between header groups and around the inset
+/// glass surface. The fold and the scaffold spend this typed fact; neither
+/// restates `tokens::SPACE_8` / `tokens::SPACE_6` as a second layout budget.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ListPageRhythm {
+    /// Shared gap between header groups, header and body, and header bands.
+    pub gap: f32,
+    /// Shared content inset of the one page-header glass surface.
+    pub inset: f32,
+}
+
+impl ListPageRhythm {
+    #[must_use]
+    pub const fn shared() -> Self {
+        Self {
+            gap: tokens::SPACE_8.0,
+            inset: tokens::SPACE_6.0,
+        }
+    }
+}
+
 /// One frame-local inventory header allocation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ListPageBudget {
     /// Count of fixed control rows the header must reserve.
     pub rows: usize,
-    /// Shared inter-band rhythm charged between header groups.
-    pub gap: f32,
+    /// The single rhythm spent by the fold and the scaffold.
+    pub rhythm: ListPageRhythm,
+    /// Whole height one optional header group charges, including its gap.
+    pub optional_group_height: f32,
     /// Height available to the primary body after the header and safety band.
     /// Page-specific compositions may spend this as a floor calculation, but
     /// the scaffold must not pin the body to it: the page's own primary/elastic
@@ -28,6 +51,19 @@ pub struct ListPageBudget {
 }
 
 impl ListPageBudget {
+    /// Mandatory-only rung for isolated component tests. Production pages
+    /// always bind [`Self::from_page_layout`].
+    #[must_use]
+    pub const fn mandatory_only() -> Self {
+        Self {
+            rows: 2,
+            rhythm: ListPageRhythm::shared(),
+            optional_group_height: 0.0,
+            table_height: 0.0,
+            admit_optional_group: false,
+        }
+    }
+
     /// Keep the mandatory header rung when a page already owns its optional
     /// evidence through a second, page-specific layout budget.
     #[must_use]
@@ -35,7 +71,7 @@ impl ListPageBudget {
         Self {
             rows: 2,
             table_height: self.table_height
-                + self.rows.saturating_sub(2) as f32 * (self.gap + tokens::SPACE_8.0),
+                + self.rows.saturating_sub(2) as f32 * self.optional_group_height,
             admit_optional_group: false,
             ..self
         }
@@ -54,8 +90,9 @@ impl ListPageBudget {
     ) -> Self {
         let control_extent =
             control_measurement(ControlRole::Button, ControlState::Normal, ui_size, density).extent;
-        let gap = tokens::SPACE_8.0;
-        let header_inset = tokens::SPACE_6.0 * 2.0;
+        let rhythm = ListPageRhythm::shared();
+        let gap = rhythm.gap;
+        let header_inset = rhythm.inset * 2.0;
         let mandatory_footprint = control_extent * 2.0 + gap + header_inset;
         let safety = BOTTOM_SAFETY_BAND;
         let remaining_after_mandatory =
@@ -68,7 +105,8 @@ impl ListPageBudget {
             control_extent * rows as f32 + gap * (rows.saturating_sub(1)) as f32 + header_inset;
         Self {
             rows,
-            gap,
+            rhythm,
+            optional_group_height: control_extent + gap,
             table_height: (layout.content_height - header_height - gap - safety).max(0.0),
             admit_optional_group,
         }

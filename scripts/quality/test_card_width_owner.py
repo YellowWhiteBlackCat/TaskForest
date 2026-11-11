@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""One card-row width admission, one owner, one gate.
+"""One bounded card-row width fold, one owner, one gate.
 
 `taskmanager_ui_contract::presentation::card_width` owns the WHOLE-column
-verdict: how many complete cards fit a measured slot and whether the group
-header's label/overflow fact group fits before any card is spent. Bevy used
-to declare its own `GroupWidthAdmission`, its own `card_columns` ladder and
-its own `admit_group_width` arithmetic — and silently discarded the
-`has_overflow` fact with `let _ = has_overflow`.
+verdict, the measured card/content caps, the bounded lower content width
+and the residual lane space. It also decides whether the group header's
+label/overflow fact group fits inside that bounded group before any card
+is spent. Bevy used to declare its own `GroupWidthAdmission`, its own
+`card_columns` ladder and its own `admit_group_width` arithmetic — and
+silently discarded the `has_overflow` fact with `let _ = has_overflow`.
 
 This gate refuses a frontend that forks the verdict type, redefines the
 admission function, or re-derives the width arithmetic. It also proves the
@@ -29,10 +30,14 @@ LOCAL_GATES = ROOT / "scripts/quality/local-gates.sh"
 
 OWNER = CRATES / "taskmanager-ui-contract/src/presentation/card_width.rs"
 OWNER_SYMBOLS = (
+    "pub struct CardRowWidthBudget",
     "pub struct CardRowWidthSpec",
     "pub enum CardRowWidthAdmission",
+    "pub const fn from_measured_card_cap(",
+    "pub fn row_width_cap(",
     "pub fn admit_card_row_width(",
     "pub fn card_row_columns(",
+    "pub fn admit_card_row_width_budget(",
     "pub const fn header_width(",
     "pub const fn row_width(",
 )
@@ -57,6 +62,10 @@ LOCAL_COLUMN_REQUEST = re.compile(r"\bfn\s+card_columns\s*\(")
 LOCAL_ROW_ARITHMETIC = re.compile(
     r"card_min_width_px\s*\*\s*\w+\s+[\s\S]{0,120}?group_gap_px\s*\*"
 )
+LOCAL_WIDTH_CAP = re.compile(
+    r"\b(?:card|content)_(?:max|cap)(?:_width)?(?:_px|_rem)?\b\s*(?::|=)\s*\d"
+    r"|\bfn\s+(?:card_row_width|content_width_cap|card_max_width)\w*\s*\("
+)
 DISCARDED_OVERFLOW = re.compile(r"\blet\s+_\s*=\s*has_overflow\s*;")
 
 BINDINGS = (
@@ -64,9 +73,13 @@ BINDINGS = (
         CRATES / "taskmanager-bevy-ui/src/pages/processes/card_lane.rs",
         (
             "CardRowWidthSpec",
-            "admit_card_row_width",
+            "CardRowWidthBudget",
+            "from_measured_card_cap",
+            "admit_card_row_width_budget",
             "card_row_columns",
             "has_overflow",
+            "card_max_width_px",
+            "content_width_cap",
         ),
     ),
 )
@@ -175,6 +188,56 @@ class CardWidthOwnerTests(unittest.TestCase):
         self.assertFalse(
             LOCAL_VERDICT.search("use taskmanager_ui_contract::presentation::card_width::CardRowWidthAdmission;")
         )
+
+    def test_no_frontend_forks_the_bounded_width_cap(self):
+        offenders: list[str] = []
+        for path in frontend_sources():
+            masked = code_only(path.read_text(encoding="utf-8"))
+            for number, line in enumerate(masked.splitlines(), start=1):
+                if LOCAL_WIDTH_CAP.search(line):
+                    offenders.append(
+                        f"{path.relative_to(CRATES).as_posix()}:{number}: {line.strip()}"
+                    )
+        self.assertEqual(
+            offenders,
+            [],
+            "measured card/content caps live in the shared width fold:\n"
+            + "\n".join(offenders),
+        )
+
+    def test_the_bevy_scene_spends_the_shared_row_width(self):
+        source = (
+            CRATES / "taskmanager-bevy-ui/src/pages/processes/card_lane/scenes.rs"
+        ).read_text(encoding="utf-8")
+        for symbol in (
+            "CardRowWidthMeasurements",
+            "row_width.content_width_rem",
+            "row_width.card_width_rem",
+            "max_width: percent(100)",
+        ):
+            with self.subTest(symbol=symbol):
+                self.assertIn(symbol, source)
+        atomic = code_only(source.split("pub(crate) fn atomic_card_scene", 1)[1])
+        for symbol in (
+            "flex_grow: 0.0",
+            "flex_shrink: 0.0",
+            "flex_basis: rem(row_width.card_width_rem)",
+            "max_width: rem(row_width.card_width_rem)",
+        ):
+            with self.subTest(symbol=symbol):
+                self.assertIn(
+                    symbol,
+                    atomic,
+                    "an atomic card must not grow past the shared bounded card width",
+                )
+
+    def test_bevy_declares_only_the_measured_constants_the_owner_requires(self):
+        source = (
+            CRATES / "taskmanager-bevy-ui/src/pages/processes/card_lane.rs"
+        ).read_text(encoding="utf-8")
+        self.assertIn("let card_max_width_px = control_height_px * 12.0;", source)
+        self.assertIn("max_columns: 4", source)
+        self.assertNotIn("content_width_cap:", source)
 
 
 if __name__ == "__main__":

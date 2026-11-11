@@ -26,6 +26,7 @@ use taskmanager_application::i18n::{key_value_label, more_rows_label, t};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::card_width::card_row_columns;
 
 use crate::app::PageContext;
 use crate::glass::{BackdropMirror, GlassPanelMaterial, OpticalGlassCard, card_material};
@@ -37,10 +38,10 @@ use crate::window::{Role, TextRole};
 
 use super::runtime::{on_group_overflow_activated, on_view_mode_activated};
 use super::{
-    CardGroupPlan, FocusProjection, ProcessAtomicCard, ProcessCardFlow, ProcessCardGroup,
-    ProcessCardStateOverlay, ProcessFocusContent, ProcessFocusDashboard, ProcessFocusField,
-    ProcessFocusSortDir, ProcessFocusValue, ProcessGroupOverflow, ProcessViewMode,
-    ProcessViewModeButton, focus_projection,
+    CardGroupPlan, CardRowWidthMeasurements, FocusProjection, ProcessAtomicCard, ProcessCardFlow,
+    ProcessCardGroup, ProcessCardStateOverlay, ProcessFocusContent, ProcessFocusDashboard,
+    ProcessFocusField, ProcessFocusSortDir, ProcessFocusValue, ProcessGroupOverflow,
+    ProcessViewMode, ProcessViewModeButton, focus_projection,
 };
 use crate::pages::processes::projection::{self, ProcessRowView};
 use crate::pages::processes::{ProcessRowLink, ProcessTableArtifact, input};
@@ -287,13 +288,28 @@ pub(crate) fn group_scene(
     let hidden = group.total.saturating_sub(group.members.len());
     let header = key_value_label(group.group.label(), &group.total.to_string());
     let overflow = overflow_action_scene(group.group, hidden, palette);
+    let row_width = if group.row_width.content_width_rem > 0.0 {
+        group.row_width
+    } else {
+        let metrics = super::CardFlowMetrics::from_palette(palette);
+        let spec = metrics.width_spec();
+        let columns = card_row_columns(spec.content_width_cap, spec);
+        metrics.width_rem(spec.row_width_bounded(columns, spec.content_width_cap))
+    };
     let cards: Vec<Box<dyn Scene>> = group
         .members
         .iter()
         .filter_map(|index| {
-            rows.iter()
-                .find(|row| row.index == *index)
-                .map(|row| atomic_card_scene(row, hidden_columns, palette, query, card_height_rem))
+            rows.iter().find(|row| row.index == *index).map(|row| {
+                atomic_card_scene(
+                    row,
+                    hidden_columns,
+                    palette,
+                    query,
+                    card_height_rem,
+                    row_width,
+                )
+            })
         })
         .collect();
     Box::new(bsn! {
@@ -308,11 +324,13 @@ pub(crate) fn group_scene(
         ProcessTableArtifact
         Children [
             Node {
-                width: percent(100),
+                width: rem(row_width.content_width_rem),
+                max_width: percent(100),
                 height: rem(palette.control_height_rem),
                 align_items: AlignItems::Center,
-                column_gap: Val::Px(space_8()),
-                flex_shrink: 0.0,
+                column_gap: rem(row_width.gap_rem),
+                flex_shrink: 1.0,
+                min_width: px(0.0),
                 overflow: Overflow::clip_x(),
             }
             Children [
@@ -320,11 +338,14 @@ pub(crate) fn group_scene(
                 @{ overflow }
             ] --
             Node {
-                width: percent(100),
+                width: rem(row_width.content_width_rem),
+                max_width: percent(100),
                 height: Val::Rem(card_height_rem),
                 flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(space_8()),
-                flex_shrink: 0.0,
+                column_gap: rem(row_width.gap_rem),
+                flex_shrink: 1.0,
+                min_width: px(0.0),
+                justify_content: JustifyContent::Start,
             }
             Children [ { cards } ]
         ]
@@ -422,6 +443,7 @@ pub(crate) fn atomic_card_scene(
     palette: &UiPalette,
     query: &str,
     card_height_rem: f32,
+    row_width: CardRowWidthMeasurements,
 ) -> Box<dyn Scene> {
     let columns = crate::widgets::table::visible_columns(hidden_columns);
     let status = projection::cell_by_id(row, &columns, "Status");
@@ -440,9 +462,11 @@ pub(crate) fn atomic_card_scene(
     let overlay = state_overlay_scene();
     Box::new(bsn! {
         Node {
-            flex_grow: 1.0,
-            flex_basis: px(0.0),
-            min_width: px(0.0),
+            width: rem(row_width.card_width_rem),
+            max_width: rem(row_width.card_width_rem),
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
+            flex_basis: rem(row_width.card_width_rem),
             height: Val::Rem(card_height_rem),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),

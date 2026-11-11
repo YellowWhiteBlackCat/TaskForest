@@ -411,7 +411,13 @@ fn rebuild(
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let rail = crate::widgets::scrollbar::scrollbar_rail_scene(palette);
-    let lane = crate::widgets::scrollbar::rail_lane(UiRect::all(Val::Px(space_8())));
+    let bottom_inset = Val::Px(space_8() + palette.control_height_px());
+    let lane = crate::widgets::scrollbar::rail_lane(UiRect::new(
+        Val::Px(space_8()),
+        Val::Px(space_8()),
+        Val::Px(space_8()),
+        bottom_inset,
+    ));
     let GlassPanelMaterial {
         fill,
         edge,

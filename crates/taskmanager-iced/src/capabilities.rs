@@ -45,13 +45,11 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
                          hover-only because their triggers are not focusable",
             },
         ),
-        (
-            Toast,
-            Divergent {
-                reason: "transient feedback renders through the shared footer activity line, \
-                         not floating toasts",
-            },
-        ),
+        // The shared shell feedback notice owns one transient fact. Iced now
+        // paints it as a non-modal floating Card-glass toast with an optional
+        // keyboard-reachable dismiss action; the footer keeps the same text as
+        // a durable activity line, not as the toast's semantic replacement.
+        (Toast, Ported),
         // `components::plain_text_input` owns the single-line native
         // TextInput binding; `components::multi_line_text_input` owns the
         // native TextEditor binding. Both read `control_glass` and resolve

@@ -37,7 +37,7 @@ use taskforest_core::core::source::SourceStatus;
 use taskmanager_application::i18n;
 use taskmanager_application::i18n::control_error_detail;
 use taskmanager_application::{RefreshRequest, merge_source_lines};
-use taskmanager_theme::{Color, Palette, Theme, tokens};
+use taskmanager_theme::{Color, Length, Palette, Theme, tokens};
 use taskmanager_ui::icons_binding::icon;
 use taskmanager_ui::inputs::text_input::{TextInput, TextInputState};
 use taskmanager_ui::primitives::button::{Button, ButtonState, ButtonVariant};
@@ -52,7 +52,7 @@ use taskmanager_ui::theme_binding::rem_length;
 use taskmanager_ui_contract::IconId;
 
 mod budget;
-pub use budget::ListPageBudget;
+pub use budget::{ListPageBudget, ListPageRhythm};
 
 /// Debug-selector identity of the shared list-page inner shell.
 ///
@@ -83,12 +83,7 @@ impl ListPageScaffold {
             theme: *theme,
             header: header.into_any_element(),
             body: body.into_any_element(),
-            budget: ListPageBudget {
-                rows: 2,
-                gap: tokens::SPACE_8.0,
-                table_height: 0.0,
-                admit_optional_group: false,
-            },
+            budget: ListPageBudget::mandatory_only(),
         }
     }
 
@@ -100,30 +95,30 @@ impl ListPageScaffold {
         self
     }
 
+    /// The one inset glass surface around a page header. Production `render`
+    /// and headless tests spend this same role/rhythm without exposing a
+    /// second material or elevation path.
+    #[must_use]
+    pub fn header_surface(&self, header: AnyElement) -> Div {
+        header_surface(header, self.theme, self.budget.rhythm, self.budget.rows)
+    }
+
     /// Render the common full-size column with a bounded, shrinkable body.
     #[must_use]
     pub fn render(self) -> Div {
-        let gap = rem_length(tokens::SPACE_8);
-        let header =
-            CardSurface::unpadded_for_role(self.theme.palette(), GlassSurfaceRole::PageHeader)
-                .radius(tokens::control_radius(&self.theme))
-                .render()
-                .debug_selector(|| LIST_PAGE_HEADER_SURFACE_SELECTOR.to_string())
-                .w_full()
-                .min_w(px(0.0))
-                .flex()
-                .flex_col()
-                .gap(gap)
-                .p(rem_length(tokens::SPACE_6))
-                .child(self.header);
+        let ListPageScaffold {
+            theme,
+            header,
+            body,
+            budget,
+        } = self;
+        let gap = rem_length(Length(budget.rhythm.gap));
+        let header = header_surface(header, theme, budget.rhythm, budget.rows);
         div()
             .flex()
             .flex_col()
             .gap(gap)
             .size_full()
-            // The list-page family's ONE inner shell (ADR-042): header band
-            // + bounded body, shared by every inventory page so their
-            // chrome/list separation adjusts in one place.
             .debug_selector(|| LIST_PAGE_SCAFFOLD_SELECTOR.to_string())
             .child(header)
             .child(
@@ -133,9 +128,25 @@ impl ListPageScaffold {
                     .flex_1()
                     .min_w(px(0.0))
                     .min_h(px(0.0))
-                    .child(self.body),
+                    .child(body),
             )
     }
+}
+
+fn header_surface(header: AnyElement, theme: Theme, rhythm: ListPageRhythm, rows: usize) -> Div {
+    let gap = rem_length(Length(rhythm.gap));
+    let inset = rem_length(Length(rhythm.inset));
+    let mut surface = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::PageHeader)
+        .radius(tokens::control_radius(&theme))
+        .render()
+        .debug_selector(|| LIST_PAGE_HEADER_SURFACE_SELECTOR.to_string())
+        .w_full()
+        .min_w(px(0.0))
+        .p(inset);
+    if rows > 1 {
+        surface = surface.flex().flex_col().gap(gap);
+    }
+    surface.child(header)
 }
 
 // ── ActionFeedback (transient action-outcome payload) ─────────────────────────

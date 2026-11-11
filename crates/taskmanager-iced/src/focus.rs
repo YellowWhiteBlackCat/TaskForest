@@ -34,6 +34,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DiagnosticConfirm => "iced-diagnostic-confirm".to_owned(),
         FocusTarget::DiagnosticRetry => "iced-diagnostic-retry".to_owned(),
         FocusTarget::ModalClose => MODAL_CLOSE_ID.to_owned(),
+        FocusTarget::ToastDismiss => "iced-toast-dismiss".to_owned(),
         FocusTarget::TableRow { page, index } => {
             format!("iced-table-row-{}-{index}", page_key(page))
         }

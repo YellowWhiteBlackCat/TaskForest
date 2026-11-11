@@ -15,8 +15,9 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::math::Vec2;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
-use bevy::ui::prelude::{ComputedNode, Display, Node};
+use bevy::ui::prelude::{ComputedNode, Display, Node, Val};
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::ScrollArea;
 use taskforest_core::core::metrics::ScalarObservation;
 use taskforest_core::core::process::{ProcessItem, ProcessScalarObservations};
 use taskmanager_application::i18n::t;
@@ -32,12 +33,12 @@ use crate::pages::processes::card_lane::{
     ProcessCardGroup, ProcessFocusDashboard, ProcessViewMode, ProcessViewModeButton,
     card_flow_budget, card_flow_plan, focus_projection,
 };
-use crate::pages::processes::details::detail_row_slots;
+use crate::pages::processes::details::{ProcessDetailsRoot, detail_row_slots};
 use crate::pages::processes::{
     ProcessCountLine, ProcessDetailsContainer, ProcessPageRoot, ProcessRowLink, ProcessRowsRoot,
     ProcessTableArtifact, ProcessTableContainer, content,
 };
-use crate::palette::{UiPalette, ui_palette};
+use crate::palette::{UiPalette, space_8, ui_palette};
 use crate::window::WindowPalette;
 use taskmanager_ui_contract::presentation::vocabulary::COMPACT_CONTENT_WIDTH;
 
@@ -280,6 +281,69 @@ fn the_measured_cards_stay_inside_the_bounded_flow_viewport() {
 }
 
 #[test]
+fn a_wide_measured_card_never_exceeds_the_shared_cap_or_the_right_edge() {
+    use bevy::ui::UiGlobalTransform;
+
+    let items: Vec<ProcessItem> = (0..24).map(|pid| process(pid, "p", "Running")).collect();
+    let mut app = measured_process_app(1600, 900, items);
+    for _ in 0..6 {
+        app.update();
+    }
+    let palette = palette();
+    let metrics = CardFlowMetrics::from_palette(&palette);
+    let spec = metrics.width_spec();
+    let row_budget = card_flow_budget(1600.0, 900.0, &palette).row_width;
+    let world = app.world_mut();
+    let mut flows =
+        world.query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessCardFlow>>();
+    let (flow_size, flow_center, flow_width) = flows
+        .iter(world)
+        .find(|(node, _)| node.size().x > 0.0 && node.size().y > 0.0)
+        .map(|(node, transform)| (node.size(), transform.translation, node.size().x))
+        .unwrap_or_else(|| panic!("one card flow is measured"));
+    let flow_left = flow_center.x - flow_size.x / 2.0;
+    let flow_right = flow_center.x + flow_size.x / 2.0;
+    let flow_bottom = flow_center.y + flow_size.y / 2.0;
+    let cards: Vec<_> = world
+        .query_filtered::<(&ComputedNode, &UiGlobalTransform), With<ProcessAtomicCard>>()
+        .iter(world)
+        .map(|(node, transform)| (*node, *transform))
+        .collect();
+    assert!(!cards.is_empty(), "the capped wide grid paints whole cards");
+    let mut content_right = f32::MIN;
+    for (node, transform) in cards {
+        let half = node.size() / 2.0;
+        let left = transform.translation.x - half.x;
+        let right = transform.translation.x + half.x;
+        let bottom = transform.translation.y + half.y;
+        assert!(
+            left >= flow_left - 0.5 && right <= flow_right + 0.5,
+            "right edge stays bounded"
+        );
+        assert!(bottom <= flow_bottom + 0.5, "bottom edge stays bounded");
+        assert!(
+            node.size().x <= metrics.card_max_width_px + 0.5,
+            "a card cannot stretch past the shared measured cap"
+        );
+        content_right = content_right.max(right);
+    }
+    if row_budget.residual_width > 0.0 {
+        assert!(
+            flow_right - content_right > 0.0,
+            "the shared verdict's residual lane space stays outside the bounded card group"
+        );
+    }
+    assert!(
+        content_right - flow_left
+            <= row_budget
+                .content_width
+                .min(spec.content_width_cap.min(flow_width))
+                + 0.5,
+        "the whole lower content group stays inside the shared content cap"
+    );
+}
+
+#[test]
 fn a_slot_too_short_for_one_group_degrades_to_the_dense_table() {
     // The shared contract answers ZERO groups when not even one complete
     // group fits; the lane then steps aside instead of squeezing a card.
@@ -411,6 +475,7 @@ fn the_card_plan_admits_whole_groups_only() {
         groups: 1,
         group_height_px: 200.0,
         columns: 2,
+        metrics: Some(CardFlowMetrics::from_palette(&palette())),
         ..Default::default()
     };
     let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
@@ -455,6 +520,7 @@ fn the_card_plan_folds_one_bucket_across_the_whole_page() {
         groups: 2,
         group_height_px: 200.0,
         columns: 4,
+        metrics: Some(CardFlowMetrics::from_palette(&palette())),
         ..Default::default()
     };
     let plan = card_flow_plan(&shell, budget, CardFlowWindow::default());
@@ -858,6 +924,24 @@ fn the_details_rail_is_admitted_as_a_whole_group_by_the_measured_page_slot() {
         display,
         Some(Display::Flex),
         "the shared band admits the details rail beside the card lane"
+    );
+}
+
+#[test]
+fn the_details_scroll_area_reserves_a_control_height_bottom_safety_band() {
+    let mut app = card_lane_app(shell_with(Vec::new()), palette());
+    app.update();
+
+    let palette = palette();
+    let node = app
+        .world_mut()
+        .query_filtered::<&Node, (With<ProcessDetailsRoot>, With<ScrollArea>)>()
+        .single(app.world())
+        .expect("the details scroll area is mounted");
+    assert_eq!(
+        node.padding.bottom,
+        Val::Px(space_8() + palette.control_height_px()),
+        "the scroll content keeps a full control-height safety band after its final row"
     );
 }
 

@@ -20,6 +20,8 @@ use taskmanager_shell::ProcessStatusFilter;
 pub enum FocusTarget {
     /// The current modal close action.
     ModalClose,
+    /// The non-modal feedback toast's keyboard-reachable dismiss action.
+    ToastDismiss,
     DiagnosticConfirm,
     DiagnosticRetry,
     /// A row in one of the renderer-local typed tables.
@@ -330,8 +332,9 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 204] = [
+    pub const ALL: [Self; 205] = [
         Self::ModalClose,
+        Self::ToastDismiss,
         Self::DiagnosticConfirm,
         Self::DiagnosticRetry,
         Self::PageTab(AppPage::Performance),

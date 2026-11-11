@@ -611,6 +611,9 @@ fi
 if maybe iced-scroll-owner; then
     run_stage iced-scroll-owner quick run_py scripts/quality/test_iced_scroll_owner.py
 fi
+if maybe command-launch-owner; then
+    run_stage command-launch-owner quick run_py scripts/quality/test_command_launch_owner.py
+fi
 if maybe failure-severity-owner; then
     run_stage failure-severity-owner quick run_py scripts/quality/test_failure_severity_owner.py
 fi

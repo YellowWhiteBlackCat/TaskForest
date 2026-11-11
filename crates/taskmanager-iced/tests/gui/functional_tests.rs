@@ -52,7 +52,7 @@ fn alert_rule_intents_are_split_by_user_operation() {
 }
 
 #[test]
-fn supplied_gpu_and_feedback_mappings_are_accepted_differences() {
+fn supplied_gpu_mapping_is_an_accepted_difference_and_feedback_is_a_local_toast() {
     let declaration = functional_declaration();
     let gpu = declaration
         .entries
@@ -71,13 +71,12 @@ fn supplied_gpu_and_feedback_mappings_are_accepted_differences() {
         .iter()
         .find(|entry| entry.intent == ProductIntent::TransientFeedback)
         .expect("feedback intent is registered");
-    assert!(matches!(
+    assert_eq!(
         feedback.decision,
-        SurfaceDecision::AcceptedDifference {
-            route: "footer.activity-line",
-            ..
+        SurfaceDecision::Local {
+            route: "root.toast",
         }
-    ));
+    );
 }
 
 #[test]

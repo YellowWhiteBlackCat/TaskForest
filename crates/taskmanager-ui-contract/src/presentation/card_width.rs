@@ -1,27 +1,71 @@
-//! The shared card-row width admission: whole columns only, one arithmetic.
+//! The shared card-row width admission: whole groups inside one capped lane.
 //!
 //! [`super::card_flow`] answers how many COMPLETE group BLOCKS fit in a
 //! measured slot and how tall one card may grow. It does not answer how many
 //! cards sit side by side in one group. That width verdict is the same
 //! elastic-layout law seen from the other axis: a card is admitted only when
-//! its WHOLE lower content keeps its readable floor, and the group header's
-//! overflow action is a separate whole group that must fit beside the bucket
-//! label before any card column is spent.
+//! its WHOLE lower content keeps its readable floor, the measured content
+//! width never exceeds the shape's own card/content cap, and the group
+//! header's overflow action is a separate whole group that must fit beside
+//! the bucket label before any card column is spent.
 //!
-//! The shapes measure their own slot, their own card width floor, their own
-//! gap and (when a bucket is truncated) their own header overflow width. This
-//! module owns the ARITHMETIC and the typed verdict, so no renderer carries a
-//! second "how many columns fit" ladder or silently clips the last column.
+//! The shapes measure their own slot, their own card width floor and ceiling,
+//! their own gap and (when a bucket is truncated) their own header overflow
+//! width. This module owns the ARITHMETIC and the typed verdict, so no
+//! renderer carries a second "how many columns fit" ladder, a second maximum
+//! content width, or silently clips the last column.
+
+/// The measured lane after whole columns and the cap have been admitted.
+///
+/// Reason row: a very wide slot must not inflate a capped number of cards
+/// into empty banners. The lower content is therefore one bounded whole
+/// group; its residual slot stays OUTSIDE that group as lane-owned space.
+/// The same bounded width is the only space the card row and, when a bucket
+/// is truncated, its overflow header may spend.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CardRowWidthBudget {
+    /// Complete card columns admitted by the measured slot and the caps.
+    pub columns: usize,
+    /// Bounded width the whole card row paints, in the shape's logical unit.
+    pub content_width: f32,
+    /// Largest width one card may paint inside the bounded content group.
+    pub card_width: f32,
+    /// Lane-owned residual space outside the bounded content group.
+    pub residual_width: f32,
+}
+
+impl CardRowWidthBudget {
+    /// A zero-width budget for a lane that admits no whole card.
+    #[must_use]
+    pub const fn degraded() -> Self {
+        Self {
+            columns: 0,
+            content_width: 0.0,
+            card_width: 0.0,
+            residual_width: 0.0,
+        }
+    }
+
+    /// Whether the lane has admitted at least one whole card column.
+    #[must_use]
+    pub const fn is_admitted(&self) -> bool {
+        self.columns > 0
+    }
+}
 
 /// The measured width facts one card row hands to the shared admission.
 ///
-/// All four values are in the shape's own logical length unit. The contract
-/// never reads a theme token: a shape lifts its own measured numbers at its
-/// `presentation_binding.rs` seam (ADR-063 keeps the numbers with the theme).
+/// All length values are in the shape's own logical length unit. The
+/// contract never reads a theme token: a shape lifts its own measured
+/// numbers at its `presentation_binding.rs` seam (ADR-063 keeps the
+/// numbers with the theme). `card_max_width` is a measured CONTENT cap,
+/// not a second theme ladder and not a window breakpoint.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CardRowWidthSpec {
     /// The narrowest a whole card may be without clipping its fact line.
     pub card_min_width: f32,
+    /// The widest one card may become before it reads as an empty banner.
+    pub card_max_width: f32,
     /// The gap between two cards, also charged between header facts.
     pub gap: f32,
     /// The narrowest the group header's bucket label may be.
@@ -30,29 +74,65 @@ pub struct CardRowWidthSpec {
     pub overflow_action_min_width: f32,
     /// Largest column count the product paints in one card row.
     pub max_columns: usize,
+    /// Largest width the whole lower card content may paint in one row.
+    pub content_width_cap: f32,
 }
 
 impl CardRowWidthSpec {
-    /// Build a spec from a card floor, a gap, the two header floors and a cap.
+    /// Build a spec from measured floors, ceilings, gaps and product caps.
     ///
-    /// A degenerate floor or gap collapses the whole row to the typed
-    /// degraded verdict below, so no arithmetic divides by zero or admits a
-    /// negative column.
+    /// A degenerate floor, ceiling or gap collapses the whole row to the
+    /// typed degraded verdict below, so no arithmetic divides by zero or
+    /// admits a negative column.
     #[must_use]
     pub const fn new(
         card_min_width: f32,
+        card_max_width: f32,
+        gap: f32,
+        header_label_min_width: f32,
+        overflow_action_min_width: f32,
+        max_columns: usize,
+        content_width_cap: f32,
+    ) -> Self {
+        Self {
+            card_min_width,
+            card_max_width,
+            gap,
+            header_label_min_width,
+            overflow_action_min_width,
+            max_columns,
+            content_width_cap,
+        }
+    }
+
+    /// Derive the whole-row content cap from the shape's measured card cap.
+    ///
+    /// Reason row: the widest useful lower content is `max_columns` cards,
+    /// each at the measured card ceiling, plus their gaps. A shape supplies
+    /// measured lengths and product limits; the fold, not the renderer,
+    /// owns the cap arithmetic. Slot space beyond this width stays with the
+    /// lane and cannot enlarge a card into an empty banner.
+    #[must_use]
+    pub const fn from_measured_card_cap(
+        card_min_width: f32,
+        card_max_width: f32,
         gap: f32,
         header_label_min_width: f32,
         overflow_action_min_width: f32,
         max_columns: usize,
     ) -> Self {
-        Self {
+        let columns = if max_columns > 0 { max_columns } else { 1 };
+        let content_width_cap =
+            card_max_width * columns as f32 + gap * (columns.saturating_sub(1)) as f32;
+        Self::new(
             card_min_width,
+            card_max_width,
             gap,
             header_label_min_width,
             overflow_action_min_width,
             max_columns,
-        }
+            content_width_cap,
+        )
     }
 
     /// Whether every measured fact is finite and strictly positive.
@@ -60,6 +140,8 @@ impl CardRowWidthSpec {
     pub const fn is_valid(&self) -> bool {
         self.card_min_width.is_finite()
             && self.card_min_width > 0.0
+            && self.card_max_width.is_finite()
+            && self.card_max_width >= self.card_min_width
             && self.gap.is_finite()
             && self.gap > 0.0
             && self.header_label_min_width.is_finite()
@@ -67,6 +149,10 @@ impl CardRowWidthSpec {
             && self.overflow_action_min_width.is_finite()
             && self.overflow_action_min_width > 0.0
             && self.max_columns > 0
+            && self.content_width_cap.is_finite()
+            && self.content_width_cap >= self.card_min_width
+            && self.content_width_cap >= self.header_width(true)
+            && self.content_width_cap >= self.row_width(self.max_columns)
     }
 
     /// Width of a whole `columns`-card row, charging every gap between cards.
@@ -76,6 +162,44 @@ impl CardRowWidthSpec {
             return 0.0;
         }
         self.card_min_width * columns as f32 + self.gap * (columns - 1) as f32
+    }
+
+    /// The largest whole row width `columns` complete cards may spend.
+    ///
+    /// Reason row: each card keeps its measured floor, never exceeds its
+    /// measured card ceiling, and the whole row never exceeds the measured
+    /// content cap. Gaps between cards are charged once, never stretched.
+    #[must_use]
+    pub fn row_width_cap(&self, columns: usize) -> f32 {
+        if columns == 0 {
+            return 0.0;
+        }
+        let card_cap = self.card_max_width * columns as f32;
+        let gaps = self.gap * (columns - 1) as f32;
+        (card_cap + gaps).min(self.content_width_cap)
+    }
+
+    /// The row width a measured slot actually spends for `columns` cards.
+    ///
+    /// The content cap and the slot both bound the row; neither the card
+    /// floor nor the card ceiling is reinterpreted by this clamp.
+    #[must_use]
+    pub fn row_width_bounded(&self, columns: usize, slot_width: f32) -> f32 {
+        let slot = if slot_width.is_finite() && slot_width > 0.0 {
+            slot_width
+        } else {
+            0.0
+        };
+        self.row_width_cap(columns).min(slot)
+    }
+
+    /// Width one card paints when `columns` cards share `content_width`.
+    #[must_use]
+    pub const fn card_width(&self, columns: usize, content_width: f32) -> f32 {
+        if columns == 0 {
+            return 0.0;
+        }
+        (content_width - self.gap * (columns - 1) as f32) / columns as f32
     }
 
     /// Width the group header needs with and without its overflow action.
@@ -90,12 +214,21 @@ impl CardRowWidthSpec {
 }
 
 /// The typed width verdict for ONE admitted group row.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CardRowWidthAdmission {
-    /// Every requested whole card column fits; paint the full row.
-    Full { columns: usize },
+    /// Every requested whole card column fits; paint the bounded full row.
+    Full {
+        columns: usize,
+        content_width: f32,
+        card_width: f32,
+        residual_width: f32,
+    },
     /// Only ONE card keeps its whole lower content in this slot.
-    SingleColumn,
+    SingleColumn {
+        content_width: f32,
+        card_width: f32,
+        residual_width: f32,
+    },
     /// Even one card, or the header's whole fact group, cannot keep its floor.
     /// The caller degrades the WHOLE lane instead of clipping a column.
     Degrade,
@@ -106,8 +239,8 @@ impl CardRowWidthAdmission {
     #[must_use]
     pub const fn columns(&self) -> usize {
         match self {
-            Self::Full { columns } => *columns,
-            Self::SingleColumn => 1,
+            Self::Full { columns, .. } => *columns,
+            Self::SingleColumn { .. } => 1,
             Self::Degrade => 0,
         }
     }
@@ -117,15 +250,44 @@ impl CardRowWidthAdmission {
     pub const fn is_admitted(&self) -> bool {
         !matches!(self, Self::Degrade)
     }
+
+    /// The bounded lane a renderer may paint. A degraded lane owns no width.
+    #[must_use]
+    pub const fn budget(&self) -> CardRowWidthBudget {
+        match self {
+            Self::Full {
+                columns,
+                content_width,
+                card_width,
+                residual_width,
+            } => CardRowWidthBudget {
+                columns: *columns,
+                content_width: *content_width,
+                card_width: *card_width,
+                residual_width: *residual_width,
+            },
+            Self::SingleColumn {
+                content_width,
+                card_width,
+                residual_width,
+            } => CardRowWidthBudget {
+                columns: 1,
+                content_width: *content_width,
+                card_width: *card_width,
+                residual_width: *residual_width,
+            },
+            Self::Degrade => CardRowWidthBudget::degraded(),
+        }
+    }
 }
 
 /// How many whole card columns a measured slot admits, and how many columns
 /// the shape may request in the first place.
 ///
-/// `requested_columns` is the shape's own measured width ceiling (for example
-/// the slot ÷ minimum card width); this fold only clamps it into the product
-/// cap. The admission then spends the smaller of that and the width the slot
-/// can actually hold, whole column at a time.
+/// `requested_columns` is the shape's own measured width ceiling; this fold
+/// clamps it into the product column cap and the measured content cap. The
+/// admission then spends the smaller of that and the width the slot can
+/// actually hold, whole column at a time.
 #[must_use]
 pub fn admit_card_row_width(
     slot_width: f32,
@@ -136,41 +298,83 @@ pub fn admit_card_row_width(
     if !slot_width.is_finite() || slot_width <= 0.0 || !spec.is_valid() {
         return CardRowWidthAdmission::Degrade;
     }
+    let spendable = slot_width.min(spec.content_width_cap);
     // The header is a separate whole group ABOVE the card row. When the
     // bucket is truncated, its label and overflow action must fit together;
-    // a slot that clips either fact cannot spend a card column at all.
-    if spec.header_width(has_overflow) > slot_width {
+    // a bounded content group that clips either fact cannot spend a card
+    // column at all.
+    let header_width = spec.header_width(has_overflow);
+    if header_width > spendable {
         return CardRowWidthAdmission::Degrade;
     }
-    if spec.row_width(1) > slot_width {
+    if spec.row_width(1) > spendable {
         return CardRowWidthAdmission::Degrade;
     }
     let cap = spec.max_columns.max(1);
     let requested = requested_columns.clamp(1, cap);
     let mut columns = 1usize;
-    while columns < requested && spec.row_width(columns + 1) <= slot_width {
+    while columns < requested && spec.row_width(columns + 1) <= spendable {
+        let bounded = spec.row_width_bounded(columns + 1, spendable);
+        if bounded < spec.row_width(columns + 1) || header_width > bounded {
+            break;
+        }
         columns += 1;
     }
+    let content_width = spec.row_width_bounded(columns, spendable);
+    if content_width < spec.row_width(columns) || header_width > content_width {
+        return CardRowWidthAdmission::Degrade;
+    }
+    let card_width = spec.card_width(columns, content_width);
+    if card_width < spec.card_min_width || card_width > spec.card_max_width {
+        return CardRowWidthAdmission::Degrade;
+    }
+    let residual_width = (slot_width - content_width).max(0.0);
     if columns == 1 {
-        CardRowWidthAdmission::SingleColumn
+        CardRowWidthAdmission::SingleColumn {
+            content_width,
+            card_width,
+            residual_width,
+        }
     } else {
-        CardRowWidthAdmission::Full { columns }
+        CardRowWidthAdmission::Full {
+            columns,
+            content_width,
+            card_width,
+            residual_width,
+        }
     }
 }
 
-/// The largest whole column count a measured slot can request before gaps.
+/// The largest whole column count a measured slot and the content cap admit.
 ///
 /// This is pure geometry over the same spec, so the shape's own column
-/// request and the admission verdict can never disagree about the card floor.
+/// request and the admission verdict can never disagree about the card
+/// floor or the measured maximum content width.
 #[must_use]
 pub fn card_row_columns(slot_width: f32, spec: CardRowWidthSpec) -> usize {
     if !slot_width.is_finite() || slot_width <= 0.0 || !spec.is_valid() {
         return 1;
     }
-    let numerator = slot_width + spec.gap;
+    let spendable = slot_width.min(spec.content_width_cap);
+    let numerator = spendable + spec.gap;
     let denominator = spec.card_min_width + spec.gap;
     let columns = (numerator / denominator).floor() as usize;
     columns.clamp(1, spec.max_columns.max(1))
+}
+
+/// Admit one bounded card row and return its paint-ready width budget.
+///
+/// The header's whole overflow group is charged INSIDE the bounded content
+/// width; it can never be paid for by the residual lane space. A truncated
+/// bucket therefore cannot bypass the cap by widening its header.
+#[must_use]
+pub fn admit_card_row_width_budget(
+    slot_width: f32,
+    requested_columns: usize,
+    spec: CardRowWidthSpec,
+    has_overflow: bool,
+) -> CardRowWidthBudget {
+    admit_card_row_width(slot_width, requested_columns, spec, has_overflow).budget()
 }
 
 #[cfg(test)]

@@ -45,8 +45,9 @@
 //!   - *Single-row compact ribbons*: View presets and toolbar actions collapse into a
 //!     32px horizontal glide rail, keeping at least 7-9 rows of table data visible in
 //!     compact 720x480 viewports.
-//!   - *Bottom activity line*: Transient feedback routes to the window footer line rather
-//!     than floating toast overlays.
+//!   - *Bottom activity line*: the footer keeps a durable parallel readout of shell
+//!     feedback, while the point-of-action notice paints as a non-modal Card-glass
+//!     toast bound to the shared `FeedbackPresentation`.
 //! - **Bevy UI Quality Baselines**:
 //!   - *Pure data-driven ECS scene graph*: 100% `bsn!` declarative scene tree where all
 //!     surfaces are reactive entities governed by components and observer events.

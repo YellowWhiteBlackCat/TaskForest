@@ -6,14 +6,20 @@
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct WindowTimeCache {
     service_log_now_micros: u64,
+    now_millis: u64,
 }
 
 impl WindowTimeCache {
     pub(super) fn observe_tick_millis(&mut self, now_ms: u64) {
         self.service_log_now_micros = now_ms.saturating_mul(1_000);
+        self.now_millis = now_ms;
     }
 
     pub(super) const fn service_log_now_micros(self) -> u64 {
         self.service_log_now_micros
+    }
+
+    pub(super) const fn now_millis(self) -> u64 {
+        self.now_millis
     }
 }

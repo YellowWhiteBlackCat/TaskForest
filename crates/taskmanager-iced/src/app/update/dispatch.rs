@@ -63,6 +63,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::PointerPressed
         | Message::TextSelectionClaimed(_)
         | Message::SearchBackspace
+        | Message::DismissToast
         | Message::Focus(_)
         | Message::FocusedTargetUnmounted(_)) => MessageDomain::Input(message),
 

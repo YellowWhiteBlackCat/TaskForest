@@ -20,6 +20,10 @@ impl IcedApp {
     ) -> UpdateDispatch {
         match message {
             Message::Tick => UpdateDispatch::effect(self.handle_tick_message()),
+            Message::DismissToast => {
+                self.toast.dismiss(&self.shell);
+                UpdateDispatch::none()
+            }
             Message::ModifiersChanged(modifiers) => {
                 self.input.modifiers = modifiers;
                 self.shell.set_control_held(modifiers.control());

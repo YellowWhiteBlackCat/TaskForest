@@ -764,3 +764,6 @@ mod phase6_gaps;
 
 #[path = "tests/projection_cache.rs"]
 mod projection_cache;
+
+#[path = "toast_tests.rs"]
+mod toast_tests;

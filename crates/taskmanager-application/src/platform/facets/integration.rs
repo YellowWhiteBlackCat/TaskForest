@@ -46,6 +46,23 @@ pub struct CommandLaunchRequest {
     pub command: String,
 }
 
+impl CommandLaunchRequest {
+    /// Canonicalize one frontend command draft into the one launch payload.
+    ///
+    /// A multiline editor can publish CRLF or lone-CR line endings, while a
+    /// single-line input can publish leading/trailing whitespace. The request
+    /// owner folds both into one LF/trimmed command so every frontend submits
+    /// the same fact to the platform runtime.
+    #[must_use]
+    pub fn from_draft(draft: &str) -> Option<Self> {
+        let normalized = draft.replace("\r\n", "\n").replace('\r', "\n");
+        let command = normalized.trim();
+        (!command.is_empty()).then(|| Self {
+            command: command.to_owned(),
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResourceRevealRequest {
     pub target: FrozenProcessIdentity,

@@ -174,6 +174,12 @@ impl IcedApp {
         self.window_time.service_log_now_micros()
     }
 
+    /// Tick-injected wall time used by transient presentation lifetimes.
+    #[must_use]
+    pub(crate) const fn window_now_millis(&self) -> u64 {
+        self.window_time.now_millis()
+    }
+
     /// The Performance-page resource currently selected for detail rendering
     /// (the select-a-device model). Read by the view each frame.
     #[must_use]

@@ -29,6 +29,7 @@ pub(crate) mod inputs;
 pub(crate) mod popover;
 pub(crate) mod primitives;
 pub(crate) mod selectable_text;
+mod toast;
 mod tooltip;
 
 pub(crate) use controls::*;
@@ -36,6 +37,7 @@ pub(crate) use inputs::*;
 pub(crate) use popover::Popover;
 pub(crate) use primitives::*;
 pub(crate) use selectable_text::SelectableText;
+pub(crate) use toast::toast;
 pub(crate) use tooltip::{Tooltip, TooltipTrigger};
 
 pub(crate) type IcedElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;

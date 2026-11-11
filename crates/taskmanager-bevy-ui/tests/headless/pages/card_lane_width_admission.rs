@@ -1,14 +1,14 @@
 //! test-intent: behavior
 //!
-//! Elastic-layout proof for the Applications card lane's RIGHT edge. The
-//! shared height verdict admits whole group blocks, and the shared width verdict
-//! admits whole card columns: a group's lower content is admitted as a WHOLE,
-//! so a narrow viewport must degrade the whole card row to one column before
-//! any PID/CPU/memory fact line or the group's overflow action is clipped.
+//! Elastic-layout proof for the Applications card lane's RIGHT edge and
+//! bounded lower content. The shared height verdict admits whole group
+//! blocks; the shared width verdict admits whole card columns INSIDE a
+//! measured content cap. Residual lane space must stay outside the cards,
+//! and a truncated bucket's overflow header must not bypass that cap.
 
 use taskmanager_theme::{Theme, tokens::UiSize};
 use taskmanager_ui_contract::presentation::card_width::{
-    CardRowWidthAdmission, admit_card_row_width, card_row_columns,
+    CardRowWidthBudget, admit_card_row_width_budget, card_row_columns,
 };
 
 use crate::pages::processes::card_lane::{CardFlowMetrics, card_flow_budget};
@@ -18,86 +18,116 @@ fn metrics() -> CardFlowMetrics {
     CardFlowMetrics::from_palette(&ui_palette(&Theme::dark(), UiSize::Standard))
 }
 
-fn admit(
-    width: f32,
-    columns: usize,
-    metrics: &CardFlowMetrics,
-    has_overflow: bool,
-) -> CardRowWidthAdmission {
-    admit_card_row_width(width, columns, metrics.width_spec(), has_overflow)
+fn palette() -> crate::palette::UiPalette {
+    ui_palette(&Theme::dark(), UiSize::Standard)
+}
+
+fn budget(width: f32, columns: usize, overflow: bool) -> CardRowWidthBudget {
+    let spec = metrics().width_spec();
+    admit_card_row_width_budget(width, columns, spec, overflow)
 }
 
 #[test]
-fn a_wide_slot_admits_the_whole_measured_card_grid() {
+fn a_wide_slot_admits_a_capped_grid_and_leaves_the_residual_outside_the_cards() {
     let metrics = metrics();
-    let width = 1000.0;
-    let columns = card_row_columns(width, metrics.width_spec());
-    assert!(columns >= 2, "a wide lane admits a grid, not one banner");
-    assert_eq!(
-        admit(width, columns, &metrics, false),
-        CardRowWidthAdmission::Full { columns },
-        "the whole lower content group fits without a clipped column"
-    );
-}
-
-#[test]
-fn a_narrow_slot_degrades_the_whole_group_to_one_column() {
-    let metrics = metrics();
-    // The shared height verdict still admits groups; the width verdict is the
-    // one that must refuse to spend a second column on this slot.
-    let width = metrics.card_min_width_px + metrics.group_gap_px * 2.0;
-    let budget = card_flow_budget(width, 600.0, &ui_palette(&Theme::dark(), UiSize::Standard));
-    assert!(budget.groups >= 1, "the height verdict admits whole groups");
-    assert_eq!(
-        admit(width, 2, &metrics, false),
-        CardRowWidthAdmission::SingleColumn,
-        "a narrow right edge admits ONE whole card, never a clipped second"
-    );
-}
-
-#[test]
-fn an_overflow_header_reserves_its_own_whole_group_slot() {
-    let metrics = metrics();
-    // The header is a separate whole group: its label and overflow action
-    // are charged together before any card column is spent. A slot that
-    // clips either fact degrades the lane instead of painting a half header.
     let spec = metrics.width_spec();
-    let width = spec.header_width(true) - 1.0;
+    let width = 3_000.0;
+    let columns = card_row_columns(width, spec);
+    let admitted = budget(width, columns, false);
+    assert_eq!(columns, metrics.max_columns);
+    assert_eq!(admitted.columns, metrics.max_columns);
+    assert_eq!(admitted.content_width, spec.content_width_cap);
+    assert_eq!(admitted.card_width, metrics.card_max_width_px);
     assert_eq!(
-        admit(width, 2, &metrics, true),
-        CardRowWidthAdmission::Degrade,
+        admitted.residual_width,
+        width - spec.content_width_cap,
+        "extra slot width stays outside the bounded lower content group"
+    );
+    assert!(admitted.card_width >= metrics.card_min_width_px);
+    assert!(admitted.card_width <= metrics.card_max_width_px);
+}
+
+#[test]
+fn the_measured_budget_and_the_plan_bind_the_same_shared_cap() {
+    let metrics = metrics();
+    let spec = metrics.width_spec();
+    let width = 3_000.0;
+    let flow = card_flow_budget(width, 620.0, &palette());
+    assert_eq!(flow.columns, metrics.max_columns);
+    assert_eq!(flow.row_width.content_width, spec.content_width_cap);
+    assert_eq!(flow.row_width.card_width, metrics.card_max_width_px);
+    assert!(flow.row_width.residual_width > 0.0);
+    assert_eq!(
+        flow.row_width_measurements().content_width_rem * metrics.rem_px,
+        flow.row_width.content_width,
+        "Bevy converts the shared width verdict once at its palette seam"
+    );
+    assert_eq!(
+        flow.row_width_measurements().card_width_rem * metrics.rem_px,
+        flow.row_width.card_width,
+        "the rendered card width is the shared verdict, not a local ladder"
+    );
+}
+
+#[test]
+fn a_narrow_slot_degrades_the_whole_group_to_one_bounded_card() {
+    let metrics = metrics();
+    let width = metrics.card_min_width_px + metrics.group_gap_px * 2.0;
+    let flow = card_flow_budget(width, 600.0, &palette());
+    assert!(flow.groups >= 1, "the height verdict admits whole groups");
+    let admitted = budget(width, 2, false);
+    assert_eq!(admitted.columns, 1);
+    assert_eq!(admitted.content_width, width);
+    assert_eq!(admitted.card_width, width);
+    assert_eq!(admitted.residual_width, 0.0);
+    assert!(admitted.card_width >= metrics.card_min_width_px);
+    assert!(admitted.card_width <= metrics.card_max_width_px);
+}
+
+#[test]
+fn an_overflow_header_reserves_its_own_bounded_group_slot() {
+    let metrics = metrics();
+    let spec = metrics.width_spec();
+    let header = spec.header_width(true);
+    assert!(
+        header < metrics.card_min_width_px,
+        "the Bevy fixture's whole overflow header fits one card floor"
+    );
+    assert_eq!(
+        budget(metrics.card_min_width_px - 1.0, 2, true),
+        CardRowWidthBudget::degraded(),
         "the whole header fact group is charged before the card row"
     );
     assert_eq!(
-        admit(width, 2, &metrics, false),
-        CardRowWidthAdmission::Degrade,
-        "the measured header-overflow slot is also below one card's floor"
+        budget(metrics.card_min_width_px, 2, true).columns,
+        1,
+        "one whole card and its header fit at the card floor"
     );
+    let wide = budget(3_000.0, metrics.max_columns, true);
+    assert_eq!(wide.content_width, spec.content_width_cap);
     assert_eq!(
-        admit(spec.header_width(true), 2, &metrics, true),
-        CardRowWidthAdmission::Degrade,
-        "the measured header is narrower than one card, so the card floor still refuses it"
-    );
-    assert_eq!(
-        admit(spec.card_min_width, 2, &metrics, true),
-        CardRowWidthAdmission::SingleColumn,
-        "at the card floor one whole card and its header are admitted"
+        wide.residual_width,
+        3_000.0 - spec.content_width_cap,
+        "the overflow header cannot spend residual lane space"
     );
 }
 
 #[test]
 fn a_truncated_bucket_keeps_its_measured_wide_grid() {
-    let palette = ui_palette(&Theme::dark(), UiSize::Standard);
+    let palette = palette();
     let width = 1180.0 - space_8() * 2.0;
-    let budget = card_flow_budget(width, 620.0, &palette);
-    assert!(
-        budget.columns >= 3,
-        "a 1180px window admits a wide card grid"
-    );
+    let flow = card_flow_budget(width, 620.0, &palette);
+    assert!(flow.columns >= 3, "a 1180px window admits a wide card grid");
     assert_eq!(
-        budget.width_columns(budget.columns + 1, true),
-        budget.columns,
+        flow.width_columns(flow.columns + 1, true),
+        flow.columns,
         "a truncated bucket paints every admitted card column"
+    );
+    assert!(flow.row_width.content_width <= width);
+    assert_eq!(
+        flow.row_width.content_width + flow.row_width.residual_width,
+        width,
+        "the bounded content group and its residual partition the measured slot"
     );
 }
 
@@ -105,20 +135,14 @@ fn a_truncated_bucket_keeps_its_measured_wide_grid() {
 fn a_slot_too_narrow_for_one_card_degrades_the_whole_lane() {
     let metrics = metrics();
     assert_eq!(
-        admit(metrics.card_min_width_px - 1.0, 1, &metrics, false),
-        CardRowWidthAdmission::Degrade,
+        budget(metrics.card_min_width_px - 1.0, 1, false),
+        CardRowWidthBudget::degraded(),
         "a slot too narrow for one card's fact line degrades the whole lane"
     );
     assert_eq!(
-        admit(0.0, 3, &metrics, false),
-        CardRowWidthAdmission::Degrade,
+        budget(0.0, 3, false),
+        CardRowWidthBudget::degraded(),
         "an unmeasured slot never fabricates a card row"
     );
-    assert_eq!(
-        CardRowWidthAdmission::Degrade.columns(),
-        0,
-        "zero admitted columns is the typed whole-group degradation"
-    );
-    assert_eq!(CardRowWidthAdmission::SingleColumn.columns(), 1);
-    assert_eq!(CardRowWidthAdmission::Full { columns: 3 }.columns(), 3);
+    assert!(!CardRowWidthBudget::degraded().is_admitted());
 }

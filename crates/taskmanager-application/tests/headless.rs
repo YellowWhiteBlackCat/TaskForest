@@ -18,3 +18,6 @@ mod application_service_lifecycle_tests;
 
 #[path = "headless/application_request_session_tests.rs"]
 mod application_request_session_tests;
+
+#[path = "headless/application_command_launch_request_tests.rs"]
+mod application_command_launch_request_tests;

@@ -34,14 +34,6 @@ impl RunTaskState {
         self.command.text()
     }
 
-    /// Canonicalize native editor line endings into the shell's newline
-    /// separator before the existing typed `CommandLaunchRequest` leaves the
-    /// frontend. CRLF-only scripts stay real multi-line commands on Windows.
-    #[must_use]
-    pub fn normalized_command(&self) -> String {
-        self.command().replace("\r\n", "\n").replace('\r', "\n")
-    }
-
     pub fn perform(&mut self, action: text_editor::Action) {
         self.command.perform(action);
     }

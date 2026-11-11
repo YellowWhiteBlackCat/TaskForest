@@ -24,9 +24,9 @@ fn declaration_is_total_and_every_difference_is_registered() {
 
 /// The registered divergences are exactly the known architecture drivers —
 /// this pins the set so a new divergence cannot appear silently. Text
-/// selection keeps its registered keyboard-focus boundary, the footer
-/// feedback line remains the toast divergence, and Tooltip records the
-/// native Iced hover-only trigger and dismissal boundary.
+/// selection keeps its registered keyboard-focus boundary, and Tooltip records
+/// the native Iced hover-only trigger and dismissal boundary. Toast is now a
+/// non-modal floating card over the same shared shell feedback notice.
 #[test]
 fn the_registered_divergences_are_exactly_the_known_drivers() {
     let declaration = capability_declaration();
@@ -36,7 +36,7 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         .filter(|entry| matches!(entry.support, CapabilitySupport::Divergent { .. }))
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(divergent, ["tooltip", "toast", "text-selection"]);
+    assert_eq!(divergent, ["tooltip", "text-selection"]);
 }
 
 /// The prose registry is a human-readable projection of the declaration; this
@@ -133,9 +133,7 @@ fn every_capability_is_classified_correctly() {
                     "Scrollbar must be Native via iced scrollable"
                 );
             }
-            ComponentCapability::Tooltip
-            | ComponentCapability::Toast
-            | ComponentCapability::TextSelection => {
+            ComponentCapability::Tooltip | ComponentCapability::TextSelection => {
                 assert!(
                     matches!(entry.support, CapabilitySupport::Divergent { reason } if !reason.is_empty()),
                     "{capability:?} must be Divergent with a non-empty reason"

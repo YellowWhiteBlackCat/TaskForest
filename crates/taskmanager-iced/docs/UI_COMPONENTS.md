@@ -16,8 +16,11 @@ native selection and renderer caches; all shared types use their defining module
   button, icon button, pill, checkbox, section header, toolbar, label,
   single-line input, multi-line editor and the component-layer spinner entry.
   Every native button spends the adapter's typed style/state/focus/activation
-  seam; Run Task mounts the multi-line editor over the existing typed command
-  launch path and normalizes CRLF/CR to newline before submission;
+  seam; Run Task mounts the multi-line editor over the existing
+  `CommandLaunchRequest::from_draft` owner, which alone canonicalizes line
+  endings and trims the draft; `ui/components/toast.rs` paints the shared
+  shell feedback notice as a non-modal Card-glass toast whose visibility
+  follows the shell's `FeedbackLifecycle`.
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero);

@@ -88,6 +88,7 @@ mod snapshot_export;
 mod startup_menu;
 pub(crate) mod subscription;
 mod surface;
+pub(crate) mod toast;
 mod update;
 mod viewport_state;
 mod window_capture;
@@ -325,6 +326,8 @@ pub enum Message {
     ConfirmProcessBatch,
     /// The pending end-task confirmation was dismissed.
     DismissOverlay,
+    /// Dismiss the current non-modal feedback toast without changing focus.
+    DismissToast,
     /// Request Disconnect/Lock for the currently selected login session.
     RequestSessionControl(SessionControlAction),
     /// Request Disconnect/Lock for the exact login session frozen by its row menu.
@@ -585,6 +588,8 @@ pub struct IcedApp {
     configuration: configuration_state::IcedConfiguration,
     /// Run New Task state.
     pub(crate) run_task: crate::ui::overlays::run_task::RunTaskState,
+    /// Dismissed-feedback identity for the non-modal toast.
+    pub(crate) toast: toast::ToastState,
     /// The native window's DPI scale factor (ICED-054). Defaults to 1.0 until
     /// the first scale event arrives; it multiplies the app's render scale
     /// into the device-pixel product the chart aligns against.

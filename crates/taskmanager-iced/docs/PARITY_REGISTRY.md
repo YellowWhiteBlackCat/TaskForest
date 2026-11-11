@@ -3,12 +3,11 @@
 Component/surface capability parity is MACHINE-CHECKED (CORE-08):
 `src/capabilities.rs` declares every ui-contract registry capability with an
 explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
-`Unsupported`. The registered divergences are Tooltip, Toast and TextSelection:
+`Unsupported`. The registered divergences are Tooltip and TextSelection:
 
 - Tooltip: the focused Performance rail readout opens on keyboard focus and
   dismisses on pointer click/Escape; footer and row hint badges remain
   hover-only because their triggers are not focusable.
-- Toast: transient feedback renders through the shared footer activity line.
 - TextSelection: pointer/word/block selection, multi-line spans, Ctrl/Cmd-C,
   and Ctrl/Cmd-A on the readout that owns the window selection are ported; an
   unowned readout keeps Ctrl-A on the shared row-summary command because
@@ -16,6 +15,14 @@ explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
 
 Scrollbar is declared `Native` via iced's scrollable; every other capability is
 `Ported`. A silent omission or unexplained difference fails the crate gate.
+
+Toast is a real non-modal Card-glass card over the root view: the shared shell
+`FeedbackPresentation` owns the copy, tone and lifetime, while Iced owns only
+the floating presentation, the shared `content_button` dismiss stop and the
+local dismissal receipt. Only `FeedbackLifecycle::Timed` expires a toast;
+`UntilReplaced` and `PlatformBatches` remain visible until the shared shell
+replaces or clears the notice. The footer activity line remains a durable
+parallel readout of the same shell fact, not the toast's semantic replacement.
 
 The control family (button, icon button, pill, checkbox, label, section
 header, toolbar, spinner, single-line input, multi-line input, switch, slider,
@@ -40,7 +47,7 @@ glass button in both availability states, the Network signal-quality bar
 spends the shared progress primitive, and the Applications priority preset
 uses the shared select. These are
 PRESENTATION executions of the shared tokens, not new semantics: the
-three registered divergences above keep their reasons unchanged.
+two registered divergences above keep their reasons unchanged.
 
 The Applications action bar is a bounded horizontal scroll owner
 (`controls/strip.rs::bounded_toolbar`): complete action groups keep their
@@ -49,7 +56,7 @@ slot, and the lower process table never loses a vertical row to a wrapped
 toolbar. GPUI keeps the same vocabulary in an anchored overflow menu; this
 is a toolkit presentation execution, not a new capability.
 
-<!-- iced-capability-divergences: tooltip, toast, text-selection -->
+<!-- iced-capability-divergences: tooltip, text-selection -->
 
 Below is the complementary PAGE-LEVEL registry: Performance-page skin
 divergences hanging on a shared semantic with a real Iced-vs-GPUI architecture

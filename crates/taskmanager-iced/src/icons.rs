@@ -20,7 +20,21 @@ pub(crate) fn icon<'a>(
     id: IconId,
     size: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let tint = crate::theme_binding::color(theme_snapshot.palette().fg);
+    icon_tinted(
+        id,
+        size,
+        crate::theme_binding::color(theme_snapshot.palette().fg),
+    )
+}
+
+/// Render one semantic icon with a caller-owned palette accent. The icon
+/// identity and bytes remain the shared asset registry's; only the tint is
+/// projected from the caller's resolved status token.
+pub(crate) fn icon_tinted<'a>(
+    id: IconId,
+    size: f32,
+    tint: iced::Color,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let Some(bytes) = asset_bytes(id) else {
         return text("·")
             .size(size)

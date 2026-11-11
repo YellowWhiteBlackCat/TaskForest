@@ -41,13 +41,11 @@ impl RootView {
     }
 
     pub(crate) fn request_run_command(&mut self, cx: &mut Context<Self>) -> bool {
-        let command = self.run_command_text(cx).trim().to_owned();
-        if command.is_empty() {
-            self.run_error = Some("No command given".into());
+        let Some(request) = CommandLaunchRequest::from_draft(&self.run_command_text(cx)) else {
+            self.run_error = Some(i18n::t("search.run_command").to_owned());
             return false;
-        }
+        };
         self.run_error = None;
-        let request = CommandLaunchRequest { command };
         let attempt = self
             .shell
             .begin_shell_ui_action(ShellUiActionIntent::Command(request.clone()));
@@ -210,3 +208,7 @@ impl RootView {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/root/command_launch_tests.rs"]
+mod command_launch_tests;

@@ -18,8 +18,10 @@ projection:
 - `ShellApp` owns every row fact: query, status filter, sort, visible row
   window, selection, semantic identity, and typed availability.
 - `taskmanager-ui-contract::presentation::card_flow` owns whole-group
-  admission and the card-height clamp. Bevy supplies only its own measured
-  control ladder, group header height, group gap, and column ceiling.
+  admission and the card-height clamp. `presentation::card_width` owns the
+  measured card/content caps, whole-column admission, bounded lower content
+  width and residual lane space. Bevy supplies only its own measured control
+  ladder, group header height, group gap, card ceiling, and column ceiling.
 - `taskmanager-theme` owns design tokens; the Bevy card hero consumes
   `GlassTier::Card` through the palette and the shared shadow contract.
 - The focus dashboard and the atomic cards are ALL marked for real optical
@@ -53,9 +55,13 @@ projection:
   overflow action. Activating it reduces through the shell's canonical status
   filter and switches the page to its dense table, so every omitted row stays
   reachable.
-- A card's width floor is the width its PID/CPU/memory fact line needs; wide
-  slots therefore admit a card grid instead of a row of banners. Each fact is
-  labeled from the shared catalog and clipped on a bounded single line.
+- A card's width floor is the width its PID/CPU/memory fact line needs; its
+  measured ceiling stops it becoming an empty banner. The shared cap fold
+  admits a whole card grid and returns one bounded content width plus the
+  residual lane space. Wide slots keep that residual OUTSIDE the card group,
+  and the group header's overflow action stays inside the same bounded
+  group. Each fact is labeled from the shared catalog and clipped on a
+  bounded single line.
 - The lane scrolls by whole buckets. A typed `CardFlowWindow` owns the first
   visible bucket, and the shell's selection reveal moves that window to the
   selected row's bucket instead of leaving the cursor behind.
@@ -68,8 +74,9 @@ projection:
   so its floor and ceiling are the same height: leftover slot space stays
   OUTSIDE the card instead of inflating it into an empty panel.
 - The lower card flow is a bounded `Overflow::clip_y()` viewport. Its right and
-  bottom edges are headlessly asserted at 1180×780 and the compact 720×480
-  degradation is asserted through the zero-group verdict.
+  bottom edges are headlessly asserted at 1180×780, a wide 1600×900 measured
+  composition asserts the shared cap and its residual, and the compact
+  720×480 degradation is asserted through the zero-group verdict.
 - Atom cards keep the same `ProcessRowLink`, semantic address, AccessKit node,
   official `Button`, pointer activation, and secondary-press seam as dense
   rows. Keyboard/focus routing remains the shell's single authority. The
@@ -82,10 +89,11 @@ projection:
   whole-group admission, focus facts, dense-mode seams, zero-group
   degradation, measured bounds, overflow activation, and the typed painted
   fallback without an adapter.
-- `tests/headless/pages/card_lane_width_admission.rs` asserts the right-edge
-  verdict before the renderer spends it: whole group width admission, a
-  narrow slot's one-column degradation, the overflow action's reserved slot,
-  and the typed zero-column degradation for a slot that holds no whole card.
+- `tests/headless/pages/card_lane_width_admission.rs` asserts the capped
+  right-edge verdict before the renderer spends it: whole group width
+  admission, the measured card/content cap and residual, a narrow slot's
+  one-column degradation, the overflow action's bounded slot, and the typed
+  zero-column degradation for a slot that holds no whole card.
 - `tests/headless/optical_backdrop_mirror.rs` proves that a marked surface is
   mirrored at its measured rectangle, that a move or palette change bumps the
   composite revision, that an unchanged surface does not, and that stale

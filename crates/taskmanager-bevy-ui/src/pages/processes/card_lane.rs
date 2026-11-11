@@ -24,7 +24,7 @@ use taskmanager_shell::saved_views::sort_token;
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, SortDir};
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowSpec, admit_card_groups};
 use taskmanager_ui_contract::presentation::card_width::{
-    CardRowWidthSpec, admit_card_row_width, card_row_columns,
+    CardRowWidthBudget, CardRowWidthSpec, admit_card_row_width_budget, card_row_columns,
 };
 
 use crate::palette::{UiPalette, space_4, space_8, space_16};
@@ -165,10 +165,14 @@ impl FocusProjection {
 pub(crate) struct CardFlowMetrics {
     /// The control height one card row line occupies, in logical pixels.
     pub(crate) control_height_px: f32,
+    /// The live rem size in logical px, owned by the palette binding.
+    pub(crate) rem_px: f32,
     /// The measured atomic-card height, in logical pixels.
     pub(crate) card_height_px: f32,
     /// The narrowest an atomic card may be, in logical pixels.
     pub(crate) card_min_width_px: f32,
+    /// The widest an atomic card may be before it reads as an empty banner.
+    pub(crate) card_max_width_px: f32,
     /// The group header height, in logical pixels.
     pub(crate) header_height_px: f32,
     /// The gap between two group blocks, in logical pixels.
@@ -200,13 +204,18 @@ impl CardFlowMetrics {
         // memory each carry a label and a value, and below this width the
         // memory value clips instead of truncating. Eight control heights
         // is the smallest multiple that holds that line in the standard
-        // type size, so a wide slot paints a card GRID instead of a row of
-        // wide banners.
+        // type size. Twelve control heights is the measured CONTENT max:
+        // extra slot width stays outside the bounded card group rather than
+        // stretching one card into a banner. The shared cap fold derives
+        // the whole-row width from these two measured limits.
         let card_min_width_px = control_height_px * 8.0;
+        let card_max_width_px = control_height_px * 12.0;
         Self {
             control_height_px,
+            rem_px: palette.rem_px,
             card_height_px,
             card_min_width_px,
+            card_max_width_px,
             header_height_px: control_height_px,
             group_gap_px: space_8(),
             card_floor_px: card_height_px,
@@ -220,13 +229,48 @@ impl CardFlowMetrics {
     /// The measured width facts the shared card-row admission spends.
     #[must_use]
     pub(crate) const fn width_spec(self) -> CardRowWidthSpec {
-        CardRowWidthSpec::new(
+        CardRowWidthSpec::from_measured_card_cap(
             self.card_min_width_px,
+            self.card_max_width_px,
             self.group_gap_px,
             self.header_label_min_width_px,
             self.overflow_action_min_width_px,
             self.max_columns,
         )
+    }
+
+    /// The measured width facts one bounded card row paints in `rem`.
+    ///
+    /// Bevy owns the logical px → rem conversion; the shared contract owns
+    /// every cap and admission arithmetic. A degenerate slot returns the
+    /// shared cap fold's bounded row instead of a second fallback ladder.
+    #[must_use]
+    pub(crate) fn width_rem(self, slot_width_px: f32) -> CardRowWidthMeasurements {
+        let spec = self.width_spec();
+        let measured_slot = if slot_width_px.is_finite() && slot_width_px > 0.0 {
+            slot_width_px
+        } else {
+            self.width_spec().content_width_cap
+        };
+        let columns = card_row_columns(measured_slot, spec);
+        let budget = admit_card_row_width_budget(measured_slot, columns, spec, false);
+        let bounded_columns = budget.columns.max(1);
+        let content_width = if budget.is_admitted() {
+            budget.content_width
+        } else {
+            spec.row_width_bounded(bounded_columns, spec.content_width_cap)
+        };
+        let card_width = if budget.is_admitted() {
+            budget.card_width
+        } else {
+            spec.card_width(bounded_columns, content_width)
+        };
+        let rem = self.rem_px.max(1.0);
+        CardRowWidthMeasurements {
+            content_width_rem: content_width / rem,
+            card_width_rem: card_width / rem,
+            gap_rem: self.group_gap_px / rem,
+        }
     }
 
     /// The shared contract's spec for one group block: the header plus the
@@ -239,6 +283,14 @@ impl CardFlowMetrics {
         )
         .with_gap(self.group_gap_px)
     }
+}
+
+/// The shared cap fold's width verdict, converted to Bevy's rem unit once.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct CardRowWidthMeasurements {
+    pub(crate) content_width_rem: f32,
+    pub(crate) card_width_rem: f32,
+    pub(crate) gap_rem: f32,
 }
 
 /// The shared contract's verdict, projected into the page's typed budget.
@@ -259,6 +311,8 @@ pub(crate) struct CardFlowBudget {
     pub(crate) width_px: f32,
     /// The palette-derived card metrics behind that width admission.
     pub(crate) metrics: Option<CardFlowMetrics>,
+    /// The shared cap fold's bounded row width for this measured slot.
+    pub(crate) row_width: CardRowWidthBudget,
 }
 
 impl Default for CardFlowBudget {
@@ -270,6 +324,7 @@ impl Default for CardFlowBudget {
             columns: 1,
             width_px: 0.0,
             metrics: None,
+            row_width: CardRowWidthBudget::degraded(),
         }
     }
 }
@@ -308,14 +363,32 @@ impl CardFlowBudget {
         if !self.width_px.is_finite() || self.width_px <= 0.0 {
             return self.columns.min(member_count);
         }
-        let admissible = admit_card_row_width(
+        let admissible = admit_card_row_width_budget(
             self.width_px,
             self.columns,
             metrics.width_spec(),
             has_overflow,
         )
-        .columns();
+        .columns;
         admissible.min(member_count)
+    }
+
+    /// The shared cap fold, converted to Bevy's rem unit at the binding seam.
+    ///
+    /// An unmeasured fixture still spends the shared measured cap, never a
+    /// frontend-local width ladder. The palette-backed metrics are the same
+    /// shape that produced the measured budget.
+    #[must_use]
+    pub(crate) fn row_width_measurements(self) -> CardRowWidthMeasurements {
+        let Some(metrics) = self.metrics else {
+            return CardRowWidthMeasurements::default();
+        };
+        let measured_slot = if self.measured && self.width_px.is_finite() && self.width_px > 0.0 {
+            self.width_px
+        } else {
+            metrics.width_spec().content_width_cap
+        };
+        metrics.width_rem(measured_slot)
     }
 }
 
@@ -336,9 +409,9 @@ pub(crate) fn card_flow_budget(
     let metrics = CardFlowMetrics::from_palette(palette);
     let width_spec = metrics.width_spec();
     let requested_columns = card_row_columns(slot_width_px, width_spec);
-    let columns = admit_card_row_width(slot_width_px, requested_columns, width_spec, false)
-        .columns()
-        .max(1);
+    let row_width =
+        admit_card_row_width_budget(slot_width_px, requested_columns, width_spec, false);
+    let columns = row_width.columns.max(1);
     // The measured slot IS the bounded card-flow viewport: the mode row,
     // dashboard, page title and toolbar already spent their height before
     // this node was laid out. Only the flow's own group gap remains.
@@ -351,6 +424,7 @@ pub(crate) fn card_flow_budget(
         columns: verdict.columns,
         width_px: slot_width_px,
         metrics: Some(metrics),
+        row_width,
     }
 }
 
@@ -395,16 +469,18 @@ pub(crate) fn card_group(status: &str) -> CardGroup {
 
 /// Pure plan for the bounded lower card flow. It consumes the already pinned
 /// shell `RowPage` and admits only whole groups from the shared verdict.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CardFlowPlan {
     /// The admitted groups, in shell order, with their visible members.
     pub(crate) groups: Vec<CardGroupPlan>,
     /// Whether the visible projection is empty.
     pub(crate) empty: bool,
+    /// The bounded lower content group's width in Bevy's rem unit.
+    pub(crate) row_width: CardRowWidthMeasurements,
 }
 
 /// One status bucket's admitted card row.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct CardGroupPlan {
     /// The provider-owned status bucket this group paints.
     pub(crate) group: CardGroup,
@@ -414,6 +490,8 @@ pub(crate) struct CardGroupPlan {
     /// be narrower than the bucket, so the header states the whole count and
     /// never lets a truncated row read as the whole bucket.
     pub(crate) total: usize,
+    /// The bounded lower content group's width in Bevy's rem unit.
+    pub(crate) row_width: CardRowWidthMeasurements,
 }
 
 /// The card lane's group window.
@@ -455,10 +533,12 @@ pub(crate) fn card_flow_plan(
     window: CardFlowWindow,
 ) -> CardFlowPlan {
     let visible = shell.visible_processes();
+    let row_width = budget.row_width_measurements();
     if visible.is_empty() {
         return CardFlowPlan {
             groups: Vec::new(),
             empty: true,
+            row_width,
         };
     }
     // One bucket per provider status, in first-appearance order, with the
@@ -489,11 +569,13 @@ pub(crate) fn card_flow_plan(
             group,
             members: members[..admitted].to_vec(),
             total: members.len(),
+            row_width,
         });
     }
     CardFlowPlan {
         groups,
         empty: false,
+        row_width,
     }
 }
 

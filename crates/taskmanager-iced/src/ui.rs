@@ -11,7 +11,7 @@
 //! - `app_history_view`: the App-history page.
 
 use iced::Element;
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, stack, text};
 // Shared locale catalog (the process-wide resolver). Every iced surface — the
 // shared pages and the iced-owned modal chrome (settings / about / health /
 // containers) — resolves copy through this one `t`; the frontend owns no
@@ -26,7 +26,7 @@ use taskmanager_ui_contract::IconId;
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::theme;
-use taskmanager_shell::FeedbackTone;
+use taskmanager_shell::{FeedbackPresentation, FeedbackTone};
 use taskmanager_theme::Theme;
 
 mod about;
@@ -210,6 +210,16 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
         }
     };
 
+    let base = if let Some(notice) = toast_notice(app) {
+        let toast_layer = components::toast(theme_snapshot, notice, app.viewport_size().width);
+        stack![base, toast_layer]
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fill)
+            .into()
+    } else {
+        base
+    };
+
     if !collecting {
         if let Some(overlay) = overlays::render(app) {
             // Do not keep the application tree underneath a modal. Besides
@@ -252,6 +262,12 @@ fn telemetry_warmup_body<'a>(
     .center_x(iced::Length::Fill)
     .center_y(iced::Length::Fill)
     .into()
+}
+
+fn toast_notice(app: &crate::IcedApp) -> Option<FeedbackPresentation<'_>> {
+    let shell = &app.shell;
+    let now = app.window_now_millis();
+    app.toast.sync(shell, now)
 }
 
 fn page_icon(page: AppPage) -> IconId {
