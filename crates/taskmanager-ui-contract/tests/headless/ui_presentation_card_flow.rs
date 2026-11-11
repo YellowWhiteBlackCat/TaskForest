@@ -88,6 +88,34 @@ fn card_flow_never_turns_an_invalid_focus_floor_into_a_card() {
 }
 
 #[test]
+fn focus_card_replaces_the_duplicate_group_member_once() {
+    assert!(focus_represents_group(
+        Some("running"),
+        "running",
+        Some(7),
+        7
+    ));
+    assert!(!focus_represents_group(
+        Some("sleeping"),
+        "running",
+        Some(7),
+        7
+    ));
+    assert!(!focus_represents_group(
+        Some("running"),
+        "running",
+        Some(8),
+        7
+    ));
+
+    let members = [7, 8, 9, 10];
+    assert_eq!(group_members_without_focus(&members, 7, true), [8, 9, 10]);
+    assert_eq!(group_members_without_focus(&members, 7, false), members);
+    assert_eq!(hidden_group_members(members.len(), 2, true), 1);
+    assert_eq!(hidden_group_members(members.len(), 4, false), 0);
+}
+
+#[test]
 fn degenerate_and_inverted_footprints_fail_closed() {
     for (floor, ceiling) in [(0.0, 10.0), (-4.0, 10.0), (120.0, 80.0)] {
         let spec = CardFlowSpec::new(floor, ceiling).with_gap(8.0);

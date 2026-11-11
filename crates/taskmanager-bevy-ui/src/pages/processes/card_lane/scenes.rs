@@ -26,6 +26,7 @@ use taskmanager_application::i18n::{key_value_label, more_rows_label, t};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::card_flow::hidden_group_members;
 use taskmanager_ui_contract::presentation::card_width::card_row_columns;
 
 use crate::app::PageContext;
@@ -288,8 +289,7 @@ pub(crate) fn group_scene(
     // size, and the overflow action names what the row leaves out. When the
     // focus dashboard represents the bucket's first row, its card is not
     // painted a second time and does not count toward the hidden remainder.
-    let represented = group.members.len() + usize::from(group.focus_is_first);
-    let hidden = group.total.saturating_sub(represented);
+    let hidden = hidden_group_members(group.total, group.members.len(), group.focus_is_first);
     let header = key_value_label(group.group.label(), &group.total.to_string());
     let overflow = overflow_action_scene(group.group, hidden, palette);
     let row_width = if group.row_width.content_width_rem > 0.0 {

@@ -23,7 +23,8 @@ use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 use taskmanager_shell::saved_views::sort_token;
 use taskmanager_shell::{ProcessStatusFilter, ShellApp, SortDir};
 use taskmanager_ui_contract::presentation::card_flow::{
-    self, CardFlowAdmission, CardFlowSpec, admit_card_flow,
+    self, CardFlowAdmission, CardFlowSpec, admit_card_flow, focus_represents_group,
+    group_members_without_focus,
 };
 use taskmanager_ui_contract::presentation::card_width::{
     CardRowWidthBudget, CardRowWidthSpec, admit_card_row_width_budget, card_row_columns,
@@ -637,17 +638,13 @@ pub(crate) fn card_flow_plan(
         if groups.len() >= group_count {
             break;
         }
-        let focus_is_first =
-            focus_bucket == Some(group) && members.first() == Some(&shell.selected);
-        let card_members: Vec<usize> = if focus_is_first {
-            members
-                .iter()
-                .copied()
-                .filter(|index| *index != shell.selected)
-                .collect()
-        } else {
-            members.clone()
-        };
+        let focus_is_first = focus_represents_group(
+            focus_bucket,
+            group,
+            members.first().copied(),
+            shell.selected,
+        );
+        let card_members = group_members_without_focus(&members, shell.selected, focus_is_first);
         let has_overflow = card_members.len() > budget.columns;
         let admitted = card_members
             .len()

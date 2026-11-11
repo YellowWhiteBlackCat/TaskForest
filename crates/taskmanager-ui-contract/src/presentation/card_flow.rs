@@ -197,6 +197,52 @@ pub fn admit_card_flow(
     CardFlowAdmission::Dense
 }
 
+/// Whether a focus card already represents the selected member of a group.
+///
+/// Group presentation may show one complete selected item above its status
+/// bucket. The bucket then renders only the remaining members, and its
+/// overflow count treats the focus card as one represented member instead
+/// of painting the same identity twice.
+#[must_use]
+pub fn focus_represents_group<G: PartialEq>(
+    focus_group: Option<G>,
+    group: G,
+    first_member: Option<usize>,
+    selected: usize,
+) -> bool {
+    focus_group == Some(group) && first_member == Some(selected)
+}
+
+/// Remove the selected member from a group represented by a focus card.
+///
+/// This is the one typed de-duplication rule for card flows. It preserves
+/// provider-issued member indices and their order; callers still apply their
+/// own width and count budgets to the returned vector.
+#[must_use]
+pub fn group_members_without_focus(
+    members: &[usize],
+    selected: usize,
+    focus_is_first: bool,
+) -> Vec<usize> {
+    if !focus_is_first {
+        return members.to_vec();
+    }
+    members
+        .iter()
+        .copied()
+        .filter(|index| *index != selected)
+        .collect()
+}
+
+/// Count group members not painted in the bounded card row.
+///
+/// The focus card counts as a represented member in `total`, so the overflow
+/// affordance never claims that an already visible identity is hidden.
+#[must_use]
+pub fn hidden_group_members(total: usize, painted: usize, focus_is_first: bool) -> usize {
+    total.saturating_sub(painted.saturating_add(usize::from(focus_is_first)))
+}
+
 /// Admit whole card groups and cap the group count.
 ///
 /// The cap is the product's own content limit (a page that shows at most
