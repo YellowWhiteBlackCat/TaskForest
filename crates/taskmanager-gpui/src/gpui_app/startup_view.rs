@@ -54,6 +54,8 @@ use taskmanager_shell::{InfoSortCol, SortDir};
 
 pub use crate::gpui_app::list_view::ActionFeedback;
 
+const STARTUP_COMMAND_HEADER_MIN_WIDTH: f32 = 88.0;
+
 mod boot_evidence;
 mod layout;
 pub use layout::{StartupPageBudget, TimelinePresentation};
@@ -290,6 +292,25 @@ impl TableDelegate for StartupDelegate {
             .expect("col_ix < columns.len() (Table contract; columns immutable)")
     }
 
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let name = self.column(col_ix, cx).name.clone();
+        if col_ix == 4 {
+            div().size_full().flex().items_center().child(
+                div()
+                    .debug_selector(|| "tm-startup-command-header-label".to_string())
+                    .flex_shrink_0()
+                    .child(name),
+            )
+        } else {
+            div().size_full().child(name)
+        }
+    }
+
     /// Per-row container: keep the Table's default `div().id((_, ix))` shape (the
     /// framework chains its own `on_click` / hover / selection styling on top) and add
     /// an `on_hover` that publishes `Hover::Startup(id)` to RootView so the existing
@@ -422,18 +443,23 @@ impl TableDelegate for StartupDelegate {
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.fg_dim))
                 .child(e.source.as_str().to_string()),
-            _ => div()
+            4 => div()
+                .debug_selector(move || format!("tm-startup-command-cell:{row_ix}"))
+                .w_full()
                 .flex()
                 .min_w(px(0.0))
                 .text_size(font_size(tokens::FONT_12))
                 .text_color(hsla(theme.fg_dim))
                 .child(
                     div()
+                        .debug_selector(move || format!("tm-startup-command-text:{row_ix}"))
+                        .w_full()
                         .flex_1()
                         .min_w(px(0.0))
                         .truncate()
                         .child(e.exec.clone()),
                 ),
+            _ => div(),
         }
     }
 }
@@ -598,11 +624,17 @@ pub fn render_startup(
         let ent = table_entity;
         let horizontal_scroll = ent.read(cx).horizontal_scroll_handle.clone();
         ent.update(cx, |table, _cx| {
-            let command_width = list_view::table_geometry::elastic_last_column(
-                &[80.0, 280.0, 110.0, 140.0],
+            let leading_widths = [80.0, 280.0, 110.0, 140.0];
+            let allocated_command_width = list_view::table_geometry::elastic_last_column(
+                &leading_widths,
                 page_layout.content_width,
             );
+            let command_width = allocated_command_width.max(STARTUP_COMMAND_HEADER_MIN_WIDTH);
+            let name_width =
+                (leading_widths[1] - (command_width - allocated_command_width)).max(0.0);
             if table.col_groups.len() == 5 {
+                table.col_groups[1].width = px(name_width);
+                table.delegate_mut().columns[1].width = px(name_width);
                 table.col_groups[4].width = px(command_width);
                 table.delegate_mut().columns[4].width = px(command_width);
             }

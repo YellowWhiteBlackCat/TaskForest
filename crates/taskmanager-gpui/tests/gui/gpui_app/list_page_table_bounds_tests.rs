@@ -230,19 +230,58 @@ async fn startup_command_column_fits_the_measured_compact_content_slot(cx: &mut 
     let (width, height) = (720.0, 480.0);
     let window = install(cx, TopPage::Startup, width, height);
     let view = window.entity(cx).expect("RootView entity");
-    let command_width = view.read_with(cx, |view, cx| {
-        view.startup_table
-            .as_ref()
-            .and_then(|table| table.read(cx).col_groups.last().map(|group| group.width))
-            .expect("the startup table must bind its command column")
+    let (name_width, command_width, command_bounds) = view.read_with(cx, |view, cx| {
+        let table = view.startup_table.as_ref().expect("startup table entity");
+        let table = table.read(cx);
+        (
+            table.col_groups[1].width,
+            table.col_groups[4].width,
+            table.col_groups[4].bounds,
+        )
     });
     let mut visual = VisualTestContext::from_window(window.into(), cx);
     let viewport = visual
         .debug_bounds("tm-telemetry-ready-body")
         .expect("page viewport must render");
+    let table = visual.debug_bounds("tm-table").expect("table must render");
+    let command_header = visual
+        .debug_bounds("tm-startup-command-header-label")
+        .expect("startup command header label must render");
+    let command_cell = visual
+        .debug_bounds("tm-startup-command-cell:0")
+        .expect("startup command body cell must render");
+    let command_text = visual
+        .debug_bounds("tm-startup-command-text:0")
+        .expect("startup command body text must render");
+
     assert!(
         command_width <= px(f32::from(viewport.size.width)),
         "compact command column must fit the measured content slot: width={command_width:?}, viewport={viewport:?}"
+    );
+    assert_eq!(
+        command_width,
+        px(88.0),
+        "720x480 Startup must reserve the complete Command header label"
+    );
+    assert!(
+        name_width < px(280.0),
+        "720x480 Startup must reclaim width from the elastic name column"
+    );
+    assert!(
+        table.right() <= viewport.right() + px(0.5)
+            && command_bounds.right() <= viewport.right() + px(0.5),
+        "720x480 Startup table and command column must fit the measured viewport: table={table:?}, command={command_bounds:?}, viewport={viewport:?}"
+    );
+    assert!(
+        command_header.origin.x >= command_bounds.origin.x + px(8.0) - px(0.5)
+            && command_header.right() <= command_bounds.right() - px(8.0) + px(0.5)
+            && command_header.right() <= viewport.right() + px(0.5),
+        "720x480 Startup Command heading must fit inside its padded, visible column: label={command_header:?}, column={command_bounds:?}, viewport={viewport:?}"
+    );
+    assert!(
+        command_cell.right() <= command_bounds.right() + px(0.5)
+            && command_text.right() <= command_cell.right() + px(0.5),
+        "720x480 Startup command text must truncate within its allocated column: text={command_text:?}, cell={command_cell:?}, column={command_bounds:?}"
     );
 }
 
