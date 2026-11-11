@@ -1,5 +1,6 @@
 use gpui::{
-    AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, Window, px, size,
+    AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, VisualTestContext,
+    Window, px, size,
 };
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_shell::fixture::health::{HealthFixture, health_fixture};
@@ -65,6 +66,8 @@ async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppC
             px(780.0),
         ))),
     });
+    let mut storage_title_insets = Vec::new();
+    let mut sensor_title_insets = Vec::new();
     for (width, height) in [(1180.0, 780.0), (720.0, 480.0)] {
         cx.simulate_window_resize(window.into(), size(px(width), px(height)));
         window
@@ -78,5 +81,36 @@ async fn health_fixture_renders_at_reference_and_compact_sizes(cx: &mut TestAppC
             .unwrap();
         cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
+        let mut visual = VisualTestContext::from_window(window.into(), cx);
+        let surface = visual
+            .debug_bounds("tm-health-storage-surface")
+            .expect("storage surface must remain mounted");
+        let title = visual
+            .debug_bounds("tm-health-storage-title")
+            .expect("storage title must remain mounted");
+        assert!(
+            surface.origin.x >= px(0.0) && surface.right() <= px(width),
+            "{width}x{height}: storage surface leaves the horizontal viewport: {surface:?}"
+        );
+        storage_title_insets.push(title.origin.y - surface.origin.y);
+        let sensor_surface = visual
+            .debug_bounds("tm-health-sensor-surface")
+            .expect("sensor surface must remain mounted");
+        let sensor_title = visual
+            .debug_bounds("tm-health-sensor-title")
+            .expect("sensor title must remain mounted");
+        assert!(
+            sensor_surface.origin.x >= px(0.0) && sensor_surface.right() <= px(width),
+            "{width}x{height}: sensor surface leaves the horizontal viewport: {sensor_surface:?}"
+        );
+        sensor_title_insets.push(sensor_title.origin.y - sensor_surface.origin.y);
     }
+    assert!(
+        storage_title_insets[1] + px(1.0) < storage_title_insets[0],
+        "Ultra-Compact must spend less top inset than the multi-column layout: {storage_title_insets:?}"
+    );
+    assert!(
+        sensor_title_insets[1] + px(1.0) < sensor_title_insets[0],
+        "Ultra-Compact must spend less top inset in sensors than the multi-column layout: {sensor_title_insets:?}"
+    );
 }

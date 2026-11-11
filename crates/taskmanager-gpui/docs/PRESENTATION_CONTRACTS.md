@@ -68,6 +68,11 @@ values. Permission entry stays in Settings. The shared scrollbar uses
 viewport/max-offset geometry, keyed drag state and paint-safe invalidation
 with one edge inset.
 
+System Health keeps storage and sensor sections as complete surfaces under one
+page-owned bounded scroll rail. The typed single-column layout reduces section,
+filesystem-row, sensor-group and sensor-row insets so compact windows retain
+more readable facts without shrinking labels or splitting groups.
+
 When a tray exists, window close minimizes while root/runtime/singleton remain
 alive; tray Quit terminates. Secondary launch activates the existing window.
 Capture-only and tray-unavailable sessions may close without leaving a

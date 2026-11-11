@@ -3,7 +3,10 @@
 //! This module consumes typed snapshots and emits typed confirmation requests.
 //! It performs no collection, filesystem access, or SMART command execution.
 
-use gpui::{App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative};
+use gpui::{
+    App, Div, InteractiveElement, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px,
+    relative,
+};
 use std::rc::Rc;
 use taskmanager_application::SourceStateKind;
 use taskmanager_shell::presentation::filesystem_backing_label;
@@ -24,7 +27,7 @@ use taskforest_core::core::{
     SmartSelfTestReport,
 };
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier};
+use taskmanager_theme::{Color, Length};
 use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui_contract::presentation::budget::SystemPageBudget;
@@ -178,6 +181,13 @@ pub(crate) fn metric(theme: &Theme, label: String, value: String) -> Div {
         )
 }
 
+fn surface_inset(layout: SystemPageBudget, compact: Length, regular: Length) -> Length {
+    match layout.surfaces {
+        SystemSurfacePresentation::SingleColumn => compact,
+        SystemSurfacePresentation::MultiColumn => regular,
+    }
+}
+
 fn format_bytes(units: UnitPreferences, bytes: u64) -> String {
     units.format_quantity(bytes, QuantityFamily::Drive, false)
 }
@@ -186,6 +196,7 @@ fn filesystem_row(
     theme: &Theme,
     filesystem: &FilesystemHealth,
     disk: Option<&DiskMetrics>,
+    layout: SystemPageBudget,
     copy: &dyn Fn(SystemHealthText) -> String,
     units: UnitPreferences,
 ) -> Div {
@@ -219,9 +230,8 @@ fn filesystem_row(
         .filter(|value| value.is_finite())
         .map_or_else(unavailable, percent_text);
     CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
         .radius(tokens::control_radius(theme))
-        .padding(tokens::SPACE_9)
+        .padding(surface_inset(layout, tokens::SPACE_7, tokens::SPACE_9))
         .inset()
         .render()
         .child(
@@ -302,12 +312,18 @@ fn storage_section(
         );
     } else {
         for filesystem in &data.filesystems.filesystems {
-            rows = rows.child(filesystem_row(theme, filesystem, data.disk, copy, units));
+            rows = rows.child(filesystem_row(
+                theme, filesystem, data.disk, layout, copy, units,
+            ));
         }
     }
     section_shell(
         theme,
         copy(SystemHealthText::StorageHealth),
+        SectionShellSelectors {
+            surface: "tm-health-storage-surface",
+            title: "tm-health-storage-title",
+        },
         data.filesystems.state,
         layout,
         rows.child(self_test_card(
@@ -325,6 +341,7 @@ fn sensor_group(
     theme: &Theme,
     group: SensorGroup,
     readings: &[SensorReading],
+    layout: SystemPageBudget,
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
     let mut rows = div()
@@ -336,7 +353,11 @@ fn sensor_group(
     if folded.is_empty() {
         rows = rows.child(
             div()
-                .py(definite_length(tokens::SPACE_8))
+                .py(definite_length(surface_inset(
+                    layout,
+                    tokens::SPACE_6,
+                    tokens::SPACE_8,
+                )))
                 .text_size(font_size(tokens::FONT_11))
                 .text_color(hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::NoReadings)),
@@ -345,9 +366,8 @@ fn sensor_group(
         for row in folded {
             rows = rows.child(
                 CardSurface::new(theme.palette())
-                    .glass(GlassTier::Card)
                     .radius(tokens::control_radius(theme))
-                    .padding(tokens::SPACE_8)
+                    .padding(surface_inset(layout, tokens::SPACE_6, tokens::SPACE_8))
                     .inset()
                     .render()
                     .flex()
@@ -382,7 +402,11 @@ fn sensor_group(
         }
     }
     div()
-        .p(definite_length(tokens::SPACE_8))
+        .p(definite_length(surface_inset(
+            layout,
+            tokens::SPACE_6,
+            tokens::SPACE_8,
+        )))
         .rounded(absolute(tokens::control_radius(theme)))
         .border_1()
         .border_color(hsla(theme.border))
@@ -411,11 +435,15 @@ fn sensor_section(
         SensorGroup::FanSpeed,
         SensorGroup::Power,
     ] {
-        groups = groups.child(sensor_group(theme, group, &snapshot.readings, copy));
+        groups = groups.child(sensor_group(theme, group, &snapshot.readings, layout, copy));
     }
     section_shell(
         theme,
         copy(SystemHealthText::SensorCenter),
+        SectionShellSelectors {
+            surface: "tm-health-sensor-surface",
+            title: "tm-health-sensor-title",
+        },
         snapshot.state,
         layout,
         groups,
@@ -423,24 +451,27 @@ fn sensor_section(
     )
 }
 
+struct SectionShellSelectors {
+    surface: &'static str,
+    title: &'static str,
+}
+
 fn section_shell(
     theme: &Theme,
     title: String,
+    selectors: SectionShellSelectors,
     state: DeviceState,
     layout: SystemPageBudget,
     content: Div,
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
     CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
-        .padding(match layout.surfaces {
-            SystemSurfacePresentation::SingleColumn => tokens::SPACE_9,
-            SystemSurfacePresentation::MultiColumn => tokens::SPACE_12,
-        })
+        .padding(surface_inset(layout, tokens::SPACE_7, tokens::SPACE_12))
         .radius(tokens::card_radius(theme))
         .bordered(true)
         .child(
             div()
+                .debug_selector(|| selectors.title.to_owned())
                 .flex()
                 .flex_row()
                 .flex_wrap()
@@ -462,6 +493,7 @@ fn section_shell(
         )
         .child(content)
         .render()
+        .debug_selector(|| selectors.surface.to_owned())
         .w(match layout.surfaces {
             SystemSurfacePresentation::SingleColumn => relative(1.0),
             SystemSurfacePresentation::MultiColumn => relative(0.49),
