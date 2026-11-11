@@ -28,6 +28,7 @@ pub(crate) fn capture_scenario_target() -> Option<&'static str> {
     let raw = std::env::var("TM_BEVY_CAPTURE_PAGE").ok()?;
     match raw.trim().to_ascii_lowercase().as_str() {
         "service-logs" => Some("service-logs"),
+        "keyboard-help" => Some("keyboard-help"),
         "perf-memory" => Some("perf-memory"),
         "perf-disk" => Some("perf-disk"),
         "perf-network" => Some("perf-network"),
@@ -209,6 +210,7 @@ pub(crate) fn capture_page() -> Option<Page> {
         | "device-hotplug"
         | "sidebar-edit" => Some(Page::Performance),
         "services" | "service-logs" | "services-search-highlight" => Some(Page::Services),
+        "keyboard-help" => Some(Page::Settings),
         "startup" | "startup-impact" | "startup-failure-evidence" | "startup-boot-markers" => {
             Some(Page::Startup)
         }

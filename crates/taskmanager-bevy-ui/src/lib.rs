@@ -71,6 +71,7 @@ pub(crate) mod focus_visible;
 pub(crate) mod frame_timing;
 pub mod functional;
 pub(crate) mod glass;
+pub(crate) mod help_overlay;
 pub mod icons;
 pub mod input;
 pub mod input_contract;

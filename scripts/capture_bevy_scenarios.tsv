@@ -6,6 +6,7 @@ applications-card-lane-details-compact	applications-card-lane-details-compact	72
 performance	performance	1180x780	gnome-light
 services	services	1180x780	gnome-light
 service-logs	service-logs	1180x780	gnome-light
+keyboard-help	keyboard-help	1180x780	gnome-light
 system	system	1180x780	gnome-light
 startup	startup	1180x780	gnome-light
 users	users	1180x780	gnome-light
@@ -17,6 +18,7 @@ applications-compact	applications	720x480	gnome-light
 performance-compact	performance	720x480	gnome-light
 services-compact	services	720x480	gnome-light
 service-logs-compact	services	720x480	gnome-light
+keyboard-help-compact	keyboard-help	720x480	gnome-light
 system-compact	system	720x480	gnome-light
 startup-compact	startup	720x480	gnome-light
 users-compact	users	720x480	gnome-light

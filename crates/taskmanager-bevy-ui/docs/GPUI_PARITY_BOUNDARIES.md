@@ -33,6 +33,15 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   selection reveal, semantic address, official `Button`, and secondary-press
   seam. The focus ring follows the toolkit's `InputFocus`, and the card lane's
   overflow action filters through the shell and switches to dense mode.
+- **Keyboard help**: bare `F1` opens the shell-owned help mode; `?` / Escape /
+  the footer Close action leave it. `?` types into an active search field,
+  and a learned page chord closes help while still moving the route.
+  `help_overlay.rs` binds the shared `page_help`, `command_help`, binding
+  declaration and local opener table to the product's centered bounded-scroll
+  dialog; the standard and compact `keyboard-help` captures prove the mounted,
+  painted surface. Hardware-WESL capture readiness additionally requires an
+  attached production material on this dialog, so a `Painted` fallback cannot
+  be recorded as optical evidence.
 - **Empty / error / permission states**: the card lane has a typed empty state;
   settings permission controls consume the shell's typed
   `CapabilitySnapshot` and reject a stale escalation offer; detail summaries

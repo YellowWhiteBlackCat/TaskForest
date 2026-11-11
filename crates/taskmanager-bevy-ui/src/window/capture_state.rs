@@ -104,6 +104,10 @@ pub(super) fn initialize_capture_state(
         state.preferences.gray_zero_values = true;
     }
     commands.trigger(crate::input::ShellInteractionApplied);
+    if capture_scenario_target() == Some("keyboard-help") {
+        track.shell.toggle_help();
+        commands.trigger(crate::input::ShellInteractionApplied);
+    }
     if capture_scenario_target() == Some("apps-group-expanded") {
         commands.trigger(WindowSurfaceCommand::ProcessTree);
         commands.trigger(crate::pages::process_tree::TreeExpansionCommand::ExpandAll);

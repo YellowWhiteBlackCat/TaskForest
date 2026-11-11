@@ -151,7 +151,7 @@ fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
         key_dot * 0.06,
         (key_dot + fill_dot) * 0.02,
         fill_dot * 0.08,
-    ) * specular_rim * max(glass.optics.w, 0.06);
+    ) * specular_rim * glass.optics.w;
     let sheen_diag = in.uv.x * 0.45 + in.uv.y * 0.55;
     let sheen = pow(max(0.0, 1.0 - sheen_diag), 2.5) * 0.06 * glass.finish.y;
     var color = mix(refracted, glass.tint.rgb, glass.tint.a)

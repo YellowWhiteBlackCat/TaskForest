@@ -100,6 +100,17 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
     let fresnel = &first[7];
     let fresnel_and_dispersion = &first[8];
 
+    let neutral_channels = edge_channel_difference(refracted);
+    let dispersed_channels = edge_channel_difference(dispersed);
+    println!(
+        "optical-gpu comparison: zero-dispersion edge RGB delta={neutral_channels:.4}; \
+         authored-dispersion edge RGB delta={dispersed_channels:.4}"
+    );
+    assert!(
+        neutral_channels < 0.01,
+        "zero authored dispersion must not tint a neutral backdrop edge"
+    );
+
     let baseline_energy = gradient_energy(baseline);
     let blur_energy = gradient_energy(blur);
     assert!(
@@ -113,8 +124,6 @@ fn production_shader_renders_optical_effects_and_tracks_the_backdrop() {
         "refraction should move backdrop samples near the edge: {edge_shift}"
     );
 
-    let neutral_channels = edge_channel_difference(refracted);
-    let dispersed_channels = edge_channel_difference(dispersed);
     assert!(
         dispersed_channels > neutral_channels + 2.0,
         "dispersion should separate red and blue samples: {dispersed_channels} vs {neutral_channels}"

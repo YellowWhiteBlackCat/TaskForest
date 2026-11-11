@@ -160,6 +160,7 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     /// once the chain above them falls through.
     fn dispatch(&mut self, press: KeyPress) {
         if self.product_modal(press)
+            || self.help_toggle(press)
             || self.frontend_menus(press)
             || self.service_log_panel(press)
             || self.dismiss_shared_surface(press)
@@ -181,6 +182,24 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         }
         self.table_motion(press);
         self.shared_key(press);
+    }
+
+    fn help_toggle(&mut self, press: KeyPress) -> bool {
+        if press.key_code != KeyCode::F1 || press.modifiers != Modifiers::NONE {
+            return false;
+        }
+        if matches!(
+            press.context,
+            KeyboardOwner::Gate | KeyboardOwner::FrontendMenu | KeyboardOwner::ServiceLogPanel
+        ) {
+            return false;
+        }
+        if matches!(press.context, KeyboardOwner::SharedSurface) && !self.shell.help_open() {
+            return false;
+        }
+        self.shell.toggle_help();
+        self.applied = true;
+        true
     }
 
     /// Arm 0a — open action menus (frontend-local modals): an open modal owns the
@@ -331,9 +350,13 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
     }
 
     /// Arm 1 — frontend navigation: route chords move the Bevy route AND the
-    /// shell page so scope derivation follows the visible page.
+    /// shell page so scope derivation follows the visible page. A shortcut
+    /// learned from the help sheet retains this path: the shell's shared
+    /// `PageChanged` effect retires help while the route still moves.
     fn route_chord(&mut self, press: KeyPress) -> bool {
-        if !matches!(press.context, KeyboardOwner::Free) {
+        if !matches!(press.context, KeyboardOwner::Free)
+            && !(self.shell.help_open() && matches!(press.context, KeyboardOwner::SharedSurface))
+        {
             return false;
         }
         let Some(page) = route_key_press(press.key_code, modifier_state(self.keys)) else {

@@ -433,6 +433,7 @@ impl Plugin for FrontendWindowPlugin {
         app.init_resource::<crate::drain::FeedbackActivityCache>();
         backdrop_capture::register(app);
         crate::window_surface::register(app);
+        crate::help_overlay::register(app);
         crate::saved_views::register(app);
         crate::event_center::register(app);
         crate::about_modal::register(app);

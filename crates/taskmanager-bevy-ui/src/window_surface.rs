@@ -3,6 +3,7 @@
 use crate::app::FrontendTrack;
 use crate::first_run_modal::SetupState;
 use crate::glass::{OpticalGlassCard, noise_overlay_scene};
+use crate::help_overlay::HelpOverlay;
 use crate::input::ShellInteractionApplied;
 use crate::menu_modal::{ActionMenuContext, MenuModal, MenuModalChanged};
 use crate::pages::performance::sidebar_editor::{self, SidebarState};
@@ -22,7 +23,7 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::With;
+use bevy::ecs::query::{Or, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, SystemParam};
@@ -302,6 +303,8 @@ pub(crate) fn close(
 fn request_paint(_event: On<WindowSurfaceChanged>, mut paint: ResMut<SurfacePaint>) {
     paint.dirty = true;
 }
+type ModalOverlayFilter = Or<(With<WindowSurfaceOverlay>, With<HelpOverlay>)>;
+
 #[derive(SystemParam)]
 struct SurfaceRender<'w, 's> {
     sidebar: Res<'w, SidebarState>,
@@ -313,7 +316,7 @@ struct SurfaceRender<'w, 's> {
     palette: Option<Res<'w, WindowPalette>>,
     setup: Option<Res<'w, SetupState>>,
     roots: Query<'w, 's, Entity, With<AppShellRoot>>,
-    overlays: Query<'w, 's, Entity, With<WindowSurfaceOverlay>>,
+    overlays: Query<'w, 's, Entity, ModalOverlayFilter>,
     commands: Commands<'w, 's>,
 }
 fn paint_surface(mut render: SurfaceRender) {
@@ -385,6 +388,34 @@ pub(crate) fn modal_scene(
     actions: Vec<Box<dyn Scene>>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let geometry = modal_geometry_scene(title, body, actions, palette, false);
+    bsn! {
+        Node {
+            position_type: PositionType::Absolute,
+            width: percent(100),
+            height: percent(100),
+        }
+        WindowSurfaceOverlay({kind})
+        Children [ @{geometry} ]
+    }
+}
+
+pub(crate) fn standalone_modal_scene(
+    title: &'static str,
+    body: Box<dyn Scene>,
+    actions: Vec<Box<dyn Scene>>,
+    palette: &UiPalette,
+) -> Box<dyn Scene> {
+    Box::new(modal_geometry_scene(title, body, actions, palette, true))
+}
+
+fn modal_geometry_scene(
+    title: &'static str,
+    body: Box<dyn Scene>,
+    actions: Vec<Box<dyn Scene>>,
+    palette: &UiPalette,
+    show_scroll_rail: bool,
+) -> impl Scene + use<> {
     let modal_gap_rem = palette.rem_ratio(space_8());
     let modal_padding_rem = palette.rem_ratio(space_24());
     let footer_gap_rem = palette.rem_ratio(space_8());
@@ -395,10 +426,45 @@ pub(crate) fn modal_scene(
     let fill = palette.glass_fill(tier);
     let edge = palette.glass_edge(tier);
     let grain = Box::new(noise_overlay_scene(tier, palette, radius_rem)) as Box<dyn Scene>;
+    let lane = if show_scroll_rail {
+        crate::widgets::scrollbar::LANE_WIDTH_REM
+    } else {
+        0.0
+    };
+    let body_viewport = Box::new(bsn! {
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            flex_basis: Val::Px(0.0),
+            min_width: Val::Px(0.0),
+            min_height: Val::Px(0.0),
+            padding: UiRect::right(Val::Rem(lane)),
+            overflow: Overflow::scroll_y(),
+        }
+        ScrollArea ModalBody
+        Children [ @{body} ]
+    }) as Box<dyn Scene>;
+    let mut body_children = vec![body_viewport];
+    if show_scroll_rail {
+        body_children.push(Box::new(crate::widgets::scrollbar::scrollbar_rail_scene(
+            palette,
+        )));
+    }
+    let body_slot = Box::new(bsn! {
+        Node {
+            width: percent(100),
+            flex_grow: 1.0,
+            flex_basis: Val::Px(0.0),
+            min_width: Val::Px(0.0),
+            min_height: Val::Px(0.0),
+            flex_direction: FlexDirection::Row,
+        }
+        Children [ {body_children} ]
+    }) as Box<dyn Scene>;
     bsn! {
         Node { width: percent(100), height: percent(100), position_type: PositionType::Absolute,
             justify_content: JustifyContent::Center, align_items: AlignItems::Center }
-        BackgroundColor({ palette.glass_scrim_fill }) WindowSurfaceOverlay({ kind })
+        BackgroundColor({ palette.glass_scrim_fill })
         Children [
             Node { width: percent(90), max_width: rem(WINDOW_SURFACE_MAX_WIDTH_REM), height: percent(90), max_height: percent(90), min_height: Val::Rem(0.0), min_width: Val::Rem(0.0),
                 flex_direction: FlexDirection::Column, row_gap: Val::Rem(modal_gap_rem), padding: UiRect::all(Val::Rem(modal_padding_rem)),
@@ -414,8 +480,7 @@ pub(crate) fn modal_scene(
                 @{ grain } --
                 Node { min_height: rem(palette.control_height_rem), flex_shrink: 0.0 } ModalHeading
                 Children [ Text(title) TextRole(Role::Heading) ] --
-                Node { flex_grow: 1.0, flex_basis: Val::Rem(0.0), min_height: Val::Rem(0.0), min_width: Val::Rem(0.0), overflow: Overflow::scroll_y() }
-                ScrollArea ModalBody Children [ @{ body } ] --
+                @{body_slot} --
                 Node { flex_direction: FlexDirection::Row, flex_wrap: FlexWrap::Wrap, column_gap: Val::Rem(footer_gap_rem), row_gap: Val::Rem(footer_gap_rem), min_height: rem(palette.control_height_rem), flex_shrink: 0.0 }
                 ModalFooter Children [ { actions } ]
             ]

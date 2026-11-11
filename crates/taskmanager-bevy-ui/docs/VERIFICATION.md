@@ -108,6 +108,13 @@ that still fails closed to a typed fallback. See
 resolver is headlessly proved and the chain is GPU-measured, but no
 published screenshot shows the nested appearance in the shipped window.
 
+The pixel proof also verifies the authored dispersion boundary: a zero value
+must leave a neutral backdrop achromatic, while enabled dispersion separates
+the sampled edge channels. For shipped-window evidence,
+`TM_BEVY_CAPTURE_HARDWARE_WESL=1 scripts/capture-bevy.sh` requires the current
+hardware receipt, and capture readiness waits for an attached production
+material on the target glass surface before it accepts a frame.
+
 Check the shared workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.20
 version across this crate and `taskmanager-platform-runtime`
 (`cargo tree -p taskmanager-bevy-ui -d`).

@@ -32,6 +32,7 @@ use crate::widgets::chart::CurveMeasurement;
 use crate::widgets::table::ZeroValueCell;
 use crate::window::capture_marker_cores::CoreGridCaptureAccess;
 use crate::window::capture_marker_interactive::InteractiveCaptureAccess;
+use crate::window::capture_marker_optical::{HelpGlassCapture, help_capture_ready};
 use crate::window::{FeedbackLine, WindowPalette};
 use crate::window_surface::{ModalBody, WindowSurfaceKind, WindowSurfaceState};
 use bevy::ecs::entity::Entity;
@@ -71,6 +72,7 @@ pub(super) struct CaptureAccess<'w, 's> {
     pub(super) pages: Query<'w, 's, &'static PageContent>,
     pub(super) process_pages: Query<'w, 's, &'static ComputedNode, With<ProcessPageRoot>>,
     pub(super) text: Query<'w, 's, (&'static Text, &'static ComputedNode)>,
+    pub(super) help_glass: HelpGlassCapture<'w, 's>,
     feedback_lines: Query<'w, 's, (&'static Text, &'static ComputedNode), With<FeedbackLine>>,
     focus: FocusCapture<'w, 's>,
     confirmation: ConfirmationCapture<'w, 's>,
@@ -406,6 +408,15 @@ pub(super) fn emit_capture_marker(mut access: CaptureAccess) {
                 access.state.data_presented = true;
                 return;
             }
+        }
+        Some("keyboard-help")
+            if !help_capture_ready(
+                &access,
+                &access.help_glass,
+                std::env::var("TM_BEVY_CAPTURE_HARDWARE_WESL").is_ok_and(|value| value == "1"),
+            ) =>
+        {
+            return;
         }
         Some("event-center") => {
             if !access
