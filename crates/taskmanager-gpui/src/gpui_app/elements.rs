@@ -21,6 +21,7 @@ pub use actions::{Pill, ToolBtn, pill, tool_btn};
 pub(crate) use graphs::mini_graph_cell;
 pub use graphs::{
     GraphLegendEntry, graph_card, graph_card_with_dual_state, graph_card_with_state, graph_legend,
+    graph_surface,
 };
 pub use overlays::{
     dialog_overlay, dialog_overlay_width, more_rows_hint, tooltip, tooltip_overlay, truncated_text,

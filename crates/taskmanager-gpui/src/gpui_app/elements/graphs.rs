@@ -8,7 +8,7 @@ use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_theme::Color;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{GlassTier, Theme};
+use taskmanager_theme::{GlassSurfaceRole, Theme};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
@@ -25,10 +25,8 @@ use taskmanager_ui::theme_binding::rgba;
 /// Returns a `Div` (not `impl IntoElement`) so callers can keep chaining layout
 /// (e.g. an absolute overlay label on top of the graph, as cpu_view per-core does).
 pub fn graph_card(theme: &Theme, graph: impl IntoElement) -> Div {
-    CardSurface::unpadded(theme.palette())
-        .glass(GlassTier::Card)
+    graph_surface(theme)
         .radius(tokens::card_radius(theme))
-        .inset()
         .render()
         .flex_1()
         .min_h(px(0.0))
@@ -41,6 +39,13 @@ pub fn graph_card(theme: &Theme, graph: impl IntoElement) -> Div {
                 )))
                 .child(graph),
         )
+}
+
+/// A plot frame or an in-card readout uses the shared inset plot role; the
+/// parent card owns the page's floating elevation.
+#[must_use]
+pub fn graph_surface(theme: &Theme) -> CardSurface {
+    CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
 }
 
 /// Graph card with an honest first-frame status overlay.
@@ -94,10 +99,8 @@ fn graph_card_with_explicit_state(
                 .items_center()
                 .justify_center()
                 .child(
-                    CardSurface::unpadded(theme.palette())
-                        .glass(GlassTier::Card)
+                    graph_surface(theme)
                         .radius(tokens::control_radius(theme))
-                        .inset()
                         .render()
                         .px(definite_length(tokens::SPACE_12))
                         .py(definite_length(tokens::SPACE_6))

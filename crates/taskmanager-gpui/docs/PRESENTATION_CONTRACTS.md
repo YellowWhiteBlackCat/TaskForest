@@ -19,7 +19,10 @@ minimum height, with secondary commands reachable through the actions menu.
 Every live Performance device page composes through `perf_views::layout`.
 `ChartSpec` tiers own chart floors, state overlays, hover, legends and summary
 rows. Live charts and statistics stay in a fixed main viewport; the device rail
-alone scrolls at page level. CPU has a bounded nested details viewport. GPU
+alone scrolls at page level. Chart frames, first-frame state capsules and
+summary pills spend one inset `GlassSurfaceRole::InlinePlot`: the shared
+Card-tier material stays unchanged while the parent card carries elevation.
+CPU has a bounded nested details viewport. GPU
 keeps its headline, optional engine cards and memory group without inventing
 unsupported families. Disk/network directions share a peak and static grid but
 have separate scene keys and independent hover facts.

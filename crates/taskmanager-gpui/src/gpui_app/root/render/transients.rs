@@ -8,7 +8,7 @@ use gpui::{
     px,
 };
 use taskmanager_shell::FeedbackSeverity;
-use taskmanager_theme::GlassTier;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowControls};
 use taskmanager_ui::icons_binding::icon;
@@ -35,6 +35,12 @@ const FEEDBACK_TITLE_CLEARANCE: f32 = 180.0;
 const FEEDBACK_MAX_WIDTH: f32 = 420.0;
 const FEEDBACK_MIN_WIDTH: f32 = 240.0;
 const FEEDBACK_VIEWPORT_WIDTH_FRACTION: f32 = 0.36;
+
+/// The shell's transient status receipt uses the shared toast role so its
+/// glass tier and floating elevation have one owner.
+pub(super) fn feedback_notice_surface(theme: &Theme) -> CardSurface {
+    CardSurface::for_role(theme.palette(), GlassSurfaceRole::Toast)
+}
 
 /// The frame facts the transient overlay layer reads: live viewport width and
 /// whether server decorations own the titlebar. Bundled so the compose entry
@@ -186,8 +192,7 @@ fn compose_shell_feedback(
             });
         })
         .child("\u{2715}");
-    let card = CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
+    let card = feedback_notice_surface(theme)
         .radius(tokens::card_radius(theme))
         .padding(tokens::SPACE_6)
         .render()

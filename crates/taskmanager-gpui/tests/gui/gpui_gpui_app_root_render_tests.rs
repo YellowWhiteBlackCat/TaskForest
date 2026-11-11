@@ -546,6 +546,51 @@ async fn feedback_overlay_stays_in_native_navigation_chrome(cx: &mut TestAppCont
     );
 }
 
+#[test]
+fn feedback_notice_uses_the_shared_toast_role_across_primary_themes() {
+    use gpui::Styled;
+    use taskmanager_theme::{
+        GlassSurfaceRole, HighContrast, LightDark, ResolvedFonts, Skin, tokens,
+    };
+    use taskmanager_ui::theme_binding::{glass_fill, glass_shadow, rem_length};
+
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            for high_contrast in [HighContrast::Off, HighContrast::On] {
+                let theme =
+                    Theme::build(skin, mode, high_contrast, ResolvedFonts::system_for(skin));
+                let tier = GlassSurfaceRole::Toast.tier();
+                let expected_radius: gpui::AbsoluteLength =
+                    rem_length(tokens::card_radius(&theme)).into();
+                let mut surface = super::transients::feedback_notice_surface(&theme).render();
+
+                assert_eq!(
+                    surface.style().background.as_ref(),
+                    Some(&glass_fill(&theme, tier)),
+                    "feedback must resolve through the shared Toast glass role"
+                );
+                assert_eq!(
+                    surface.style().border_widths.top,
+                    Some(gpui::AbsoluteLength::Rems(gpui::Rems(
+                        tier.edge_width_rem()
+                    ))),
+                    "feedback must keep the shared glass hairline"
+                );
+                assert_eq!(
+                    surface.style().corner_radii.top_left,
+                    Some(expected_radius),
+                    "feedback keeps its existing card geometry"
+                );
+                assert_eq!(
+                    surface.style().box_shadow.as_ref(),
+                    Some(&glass_shadow(&theme, tier)),
+                    "a transient toast floats above the page"
+                );
+            }
+        }
+    }
+}
+
 /// A compact native-window rail has no horizontal titlebar slot. In that
 /// layout feedback collapses to its severity indicator inside the rail.
 #[gpui::test]

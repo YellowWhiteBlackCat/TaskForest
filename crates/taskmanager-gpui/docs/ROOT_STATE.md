@@ -23,7 +23,9 @@
   another facet's available data or distinct missing reason.
 - `root/render/surfaces.rs` maps the application surface authority to one
   active renderer. `render/transients.rs` then composes feedback, pause and
-  tooltips.
+  tooltips. Shell feedback spends the shared `GlassSurfaceRole::Toast`; it
+  keeps the existing floating Card-tier material while one owner controls the
+  tier and elevation.
 - `root/responsive.rs` derives one frame/content budget. Pages receive explicit
   slots after shell chrome is deducted; width and vertical capacity stay
   separate.

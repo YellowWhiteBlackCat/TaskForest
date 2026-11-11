@@ -11,7 +11,6 @@
 use taskmanager_shell::presentation::fan_rpm;
 use taskmanager_shell::presentation::power_w;
 use taskmanager_shell::presentation::temperature_c;
-use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::theme_binding::definite_length;
 use taskmanager_ui::theme_binding::font_size;
 use taskmanager_ui::theme_binding::font_weight;
@@ -44,7 +43,7 @@ use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MIN_WIDTH;
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier, Length, Theme};
+use taskmanager_theme::{Color, Length, Theme};
 use taskmanager_ui_contract::presentation::budget::PerformancePageBudget;
 use taskmanager_ui_contract::presentation::vocabulary::{
     PerformanceDetailsPresentation, PerformanceVerticalRunway,
@@ -519,10 +518,8 @@ fn summary_overlay(theme: &Theme, row: Div) -> Div {
         .max_w(px(320.0))
         .min_w(px(0.0))
         .child(
-            CardSurface::unpadded(theme.palette())
-                .glass(GlassTier::Card)
+            elements::graph_surface(theme)
                 .radius(tokens::control_radius(theme))
-                .inset()
                 .render()
                 .px(definite_length(tokens::SPACE_8))
                 .py(definite_length(tokens::SPACE_2))

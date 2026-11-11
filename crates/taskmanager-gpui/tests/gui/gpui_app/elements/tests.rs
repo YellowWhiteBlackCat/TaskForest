@@ -4,6 +4,7 @@
 //! shared search-highlight matcher parity (ADR-020). `super::` resolves back
 //! into the parent `elements` module where the helpers live.
 
+use taskmanager_ui::theme_binding::glass_fill;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::rgba;
 // Re-export every helper from the parent `elements` module so the nested
@@ -66,6 +67,7 @@ mod card_shadow_tests {
     use crate::gpui_app::graph::{GraphSettings, new_graph_cache};
     use gpui::{Hsla, Styled, div};
     use std::rc::Rc;
+    use taskmanager_theme::GlassSurfaceRole;
     use taskmanager_theme::theme::{GlassShadowProjection, GlassTier};
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::theme_binding::glass_shadow;
@@ -159,9 +161,20 @@ mod card_shadow_tests {
 
     #[test]
     fn inline_graphs_do_not_stack_shadows() {
-        let theme = Theme::dark();
+        for skin in Skin::ALL {
+            for mode in LightDark::ALL {
+                for high_contrast in [HighContrast::Off, HighContrast::On] {
+                    let theme =
+                        Theme::build(skin, mode, high_contrast, ResolvedFonts::system_for(skin));
+                    assert_inline_graph_surface_does_not_stack_shadows(&theme);
+                }
+            }
+        }
+    }
+
+    fn assert_inline_graph_surface_does_not_stack_shadows(theme: &Theme) {
         let mut cell = mini_graph_cell(
-            &theme,
+            theme,
             "core-test",
             Rc::from([25.0_f32].as_slice()),
             theme.cpu,
@@ -176,13 +189,27 @@ mod card_shadow_tests {
                 .is_none_or(|shadows| shadows.is_empty()),
             "an inline graph cell must not stack a second shadow"
         );
-        let mut main = graph_card(&theme, div());
+        let mut main = graph_card(theme, div());
         assert!(
             main.style()
                 .box_shadow
                 .as_ref()
                 .is_none_or(|shadows| shadows.is_empty()),
             "the enclosing graph card must not stack a second shadow"
+        );
+
+        let mut pill = graph_surface(theme).render();
+        assert_eq!(
+            pill.style().background.as_ref(),
+            Some(&glass_fill(theme, GlassSurfaceRole::InlinePlot.tier())),
+            "inline chart material must resolve through the shared InlinePlot role"
+        );
+        assert!(
+            pill.style()
+                .box_shadow
+                .as_ref()
+                .is_none_or(|shadows| shadows.is_empty()),
+            "inline chart surfaces must stay inset"
         );
     }
 
