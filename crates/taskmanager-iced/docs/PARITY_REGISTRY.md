@@ -57,6 +57,11 @@ uses the shared select. These are
 PRESENTATION executions of the shared tokens, not new semantics: the
 two registered divergences above keep their reasons unchanged.
 
+Native Iced status values from the activation and input families pass through
+`ControlPaintState` and the shared `ControlInkPriority` before a style reads
+theme tokens. Slider drag, opened select and focused text input therefore keep
+the same precedence as GPUI buttons instead of owning local status folds.
+
 The bounded horizontal action strip (`controls/strip.rs::bounded_toolbar`)
 keeps complete groups at intrinsic width and uses the caller's declared
 control role for its viewport height, without adding internal control

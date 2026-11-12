@@ -23,7 +23,7 @@ use taskmanager_shell::presentation::duration;
 use taskmanager_shell::presentation::{
     bytes, health_score_for_snapshot, health_score_summary, missing_value,
 };
-use taskmanager_theme::Theme;
+use taskmanager_theme::{GlassSurfaceRole, Theme};
 
 mod projection;
 
@@ -327,7 +327,7 @@ fn panel<'a>(
         .spacing(6)
         .width(Length::Fill),
     )
-    .style(move |_| theme::panel_style(theme_snapshot))
+    .style(move |_| theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::PageHeader))
     .padding(10)
     .width(Length::Fill)
     .into()

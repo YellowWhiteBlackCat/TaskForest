@@ -20,8 +20,8 @@ use bevy::render::renderer::{RenderAdapterInfo, RenderDevice};
 use bevy::scene::{CommandsSceneExt, bsn};
 use bevy::ui::UiTargetCamera;
 use bevy::ui::{
-    BackgroundColor, BorderColor, ComputedNode, Node, PositionType, UiGlobalTransform, UiSystems,
-    Val,
+    BackgroundColor, BorderColor, BoxShadow, ComputedNode, Node, PositionType, ShadowStyle,
+    UiGlobalTransform, UiSystems, Val,
 };
 use bevy::ui_render::prelude::MaterialNode;
 use taskmanager_theme::GlassTier;
@@ -35,6 +35,7 @@ use super::{
     OpticalGlassUniform, optical_glass_capability,
 };
 use crate::glass::GlassNoiseLayer;
+use crate::palette::UiPalette;
 use crate::widgets::chart::canvas::CanvasGrid;
 use crate::widgets::chart::painter::paint_chart_canvases;
 use crate::widgets::chart::{ChartCanvas, ChartPaintState, ChartStyle};
@@ -136,19 +137,43 @@ pub(crate) fn register(app: &mut App) {
     );
 }
 
+/// The painted/optical ownership system's declared access set.
+#[derive(SystemParam)]
+pub(crate) struct OpticalPaintAccess<'w, 's> {
+    palette: Option<Res<'w, WindowPalette>>,
+    sources: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static OpticalBackdropSource,
+            &'static mut ChartCanvas,
+        ),
+    >,
+    parents: Query<'w, 's, &'static ChildOf>,
+    children: Query<'w, 's, &'static Children>,
+    background: Query<'w, 's, (&'static mut BackgroundColor, &'static mut BorderColor)>,
+    shadows: Query<'w, 's, &'static mut BoxShadow>,
+    grain_layers: Query<'w, 's, &'static mut Visibility, With<GlassNoiseLayer>>,
+}
+
 /// Preserve the painted card until GPU readiness can be observed.
 pub(crate) fn sync_optical_backdrop_paint(
-    palette: Option<Res<WindowPalette>>,
     cards: Query<(Entity, &OpticalGlassCard, Option<&OpticalGlassBinding>)>,
-    mut sources: Query<(Entity, &OpticalBackdropSource, &mut ChartCanvas)>,
-    parents: Query<&ChildOf>,
-    children: Query<&Children>,
-    mut background: Query<(&mut BackgroundColor, &mut BorderColor)>,
-    mut grain_layers: Query<&mut Visibility, With<GlassNoiseLayer>>,
+    mut access: OpticalPaintAccess<'_, '_>,
 ) {
-    let Some(palette) = palette else {
+    let Some(palette) = access.palette else {
         return;
     };
+    let OpticalPaintAccess {
+        ref mut sources,
+        ref parents,
+        ref children,
+        ref mut background,
+        ref mut shadows,
+        ref mut grain_layers,
+        ..
+    } = access;
     for (card_entity, card, binding) in &cards {
         let is_attached = matches!(binding, Some(OpticalGlassBinding::Attached(_)));
         if let Ok((mut fill, mut border)) = background.get_mut(card_entity) {
@@ -167,6 +192,12 @@ pub(crate) fn sync_optical_backdrop_paint(
                 *border = BorderColor::all(next_edge);
             }
         }
+        if let Ok(mut shadows) = shadows.get_mut(card_entity) {
+            let next_shadows = optical_shadow(&palette.inner, card.tier, is_attached);
+            if shadows.0 != next_shadows {
+                shadows.0 = next_shadows;
+            }
+        }
         if let Ok(card_children) = children.get(card_entity) {
             let next_vis = if is_attached {
                 Visibility::Hidden
@@ -182,8 +213,8 @@ pub(crate) fn sync_optical_backdrop_paint(
             }
         }
 
-        for (entity, source, mut canvas) in &mut sources {
-            if !is_descendant(entity, card_entity, &parents) {
+        for (entity, source, mut canvas) in sources.iter_mut() {
+            if !is_descendant(entity, card_entity, parents) {
                 continue;
             }
             if canvas.style.grid != source.grid {
@@ -423,6 +454,18 @@ fn backdrop_chart_style(source: ChartStyle, grid: Option<CanvasGrid>) -> ChartSt
         flow: None,
         format: None,
     }
+}
+
+/// Keep the theme's layered elevation visible while the optical material owns
+/// the panel's inner refraction and rim. Both paths share the same ambient /
+/// contact geometry; the optical path discards only the contact layer's ink,
+/// which the WESL Fresnel rim replaces at the edge.
+fn optical_shadow(palette: &UiPalette, tier: GlassTier, attached: bool) -> Vec<ShadowStyle> {
+    let mut shadows = palette.glass_shadow(tier);
+    if attached && let Some(contact) = shadows.last_mut() {
+        contact.color = Color::NONE;
+    }
+    shadows
 }
 
 fn border_matches(border: &BorderColor, color: Color) -> bool {

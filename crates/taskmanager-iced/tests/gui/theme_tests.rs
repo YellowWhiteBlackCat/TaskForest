@@ -470,6 +470,20 @@ fn page_card_entry_points_spend_the_shared_role_material() {
     assert_eq!(stats_rail_style(&theme), role);
 }
 
+/// Nested modal health panels use the inset PageHeader role: the same Card
+/// glass material as a page card, but no second floating elevation shadow.
+#[test]
+fn inset_page_header_keeps_card_material_without_a_second_shadow() {
+    let theme = Theme::dark();
+    let page_card = glass_surface_style(&theme, GlassSurfaceRole::PageCard);
+    let page_header = glass_surface_style(&theme, GlassSurfaceRole::PageHeader);
+    assert_eq!(page_header.background, page_card.background);
+    assert_eq!(page_header.border, page_card.border);
+    assert_eq!(page_header.text_color, page_card.text_color);
+    assert_eq!(page_header.shadow, iced::Shadow::default());
+    assert_ne!(page_card.shadow, iced::Shadow::default());
+}
+
 #[test]
 fn high_contrast_mode_strengthens_iced_borders_and_text() {
     let standard = Theme::build(

@@ -30,6 +30,7 @@ use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use super::IcedElement;
+use super::controls::state::ControlPaintState;
 use crate::app::{FocusTarget, Message};
 use crate::focus::focus_id;
 use crate::theme::{self, ControlVisualState};
@@ -105,12 +106,12 @@ pub(crate) fn switch<'a>(
 fn switch_track_fill(theme_snapshot: &Theme, on: bool, status: button::Status) -> Color {
     let palette = theme_snapshot.palette();
     let base = if on { palette.accent } else { palette.border };
-    match status {
-        button::Status::Disabled => {
+    match ControlPaintState::from_button(status).visual() {
+        ControlVisualState::Disabled => {
             crate::theme_binding::color(mix(base, palette.window_backdrop, 0.5))
         }
-        button::Status::Hovered => crate::theme_binding::color(mix(base, palette.hover, 0.28)),
-        button::Status::Pressed => {
+        ControlVisualState::Hovered => crate::theme_binding::color(mix(base, palette.hover, 0.28)),
+        ControlVisualState::Pressed => {
             crate::theme_binding::color(mix(base, color::Color::BLACK, 0.22))
         }
         _ => crate::theme_binding::color(base),
@@ -138,11 +139,7 @@ fn switch_knob_style(theme_snapshot: &Theme, disabled: bool) -> container::Style
     let mut style = theme::control_glass(
         theme_snapshot,
         ControlRole::Badge,
-        if disabled {
-            ControlVisualState::Disabled
-        } else {
-            ControlVisualState::Active
-        },
+        ControlVisualState::from_ink_priority(false, false, false, disabled, false),
     );
     style.background = Some(Background::Color(crate::theme_binding::color(
         if disabled {
@@ -233,11 +230,7 @@ fn slider_style(
     status: iced::widget::slider::Status,
 ) -> iced::widget::slider::Style {
     let palette = theme_snapshot.palette();
-    let state = match status {
-        iced::widget::slider::Status::Active => ControlVisualState::Active,
-        iced::widget::slider::Status::Hovered => ControlVisualState::Hovered,
-        iced::widget::slider::Status::Dragged => ControlVisualState::Pressed,
-    };
+    let state = ControlPaintState::from_slider(status).visual();
     let glass = theme::control_glass(theme_snapshot, ControlRole::Toggle, state);
     let gradient = theme::control_glass_gradient(theme_snapshot, &glass);
     iced::widget::slider::Style {
@@ -321,11 +314,7 @@ fn select_style(
     status: iced::widget::pick_list::Status,
 ) -> iced::widget::pick_list::Style {
     let palette = theme_snapshot.palette();
-    let state = match status {
-        iced::widget::pick_list::Status::Active => ControlVisualState::Active,
-        iced::widget::pick_list::Status::Hovered => ControlVisualState::Hovered,
-        iced::widget::pick_list::Status::Opened { .. } => ControlVisualState::Focused,
-    };
+    let state = ControlPaintState::from_pick_list(status).visual();
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
     let background =
         iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
@@ -410,12 +399,7 @@ fn search_style(
     status: iced::widget::text_input::Status,
 ) -> iced::widget::text_input::Style {
     let palette = theme_snapshot.palette();
-    let state = match status {
-        iced::widget::text_input::Status::Active => ControlVisualState::Active,
-        iced::widget::text_input::Status::Hovered => ControlVisualState::Hovered,
-        iced::widget::text_input::Status::Focused { .. } => ControlVisualState::Focused,
-        iced::widget::text_input::Status::Disabled => ControlVisualState::Disabled,
-    };
+    let state = ControlPaintState::from_text_input(status).visual();
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
     let background =
         iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
@@ -436,12 +420,7 @@ fn search_style(
 }
 
 fn search_clear_style(theme_snapshot: &Theme, status: button::Status) -> button::Style {
-    let state = match status {
-        button::Status::Active => ControlVisualState::Active,
-        button::Status::Hovered => ControlVisualState::Hovered,
-        button::Status::Pressed => ControlVisualState::Pressed,
-        button::Status::Disabled => ControlVisualState::Disabled,
-    };
+    let state = ControlPaintState::from_button(status).visual();
     let glass = theme::control_glass(theme_snapshot, ControlRole::IconButton, state);
     button::Style {
         background: glass.background,
@@ -581,6 +560,13 @@ fn segment_style(
 ) -> button::Style {
     let palette = theme_snapshot.palette();
     let radius = theme::scaled_radius(theme_snapshot, palette.control_radius);
+    let ink = ControlVisualState::from_ink_priority(
+        matches!(status, button::Status::Hovered),
+        matches!(status, button::Status::Pressed),
+        false,
+        matches!(status, button::Status::Disabled),
+        selected,
+    );
     // The track is ONE connected surface: an idle segment stays transparent
     // so the track's own glass shows through, exactly as the GPUI connected
     // track renders. The active segment fills with the accent and wins over
@@ -591,12 +577,12 @@ fn segment_style(
             crate::theme_binding::color(theme_snapshot.accent_text),
         )
     } else {
-        match status {
-            button::Status::Hovered => (
+        match ink {
+            ControlVisualState::Hovered => (
                 Background::Color(crate::theme_binding::color(palette.hover)),
                 crate::theme_binding::color(palette.fg),
             ),
-            button::Status::Pressed => (
+            ControlVisualState::Pressed => (
                 Background::Color(crate::theme_binding::color(mix(
                     palette.hover,
                     palette.window_backdrop,
@@ -604,7 +590,7 @@ fn segment_style(
                 ))),
                 crate::theme_binding::color(palette.fg),
             ),
-            button::Status::Disabled => (
+            ControlVisualState::Disabled => (
                 Background::Color(Color::TRANSPARENT),
                 crate::theme_binding::color(palette.fg_muted),
             ),

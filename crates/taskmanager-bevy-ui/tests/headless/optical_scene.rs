@@ -17,7 +17,7 @@ use bevy::math::{UVec2, Vec2};
 use bevy::scene::ScenePlugin;
 use bevy::ui::widget::Text;
 use bevy::ui::{
-    BackgroundColor, BorderColor, ComputedNode, Node, UiGlobalTransform, UiTargetCamera,
+    BackgroundColor, BorderColor, BoxShadow, ComputedNode, Node, UiGlobalTransform, UiTargetCamera,
 };
 use taskmanager_theme::optical_glass::OpticalGlassFeature;
 use taskmanager_theme::tokens::UiSize;
@@ -180,6 +180,7 @@ fn an_attached_material_does_not_hide_the_painted_fallback() {
             },
             BackgroundColor(palette.glass_fill(GlassTier::Card)),
             BorderColor::all(palette.glass_edge(GlassTier::Card)),
+            BoxShadow(palette.glass_shadow(GlassTier::Card)),
             OpticalGlassBinding::Attached(Handle::default()),
         ))
         .id();
@@ -223,6 +224,22 @@ fn an_attached_material_does_not_hide_the_painted_fallback() {
         world.get::<BorderColor>(card).expect("card edge").top,
         Color::NONE
     );
+    let attached = world.get::<BoxShadow>(card).expect("card shadow").0.clone();
+    let painted = palette.glass_shadow(GlassTier::Card);
+    assert_eq!(
+        attached.len(),
+        painted.len(),
+        "the shared shadow ladder stays"
+    );
+    for (attached_layer, painted_layer) in attached.iter().zip(painted.iter()) {
+        assert_eq!(attached_layer.y_offset, painted_layer.y_offset);
+        assert_eq!(attached_layer.blur_radius, painted_layer.blur_radius);
+    }
+    assert_ne!(
+        attached.last().map(|layer| layer.color),
+        painted.last().map(|layer| layer.color),
+        "the optical material's Fresnel rim replaces the contact ink"
+    );
     assert_eq!(
         world.get::<Visibility>(grain).copied(),
         Some(Visibility::Hidden)
@@ -253,6 +270,11 @@ fn an_attached_material_does_not_hide_the_painted_fallback() {
     assert_eq!(
         world.get::<BorderColor>(card).expect("fallback edge").top,
         palette.glass_edge(GlassTier::Card)
+    );
+    assert_eq!(
+        world.get::<BoxShadow>(card).expect("fallback shadow").0,
+        palette.glass_shadow(GlassTier::Card),
+        "the painted fallback restores the theme's layered shadow"
     );
     assert_eq!(
         world.get::<Visibility>(grain).copied(),

@@ -15,6 +15,7 @@ use taskmanager_assets::embedded_fonts;
 use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_theme::{HighContrast, LightDark, Skin};
+use taskmanager_ui_contract::presentation::control_ink::ControlInkState;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 type TestElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
@@ -132,6 +133,64 @@ fn dispatch(
         );
     }
     messages
+}
+
+/// Every Iced input status folds through the shared interaction-ink verdict:
+/// a disabled status wins over hover/press, a dragged slider stays pressed,
+/// and an opened select keeps the focused ink even while hovered.
+#[test]
+fn input_status_folds_through_shared_control_ink() {
+    use crate::ui::components::controls::state::ControlPaintState;
+
+    let theme = theme_for(Skin::Gnome, LightDark::Dark).with_focus_visible(true);
+    assert_eq!(
+        ControlPaintState::from_button(button::Status::Disabled).visual(),
+        ControlVisualState::Disabled
+    );
+    let active_rail = slider_style(&theme, iced::widget::slider::Status::Active).rail;
+    let dragged_rail = slider_style(&theme, iced::widget::slider::Status::Dragged).rail;
+    assert_ne!(
+        dragged_rail.backgrounds.1, active_rail.backgrounds.1,
+        "a dragged slider must publish its resolved pressed ink"
+    );
+    assert_eq!(
+        ControlPaintState::from_slider(iced::widget::slider::Status::Dragged).visual(),
+        ControlVisualState::Pressed
+    );
+    assert_eq!(
+        ControlPaintState::from_pick_list(iced::widget::pick_list::Status::Opened {
+            is_hovered: true
+        })
+        .visual(),
+        ControlVisualState::Focused
+    );
+    assert_eq!(
+        ControlPaintState::from_text_input(iced::widget::text_input::Status::Focused {
+            is_hovered: true
+        })
+        .visual(),
+        ControlVisualState::Focused
+    );
+    assert_eq!(
+        ControlInkState::Focused.changes_measurement(),
+        false,
+        "control ink only reweights paint"
+    );
+    assert_ne!(
+        switch_track_fill(&theme, true, button::Status::Disabled),
+        switch_track_fill(&theme, true, button::Status::Hovered),
+        "a disabled switch must not keep the hover ink"
+    );
+    assert_eq!(
+        select_style(
+            &theme,
+            iced::widget::pick_list::Status::Opened { is_hovered: true },
+        )
+        .border
+        .color,
+        crate::theme::focus_ring_color(&theme.with_focus_visible(true), false),
+        "an opened select must keep the focused ink over hover"
+    );
 }
 
 fn apply(app: &mut crate::IcedApp, messages: Vec<Message>) {

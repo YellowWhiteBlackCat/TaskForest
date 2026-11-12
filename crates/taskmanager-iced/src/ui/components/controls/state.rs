@@ -4,7 +4,7 @@
 //! `ControlVisualState` is the only vocabulary `control_glass` accepts. This
 //! module owns that conversion and no geometry or interaction policy.
 
-use iced::widget::{button, checkbox, text_editor, text_input};
+use iced::widget::{button, checkbox, pick_list, slider, text_editor, text_input};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, Theme};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -75,6 +75,28 @@ impl ControlPaintState {
             false,
             matches!(status, text_editor::Status::Focused { .. }),
             matches!(status, text_editor::Status::Disabled),
+            false,
+        ))
+    }
+
+    #[must_use]
+    pub(crate) const fn from_slider(status: slider::Status) -> Self {
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, slider::Status::Hovered),
+            matches!(status, slider::Status::Dragged),
+            false,
+            false,
+            false,
+        ))
+    }
+
+    #[must_use]
+    pub(crate) const fn from_pick_list(status: pick_list::Status) -> Self {
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, pick_list::Status::Hovered),
+            false,
+            matches!(status, pick_list::Status::Opened { .. }),
+            false,
             false,
         ))
     }

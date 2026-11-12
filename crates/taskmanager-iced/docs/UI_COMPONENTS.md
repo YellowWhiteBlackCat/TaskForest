@@ -54,12 +54,15 @@ native selection and renderer caches; all shared types use their defining module
   `GlassSurfaceRole::PageHeader`: it keeps the Card-tier fill and hairline
   without stacking the floating elevation shadow that the GPUI control-band
   owner removed.
+  Health-modal inner panels spend the same inset `PageHeader` role, so a modal
+  never stacks a second floating shadow on its own nested surfaces.
   `theme/control_measurement.rs` selects the live `UiSize`/`RowDensity` axis
   and delegates to `presentation_binding::control_measurement`; every control
   spends `ControlRole::{Button, IconButton, Input, Toggle}` through
-  `resolve_size`, never a second size table. Toolkit statuses fold through
-  the shared `ControlInkPriority`, so hover/pressed/focus/disabled resolve
-  to exactly one ink and only reweight paint (the shared
+  `resolve_size`, never a second size table. Toolkit statuses from buttons,
+  inputs, editors, switches, sliders, selects and segmented segments fold
+  through the shared `ControlInkPriority`, so hover/pressed/focus/disabled
+  resolve to exactly one ink and only reweight paint (the shared
   `ControlState::changes_measurement` contract). The focus ring reads the
   shared ring token, so a pointer-driven focus paints no ring on the switch,
   segmented track, buttons or checkbox. Primary page cards, generic panels

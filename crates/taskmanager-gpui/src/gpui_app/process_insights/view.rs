@@ -26,7 +26,7 @@ use taskforest_core::core::process_telemetry::LimitValue;
 use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProjectedProcessResources;
 use taskmanager_theme::tokens;
-use taskmanager_theme::{Color, GlassTier, Theme};
+use taskmanager_theme::{Color, GlassSurfaceRole, Theme};
 
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
@@ -121,8 +121,7 @@ pub(crate) fn render_process_insights(props: ProcessInsightsViewProps<'_>) -> Di
 }
 
 fn card(theme: &Theme, title: &str, width: f32) -> Div {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
+    CardSurface::for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
         .padding(tokens::SPACE_10)
         .radius(tokens::card_radius(theme))
         .bordered(false)
@@ -585,6 +584,10 @@ fn error_label(kind: ProcessInsightsErrorKind, labels: &ProcessInsightsLabels) -
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_cap_tests.rs"]
 mod cap_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/process_insights/surface.rs"]
+mod surface_tests;
 
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_environment_tests.rs"]
