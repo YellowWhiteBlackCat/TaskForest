@@ -27,10 +27,11 @@ use iced::{Background, Border, Color, Length};
 use taskmanager_theme::color::{self, mix};
 use taskmanager_theme::{GlassSurfaceRole, GlassTier, Theme, tokens};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::control_ink::ControlInkPriority;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use super::IcedElement;
-use super::controls::state::ControlPaintState;
+use super::controls::state::{button_ink, pick_list_ink, slider_ink, text_input_ink};
 use crate::app::{FocusTarget, Message};
 use crate::focus::focus_id;
 use crate::theme::{self, ControlVisualState};
@@ -106,7 +107,7 @@ pub(crate) fn switch<'a>(
 fn switch_track_fill(theme_snapshot: &Theme, on: bool, status: button::Status) -> Color {
     let palette = theme_snapshot.palette();
     let base = if on { palette.accent } else { palette.border };
-    match ControlPaintState::from_button(status).visual() {
+    match button_ink(status) {
         ControlVisualState::Disabled => {
             crate::theme_binding::color(mix(base, palette.window_backdrop, 0.5))
         }
@@ -139,7 +140,13 @@ fn switch_knob_style(theme_snapshot: &Theme, disabled: bool) -> container::Style
     let mut style = theme::control_glass(
         theme_snapshot,
         ControlRole::Badge,
-        ControlVisualState::from_ink_priority(false, false, false, disabled, false),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: false,
+            pressed: false,
+            focused: false,
+            disabled,
+            selected: false,
+        }),
     );
     style.background = Some(Background::Color(crate::theme_binding::color(
         if disabled {
@@ -230,7 +237,7 @@ fn slider_style(
     status: iced::widget::slider::Status,
 ) -> iced::widget::slider::Style {
     let palette = theme_snapshot.palette();
-    let state = ControlPaintState::from_slider(status).visual();
+    let state = slider_ink(status);
     let glass = theme::control_glass(theme_snapshot, ControlRole::Toggle, state);
     let gradient = theme::control_glass_gradient(theme_snapshot, &glass);
     iced::widget::slider::Style {
@@ -316,7 +323,7 @@ fn select_style(
     status: iced::widget::pick_list::Status,
 ) -> iced::widget::pick_list::Style {
     let palette = theme_snapshot.palette();
-    let state = ControlPaintState::from_pick_list(status).visual();
+    let state = pick_list_ink(status);
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
     let background =
         iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
@@ -333,7 +340,9 @@ fn select_style(
 /// Card-tier fill, hairline edge, panel radius and elevation the GPUI
 /// dropdown menu paints, instead of the toolkit's default opaque, square
 /// menu surface. The cursor row spends the shared hover ink with the normal
-/// foreground, exactly like the GPUI popup menu's cursor row.
+/// foreground, exactly like the GPUI popup menu's cursor row. That cursor ink
+/// is the shared fold's `Hovered` verdict: the toolkit paints the cursor row
+/// in the hover token, and the fold is what names that ink.
 #[must_use]
 pub(crate) fn select_menu_style(theme_snapshot: &Theme) -> iced::widget::overlay::menu::Style {
     let palette = theme_snapshot.palette();
@@ -345,7 +354,7 @@ pub(crate) fn select_menu_style(theme_snapshot: &Theme) -> iced::widget::overlay
         border: surface.border,
         text_color: crate::theme_binding::color(palette.fg),
         selected_text_color: crate::theme_binding::color(palette.fg),
-        selected_background: Background::Color(crate::theme_binding::color(palette.hover)),
+        selected_background: Background::Color(theme::hover_ink(theme_snapshot)),
         shadow: surface.shadow,
     }
 }
@@ -422,7 +431,7 @@ fn search_style(
     status: iced::widget::text_input::Status,
 ) -> iced::widget::text_input::Style {
     let palette = theme_snapshot.palette();
-    let state = ControlPaintState::from_text_input(status).visual();
+    let state = text_input_ink(status);
     let glass = theme::control_glass(theme_snapshot, ControlRole::Input, state);
     let background =
         iced::Background::Gradient(theme::control_glass_gradient(theme_snapshot, &glass));
@@ -443,7 +452,7 @@ fn search_style(
 }
 
 fn search_clear_style(theme_snapshot: &Theme, status: button::Status) -> button::Style {
-    let state = ControlPaintState::from_button(status).visual();
+    let state = button_ink(status);
     let glass = theme::control_glass(theme_snapshot, ControlRole::IconButton, state);
     button::Style {
         background: glass.background,
@@ -573,7 +582,10 @@ fn segmented_neighbor_index(
 
 /// One segment's surface. The active segment fills with the accent and wins
 /// over hover (a selected segment stays accent-filled); idle segments are
-/// transparent over the track surface with token hover/pressed tints.
+/// transparent over the track surface with token hover/pressed tints. That
+/// "selection wins over the transient pointer states" rule has ONE address:
+/// the shared selection-dominant fold, the same verdict the GPUI segmented
+/// control resolves.
 fn segment_style(
     theme_snapshot: &Theme,
     index: usize,
@@ -583,45 +595,49 @@ fn segment_style(
 ) -> button::Style {
     let palette = theme_snapshot.palette();
     let radius = theme::scaled_radius(theme_snapshot, palette.control_radius);
-    let ink = ControlVisualState::from_ink_priority(
-        matches!(status, button::Status::Hovered),
-        matches!(status, button::Status::Pressed),
-        false,
-        matches!(status, button::Status::Disabled),
+    // The active segment paints the accent as its OWN fill, so the shared
+    // selection-dominant fold resolves its ink. The press signal is
+    // projected only for an idle segment: the GPUI twin's active segment
+    // carries no press ink at all (its fill is a function of active and
+    // hovered alone), so the accent that shows which choice is active stays
+    // visible while it is pressed — the same pixels this frontend painted
+    // before the rule moved into the shared fold.
+    let ink = ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+        hovered: matches!(status, button::Status::Hovered),
+        pressed: matches!(status, button::Status::Pressed) && !selected,
+        focused: false,
+        disabled: matches!(status, button::Status::Disabled),
         selected,
-    );
+    });
     // The track is ONE connected surface: an idle segment stays transparent
     // so the track's own glass shows through, exactly as the GPUI connected
     // track renders. The active segment fills with the accent and wins over
     // hover; the hover/pressed tints are the shared palette tokens.
-    let (background, text_color) = if selected {
-        (
+    let (background, text_color) = match ink {
+        ControlVisualState::Selected => (
             Background::Color(crate::theme_binding::color(palette.accent)),
             crate::theme_binding::color(theme_snapshot.accent_text),
-        )
-    } else {
-        match ink {
-            ControlVisualState::Hovered => (
-                Background::Color(crate::theme_binding::color(palette.hover)),
-                crate::theme_binding::color(palette.fg),
-            ),
-            ControlVisualState::Pressed => (
-                Background::Color(crate::theme_binding::color(mix(
-                    palette.hover,
-                    palette.window_backdrop,
-                    0.45,
-                ))),
-                crate::theme_binding::color(palette.fg),
-            ),
-            ControlVisualState::Disabled => (
-                Background::Color(Color::TRANSPARENT),
-                crate::theme_binding::color(palette.fg_muted),
-            ),
-            _ => (
-                Background::Color(Color::TRANSPARENT),
-                crate::theme_binding::color(palette.fg),
-            ),
-        }
+        ),
+        ControlVisualState::Hovered => (
+            Background::Color(crate::theme_binding::color(palette.hover)),
+            crate::theme_binding::color(palette.fg),
+        ),
+        ControlVisualState::Pressed => (
+            Background::Color(crate::theme_binding::color(mix(
+                palette.hover,
+                palette.window_backdrop,
+                0.45,
+            ))),
+            crate::theme_binding::color(palette.fg),
+        ),
+        ControlVisualState::Disabled => (
+            Background::Color(Color::TRANSPARENT),
+            crate::theme_binding::color(palette.fg_muted),
+        ),
+        _ => (
+            Background::Color(Color::TRANSPARENT),
+            crate::theme_binding::color(palette.fg),
+        ),
     };
     button::Style {
         background: Some(background),

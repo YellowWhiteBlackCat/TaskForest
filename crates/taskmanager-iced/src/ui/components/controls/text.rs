@@ -9,10 +9,10 @@ use iced::{Background, Length};
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
-use super::state::ControlPaintState;
+use super::state::{text_editor_ink, text_input_ink};
 use crate::app::{FocusTarget, Message};
 use crate::focus::focus_id;
-use crate::theme::{self, control_glass};
+use crate::theme::{self, ControlVisualState, control_glass};
 use crate::ui::components::IcedElement;
 
 /// A single-line input. `id` binds the field to the shared focus shell's
@@ -35,11 +35,7 @@ pub(crate) fn plain_text_input<'a>(
         .padding([(extent - font_size * 1.3).max(0.0) * 0.5, padding_x])
         .size(font_size)
         .style(move |_, status| {
-            text_input_style(
-                theme_snapshot,
-                ControlRole::Input,
-                ControlPaintState::from_text_input(status),
-            )
+            text_input_style(theme_snapshot, ControlRole::Input, text_input_ink(status))
         })
         .width(Length::Fill);
     if let Some(target) = target {
@@ -58,9 +54,9 @@ pub(crate) fn plain_text_input<'a>(
 pub(crate) fn text_input_style(
     theme: &Theme,
     role: ControlRole,
-    state: ControlPaintState,
+    state: ControlVisualState,
 ) -> text_input::Style {
-    let glass = control_glass(theme, role, state.visual());
+    let glass = control_glass(theme, role, state);
     let palette = theme.palette();
     let ink = glass
         .text_color
@@ -101,11 +97,7 @@ pub(crate) fn multi_line_text_input<'a>(
         .font(crate::theme_binding::ui_font(theme_snapshot))
         .height(Length::Fixed(extent * 3.0))
         .style(move |_, status| {
-            text_editor_style(
-                theme_snapshot,
-                ControlRole::Input,
-                ControlPaintState::from_text_editor(status),
-            )
+            text_editor_style(theme_snapshot, ControlRole::Input, text_editor_ink(status))
         });
     if let Some(target) = target {
         editor = editor.id(iced::widget::Id::from(focus_id(target)));
@@ -135,9 +127,9 @@ pub(crate) fn multi_line_text_input<'a>(
 pub(crate) fn text_editor_style(
     theme: &Theme,
     role: ControlRole,
-    state: ControlPaintState,
+    state: ControlVisualState,
 ) -> text_editor::Style {
-    let glass = control_glass(theme, role, state.visual());
+    let glass = control_glass(theme, role, state);
     let palette = theme.palette();
     let ink = glass
         .text_color

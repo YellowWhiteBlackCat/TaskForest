@@ -140,11 +140,13 @@ fn dispatch(
 /// and an opened select keeps the focused ink even while hovered.
 #[test]
 fn input_status_folds_through_shared_control_ink() {
-    use crate::ui::components::controls::state::ControlPaintState;
+    use crate::ui::components::controls::state::{
+        button_ink, pick_list_ink, slider_ink, text_input_ink,
+    };
 
     let theme = theme_for(Skin::Gnome, LightDark::Dark).with_focus_visible(true);
     assert_eq!(
-        ControlPaintState::from_button(button::Status::Disabled).visual(),
+        button_ink(button::Status::Disabled),
         ControlVisualState::Disabled
     );
     let active_rail = slider_style(&theme, iced::widget::slider::Status::Active).rail;
@@ -154,21 +156,15 @@ fn input_status_folds_through_shared_control_ink() {
         "a dragged slider must publish its resolved pressed ink"
     );
     assert_eq!(
-        ControlPaintState::from_slider(iced::widget::slider::Status::Dragged).visual(),
+        slider_ink(iced::widget::slider::Status::Dragged),
         ControlVisualState::Pressed
     );
     assert_eq!(
-        ControlPaintState::from_pick_list(iced::widget::pick_list::Status::Opened {
-            is_hovered: true
-        })
-        .visual(),
+        pick_list_ink(iced::widget::pick_list::Status::Opened { is_hovered: true }),
         ControlVisualState::Focused
     );
     assert_eq!(
-        ControlPaintState::from_text_input(iced::widget::text_input::Status::Focused {
-            is_hovered: true
-        })
-        .visual(),
+        text_input_ink(iced::widget::text_input::Status::Focused { is_hovered: true }),
         ControlVisualState::Focused
     );
     assert_eq!(
@@ -190,6 +186,54 @@ fn input_status_folds_through_shared_control_ink() {
         .color,
         crate::theme::focus_ring_color(&theme.with_focus_visible(true), false),
         "an opened select must keep the focused ink over hover"
+    );
+}
+
+/// The segmented segment resolves the shared SELECTION-DOMINANT fold, the
+/// same verdict the GPUI segmented control resolves: the active segment
+/// paints the accent as its own fill and keeps it while the pointer rests
+/// on it, while an idle segment still wears the hover tint. The visible
+/// pixels are the ones this frontend painted before the rule moved into the
+/// shared fold.
+#[test]
+fn segmented_segments_resolve_the_selection_dominant_fold() {
+    let theme = theme_for(Skin::Gnome, LightDark::Dark);
+    let palette = theme.palette();
+
+    let active = segment_style(&theme, 0, 3, true, button::Status::Active);
+    let active_hovered = segment_style(&theme, 0, 3, true, button::Status::Hovered);
+    let idle_hovered = segment_style(&theme, 1, 3, false, button::Status::Hovered);
+    let idle = segment_style(&theme, 1, 3, false, button::Status::Active);
+
+    let Some(Background::Color(active_fill)) = active.background else {
+        panic!("the active segment paints a solid fill");
+    };
+    let Some(Background::Color(active_hovered_fill)) = active_hovered.background else {
+        panic!("the hovered active segment paints a solid fill");
+    };
+    assert_eq!(
+        active_fill,
+        crate::theme_binding::color(palette.accent),
+        "the active segment wears the accent"
+    );
+    assert_eq!(
+        active_hovered_fill, active_fill,
+        "a pointer resting on the active segment must not erase the accent"
+    );
+    let Some(Background::Color(idle_hovered_fill)) = idle_hovered.background else {
+        panic!("the hovered idle segment paints a solid fill");
+    };
+    assert_eq!(
+        idle_hovered_fill,
+        crate::theme_binding::color(palette.hover),
+        "an idle segment still wears the shared hover ink"
+    );
+    let Some(Background::Color(idle_fill)) = idle.background else {
+        panic!("the idle segment paints a fill");
+    };
+    assert_ne!(
+        idle_fill, idle_hovered_fill,
+        "the idle segment's hover ink must differ from its resting fill"
     );
 }
 

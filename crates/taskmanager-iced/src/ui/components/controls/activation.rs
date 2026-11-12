@@ -15,10 +15,11 @@ use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use super::material::focusable_control_button;
-use super::state::{ButtonTone, ControlPaintState};
+use super::state::{ButtonTone, button_ink, checkbox_ink};
 use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
 use crate::theme;
+use crate::theme::ControlVisualState;
 use crate::ui::components::IcedElement;
 
 /// A shared-glass, focus-reachable button. Disabled keeps the same hit target
@@ -63,7 +64,7 @@ pub(crate) fn icon_button<'a>(
                 &style_theme,
                 ControlRole::IconButton,
                 ButtonTone::Secondary,
-                ControlPaintState::from_button(status),
+                button_ink(status),
             )
         }),
         padding: Padding::ZERO,
@@ -144,11 +145,7 @@ pub(crate) fn check_box<'a>(
                 | checkbox::Status::Hovered { is_checked }
                 | checkbox::Status::Disabled { is_checked } => is_checked,
             };
-            checkbox_style(
-                theme_snapshot,
-                ControlPaintState::from_checkbox(status),
-                is_checked,
-            )
+            checkbox_style(theme_snapshot, checkbox_ink(status), is_checked)
         });
     if !disabled {
         control = control.on_toggle(move |next| pointer_toggle(next));
@@ -169,15 +166,15 @@ pub(crate) fn check_box<'a>(
 #[must_use]
 pub(crate) fn checkbox_style(
     theme: &Theme,
-    state: ControlPaintState,
+    state: ControlVisualState,
     checked: bool,
 ) -> checkbox::Style {
-    let glass = theme::control_glass(theme, ControlRole::Toggle, state.visual());
+    let glass = theme::control_glass(theme, ControlRole::Toggle, state);
     let palette = theme.palette();
     let mut background = glass
         .background
         .unwrap_or_else(|| Background::Color(crate::theme_binding::color(palette.surface)));
-    if checked && state != ControlPaintState::Disabled {
+    if checked && state != ControlVisualState::Disabled {
         background = Background::Color(checked_glass_background(theme));
     }
     checkbox::Style {

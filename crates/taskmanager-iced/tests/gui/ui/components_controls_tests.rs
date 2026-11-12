@@ -9,7 +9,7 @@ use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Scrollable;
 use iced::advanced::widget::{Id, Tree};
 use iced::keyboard::key::{Code, Key, Named, Physical};
-use iced::widget::text_editor;
+use iced::widget::{button, text_editor};
 use iced::{Element, Event, Point, Rectangle, Size, mouse};
 use taskmanager_application::AppPage;
 use taskmanager_application::i18n::{Language, with_language};
@@ -27,7 +27,7 @@ use crate::theme::{ControlVisualState, control_glass};
 use crate::ui::components::divider;
 
 use super::activation::{checkbox_style, checked_glass_background};
-use super::state::{ControlPaintState, button_style};
+use super::state::{button_ink, button_style, text_editor_ink};
 use super::text::{text_editor_style, text_input_style};
 use super::*;
 
@@ -49,12 +49,12 @@ fn production_multi_line_text_input<'a>(
     )
 }
 
-fn production_text_editor_style(theme: &Theme, state: ControlPaintState) -> text_editor::Style {
+fn production_text_editor_style(theme: &Theme, state: ControlVisualState) -> text_editor::Style {
     text_editor_style(theme, ControlRole::Input, state)
 }
 
-fn editor_paint_state(status: text_editor::Status) -> ControlPaintState {
-    ControlPaintState::from_text_editor(status)
+fn editor_paint_state(status: text_editor::Status) -> ControlVisualState {
+    text_editor_ink(status)
 }
 
 #[derive(Default)]
@@ -247,21 +247,21 @@ fn control_styles_share_one_glass_material_and_keep_state_geometry_invariant() {
             assert_eq!(measured.padding_x, baseline.padding_x);
         }
     }
-    let checked = checkbox_style(&theme, ControlPaintState::Active, true);
-    let unchecked = checkbox_style(&theme, ControlPaintState::Active, false);
+    let checked = checkbox_style(&theme, ControlVisualState::Active, true);
+    let unchecked = checkbox_style(&theme, ControlVisualState::Active, false);
     assert_ne!(checked.background, unchecked.background);
     assert_eq!(checked.border, unchecked.border);
     let active = button_style(
         &theme,
         ControlRole::Button,
         ButtonTone::Secondary,
-        ControlPaintState::Active,
+        ControlVisualState::Active,
     );
     let pressed = button_style(
         &theme,
         ControlRole::Button,
         ButtonTone::Secondary,
-        ControlPaintState::Pressed,
+        ControlVisualState::Pressed,
     );
     assert_eq!(
         active.background,
@@ -275,15 +275,15 @@ fn control_styles_share_one_glass_material_and_keep_state_geometry_invariant() {
     assert_eq!(active.shadow.offset, pressed.shadow.offset);
     assert_eq!(active.shadow.blur_radius, pressed.shadow.blur_radius);
     assert!(pressed.shadow.color.a < active.shadow.color.a);
-    let input_active = text_input_style(&theme, ControlRole::Input, ControlPaintState::Active);
-    let input_focused = text_input_style(&theme, ControlRole::Input, ControlPaintState::Focused);
+    let input_active = text_input_style(&theme, ControlRole::Input, ControlVisualState::Active);
+    let input_focused = text_input_style(&theme, ControlRole::Input, ControlVisualState::Focused);
     assert_eq!(input_active.border.radius, input_focused.border.radius);
     assert_eq!(
         input_focused.border.color,
         crate::theme::focus_ring_color(&theme, false)
     );
-    let editor_active = production_text_editor_style(&theme, ControlPaintState::Active);
-    let editor_focused = production_text_editor_style(&theme, ControlPaintState::Focused);
+    let editor_active = production_text_editor_style(&theme, ControlVisualState::Active);
+    let editor_focused = production_text_editor_style(&theme, ControlVisualState::Focused);
     assert_eq!(editor_active.border.radius, editor_focused.border.radius);
     assert_eq!(
         editor_focused.border.color,
@@ -295,21 +295,64 @@ fn control_styles_share_one_glass_material_and_keep_state_geometry_invariant() {
     let _ = (
         pill(&theme, FocusTarget::EndTask, "pill", false, Message::Tick),
         production_multi_line_text_input(&theme, &text_editor::Content::with_text("line")),
-        text_input_style(&theme, ControlRole::Input, ControlPaintState::Active),
+        text_input_style(&theme, ControlRole::Input, ControlVisualState::Active),
         production_text_editor_style(&theme, editor_paint_state(text_editor::Status::Active)),
-        checkbox_style(&theme, ControlPaintState::Active, true),
-        checkbox_style(&theme, ControlPaintState::Active, false),
+        checkbox_style(&theme, ControlVisualState::Active, true),
+        checkbox_style(&theme, ControlVisualState::Active, false),
         checked_glass_background(&theme),
         button_style(
             &theme,
             ControlRole::Button,
             ButtonTone::Secondary,
-            ControlPaintState::Pressed,
+            ControlVisualState::Pressed,
         ),
         spinner(&theme, Some(0.25)),
         crate::ui::spinner::arc_span(0.0),
         crate::ui::spinner::arc_span(0.5),
         divider(&theme),
+    );
+}
+
+/// Every native toolkit status the control family consumes resolves through
+/// the shared interaction fold — there is no local status→ink table left in
+/// this frontend. The verdicts are the shared ones, so a hovered button, a
+/// disabled checkbox and a focused field read exactly like their GPUI twins.
+#[test]
+fn every_control_status_resolves_through_the_shared_fold() {
+    use super::state::{checkbox_ink, text_input_ink};
+
+    assert_eq!(
+        button_ink(button::Status::Active),
+        ControlVisualState::Active
+    );
+    assert_eq!(
+        button_ink(button::Status::Hovered),
+        ControlVisualState::Hovered
+    );
+    assert_eq!(
+        button_ink(button::Status::Pressed),
+        ControlVisualState::Pressed
+    );
+    assert_eq!(
+        button_ink(button::Status::Disabled),
+        ControlVisualState::Disabled
+    );
+    assert_eq!(
+        checkbox_ink(iced::widget::checkbox::Status::Hovered { is_checked: false }),
+        ControlVisualState::Hovered
+    );
+    assert_eq!(
+        checkbox_ink(iced::widget::checkbox::Status::Disabled { is_checked: false }),
+        ControlVisualState::Disabled
+    );
+    assert_eq!(
+        text_input_ink(iced::widget::text_input::Status::Focused { is_hovered: true }),
+        ControlVisualState::Focused,
+        "a focused field outranks the pointer resting on it"
+    );
+    assert_eq!(
+        text_editor_ink(text_editor::Status::Hovered),
+        ControlVisualState::Hovered
     );
 }
 

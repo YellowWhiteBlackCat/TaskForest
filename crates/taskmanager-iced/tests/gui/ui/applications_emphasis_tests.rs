@@ -99,7 +99,7 @@ fn the_destructive_emphasis_paints_the_theme_danger_token() {
         &theme,
         ControlRole::Button,
         crate::ui::components::ButtonTone::Danger,
-        crate::ui::components::controls::state::ControlPaintState::Active,
+        crate::theme::ControlVisualState::Active,
     );
     let Some(iced::Background::Color(destructive_fill)) = destructive.background else {
         panic!("the destructive button paints a solid fill");
@@ -117,7 +117,7 @@ fn the_destructive_emphasis_paints_the_theme_danger_token() {
         &theme,
         ControlRole::Button,
         crate::ui::components::ButtonTone::Primary,
-        crate::ui::components::controls::state::ControlPaintState::Active,
+        crate::theme::ControlVisualState::Active,
     );
     let Some(iced::Background::Color(ordinary_fill)) = ordinary.background else {
         panic!("the ordinary button paints the accent fill");

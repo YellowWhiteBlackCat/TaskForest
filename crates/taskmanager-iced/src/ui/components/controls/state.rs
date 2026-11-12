@@ -1,116 +1,94 @@
 //! Status-to-paint mapping for the shared Iced control family.
 //!
 //! Iced's own hover/focus/disabled statuses are toolkit signals; the shared
-//! `ControlVisualState` is the only vocabulary `control_glass` accepts. This
-//! module owns that conversion and no geometry or interaction policy.
+//! `ControlInkPriority` fold is the ONE precedence owner that turns them
+//! into an ink, and `ControlVisualState` is the only vocabulary `control_glass`
+//! accepts. This module only PROJECTS each toolkit's status into that shared
+//! priority — it never resolves a verdict of its own — and owns no geometry
+//! or interaction policy.
 
 use iced::widget::{button, checkbox, pick_list, slider, text_editor, text_input};
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, Theme};
+use taskmanager_ui_contract::presentation::control_ink::ControlInkPriority;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 use crate::theme::{self, ControlVisualState};
 
-/// One explicit paint decision, independent of the toolkit's own state
-/// tracking. Headless tests can drive every state through the same paint
-/// function without a live window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ControlPaintState {
-    Active,
-    Hovered,
-    Pressed,
-    Focused,
-    Disabled,
+/// The shared ink a native button status resolves to.
+#[must_use]
+pub(crate) const fn button_ink(status: button::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, button::Status::Hovered),
+        pressed: matches!(status, button::Status::Pressed),
+        focused: false,
+        disabled: matches!(status, button::Status::Disabled),
+        selected: false,
+    })
 }
 
-impl ControlPaintState {
-    #[must_use]
-    pub(crate) const fn visual(self) -> ControlVisualState {
-        match self {
-            Self::Active => ControlVisualState::Active,
-            Self::Hovered => ControlVisualState::Hovered,
-            Self::Pressed => ControlVisualState::Pressed,
-            Self::Focused => ControlVisualState::Focused,
-            Self::Disabled => ControlVisualState::Disabled,
-        }
-    }
+/// The shared ink a native single-line input status resolves to. A focused
+/// field outranks the pointer resting on it, so the keyboard modality ring
+/// stays readable while the pointer happens to be inside the field.
+#[must_use]
+pub(crate) const fn text_input_ink(status: text_input::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, text_input::Status::Hovered),
+        pressed: false,
+        focused: matches!(status, text_input::Status::Focused { .. }),
+        disabled: matches!(status, text_input::Status::Disabled),
+        selected: false,
+    })
+}
 
-    #[must_use]
-    pub(crate) const fn from_button(status: button::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, button::Status::Hovered),
-            matches!(status, button::Status::Pressed),
-            false,
-            matches!(status, button::Status::Disabled),
-            false,
-        ))
-    }
+/// The shared ink a native multi-line editor status resolves to.
+#[must_use]
+pub(crate) const fn text_editor_ink(status: text_editor::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, text_editor::Status::Hovered),
+        pressed: false,
+        focused: matches!(status, text_editor::Status::Focused { .. }),
+        disabled: matches!(status, text_editor::Status::Disabled),
+        selected: false,
+    })
+}
 
-    #[must_use]
-    pub(crate) const fn from_text_input(status: text_input::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, text_input::Status::Hovered),
-            false,
-            matches!(status, text_input::Status::Focused { .. }),
-            matches!(status, text_input::Status::Disabled),
-            false,
-        ))
-    }
+/// The shared ink a native checkbox status resolves to.
+#[must_use]
+pub(crate) const fn checkbox_ink(status: checkbox::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, checkbox::Status::Hovered { .. }),
+        pressed: false,
+        focused: false,
+        disabled: matches!(status, checkbox::Status::Disabled { .. }),
+        selected: false,
+    })
+}
 
-    #[must_use]
-    pub(crate) const fn from_checkbox(status: checkbox::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, checkbox::Status::Hovered { .. }),
-            false,
-            false,
-            matches!(status, checkbox::Status::Disabled { .. }),
-            false,
-        ))
-    }
+/// The shared ink a native slider status resolves to. A dragged slider is the
+/// pressed ink: the thumb is under the pointer by definition.
+#[must_use]
+pub(crate) const fn slider_ink(status: slider::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, slider::Status::Hovered),
+        pressed: matches!(status, slider::Status::Dragged),
+        focused: false,
+        disabled: false,
+        selected: false,
+    })
+}
 
-    #[must_use]
-    pub(crate) const fn from_text_editor(status: text_editor::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, text_editor::Status::Hovered),
-            false,
-            matches!(status, text_editor::Status::Focused { .. }),
-            matches!(status, text_editor::Status::Disabled),
-            false,
-        ))
-    }
-
-    #[must_use]
-    pub(crate) const fn from_slider(status: slider::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, slider::Status::Hovered),
-            matches!(status, slider::Status::Dragged),
-            false,
-            false,
-            false,
-        ))
-    }
-
-    #[must_use]
-    pub(crate) const fn from_pick_list(status: pick_list::Status) -> Self {
-        Self::from_visual(ControlVisualState::from_ink_priority(
-            matches!(status, pick_list::Status::Hovered),
-            false,
-            matches!(status, pick_list::Status::Opened { .. }),
-            false,
-            false,
-        ))
-    }
-
-    #[must_use]
-    pub(crate) const fn from_visual(visual: ControlVisualState) -> Self {
-        match visual {
-            ControlVisualState::Active => Self::Active,
-            ControlVisualState::Hovered => Self::Hovered,
-            ControlVisualState::Pressed => Self::Pressed,
-            ControlVisualState::Focused => Self::Focused,
-            ControlVisualState::Disabled => Self::Disabled,
-        }
-    }
+/// The shared ink a native select trigger resolves to. An open dropdown keeps
+/// the focused ink while the pointer rests on the trigger.
+#[must_use]
+pub(crate) const fn pick_list_ink(status: pick_list::Status) -> ControlVisualState {
+    ControlVisualState::from_priority(ControlInkPriority {
+        hovered: matches!(status, pick_list::Status::Hovered),
+        pressed: false,
+        focused: matches!(status, pick_list::Status::Opened { .. }),
+        disabled: false,
+        selected: false,
+    })
 }
 
 /// Variants select the activation's ink family, never a second glass material.
@@ -129,9 +107,9 @@ pub(crate) fn button_style(
     theme: &Theme,
     role: ControlRole,
     tone: ButtonTone,
-    state: ControlPaintState,
+    state: ControlVisualState,
 ) -> button::Style {
-    let glass = theme::control_glass(theme, role, state.visual());
+    let glass = theme::control_glass(theme, role, state);
     let palette = theme.palette();
     let accent = match tone {
         ButtonTone::Primary => Some(palette.accent),
@@ -139,10 +117,10 @@ pub(crate) fn button_style(
         ButtonTone::Secondary => None,
     };
     let background = match accent {
-        Some(fill) if state != ControlPaintState::Disabled => {
+        Some(fill) if state != ControlVisualState::Disabled => {
             let ink = match state {
-                ControlPaintState::Hovered => mix(fill, palette.hover, 0.28),
-                ControlPaintState::Pressed => mix(fill, Color::BLACK, 0.22),
+                ControlVisualState::Hovered => mix(fill, palette.hover, 0.28),
+                ControlVisualState::Pressed => mix(fill, Color::BLACK, 0.22),
                 _ => fill,
             };
             iced::Background::Color(crate::theme_binding::color(ink))
@@ -152,7 +130,7 @@ pub(crate) fn button_style(
         }),
     };
     let text_color = match accent {
-        Some(_) if state != ControlPaintState::Disabled => {
+        Some(_) if state != ControlVisualState::Disabled => {
             crate::theme_binding::color(theme.accent_text)
         }
         _ => glass

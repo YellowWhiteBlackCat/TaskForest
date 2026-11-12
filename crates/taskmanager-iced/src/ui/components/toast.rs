@@ -13,8 +13,10 @@ use taskmanager_application::i18n::t;
 use taskmanager_icons::status_icon;
 use taskmanager_shell::FeedbackPresentation;
 use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
+use taskmanager_ui_contract::presentation::control_ink::ControlInkPriority;
 
 use crate::app::{FocusTarget, Message};
+use crate::theme::ControlVisualState;
 use crate::ui::components::{ContentButtonOptions, IcedElement, content_button};
 
 const MAX_CARD_WIDTH: f32 = 420.0;
@@ -40,9 +42,18 @@ pub(crate) fn toast<'a>(
             .size(f32::from(tokens::FONT_11))
             .into(),
         style: Rc::new(move |_, status| {
-            let hovered = matches!(status, iced::widget::button::Status::Hovered);
+            // The dismiss affordance resolves its ink through the shared
+            // fold, so a hovered dismiss reads like every other hovered
+            // control in this frontend: one verdict, one paint.
+            let ink = ControlVisualState::from_priority(ControlInkPriority {
+                hovered: matches!(status, iced::widget::button::Status::Hovered),
+                pressed: matches!(status, iced::widget::button::Status::Pressed),
+                focused: false,
+                disabled: matches!(status, iced::widget::button::Status::Disabled),
+                selected: false,
+            });
             iced::widget::button::Style {
-                background: hovered
+                background: matches!(ink, ControlVisualState::Hovered)
                     .then(|| Background::Color(crate::theme_binding::color(palette.border))),
                 text_color: crate::theme_binding::color(palette.fg_muted),
                 ..iced::widget::button::Style::default()

@@ -29,54 +29,186 @@ fn gradient_stops(background: Option<iced::Background>) -> Vec<(f32, iced::Color
 
 /// Iced consumes the one shared interaction-ink precedence before mapping to
 /// its visual vocabulary. Disabled keeps the strongest verdict, press keeps
-/// the pressed ink over hover, and selected-only rows stay at rest.
+/// the pressed ink over hover, and a control that paints its selection as
+/// its own surface resolves the shared `Selected` verdict.
 #[test]
 fn control_visual_state_consumes_the_shared_ink_priority() {
     assert_eq!(
-        ControlVisualState::from_ink_priority(true, true, true, true, true),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: true,
+            pressed: true,
+            focused: true,
+            disabled: true,
+            selected: true,
+        }),
         ControlVisualState::Disabled
     );
     assert_eq!(
-        ControlVisualState::from_ink_priority(true, true, true, false, true),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: true,
+            pressed: true,
+            focused: true,
+            disabled: false,
+            selected: true,
+        }),
         ControlVisualState::Pressed
     );
     assert_eq!(
-        ControlVisualState::from_ink_priority(true, false, true, false, false),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: true,
+            pressed: false,
+            focused: true,
+            disabled: false,
+            selected: false,
+        }),
         ControlVisualState::Focused
     );
     assert_eq!(
-        ControlVisualState::from_ink_priority(true, false, false, false, true),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: true,
+            pressed: false,
+            focused: false,
+            disabled: false,
+            selected: true,
+        }),
         ControlVisualState::Hovered
     );
     assert_eq!(
-        ControlVisualState::from_ink_priority(false, false, false, false, true),
-        ControlVisualState::Active
-    );
-    assert_eq!(
-        ControlVisualState::from_ink_priority(false, false, false, false, false),
+        ControlVisualState::from_priority(ControlInkPriority {
+            hovered: false,
+            pressed: false,
+            focused: false,
+            disabled: false,
+            selected: false,
+        }),
         ControlVisualState::Active
     );
     assert_eq!(ControlInkPriority::IDLE.state(), ControlInkState::Idle);
     assert_eq!(
-        crate::ui::components::controls::state::ControlPaintState::from_button(
-            button::Status::Pressed
-        )
-        .visual(),
+        crate::ui::components::controls::state::button_ink(button::Status::Pressed),
         ControlVisualState::Pressed
     );
     assert_eq!(
-        crate::ui::components::controls::state::ControlPaintState::from_text_input(
-            text_input::Status::Focused { is_hovered: true }
-        )
-        .visual(),
+        crate::ui::components::controls::state::text_input_ink(text_input::Status::Focused {
+            is_hovered: true,
+        }),
         ControlVisualState::Focused
     );
     assert_eq!(
-        crate::ui::components::controls::state::ControlPaintState::from_text_editor(
-            text_editor::Status::Disabled
-        )
-        .visual(),
+        crate::ui::components::controls::state::text_editor_ink(text_editor::Status::Disabled),
         ControlVisualState::Disabled
+    );
+}
+
+/// A control that paints its selection as its OWN surface resolves the
+/// shared selection-dominant fold: the durable selection outranks the
+/// transient hover, so the accent that shows the active choice cannot be
+/// erased while the pointer rests on it. The general fold keeps its own
+/// order for every other control.
+#[test]
+fn selection_dominant_fold_keeps_a_selected_surface_stable() {
+    let hovered_and_selected = ControlInkPriority {
+        hovered: true,
+        pressed: false,
+        focused: false,
+        disabled: false,
+        selected: true,
+    };
+    assert_eq!(
+        ControlVisualState::from_priority(hovered_and_selected),
+        ControlVisualState::Hovered,
+        "the general fold lets a transient hover win over a selection"
+    );
+    assert_eq!(
+        ControlVisualState::from_selection_dominant_priority(hovered_and_selected),
+        ControlVisualState::Selected,
+        "a control that paints its own selection keeps it under the pointer"
+    );
+    assert_eq!(
+        ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+            hovered: true,
+            pressed: false,
+            focused: false,
+            disabled: false,
+            selected: false,
+        }),
+        ControlVisualState::Hovered,
+        "an idle surface still wears the hover ink"
+    );
+    assert_eq!(
+        ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+            hovered: false,
+            pressed: false,
+            focused: false,
+            disabled: true,
+            selected: true,
+        }),
+        ControlVisualState::Disabled,
+        "an unavailable surface never advertises a selection"
+    );
+}
+
+/// The hover ink every hovered surface spends is ONE token: the shared
+/// `hover_bg` the GPUI surfaces wear.
+#[test]
+fn hover_ink_is_the_shared_hover_surface() {
+    let theme = Theme::dark();
+    assert_eq!(hover_ink(&theme), color(theme.palette().hover));
+}
+
+/// The device-rail card and the table header cell both paint their
+/// selection as their OWN surface, so they resolve the shared
+/// selection-dominant fold: the active device and the active sort column
+/// keep their identity while the pointer rests on them, exactly like the
+/// GPUI rail card and sort cell.
+#[test]
+fn selection_owning_surfaces_keep_their_ink_under_the_pointer() {
+    let theme = Theme::dark();
+    let palette = theme.palette();
+
+    let card_hovered = device_row_button_style(&theme, false, button::Status::Hovered);
+    let card_selected = device_row_button_style(&theme, true, button::Status::Active);
+    let card_selected_hovered = device_row_button_style(&theme, true, button::Status::Hovered);
+    let card_selected_pressed = device_row_button_style(&theme, true, button::Status::Pressed);
+    assert_eq!(
+        card_hovered.background,
+        Some(color(palette.hover).into()),
+        "an unselected rail card wears the shared hover ink"
+    );
+    assert_eq!(
+        card_selected.background,
+        Some(color(palette.selection).into()),
+        "the active device wears the shared selection surface"
+    );
+    assert_eq!(
+        card_selected_hovered.background, card_selected.background,
+        "a pointer resting on the active device must not erase its selection"
+    );
+    assert_eq!(
+        card_selected_pressed.background, card_selected.background,
+        "pressing the active device must not erase its selection"
+    );
+
+    let header_hovered = header_button_style(&theme, button::Status::Hovered, false);
+    let header_active = header_button_style(&theme, button::Status::Active, true);
+    let header_active_hovered = header_button_style(&theme, button::Status::Hovered, true);
+    assert_eq!(
+        header_hovered.background,
+        Some(color(palette.hover).into()),
+        "an idle header cell wears the shared hover ink"
+    );
+    assert_eq!(
+        header_active.background, None,
+        "the active sort column keeps a transparent surface"
+    );
+    assert_eq!(
+        header_active_hovered.background, header_active.background,
+        "a pointer resting on the active sort column must not repaint it"
+    );
+    assert_eq!(
+        header_active.text_color,
+        color(palette.accent),
+        "the active sort column keeps its accent label"
     );
 }
 
@@ -170,7 +302,7 @@ fn performance_rail_and_controls_scale_the_theme_radii() {
                 &theme,
                 ControlRole::Button,
                 crate::ui::components::ButtonTone::Secondary,
-                crate::ui::components::controls::state::ControlPaintState::Active,
+                ControlVisualState::Active,
             )
             .border
             .radius

@@ -20,7 +20,7 @@ use crate::app::{FocusTarget, Message};
 use crate::focus::{FocusableButton, focus_id};
 use crate::ui::components::IcedElement;
 
-use super::state::{ButtonTone, ControlPaintState};
+use super::state::{ButtonTone, button_ink};
 
 type StyleFn<'a> = Rc<dyn Fn(&iced::Theme, button::Status) -> button::Style + 'a>;
 
@@ -163,12 +163,7 @@ fn glass_content_button<'a>(
     content_button(ContentButtonOptions {
         content,
         style: Rc::new(move |_, status| {
-            super::state::button_style(
-                &style_theme,
-                role,
-                tone,
-                ControlPaintState::from_button(status),
-            )
+            super::state::button_style(&style_theme, role, tone, button_ink(status))
         }),
         padding: Padding::from([f32::from(tokens::SPACE_4), padding_x]),
         width: None,
@@ -211,12 +206,7 @@ pub(crate) fn focusable_control_button_owned(
     content_button(ContentButtonOptions {
         content: text(label).size(f32::from(tokens::FONT_13)).into(),
         style: Rc::new(move |_, status| {
-            super::state::button_style(
-                &style_theme,
-                ControlRole::Button,
-                tone,
-                ControlPaintState::from_button(status),
-            )
+            super::state::button_style(&style_theme, ControlRole::Button, tone, button_ink(status))
         }),
         padding: Padding::from([f32::from(tokens::SPACE_4), padding_x]),
         width: None,

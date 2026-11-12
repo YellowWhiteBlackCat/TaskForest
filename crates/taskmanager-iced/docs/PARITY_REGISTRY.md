@@ -61,10 +61,48 @@ uses the shared select. These are
 PRESENTATION executions of the shared tokens, not new semantics: the
 two registered divergences above keep their reasons unchanged.
 
-Native Iced status values from the activation and input families pass through
-`ControlPaintState` and the shared `ControlInkPriority` before a style reads
-theme tokens. Slider drag, opened select and focused text input therefore keep
-the same precedence as GPUI buttons instead of owning local status folds.
+Native Iced status values from the activation and input families project into
+the shared `ControlInkPriority` before a style reads theme tokens. This
+frontend owns NO private status→ink table: `controls/state.rs` only projects
+each toolkit status into the shared priority and resolves it through
+`theme::ControlVisualState::from_priority`. Slider drag, opened select and
+focused text input therefore keep the same precedence as GPUI buttons instead
+of owning local status folds, and the controls that used to spell their own
+state ink — the device-rail card, the table header cell, the table row, the
+menu cursor row, the toast dismiss affordance and the focus shell's row hover
+layer — now resolve the same shared verdicts.
+
+A control that paints its selection as its OWN surface (the device-rail card,
+the active sort column, the selected table row, the active segmented
+segment) resolves the shared SELECTION-DOMINANT fold, so the durable
+selection survives a pointer resting on it; every other control resolves the
+general fold, where a transient hover outranks a selection. The active
+segmented segment is the shared contract's own example: the GPUI segmented
+control and this frontend now resolve one rule at one address instead of two.
+
+Four state-ink differences remain, all registered here rather than forked:
+
+- Table-row hover layer: the GPUI row paints its surface as an overlay UNDER a
+  transparent content tree, so a hovered row shows the shared `hover_bg`
+  tint. The Iced row paints its surface INSIDE the row content, above the
+  focus shell's hover layer, so the hovered tint is covered by the row's own
+  fill. The ink token is the same shared `hover_bg` the GPUI row wears; only
+  the layer order differs, and changing it would mean moving the row surface
+  out of the row content — a table composition change, not an ink change.
+- Active sort column: the GPUI sort cell paints the accent at 0.10 alpha as
+  its own background and keeps a normal foreground; this frontend keeps an
+  accent foreground over a transparent background. The fold decides the
+  precedence in both (the active column survives a hover); only the token
+  binding differs.
+- Toast dismiss affordance: the GPUI dismiss changes only its text ink and
+  carries no hover fill; the Iced dismiss paints a `border`-tinted fill while
+  the pointer rests on it. The verdict now comes from the shared fold, but
+  the local fill remains an Iced presentation choice.
+- Scroll affordance: the scrollbar is declared `Native { via: "iced
+  scrollable" }` above — the toolkit's capsule thumb and translucent rail
+  stand in for the GPUI scrollbar's hover/drag thickening. Its ink is the
+  toolkit's alpha ladder, not a control-state ink, so it stays outside the
+  shared fold.
 
 The select's dropdown panel wears the shared `GlassSurfaceRole::Menu` material
 and its cursor row spends the shared hover ink with the normal foreground, so

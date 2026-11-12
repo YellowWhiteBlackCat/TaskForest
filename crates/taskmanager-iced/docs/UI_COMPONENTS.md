@@ -75,6 +75,22 @@ native selection and renderer caches; all shared types use their defining module
   and the statistics rail all resolve `GlassSurfaceRole::PageCard` through
   `glass_surface_style`; `card_style` adds only Iced's `snap` rasterization
   hint, never a second fill, edge or elevation shadow.
+  The shared fold is the ONLY status-to-ink table in this frontend:
+  `ui/components/controls/state.rs` holds no private state fold, it only
+  PROJECTS each toolkit status into a `ControlInkPriority` and resolves it
+  through `theme::ControlVisualState::from_priority`. The same rule covers
+  the device-rail card, the table header cell, the table row, the menu cursor
+  row, the toast dismiss affordance and the focus shell's row hover layer,
+  so no control spells its own hover/pressed/selected ink.
+  A control that paints its selection as its OWN surface (the device-rail
+  card, the active sort column, the selected table row, the active
+  segmented segment) resolves the shared SELECTION-DOMINANT fold, so the
+  durable selection survives a pointer resting on it; every other control
+  resolves the general fold, where a transient hover outranks a selection.
+  `theme::hover_ink` is the single address for the shared hover surface, and
+  the segmented segment's press signal is projected for idle segments only
+  (the GPUI twin's active segment carries no press ink, so the accent that
+  shows the active choice stays visible while it is pressed).
   All visible copy is an i18n key resolved by `taskmanager-application`;
   `icon_button` uses `IconId` and exposes its localized label as a shared
   tooltip because Iced 0.14 has no accessible-name operation.

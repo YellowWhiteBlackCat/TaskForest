@@ -546,7 +546,7 @@ fn selectable_row_base<'a>(
         true,
     )
     .with_right_press(on_right_press)
-    .with_hover(crate::theme_binding::color(palette.hover))
+    .with_hover(crate::theme::hover_ink(theme_snapshot))
     .into()
 }
 

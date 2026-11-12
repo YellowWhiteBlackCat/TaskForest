@@ -5,6 +5,7 @@ use iced::advanced::widget::{self, Operation, Tree};
 use iced::advanced::{self, Clipboard, Layout, Renderer, Shell, Widget};
 use iced::keyboard::key::{Key, Named};
 use iced::{Background, Border, Color, Element, Event, Length, Rectangle, Size, Theme, Vector};
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
 use crate::app::{FocusTarget, Message};
 
@@ -219,10 +220,20 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         cursor: iced::advanced::mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let hovered = !tree.state.downcast_ref::<State>().focused
-            && cursor.is_over(layout.bounds())
-            && self.hover_color.is_some();
-        if hovered {
+        // The hover layer is a control ink, so it resolves through the shared
+        // fold: a pointer resting on an enabled, unfocused surface is the
+        // `Hovered` verdict; a focused surface keeps its ring instead, and a
+        // disabled one must not advertise interaction at all.
+        let focused = tree.state.downcast_ref::<State>().focused;
+        let ink = ControlInkPriority {
+            hovered: cursor.is_over(layout.bounds()),
+            pressed: false,
+            focused,
+            disabled: !self.enabled,
+            selected: false,
+        }
+        .state();
+        if matches!(ink, ControlInkState::Hovered) && self.hover_color.is_some() {
             renderer.fill_quad(
                 iced::advanced::renderer::Quad {
                     bounds: layout.bounds(),
@@ -246,7 +257,6 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
             viewport,
         );
 
-        let focused = tree.state.downcast_ref::<State>().focused;
         // Ring visibility follows the shared palette contract (the ring
         // token's alpha encodes focus-visible): only keyboard focus stays
         // opaque, per the per-window theme snapshot's `focus_visible` bit.

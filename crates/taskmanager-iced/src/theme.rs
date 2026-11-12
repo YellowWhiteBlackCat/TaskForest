@@ -22,7 +22,7 @@ use taskmanager_theme::{
     Color, GlassShadowLayer, GlassShadowProjection, GlassSurfaceRole, GlassTier, Length, Theme,
     tokens,
 };
-use taskmanager_ui_contract::presentation::control_ink;
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 mod control_material;
@@ -43,6 +43,7 @@ pub enum ControlVisualState {
     Pressed,
     Focused,
     Disabled,
+    Selected,
 }
 
 impl ControlVisualState {
@@ -57,33 +58,44 @@ impl ControlVisualState {
     }
 
     /// Bind the shared interaction ink to Iced's visual vocabulary. The
-    /// selected page state keeps the resting visual until this frontend adds
-    /// a dedicated selected ink.
+    /// selected page state keeps its own ink: a control that paints its
+    /// selection as its own surface (the device rail card, the sort header,
+    /// the table row, the segmented segment) resolves the shared
+    /// `Selected` verdict and wears that surface.
     #[must_use]
-    pub const fn from_ink(ink: control_ink::ControlInkState) -> Self {
+    pub const fn from_ink(ink: ControlInkState) -> Self {
         match ink {
-            control_ink::ControlInkState::Idle | control_ink::ControlInkState::Selected => {
-                Self::Active
-            }
-            control_ink::ControlInkState::Hovered => Self::Hovered,
-            control_ink::ControlInkState::Pressed => Self::Pressed,
-            control_ink::ControlInkState::Focused => Self::Focused,
-            control_ink::ControlInkState::Disabled => Self::Disabled,
+            ControlInkState::Idle => Self::Active,
+            ControlInkState::Selected => Self::Selected,
+            ControlInkState::Hovered => Self::Hovered,
+            ControlInkState::Pressed => Self::Pressed,
+            ControlInkState::Focused => Self::Focused,
+            ControlInkState::Disabled => Self::Disabled,
         }
     }
 
     /// Resolve one Iced control ink through the shared interaction
-    /// precedence, then bind it to this frontend's visual vocabulary.
+    /// precedence, then bind it to this frontend's visual vocabulary. This
+    /// is the ONE fold every Iced control reads: a transient hover may win
+    /// over a durable selection, exactly as the shared contract orders it.
     #[must_use]
-    pub const fn from_ink_priority(
-        hovered: bool,
-        pressed: bool,
-        focused: bool,
-        disabled: bool,
-        selected: bool,
-    ) -> Self {
-        Self::from_ink(control_ink::ControlInkPriority::resolve(
-            hovered, pressed, focused, disabled, selected,
+    pub const fn from_priority(priority: ControlInkPriority) -> Self {
+        Self::from_ink(priority.state())
+    }
+
+    /// Resolve one Iced control ink through the shared SELECTION-DOMINANT
+    /// precedence, for a control that paints its selection as its own
+    /// surface. There the selection outranks the transient hover, so the
+    /// accent that shows which choice is active cannot be erased while the
+    /// pointer merely rests on it.
+    #[must_use]
+    pub const fn from_selection_dominant_priority(priority: ControlInkPriority) -> Self {
+        Self::from_ink(ControlInkPriority::resolve_selection_dominant(
+            priority.hovered,
+            priority.pressed,
+            priority.focused,
+            priority.disabled,
+            priority.selected,
         ))
     }
 
@@ -93,7 +105,7 @@ impl ControlVisualState {
     /// loses elevation without a second shadow ladder.
     const fn shadow_alpha(self) -> f32 {
         match self {
-            Self::Active | Self::Hovered | Self::Focused => 1.0,
+            Self::Active | Self::Hovered | Self::Focused | Self::Selected => 1.0,
             Self::Pressed => 0.55,
             Self::Disabled => 0.35,
         }
@@ -101,7 +113,7 @@ impl ControlVisualState {
 
     const fn sheen_progress(self) -> f32 {
         match self {
-            Self::Active => 0.0,
+            Self::Active | Self::Selected => 0.0,
             Self::Hovered | Self::Focused => 0.45,
             Self::Pressed => 0.18,
             Self::Disabled => 0.0,
@@ -415,16 +427,23 @@ pub(crate) fn zebra_index(index: usize) -> bool {
 /// `zebra` (from zebra_index) adds the theme's derived `zebra_bg` tint
 /// (a faint fg wash — lightens on dark skins, darkens on light skins); a
 /// selected row always wins over the stripe so selection stays the strongest
-/// surface.
+/// surface. The selection is the row's OWN fill, so it resolves through the
+/// shared selection-dominant fold — the same verdict the GPUI process table
+/// resolves for its selected row.
 #[must_use]
 pub fn row_style(theme: &Theme, selected: bool, zebra: bool) -> container::Style {
     let palette = theme.palette();
-    let background = if selected {
-        palette.selection
-    } else if zebra {
-        theme.zebra_bg()
-    } else {
-        palette.window_backdrop
+    let ink = ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+        hovered: false,
+        pressed: false,
+        focused: false,
+        disabled: false,
+        selected,
+    });
+    let background = match ink {
+        ControlVisualState::Selected => palette.selection,
+        _ if zebra => theme.zebra_bg(),
+        _ => palette.window_backdrop,
     };
     container::Style {
         background: Some(color(background).into()),
@@ -460,12 +479,26 @@ pub fn focus_ring_color(theme: &Theme, destructive: bool) -> iced::Color {
     ring
 }
 
+/// The ink one surface paints for the shared fold's `Hovered` verdict.
+///
+/// Every hovered surface in this frontend spends this one token: the menu
+/// cursor row, the device-rail card, the table header cell, and the table
+/// row's hover layer. They are all the same shared `hover_bg` the GPUI
+/// surfaces wear, so a hovered surface cannot drift from its twin.
+#[must_use]
+pub fn hover_ink(theme: &Theme) -> iced::Color {
+    color(theme.palette().hover)
+}
+
 /// Performance device-rail card surface: transparent at idle, the token hover
 /// fill while the pointer is over it, and the accent-tinted selection fill
 /// with an accent border while the card is the active device — the rail
 /// counterpart of [`row_style`]'s selected/hover surfaces, read through an
 /// iced button so the pointer states stay toolkit-native. Selection always
-/// wins over hover so the active device reads unambiguously.
+/// wins over hover so the active device reads unambiguously: the card paints
+/// its selection as its own surface, so the shared selection-dominant fold
+/// resolves the verdict (the GPUI rail's `is_hov = !is_sel && hovered`
+/// projection reaches the same answer).
 #[must_use]
 pub fn device_row_button_style(
     theme: &Theme,
@@ -473,13 +506,20 @@ pub fn device_row_button_style(
     status: button::Status,
 ) -> button::Style {
     let palette = theme.palette();
-    let background = if selected {
-        Some(color(palette.selection).into())
-    } else {
-        match status {
-            button::Status::Hovered | button::Status::Pressed => Some(color(palette.hover).into()),
-            _ => None,
-        }
+    let ink = ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+        hovered: matches!(status, button::Status::Hovered),
+        // The selected card owns its surface: the GPUI rail paints the
+        // active device's selection fill unconditionally, so the press
+        // signal is projected for the cards the pointer may still choose.
+        pressed: matches!(status, button::Status::Pressed) && !selected,
+        focused: false,
+        disabled: matches!(status, button::Status::Disabled),
+        selected,
+    });
+    let background = match ink {
+        ControlVisualState::Selected => Some(color(palette.selection).into()),
+        ControlVisualState::Hovered | ControlVisualState::Pressed => Some(hover_ink(theme).into()),
+        _ => None,
     };
     button::Style {
         background,
@@ -500,13 +540,23 @@ pub fn device_row_button_style(
 /// Clickable table-header button: transparent at rest, a token hover/pressed
 /// fill, and accent foreground on the active sort column so the click target
 /// reads alongside the ▲/▼ marker projected by `crate::ui::sort_arrow`. All
-/// states stay token-derived (ADR-017: no color literals).
+/// states stay token-derived (ADR-017: no color literals). The active column
+/// paints its selection as its own identity, so the shared selection-dominant
+/// fold keeps it stable while the pointer rests on it — the GPUI sort cell
+/// resolves the same verdict (`if active { … } else if is_hov { … }`).
 #[must_use]
 pub fn header_button_style(theme: &Theme, status: button::Status, active: bool) -> button::Style {
     let palette = theme.palette();
-    let background = match status {
-        button::Status::Hovered => Some(color(palette.hover).into()),
-        button::Status::Pressed => {
+    let ink = ControlVisualState::from_selection_dominant_priority(ControlInkPriority {
+        hovered: matches!(status, button::Status::Hovered),
+        pressed: matches!(status, button::Status::Pressed),
+        focused: false,
+        disabled: matches!(status, button::Status::Disabled),
+        selected: active,
+    });
+    let background = match ink {
+        ControlVisualState::Hovered => Some(hover_ink(theme).into()),
+        ControlVisualState::Pressed => {
             Some(color(mix(palette.hover, palette.window_backdrop, 0.45)).into())
         }
         _ => None,
