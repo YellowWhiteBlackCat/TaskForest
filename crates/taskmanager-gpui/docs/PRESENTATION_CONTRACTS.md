@@ -58,6 +58,18 @@ Primary Dashboard metric and history cards spend one floating
 The shared Card-tier fill, hairline and radius remain unchanged; this role
 records that these cards belong to the primary page and carry its elevation.
 Geometry and slot budgets are unchanged.
+
+The Dashboard metric grid is one shared adaptive grid whose item basis is
+the budget's derived card width, so the row fills the measured page slot
+exactly: the cards share the content width minus the shared `SPACE_8` gaps
+between them, and no dead band survives at the row's right edge. The column
+count and that width belong to `DashboardBudget`; the page keeps no local
+column fraction. The grid's basis is rounded down to a whole pixel so a
+fractional window width can never push the second card onto a row of its own,
+and the grid grows the cards back into the row afterwards. The budget also
+charges the coverage readout as part of the window-controls row it renders
+inside, and charges the summary row's own gap when that row is visible, so
+the mandatory metric groups reach the slot they may spend.
 Durable History shows the shared 1h/24h/7d replay projections; live process
 rings never become its authority. Recorded curves keep gaps and signed ranges
 with separate per-window scrolling.

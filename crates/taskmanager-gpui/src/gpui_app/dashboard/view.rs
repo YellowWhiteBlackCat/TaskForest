@@ -4,7 +4,7 @@ use super::surfaces::page_card;
 use super::{DashboardPanel, DashboardState};
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement, Stateful,
-    StatefulInteractiveElement, Styled, Window, div, px, relative,
+    StatefulInteractiveElement, Styled, Window, div, px,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -388,7 +388,10 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         .padding(tokens::SPACE_5)
         .render()
         .debug_selector(move || format!("tm-dashboard-history-card:{}", metric.id()))
-        .w(relative(if layout.columns == 1 { 1.0 } else { 0.49 }))
+        // The shared adaptive grid hands every card the width its row
+        // reserved, so the card fills its slot instead of re-deriving a
+        // column fraction here.
+        .w_full()
         .min_w(px(0.0))
         .h(px(layout.card_height))
         .flex_shrink_0()

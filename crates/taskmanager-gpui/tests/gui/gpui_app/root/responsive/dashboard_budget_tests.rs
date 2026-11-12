@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_theme::tokens;
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowBudget, admit_card_groups_capped};
 use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 use taskmanager_ui_contract::presentation::vocabulary::{
@@ -239,4 +240,85 @@ fn a_compact_frame_charges_the_wrapped_control_row_once() {
         footprint <= budget.review_height,
         "the cards must fit the measured slot: {budget:?}"
     );
+}
+
+/// The metric cards share the measured row: the column count and the gaps
+/// between the cards consume the whole content width, so the rendered row
+/// leaves no dead band at its right edge.
+#[test]
+fn the_metric_cards_share_the_measured_row() {
+    for width in [
+        320.0, 519.0, 520.0, 599.0, 600.0, 900.0, 1148.0, 1180.0, 1600.0,
+    ] {
+        let budget = DashboardBudget::from_page_layout(constrained_layout(width, 780.0));
+        let expected = (width - CARD_GAP * (budget.columns - 1) as f32) / budget.columns as f32;
+        assert_eq!(
+            budget.card_width, expected,
+            "the card width is the row's share: {budget:?}"
+        );
+        let consumed =
+            budget.card_width * budget.columns as f32 + CARD_GAP * (budget.columns - 1) as f32;
+        assert!(
+            (consumed - width).abs() < 0.001,
+            "the cards and their gaps consume the measured row: {budget:?}"
+        );
+        // The grid's item basis is rounded down so a fractional width can
+        // never push the second card onto a row of its own, and it never
+        // exceeds the exact share the budget reserved.
+        assert!(budget.card_basis() <= budget.card_width);
+        assert!(budget.card_basis() >= budget.card_width - 1.0);
+    }
+}
+
+/// The coverage readout renders INSIDE the window-controls row. A budget
+/// that charged it as a row of its own reserved space the page never paints,
+/// and the mandatory metric cards stopped short of the slot they may spend.
+#[test]
+fn the_coverage_readout_is_not_charged_as_its_own_row() {
+    let width = 1180.0;
+    let height = 780.0;
+    let budget = DashboardBudget::from_page_layout(constrained_layout(width, height));
+    assert_eq!(budget.summaries, DashboardSummaries::Cards);
+    let chrome = SECTION_SINGLE_ROW_HEIGHT
+        + WINDOW_CONTROLS_HEIGHT
+        + PAGING_HEIGHT
+        + f32::from(tokens::SPACE_6)
+        + ROOT_ROW_GAP * 3.0
+        + BOTTOM_SAFETY_BAND;
+    assert_eq!(
+        budget.review_height,
+        height - chrome - SUMMARY_CARD_HEIGHT,
+        "the review slot is the measured height minus the chrome the page paints: {budget:?}"
+    );
+}
+
+/// A visible summary row adds one row to the page and therefore one more
+/// gap between the page's rows. The summary row must appear exactly when a
+/// complete mandatory card group still fits behind it — never earlier.
+#[test]
+fn the_summary_row_appears_exactly_when_a_whole_group_still_fits() {
+    let width = 1180.0;
+    let chrome = SECTION_SINGLE_ROW_HEIGHT
+        + WINDOW_CONTROLS_HEIGHT
+        + PAGING_HEIGHT
+        + f32::from(tokens::SPACE_6)
+        + ROOT_ROW_GAP * 3.0
+        + BOTTOM_SAFETY_BAND;
+    let cards_at = chrome + SUMMARY_CARD_HEIGHT + CARD_FLOOR;
+
+    let at = DashboardBudget::from_page_layout(constrained_layout(width, cards_at));
+    assert_eq!(at.summaries, DashboardSummaries::Cards);
+    assert!(
+        at.metric_count > 0,
+        "the summary row never starves the mandatory cards: {at:?}"
+    );
+    assert!(at.review_height >= CARD_FLOOR);
+
+    let just_below = DashboardBudget::from_page_layout(constrained_layout(width, cards_at - 1.0));
+    assert_ne!(
+        just_below.summaries,
+        DashboardSummaries::Cards,
+        "one pixel below the whole-group admission must not paint the card summary"
+    );
+    assert!(just_below.metric_count > 0);
 }

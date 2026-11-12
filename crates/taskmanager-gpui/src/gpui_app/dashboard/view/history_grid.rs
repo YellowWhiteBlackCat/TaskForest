@@ -5,7 +5,7 @@ use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::DashboardBudget;
 use crate::gpui_app::timeline::GraphTimelineSeries;
-use gpui::{Div, Entity, ParentElement, Styled, div, px};
+use gpui::{Div, Entity, Styled, px};
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
@@ -13,7 +13,7 @@ use taskmanager_application::system_timeline::TimelineMetric;
 use taskmanager_shell::presentation::finite_peak;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
-use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui::layout::AdaptiveGrid;
 
 pub(super) fn render_history_grid(
     theme: &Theme,
@@ -42,13 +42,12 @@ pub(super) fn render_history_grid(
             graph_cache: graph_cache.clone(),
         })
     };
-    let grid = div()
-        .flex()
-        .flex_row()
-        .flex_wrap()
-        .h_full()
-        .min_h(px(0.0))
-        .gap(definite_length(tokens::SPACE_8));
+    // The shared adaptive grid owns the row geometry: the budget's derived
+    // card width is the item basis, so the row fills the measured page slot
+    // exactly instead of leaving a dead band at its right edge.
+    let grid = AdaptiveGrid::new(px(layout.card_basis()))
+        .gap(tokens::SPACE_8)
+        .debug_selector("tm-dashboard-metric-grid");
     let mut grid = grid;
     for metric in layout.metric_window(state.history_first_metric).metrics() {
         let (label, color, max, unit) = match metric {
@@ -64,5 +63,9 @@ pub(super) fn render_history_grid(
         };
         grid = grid.child(card(metric, label, color, max, unit, entity.clone()));
     }
-    grid
+    grid.render().h_full()
 }
+
+#[cfg(test)]
+#[path = "../../../../tests/gui/gpui_app/dashboard/metric_grid_bounds_tests.rs"]
+mod metric_grid_bounds_tests;
