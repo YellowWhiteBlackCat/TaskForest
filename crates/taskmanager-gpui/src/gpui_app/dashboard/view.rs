@@ -280,7 +280,7 @@ fn summary_card(
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
         .cursor_pointer()
-        .hover(|style| style.bg(fill(theme.accent.with_alpha(0.08))))
+        .hover(|style| style.bg(fill(theme.hover_bg())))
         .flex_1()
         .min_w(px(132.0))
         .on_click(move |_event, _window, cx| {

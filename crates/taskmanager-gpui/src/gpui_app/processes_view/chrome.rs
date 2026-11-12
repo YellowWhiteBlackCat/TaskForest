@@ -558,7 +558,7 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
     let bg = if active {
         theme.accent.with_alpha(0.10)
     } else if is_hov {
-        theme.accent.with_alpha(0.08)
+        theme.hover_bg()
     } else {
         Color::TRANSPARENT
     };
