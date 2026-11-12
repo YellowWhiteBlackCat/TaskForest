@@ -1,4 +1,7 @@
-use super::{Button, ButtonEvent, ButtonState, ButtonVariant, primary_fill, primary_state_fill};
+use super::{
+    Button, ButtonEvent, ButtonPaintPath, ButtonState, ButtonVariant, button_paint_path,
+    primary_fill, primary_state_fill,
+};
 use crate::styled::{active_fill, hover_fill};
 use gpui::{
     AppContext, Context, Entity, IntoElement, Modifiers, ParentElement, Render, TestAppContext,
@@ -32,6 +35,44 @@ fn primary_fill_is_a_gradient_in_every_state() {
         assert!(
             debug.contains("LinearGradient"),
             "primary hover/active fills must stay gradients, got {debug}"
+        );
+    }
+}
+
+/// The GPUI binding consumes the shared control-ink fold: an unavailable
+/// button keeps disabled ink even when conflicting pointer/press signals
+/// arrive, while an enabled press outranks hover. Keyboard focus keeps its
+/// own ring path and the button's absent selected bit stays idle.
+#[test]
+fn button_ink_priority_keeps_disabled_above_press_and_press_above_hover() {
+    assert_eq!(
+        button_paint_path(false, false, false, false),
+        ButtonPaintPath::Idle
+    );
+    assert_eq!(
+        button_paint_path(true, false, false, false),
+        ButtonPaintPath::Hovered
+    );
+    assert_eq!(
+        button_paint_path(true, true, false, false),
+        ButtonPaintPath::Pressed,
+        "press must outrank hover"
+    );
+    assert_eq!(
+        button_paint_path(false, false, true, false),
+        ButtonPaintPath::Focused,
+        "keyboard focus must keep its own ring path"
+    );
+    for (hovered, pressed) in [(false, false), (true, false), (true, true)] {
+        assert_eq!(
+            button_paint_path(hovered, pressed, false, true),
+            ButtonPaintPath::Disabled,
+            "disabled must outrank hover/press ({hovered}, {pressed})"
+        );
+        assert_eq!(
+            button_paint_path(hovered, pressed, true, true),
+            ButtonPaintPath::Disabled,
+            "disabled must outrank focus/hover/press ({hovered}, {pressed})"
         );
     }
 }

@@ -6,6 +6,8 @@
 //! encodes the focus-visible decision). Keyboard activation (Enter/Space on a
 //! focused tab stop) is dispatched by gpui's interactive element as a
 //! [`ClickEvent::Keyboard`], so pointer and keyboard share one handler.
+//! Interaction ink resolves through the shared `ControlInkPriority` fold and
+//! binds its verdict onto GPUI's declarative hover/active/focus/disabled paths.
 
 use crate::OptEventCallback;
 use std::rc::Rc;
@@ -17,7 +19,6 @@ use gpui::{
     InteractiveElement, IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString,
     StatefulInteractiveElement, Styled, Window, div, linear_color_stop, linear_gradient, point, px,
 };
-use taskmanager_theme::Color;
 
 /// The pressed-state shadow: a tighter, fainter drop than the resting state
 /// so the button visually sinks under the pointer (Mission-Center-style
@@ -32,8 +33,9 @@ fn press_shadow() -> Vec<BoxShadow> {
         inset: false,
     }]
 }
-use taskmanager_theme::Palette;
+use taskmanager_theme::{Color, Palette};
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
 use crate::styled::{active_fill, disabled_fg, hover_fill};
 use taskmanager_theme::color::on_accent;
@@ -49,6 +51,55 @@ pub enum ButtonVariant {
     Secondary,
     /// Danger fill: destructive actions.
     Danger,
+}
+
+/// Which GPUI paint path owns a resolved control ink.
+///
+/// GPUI registers interaction paint as independent declarative refinements:
+/// `Hovered` feeds `.hover()`, `Pressed` feeds `.active()`, `Focused` feeds the
+/// `.focus()` ring, and `Disabled` replaces the resting fill with the muted
+/// opacity/foreground pair. `Idle` keeps the base fill. The shared
+/// [`ControlInkPriority`] decides the verdict; this binding only projects it
+/// back onto those paths without re-deriving precedence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ButtonPaintPath {
+    Idle,
+    Hovered,
+    Pressed,
+    Focused,
+    Disabled,
+}
+
+impl ButtonPaintPath {
+    const fn from_ink(ink: ControlInkState) -> Self {
+        match ink {
+            ControlInkState::Idle | ControlInkState::Selected => Self::Idle,
+            ControlInkState::Hovered => Self::Hovered,
+            ControlInkState::Pressed => Self::Pressed,
+            ControlInkState::Focused => Self::Focused,
+            ControlInkState::Disabled => Self::Disabled,
+        }
+    }
+}
+
+/// Resolve one button paint path from GPUI interaction signals through the
+/// shared precedence fold.
+///
+/// GPUI has no single runtime status callback, so the renderer asks the fold
+/// once per declarative paint path with the signals that path would observe
+/// when live: `(true, false, ...)` for hover, `(true, true, ...)` for press,
+/// `(false, false, true, ...)` for focus, and all-false for the resting state.
+/// Buttons carry no selected bit, and `from_ink` folds a `Selected` verdict
+/// into `Idle` for frontends that do supply one.
+const fn button_paint_path(
+    hovered: bool,
+    pressed: bool,
+    focused: bool,
+    disabled: bool,
+) -> ButtonPaintPath {
+    ButtonPaintPath::from_ink(ControlInkPriority::resolve(
+        hovered, pressed, focused, disabled, false,
+    ))
 }
 
 /// Interaction state for one button. The owning view holds this entity; the
@@ -232,6 +283,13 @@ impl RenderOnce for Button {
             self.state.entity_id().as_non_zero_u64().get() as usize,
         );
 
+        let resting_path = button_paint_path(false, false, false, !enabled);
+        let hover_path = button_paint_path(true, false, false, !enabled);
+        let active_path = button_paint_path(true, true, false, !enabled);
+        let disabled_ink = resting_path == ButtonPaintPath::Disabled;
+        let hover_ink = hover_path == ButtonPaintPath::Hovered;
+        let active_ink = active_path == ButtonPaintPath::Pressed;
+
         let focus_handle = focus_handle.clone().tab_stop(enabled);
 
         let element = div()
@@ -259,20 +317,38 @@ impl RenderOnce for Button {
             // Focus ring: palette.ring is transparent when focus is not
             // keyboard-driven, so this draws only for keyboard focus.
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
-            .when(!enabled, |el| {
+            .when(disabled_ink, |el| {
                 el.opacity(0.5)
                     .text_color(crate::theme_binding::hsla(disabled_fg(&palette)))
             })
-            .when(enabled && self.variant != ButtonVariant::Secondary, |el| {
-                el.hover(|style| style.bg(hover.clone()))
-                    .active(|style| style.bg(active.clone()).shadow(press_shadow()))
-            })
-            .when(enabled && self.variant == ButtonVariant::Secondary, |el| {
-                el.border_1()
-                    .border_color(crate::theme_binding::hsla(border))
-                    .hover(|style| style.bg(hover))
-                    .active(|style| style.bg(active).shadow(press_shadow()))
-            })
+            .when(
+                !disabled_ink && self.variant != ButtonVariant::Secondary,
+                |el| {
+                    let mut el = el;
+                    if hover_ink {
+                        el = el.hover(|style| style.bg(hover.clone()));
+                    }
+                    if active_ink {
+                        el = el.active(|style| style.bg(active.clone()).shadow(press_shadow()));
+                    }
+                    el
+                },
+            )
+            .when(
+                !disabled_ink && self.variant == ButtonVariant::Secondary,
+                |el| {
+                    let mut el = el
+                        .border_1()
+                        .border_color(crate::theme_binding::hsla(border));
+                    if hover_ink {
+                        el = el.hover(|style| style.bg(hover.clone()));
+                    }
+                    if active_ink {
+                        el = el.active(|style| style.bg(active.clone()).shadow(press_shadow()));
+                    }
+                    el
+                },
+            )
             .on_key_down({
                 let on_activate = on_activate.clone();
                 move |event: &KeyDownEvent, window, cx| {

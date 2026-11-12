@@ -32,6 +32,13 @@ second floating elevation. The focus ring is deliberately NOT part of this
 ladder: it is a keyboard-focus affordance with its own geometry, owned by the
 GPUI product's `elements::focus_ring`.
 
+`primitives/button.rs` resolves hover, press, keyboard focus and disabled ink
+through the shared `ControlInkPriority` fold, then binds the verdict to GPUI's
+declarative `.hover()`, `.active()` and `.focus()` paths. The button has no
+selected bit; a selected verdict folds to its resting paint. The focus path
+stays registered and reads `Palette::ring`, so pointer-driven focus and a
+disabled button still draw no ring. State changes only paint, never extent.
+
 ## Boundary
 
 This crate owns reusable GPUI presentation only; page-specific state remains in
