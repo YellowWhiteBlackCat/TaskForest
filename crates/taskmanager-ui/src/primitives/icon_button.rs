@@ -126,7 +126,7 @@ impl RenderOnce for IconButton {
             .hover(|style| style.bg(crate::theme_binding::fill(hover_fill(palette.surface))))
             .active(|style| style.bg(crate::theme_binding::fill(active_fill(palette.surface))))
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
-            .when(!enabled, |el| el.opacity(0.5))
+            .when(!enabled, |el| el.opacity(crate::styled::disabled_opacity()))
             .on_key_down({
                 let on_activate = on_activate.clone();
                 move |event: &KeyDownEvent, window, cx| {

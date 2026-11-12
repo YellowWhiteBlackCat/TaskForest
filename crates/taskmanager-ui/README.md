@@ -44,6 +44,11 @@ fill and edge the floating panels and Iced control glass wear; its popup stays
 on the shared menu role. A hover overlay re-derives from that same tier fill,
 so trigger states do not drift back to an opaque surface literal.
 
+Disabled controls share one muted weight through `styled::disabled_opacity()`
+and `styled::disabled_fg()`. Button, icon button, switch, checkbox and text
+input all consume the same facts, so a control never invents a second disabled
+appearance while keeping its measured target.
+
 ## Boundary
 
 This crate owns reusable GPUI presentation only; page-specific state remains in

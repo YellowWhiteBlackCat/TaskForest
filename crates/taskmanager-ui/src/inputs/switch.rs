@@ -190,7 +190,7 @@ impl RenderOnce for Switch {
             .track_focus(&focus_handle)
             .flex()
             .items_center()
-            .when(disabled, |el| el.opacity(0.5))
+            .when(disabled, |el| el.opacity(crate::styled::disabled_opacity()))
             // Focus ring: transparent alpha for pointer focus, visible for
             // keyboard focus (palette.ring carries the decision).
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))

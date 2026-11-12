@@ -1,4 +1,4 @@
-use super::{active_fill, blend, disabled_fg, hover_fill, scrim};
+use super::{active_fill, blend, disabled_fg, disabled_opacity, hover_fill, scrim};
 use crate::primitives::card_surface::CardSurface;
 use taskmanager_theme::Palette;
 use taskmanager_theme::color::on_accent;
@@ -49,6 +49,13 @@ fn disabled_fg_is_muted_relative_to_fg() {
     let p = palette();
     let d = disabled_fg(&p);
     assert_ne!(d, p.fg);
+}
+
+/// The disabled weight is one shared fact: every control that mutes itself
+/// reads this helper, so an alpha change cannot silently split the family.
+#[test]
+fn disabled_opacity_is_the_single_control_weight() {
+    assert_eq!(disabled_opacity(), 0.5);
 }
 
 #[test]

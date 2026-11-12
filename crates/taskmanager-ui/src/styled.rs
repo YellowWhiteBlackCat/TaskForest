@@ -48,6 +48,14 @@ pub fn disabled_fg(palette: &Palette) -> Color {
     blend(palette.fg, palette.surface, 0.55)
 }
 
+/// The shared disabled opacity: one muted, never-interactive weight for every
+/// control that reduces itself to a static readout. Callers still keep the
+/// control's measured target; only paint fades.
+#[must_use]
+pub const fn disabled_opacity() -> f32 {
+    0.5
+}
+
 /// Translucent modal depth wash over the window.
 #[must_use]
 pub fn scrim(palette: &Palette, alpha: f32) -> Color {

@@ -659,7 +659,7 @@ impl RenderOnce for TextInput {
             .text_sm()
             .text_color(crate::theme_binding::hsla(palette.fg))
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
-            .when(disabled, |el| el.opacity(0.5))
+            .when(disabled, |el| el.opacity(crate::styled::disabled_opacity()))
             .cursor_text()
             // Editing actions (Input context keymap above).
             .on_action({

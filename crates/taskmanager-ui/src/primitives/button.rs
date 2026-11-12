@@ -37,7 +37,7 @@ use taskmanager_theme::{Color, Palette};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
-use crate::styled::{active_fill, disabled_fg, hover_fill};
+use crate::styled::{active_fill, disabled_fg, disabled_opacity, hover_fill};
 use taskmanager_theme::color::on_accent;
 use taskmanager_theme::tokens;
 
@@ -318,7 +318,7 @@ impl RenderOnce for Button {
             // keyboard-driven, so this draws only for keyboard focus.
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .when(disabled_ink, |el| {
-                el.opacity(0.5)
+                el.opacity(disabled_opacity())
                     .text_color(crate::theme_binding::hsla(disabled_fg(&palette)))
             })
             .when(

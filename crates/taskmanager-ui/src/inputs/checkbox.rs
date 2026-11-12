@@ -160,7 +160,7 @@ impl RenderOnce for Checkbox {
             .items_center()
             .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .cursor_pointer()
-            .when(disabled, |el| el.opacity(0.5))
+            .when(disabled, |el| el.opacity(crate::styled::disabled_opacity()))
             .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .border_1()
             .rounded(px(4.0))
