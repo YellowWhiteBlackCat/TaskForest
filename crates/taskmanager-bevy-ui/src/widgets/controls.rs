@@ -27,6 +27,7 @@ use crate::widgets::bounded_text::BoundedText;
 use crate::window::{Role, TextRole};
 use bevy::text::{LineBreak, TextLayout};
 use taskmanager_theme::GlassTier;
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
 /// The sortable-header indicator: a semantic direction plate (arrow-up /
 /// arrow-down) tinted with the dim ink, or empty when the sort rests
@@ -78,21 +79,31 @@ pub(crate) enum ControlTone {
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ControlVisual(pub(crate) ControlTone, pub(crate) bool);
 
-/// Resolve one control fill from the theme tokens and Bevy 0.20 interaction
-/// state. Hover and pressed are transient; selected is the page-owned state.
-pub(crate) fn control_background(
+/// Project Bevy's pointer and official press signals into the shared ink fold.
+/// Keyboard-visible focus and disabled state have no Bevy ink signal at this
+/// binding yet; the typed contract keeps their precedence available without
+/// inventing a second signal owner.
+#[must_use]
+pub(crate) fn control_ink_priority(
     visual: &ControlVisual,
     interaction: PickingInteraction,
     pressed: bool,
-    palette: &UiPalette,
-) -> Color {
-    if pressed || interaction == PickingInteraction::Pressed {
-        return palette.selection_bg;
+) -> ControlInkPriority {
+    ControlInkPriority {
+        hovered: interaction == PickingInteraction::Hovered,
+        pressed: pressed || interaction == PickingInteraction::Pressed,
+        focused: false,
+        disabled: false,
+        selected: visual.1,
     }
-    if interaction == PickingInteraction::Hovered {
-        return palette.hover_bg;
-    }
-    if visual.1 {
+}
+
+/// Resolve the durable surface family's resting or selected fill. Transient
+/// interaction ink stays in [`control_background`], which consumes the same
+/// shared priority verdict.
+#[must_use]
+fn control_rest_fill(visual: &ControlVisual, selected: bool, palette: &UiPalette) -> Color {
+    if selected {
         match visual.0 {
             ControlTone::Nav => palette.accent,
             ControlTone::Surface => palette.nav_active_bg,
@@ -112,6 +123,24 @@ pub(crate) fn control_background(
             ControlTone::Row { zebra: true } => palette.zebra_bg,
             ControlTone::Row { zebra: false } => Color::NONE,
         }
+    }
+}
+
+/// Resolve one control fill from the theme tokens and Bevy 0.20 interaction
+/// state. Hover and pressed are transient; selected is the page-owned state.
+pub(crate) fn control_background(
+    visual: &ControlVisual,
+    interaction: PickingInteraction,
+    pressed: bool,
+    palette: &UiPalette,
+) -> Color {
+    match control_ink_priority(visual, interaction, pressed).state() {
+        ControlInkState::Pressed | ControlInkState::Focused | ControlInkState::Disabled => {
+            palette.selection_bg
+        }
+        ControlInkState::Hovered => palette.hover_bg,
+        ControlInkState::Selected => control_rest_fill(visual, true, palette),
+        ControlInkState::Idle => control_rest_fill(visual, false, palette),
     }
 }
 

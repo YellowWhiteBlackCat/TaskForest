@@ -26,16 +26,17 @@ use taskmanager_application::{AppAction, AppPage};
 use taskmanager_shell::{ShellApp, fixture};
 use taskmanager_theme::{GlassTier, Theme, tokens::UiSize};
 use taskmanager_ui_contract::presentation::card_flow::{self, CardFlowAdmission};
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
 use crate::app::{FrontendTrack, Page, PageContext, Route};
 use crate::drain::ShellProjectionFolded;
 use crate::pages::processes::card_lane::{
     CardFlowBudget, ProcessAtomicCard, ProcessCardStateOverlay, ProcessViewMode,
-    runtime::sync_card_state_overlays,
+    runtime::{card_state_ink, sync_card_state_overlays},
 };
 use crate::pages::processes::content;
 use crate::palette::{UiPalette, ui_palette};
-use crate::widgets::controls::{ControlTone, ControlVisual};
+use crate::widgets::controls::{ControlTone, ControlVisual, control_ink_priority};
 use crate::window::WindowPalette;
 
 fn process(pid: u32, name: &str, status: &str) -> ProcessItem {
@@ -133,6 +134,38 @@ fn paint_states(app: &mut App) {
     app.world_mut()
         .run_system_once(sync_card_state_overlays)
         .expect("the state overlay system resolves its declared resources");
+}
+
+#[test]
+fn conflicting_interaction_bits_resolve_one_shared_card_ink() {
+    let palette = palette();
+    let visual = ControlVisual(ControlTone::Card, true);
+    let shared = ControlInkPriority::resolve(true, true, true, false, true);
+    assert_eq!(
+        shared,
+        ControlInkState::Pressed,
+        "press outranks hover, focus and selection in the shared fold"
+    );
+    assert_eq!(
+        control_ink_priority(&visual, PickingInteraction::Hovered, true).state(),
+        shared,
+        "Bevy's hover, official press and selection project into the same verdict"
+    );
+    assert_eq!(
+        control_ink_priority(&visual, PickingInteraction::Hovered, false).state(),
+        ControlInkState::Hovered,
+        "hover outranks the durable selected bit"
+    );
+    let (wash, edge) = card_state_ink(&visual, PickingInteraction::Hovered, true, &palette);
+    assert_eq!(wash, palette.selection_bg);
+    assert_eq!(edge, palette.focus_ring);
+    let (hover_wash, hover_edge) =
+        card_state_ink(&visual, PickingInteraction::Hovered, false, &palette);
+    assert_eq!(hover_wash, palette.hover_bg);
+    assert_eq!(
+        hover_edge, palette.focus_ring,
+        "the durable selected edge survives the transient hover wash"
+    );
 }
 
 #[test]

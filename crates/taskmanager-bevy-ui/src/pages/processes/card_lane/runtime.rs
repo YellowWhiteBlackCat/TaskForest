@@ -19,9 +19,9 @@ use bevy::ui::UiSystems;
 use bevy::ui::prelude::{BackgroundColor, BorderColor, ComputedNode};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
-use taskmanager_theme::GlassTier;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::card_flow::CardFlowAdmission;
+use taskmanager_ui_contract::presentation::control_ink::ControlInkState;
 
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
@@ -35,7 +35,7 @@ use super::{
     ProcessFocusValue, ProcessGroupOverflow, ProcessViewMode, ProcessViewModeButton,
     ProcessViewModeChanged, card_flow_budget, focus_projection,
 };
-use crate::widgets::controls::{ControlVisual, control_background};
+use crate::widgets::controls::{ControlVisual, control_ink_priority};
 
 /// The group header's overflow action: reduce through the shell's canonical
 /// status filter and hand the page to its dense table.
@@ -206,14 +206,19 @@ pub(crate) fn card_state_ink(
     pressed: bool,
     palette: &UiPalette,
 ) -> (Color, Color) {
-    let wash = control_background(visual, interaction, pressed, palette);
-    if wash == palette.glass_fill(GlassTier::Card) {
-        return (Color::NONE, Color::NONE);
-    }
-    let edge = if pressed || interaction == PickingInteraction::Pressed || visual.1 {
+    let priority = control_ink_priority(visual, interaction, pressed);
+    let state = priority.state();
+    let (wash, edge) = match state {
+        ControlInkState::Idle => (Color::NONE, Color::NONE),
+        ControlInkState::Hovered | ControlInkState::Focused => (palette.hover_bg, palette.accent),
+        ControlInkState::Pressed | ControlInkState::Selected | ControlInkState::Disabled => {
+            (palette.selection_bg, palette.focus_ring)
+        }
+    };
+    let edge = if matches!(state, ControlInkState::Hovered) && priority.selected {
         palette.focus_ring
     } else {
-        palette.accent
+        edge
     };
     (wash, edge)
 }

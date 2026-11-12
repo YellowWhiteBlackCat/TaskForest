@@ -25,6 +25,12 @@ projection:
   card floors and column ceiling.
 - `taskmanager-theme` owns design tokens; the Bevy card hero consumes
   `GlassTier::Card` through the palette and the shared shadow contract.
+- `taskmanager-ui-contract::presentation::control_ink` owns the one
+  interaction-ink precedence fold. Both the shared control skin and the
+  atomic card's state overlay consume its typed verdict; Bevy only projects
+  `PickingInteraction`, `Pressed` and the selected `ControlVisual` bit into
+  that contract, preserving the existing washes, edges and keyboard-press
+  behavior without re-deriving precedence in two places.
 - The focus dashboard and the atomic cards are ALL marked for real optical
   glass. `backdrop_mirror` mirrors each marked surface's PAINTED tier into
   the offscreen capture root, so the shader samples the product's real
@@ -127,8 +133,9 @@ projection:
   shadow, panel radius, optical marker and backdrop mirror.
 - `tests/headless/pages/process_card_state.rs` proves that the state overlay
   has the card's rounded bounds and border, stays idle-transparent, resolves
-  distinct hover and pressed/selected ink, and gives keyboard focus with an
-  official press the same official verdict.
+  distinct hover and pressed/selected ink, gives keyboard focus with an
+  official press the same official verdict, and resolves conflicting
+  interaction bits through the shared precedence fold.
 - `tests/headless/pages/process_menu.rs` proves the card popover freezes the
   identity of the visible row it is anchored to.
 - `tests/headless/pages/card_lane_width_admission.rs` asserts the capped
