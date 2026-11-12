@@ -453,6 +453,23 @@ fn semantic_surface_styles_follow_the_shared_role_mapping() {
     }
 }
 
+/// Legacy page-card entry points bind the shared floating role: only Iced's
+/// rasterization hint may differ, never the glass material or its elevation.
+#[test]
+fn page_card_entry_points_spend_the_shared_role_material() {
+    let theme = Theme::dark();
+    let role = glass_surface_style(&theme, GlassSurfaceRole::PageCard);
+    let snapped = card_style(&theme);
+    assert_eq!(snapped.background, role.background);
+    assert_eq!(snapped.border, role.border);
+    assert_eq!(snapped.shadow, role.shadow);
+    assert_eq!(snapped.text_color, role.text_color);
+    assert!(snapped.snap);
+    assert_eq!(card_glass_style(&theme), role);
+    assert_eq!(panel_style(&theme), role);
+    assert_eq!(stats_rail_style(&theme), role);
+}
+
 #[test]
 fn high_contrast_mode_strengthens_iced_borders_and_text() {
     let standard = Theme::build(

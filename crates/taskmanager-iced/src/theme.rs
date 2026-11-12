@@ -352,37 +352,22 @@ pub fn elevated_glass_style(theme: &Theme) -> container::Style {
     glass_surface_style(theme, GlassSurfaceRole::Dialog)
 }
 
-/// Card surface style: [`panel_style`] plus a subtle shadow — the quiet lift
-/// the Performance-page graph cards wear on the page backdrop. Same iced
-/// shadow pipeline as [`elevated_style`], deliberately fainter so modals
-/// still read as the highest elevation.
+/// A primary page card's material, resolved through the shared floating
+/// `PageCard` role. `snap` is Iced's rasterization hint; it never changes the
+/// fill, edge, shadow, or elevation owned by the role.
 #[must_use]
 pub fn card_style(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    let fill = glass_fill(theme, GlassTier::Card);
-    container::Style {
-        background: Some(fill),
-        border: glass_border(theme, GlassTier::Card),
-        shadow: glass_shadow(theme, GlassTier::Card),
-        text_color: Some(color(palette.fg)),
-        snap: true,
-    }
+    let mut style = glass_surface_style(theme, GlassSurfaceRole::PageCard);
+    style.snap = true;
+    style
 }
 
-/// The Iced card glass: the neutral card layer plus the product's quiet
-/// depth. Used by floating panels and page cards that sit above a translucent
-/// backdrop; dense table rows stay on opaque row tokens.
+/// The shared floating `PageCard` material without Iced's rasterization hint.
+/// Control glass, generic panels and the statistics rail all bind this one
+/// role instead of assembling a second fill/edge/shadow ladder.
 #[must_use]
 pub fn card_glass_style(theme: &Theme) -> container::Style {
-    let palette = theme.palette();
-    let fill = glass_fill(theme, GlassTier::Card);
-    container::Style {
-        background: Some(fill),
-        border: glass_border(theme, GlassTier::Card),
-        shadow: glass_shadow(theme, GlassTier::Card),
-        text_color: Some(color(palette.fg)),
-        ..container::Style::default()
-    }
+    glass_surface_style(theme, GlassSurfaceRole::PageCard)
 }
 
 /// The recessed inset-panel surface: a well cut INTO the page surface, used

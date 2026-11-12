@@ -62,7 +62,10 @@ native selection and renderer caches; all shared types use their defining module
   to exactly one ink and only reweight paint (the shared
   `ControlState::changes_measurement` contract). The focus ring reads the
   shared ring token, so a pointer-driven focus paints no ring on the switch,
-  segmented track, buttons or checkbox.
+  segmented track, buttons or checkbox. Primary page cards, generic panels
+  and the statistics rail all resolve `GlassSurfaceRole::PageCard` through
+  `glass_surface_style`; `card_style` adds only Iced's `snap` rasterization
+  hint, never a second fill, edge or elevation shadow.
   All visible copy is an i18n key resolved by `taskmanager-application`;
   `icon_button` uses `IconId` and exposes its localized label as a shared
   tooltip because Iced 0.14 has no accessible-name operation.
