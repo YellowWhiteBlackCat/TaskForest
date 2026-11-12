@@ -21,7 +21,7 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_ui_contract::InputModality;
 
-use super::{FocusRingVisible, InputModalityState};
+use super::{FocusIdentity, FocusRingVisible, InputModalityState};
 use crate::palette::ui_palette;
 use crate::window::WindowPalette;
 
@@ -297,4 +297,53 @@ fn normal_tab_navigation_moves_the_ring_between_real_product_controls() {
         assert!(in_modal, "Tab must remain inside the armed gate");
         tab(&mut app);
     }
+}
+
+/// The REAL Settings page rebuilds itself when a preference changes. A
+/// focused switch's identity must survive that rebuild, so the one
+/// `InputFocus` can be rebound to the replacement entity.
+#[test]
+fn a_switch_keeps_its_identity_through_the_real_settings_rebuild() {
+    use crate::app::{Page, Route};
+    use crate::pages::settings::{SettingsChoice, SettingsField};
+    let mut app = crate::window::tests::scripted_frontend_app();
+    app.world_mut().resource_mut::<Route>().page = Page::Settings;
+    app.update();
+
+    let switch_identity = |app: &mut App| {
+        app.world_mut()
+            .query_filtered::<(Entity, &SettingsChoice, &FocusIdentity), ()>()
+            .iter(app.world())
+            .find(|(_, choice, _)| matches!(choice.0, SettingsField::HighContrast(_)))
+            .map(|(entity, _, id)| (entity, id.0.clone()))
+            .expect("the high-contrast switch wears an identity")
+    };
+    let (first, identity) = switch_identity(&mut app);
+    app.world_mut()
+        .resource_mut::<InputFocus>()
+        .set(first, FocusCause::Navigated);
+    app.update();
+
+    // The same activation the page's own observer consumes, which requests
+    // the real remount through `RouteChanged`.
+    app.world_mut()
+        .trigger(bevy::ui_widgets::ValueChange::<bool> {
+            source: first,
+            value: true,
+            is_final: true,
+        });
+    app.update();
+    app.update();
+
+    let (second, second_identity) = switch_identity(&mut app);
+    assert_ne!(first, second, "the page rebuild replaced the switch entity");
+    assert_eq!(
+        identity, second_identity,
+        "the identity is the control, not the entity"
+    );
+    assert_eq!(
+        app.world().resource::<InputFocus>().get(),
+        Some(second),
+        "the focus followed the switch across the real rebuild"
+    );
 }

@@ -50,6 +50,11 @@ Testing follows a strict three-tier verification contract:
    per kind — Painted keeps the tier fill/edge/sheen, Opaque flattens the
    fill and drops the sheen, and Frosted attaches a material whose uniform
    keeps the blur but zeroes refraction, dispersion, rim and grain.
+   `tests/headless/focus_continuity.rs` proves one behaviour test per
+   interactive control family: a rebuild replaces the entity, the stable
+   identity is asserted on the replacement, and the same key lands a second
+   time; disabling the restore makes every family fail. The real Settings
+   page rebuild is proved in `tests/headless/focus_visible.rs`.
 3. **Real Window Wayland Capture (`scripts/capture-bevy.sh`)**:
    Executes the real `taskforest-b` binary inside a nested private Wayland
    compositor (KWin + Niri). Provides authoritative pixel, DPI, font

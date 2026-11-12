@@ -34,6 +34,17 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   change triggers. `tests/headless/pages/settings_slider_keyboard.rs` proves
   the tab stop, the key ownership, the cadence write-back, and the value
   write-back.
+- **Keyboard focus continuity**: EVERY interactive control the component
+  layer mounts (buttons, checkboxes, switches, radio/select choices, sliders,
+  text inputs, table rows, tabs and scrollbars) wears a stable, page-scoped
+  `FocusIdentity` resolved from the scene's own semantic markers. A rebuild
+  replaces the entity, not the control: `follow_focus_across_rebuild`
+  rebinds the one `InputFocus` to the replacement, so a control that changes
+  the page (toggling the theme mode) keeps the focus it just received.
+  `tests/headless/focus_continuity.rs` proves one behaviour test per family
+  — press, rebuild, press the SAME key, assert the second action lands —
+  each paired with a sabotage arm that disables the restore; the real
+  Settings switch rebuild is proved in `tests/headless/focus_visible.rs`.
 - **Startup status filter**: the Startup page offers GPUI's `All`, `Enabled`,
   and `Disabled` choices through the shared shell filter vocabulary. Filtering
   preserves provider identity for selection, keyboard movement, and the

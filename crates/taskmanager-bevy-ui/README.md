@@ -100,7 +100,7 @@ headless suite and capture flow live in
 - `src/app.rs` (+ `src/app/`) — frontend route model (nine pages), nav rail, page mounting, `ShellTrack`.
 - `src/input.rs` (+ `src/input/`), `input_contract.rs`, `navigation.rs` — real-input seam, shell routers, route chords, action menus, effect bridge.
 - `src/window_surface.rs`, `first_run_modal.rs`, `about_modal.rs`, `system_information_modal.rs`, `menu_modal.rs` — the single modal surface family.
-- `src/text_selection.rs`, `confirmation.rs`, `focus_visible.rs`, `semantic.rs`, `tooltip.rs` — clipboard, destructive gate, focus ring, accessibility and tooltip seams.
+- `src/text_selection.rs`, `confirmation.rs`, `focus_visible.rs`, `semantic.rs`, `tooltip.rs` — clipboard, destructive gate, focus ring (plus the page-scoped focus identity that survives a rebuild), accessibility and tooltip seams.
 - `src/window.rs` (+ `src/window/`), `scene_attach.rs` — the bsn! app shell, dual
   capture/presentation camera ownership, font roles and scene attachment.
 - `src/drain.rs`, `palette.rs`, `glass.rs` (+ `src/glass/`), `runtime.rs`,

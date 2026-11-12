@@ -31,8 +31,11 @@ Detail behind the README module map:
   change the list.
 - `src/focus_visible.rs` binds actual widget Tab navigation to toolkit focus,
   paints one keyboard ring and reveals focused controls through the owned
-  scroll area. Settings zero dimming uses the persisted config field and
-  leaves missing values distinct.
+  scroll area. It also resolves a page-scoped `FocusIdentity` for every
+  interactive primitive and restores the focused control across a page
+  rebuild; the identity names the control (semantic marker + family + page),
+  never the entity. Settings zero dimming uses the persisted config field
+  and leaves missing values distinct.
 - `src/semantic.rs` — the accessibility seam: the ui-contract
   `SemanticSnapshot` (revision-keyed) plus accessibility row nodes.
 - `src/drain.rs` — the per-frame `PreUpdate` event-port drain; folds platform

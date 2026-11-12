@@ -30,7 +30,6 @@ use bevy::ui_widgets::{
 };
 use zhuge_ui_core::value::interval_fraction;
 
-use crate::focus_visible::FocusIdentity;
 use crate::palette::UiPalette;
 
 /// One painted part of a slider's track.
@@ -163,10 +162,6 @@ pub(crate) fn slider_scene(axis: SliderAxis, palette: &UiPalette) -> impl Scene 
         SliderStep({ axis.step })
         SliderPrecision({ axis.precision })
         Slider { track_click: TrackClick::Snap, orientation: SliderOrientation::Horizontal }
-        // The page-scoped owner is the control's stable identity: a page
-        // rebuild spawns a new entity for the same slider, so the keyboard
-        // focus follows the identity instead of the entity.
-        FocusIdentity({ axis.owner.clone() })
         Children [
             Node {
                 position_type: PositionType::Absolute,
