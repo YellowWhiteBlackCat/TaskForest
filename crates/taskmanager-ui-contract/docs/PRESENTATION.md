@@ -66,6 +66,18 @@ right edge degrades the lane instead of clipping the last card or the action
 that says which rows the lane left out. A frontend binds this verdict, never
 a second "how many columns fit" ladder.
 
+The header is a typed fact with an ABSENT variant (`CardRowHeader::Plain`):
+a plain grid of equal cards has no group header and no overflow action, yet
+it spends the SAME share arithmetic (`card_width_in_row`) as the bucketed
+lane. `CardGridWidthSpec` and `admit_card_grid_width` admit that shape into
+a measured slot, so neither the dashboard metric row nor the GPU insight row
+keeps its own one-line share formula. `chrome_rows` owns the complementary
+vertical fact: the fixed chrome rows a page paints above its content are the
+theme's control-ladder extent over the lines they wrap into, never
+page-local literals. A frontend lifts its theme axis at its binding seam,
+owns only the label-width wrap point, and paints each row with the reserved
+height as its minimum.
+
 The elevation ladder a card wears is a different fact and lives with the
 theme's glass tiers: `taskmanager-theme` owns the two-layer shadow ink and
 geometry, and each renderer binding projects it (a renderer that paints one

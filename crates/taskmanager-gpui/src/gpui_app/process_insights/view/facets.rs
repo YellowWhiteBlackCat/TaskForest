@@ -21,7 +21,11 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::AdaptiveGrid;
 use taskmanager_ui::theme_binding::definite_length;
+use taskmanager_ui_contract::presentation::card_width::{CardGridWidthSpec, admit_card_grid_width};
 use zhuge_ui_core::row_page::{RowPage, page_of, rows_per_page};
+
+/// The largest column count the GPU insight row paints.
+const GPU_GRID_COLUMN_CAP: usize = 2;
 
 pub(super) fn render_projection(
     props: &ProcessInsightsViewProps<'_>,
@@ -100,16 +104,22 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_layout(
     width: f32,
     units: UnitPreferences,
 ) -> Div {
-    let card_width = if width >= 650.0 {
-        (width - tokens::SPACE_8.0) / 2.0
-    } else {
-        width
-    };
+    // The GPU insight row is a PLAIN grid: equal cards, one gap, no group
+    // header and no overflow action. The shared card-width contract owns
+    // the share arithmetic, so this row and the dashboard's metric row can
+    // never disagree about how wide one card is.
+    let columns = if width >= 650.0 { 2 } else { 1 };
+    let card_width = admit_card_grid_width(
+        width,
+        columns,
+        CardGridWidthSpec::new(tokens::SPACE_8.0, GPU_GRID_COLUMN_CAP),
+    )
+    .card_width;
     let cards = [
         gpu_card(theme, gpu, labels, card_width, units),
         gpu_engines::gpu_engines_card(theme, gpu, labels, card_width),
     ];
-    if width >= 650.0 {
+    if columns == 2 {
         AdaptiveGrid::new(px(card_width))
             .gap(tokens::SPACE_8)
             .debug_selector("tm-insights-gpu-grid")

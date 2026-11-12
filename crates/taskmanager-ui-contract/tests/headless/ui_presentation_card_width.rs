@@ -216,3 +216,81 @@ fn the_budget_helper_and_the_typed_verdict_publish_the_same_fold() {
         );
     }
 }
+
+/// A PLAIN grid has no group header and no overflow action: it must bind the
+/// same share arithmetic without inventing header widths.
+#[test]
+fn a_plain_grid_binds_the_same_share_arithmetic() {
+    let grid = CardGridWidthSpec::new(8.0, 2);
+    for slot in [0.0, 120.0, 704.0, 1148.0, 3_000.0] {
+        for requested in [1usize, 2, 4] {
+            let budget = admit_card_grid_width(slot, requested, grid);
+            let columns = budget.columns.min(grid.max_columns);
+            assert!(columns >= 1);
+            assert_eq!(budget.columns, columns);
+            assert_eq!(budget.content_width, slot);
+            assert_eq!(
+                budget.card_width,
+                card_width_in_row(grid.gap, columns, slot),
+                "the plain grid spends the ONE share arithmetic: slot {slot}"
+            );
+            // The row fills the slot exactly: the cards and their gaps
+            // consume the measured width, so no dead band survives.
+            let consumed =
+                budget.card_width * columns as f32 + grid.gap * (columns.saturating_sub(1)) as f32;
+            assert!(
+                (consumed - slot).abs() < 0.001,
+                "the plain grid fills the measured slot: slot {slot}"
+            );
+        }
+    }
+}
+
+/// The bucketed lane and the plain grid must never disagree about how wide
+/// one card is.
+#[test]
+fn the_lane_and_the_grid_share_one_card_width_fold() {
+    let lane = spec();
+    let grid = CardGridWidthSpec::new(lane.gap, lane.max_columns);
+    for slot in [720.0, 1148.0] {
+        for columns in [1usize, 2] {
+            assert_eq!(
+                lane.card_width(columns, slot),
+                card_width_in_row(lane.gap, columns, slot),
+            );
+            assert_eq!(
+                admit_card_grid_width(slot, columns, grid).card_width,
+                lane.card_width(columns, slot),
+                "one fold owns the card width: slot {slot}, columns {columns}"
+            );
+        }
+    }
+}
+
+/// A plain grid carries no header fact, so the header's width is zero and the
+/// row spends its whole slot on cards.
+#[test]
+fn a_plain_grid_charges_no_header_group() {
+    let grid = CardGridWidthSpec::new(8.0, 2);
+    let budget = admit_card_grid_width(704.0, 2, grid);
+    assert_eq!(budget.card_width, 348.0);
+    assert_eq!(budget.content_width, 704.0);
+    let lane = CardRowWidthSpec::plain_grid(120.0, 360.0, 8.0, 2);
+    assert!(lane.is_valid());
+    assert_eq!(lane.header_width(false), 0.0);
+    assert_eq!(lane.header_width(true), 0.0);
+}
+
+/// A degenerate gap or an empty column cap admits no card at all.
+#[test]
+fn a_degenerate_plain_grid_spec_admits_nothing() {
+    for grid in [
+        CardGridWidthSpec::new(0.0, 2),
+        CardGridWidthSpec::new(8.0, 0),
+    ] {
+        let budget = admit_card_grid_width(1148.0, 2, grid);
+        assert_eq!(budget.columns, 0);
+        assert_eq!(budget.card_width, 0.0);
+        assert_eq!(budget.content_width, 0.0);
+    }
+}

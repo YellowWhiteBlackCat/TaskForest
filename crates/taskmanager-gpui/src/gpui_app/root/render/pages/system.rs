@@ -37,6 +37,15 @@ impl RootView {
         let hardware = self.hardware_rc().clone();
         let processes = self.processes_arc().clone();
         let system_layout = responsive::system_budget_from_frame(frame);
+        // The section header is a CHROME ROW: the shared contract owns its
+        // height and the page paints exactly what the metric budget
+        // reserved, so the page's chrome and the page's budget can never
+        // disagree about the space the chrome spends.
+        let chrome_rows = responsive::DashboardChromeRows::from_page_layout(
+            frame.page_layout(),
+            context.presentation.appearance.ui_size,
+            context.presentation.appearance.density,
+        );
         let content: AnyElement = match self.dashboard.section {
             SystemPageSection::Dashboard => {
                 dashboard::render_dashboard(dashboard::DashboardViewProps {
@@ -45,7 +54,11 @@ impl RootView {
                     process_count: self.projection().processes.as_ref().map(|rows| rows.len()),
                     active_alert_count: self.active_alerts().len(),
                     state: &self.dashboard,
-                    layout: DashboardBudget::from_frame(frame),
+                    layout: DashboardBudget::from_frame(
+                        frame,
+                        context.presentation.appearance.ui_size,
+                        context.presentation.appearance.density,
+                    ),
                     entity: entity.clone(),
                     hover_slot: self.graph_hover.clone(),
                     graph_cache: graph_cache.clone(),
@@ -124,6 +137,7 @@ impl RootView {
                     &self.dashboard,
                     self.projection().alert_center.event_history(),
                     system_layout,
+                    chrome_rows.section_tabs,
                     entity,
                 ))
                 .child(

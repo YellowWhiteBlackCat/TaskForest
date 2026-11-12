@@ -82,6 +82,17 @@ BINDINGS = (
             "content_width_cap",
         ),
     ),
+    # A PLAIN grid (the dashboard metric row and the GPU-insight row) binds
+    # the shared grid shape. A page that re-derived its own share formula
+    # would own a second address for the same width arithmetic.
+    (
+        CRATES / "taskmanager-gpui/src/gpui_app/root/responsive/dashboard.rs",
+        ("CardGridWidthSpec", "admit_card_grid_width"),
+    ),
+    (
+        CRATES / "taskmanager-gpui/src/gpui_app/process_insights/view/facets.rs",
+        ("CardGridWidthSpec", "admit_card_grid_width"),
+    ),
 )
 
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)

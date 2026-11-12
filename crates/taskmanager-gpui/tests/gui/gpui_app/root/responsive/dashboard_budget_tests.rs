@@ -1,10 +1,31 @@
 use super::*;
 use taskmanager_theme::tokens;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 use taskmanager_ui_contract::presentation::card_flow::{CardFlowBudget, admit_card_groups_capped};
+use taskmanager_ui_contract::presentation::card_width::{CardGridWidthSpec, admit_card_grid_width};
 use taskmanager_ui_contract::presentation::dashboard::DASHBOARD_METRIC_COUNT;
 use taskmanager_ui_contract::presentation::vocabulary::{
     LayoutProfile, NavigationPresentation, VerticalSpace,
 };
+
+/// The budget at the product's default theme axis points.
+///
+/// The chrome rows are measured from the shared control ladder, so a test
+/// that states a frame must also state the axis the ladder resolves at.
+fn budget(layout: PageLayoutBudget) -> DashboardBudget {
+    DashboardBudget::from_page_layout(layout, UiSize::default(), RowDensity::default())
+}
+
+/// The chrome the page paints above its metric slot, measured from the
+/// shared chrome-row contract.
+///
+/// The budget reserves exactly this: the contract owns the row heights, the
+/// page paints them, and no page literal stands between the two.
+fn chrome_of(layout: PageLayoutBudget) -> f32 {
+    let rows =
+        DashboardChromeRows::from_page_layout(layout, UiSize::default(), RowDensity::default());
+    rows.total() + f32::from(tokens::SPACE_6) + ROOT_ROW_GAP * 3.0 + BOTTOM_SAFETY_BAND
+}
 
 fn layout(width: f32, height: f32) -> PageLayoutBudget {
     PageLayoutBudget {
@@ -70,7 +91,7 @@ fn the_page_spends_the_shared_card_flow_verdict() {
     for height in [
         0.0, 120.0, 260.0, 300.0, 358.0, 359.0, 420.0, 500.0, 620.0, 780.0, 1000.0,
     ] {
-        let budget = DashboardBudget::from_page_layout(constrained_layout(width, height));
+        let budget = budget(constrained_layout(width, height));
         assert_spends_shared_flow(budget);
         assert_cards_stay_inside_the_shared_footprint(budget);
     }
@@ -84,7 +105,7 @@ fn a_group_is_admitted_only_when_the_whole_group_fits() {
     // group at all and one pixel more keeps the group complete.
     let mut admitted_at = None;
     for height in 200..=520 {
-        let budget = DashboardBudget::from_page_layout(constrained_layout(width, height as f32));
+        let budget = budget(constrained_layout(width, height as f32));
         if budget.metric_count > 0 {
             admitted_at = Some(height as f32);
             break;
@@ -93,14 +114,14 @@ fn a_group_is_admitted_only_when_the_whole_group_fits() {
     let admitted_at =
         admitted_at.expect("a dashboard wide enough for one group must admit it eventually");
 
-    let below = DashboardBudget::from_page_layout(constrained_layout(width, admitted_at - 1.0));
+    let below = budget(constrained_layout(width, admitted_at - 1.0));
     assert_eq!(
         below.metric_count, 0,
         "one pixel below the admission must not paint half a group"
     );
     assert_eq!(below.card_height, 0.0);
 
-    let at = DashboardBudget::from_page_layout(constrained_layout(width, admitted_at));
+    let at = budget(constrained_layout(width, admitted_at));
     assert!(at.metric_count > 0);
     assert_cards_stay_inside_the_shared_footprint(at);
     assert!(at.card_height >= CARD_FLOOR);
@@ -116,7 +137,7 @@ fn the_summary_row_is_an_optional_whole_group() {
     let mut counts_at = None;
     let mut none_at = None;
     for height in 200..=700 {
-        let budget = DashboardBudget::from_page_layout(constrained_layout(width, height as f32));
+        let budget = budget(constrained_layout(width, height as f32));
         match budget.summaries {
             DashboardSummaries::Cards if cards_at.is_none() => cards_at = Some(height as f32),
             DashboardSummaries::Counts if counts_at.is_none() => counts_at = Some(height as f32),
@@ -139,18 +160,18 @@ fn the_summary_row_is_an_optional_whole_group() {
     assert!(none_at < counts_at);
     assert!(counts_at < cards_at);
 
-    let at_counts = DashboardBudget::from_page_layout(constrained_layout(width, counts_at));
+    let at_counts = budget(constrained_layout(width, counts_at));
     assert_eq!(at_counts.summaries, DashboardSummaries::Counts);
     assert!(at_counts.metric_count > 0);
 
-    let at_cards = DashboardBudget::from_page_layout(constrained_layout(width, cards_at));
+    let at_cards = budget(constrained_layout(width, cards_at));
     assert_eq!(at_cards.summaries, DashboardSummaries::Cards);
     assert!(at_cards.metric_count > 0);
     assert!(at_cards.review_height >= CARD_FLOOR);
 
     // One pixel below the card summary, the page degrades to the count row
     // rather than dropping to a half summary.
-    let just_below = DashboardBudget::from_page_layout(constrained_layout(width, cards_at - 1.0));
+    let just_below = budget(constrained_layout(width, cards_at - 1.0));
     assert_ne!(just_below.summaries, DashboardSummaries::Cards);
     assert!(just_below.metric_count > 0);
 }
@@ -162,9 +183,8 @@ fn the_bottom_safety_band_is_charged_before_the_cards() {
     // that band in the slot the cards may spend — the band is a budget fact,
     // never a rendering accident.
     let base = 600.0;
-    let taller = DashboardBudget::from_page_layout(constrained_layout(width, base));
-    let shorter =
-        DashboardBudget::from_page_layout(constrained_layout(width, base - BOTTOM_SAFETY_BAND));
+    let taller = budget(constrained_layout(width, base));
+    let shorter = budget(constrained_layout(width, base - BOTTOM_SAFETY_BAND));
     assert_eq!(
         taller.review_height - shorter.review_height,
         BOTTOM_SAFETY_BAND,
@@ -178,7 +198,7 @@ fn the_bottom_safety_band_is_charged_before_the_cards() {
 fn a_narrow_page_keeps_one_column_and_still_reaches_every_metric() {
     let width = 520.0;
     for height in [400.0, 600.0, 900.0, 1400.0] {
-        let budget = DashboardBudget::from_page_layout(constrained_layout(width, height));
+        let budget = budget(constrained_layout(width, height));
         assert_eq!(budget.columns, 1);
         assert_spends_shared_flow(budget);
         assert_cards_stay_inside_the_shared_footprint(budget);
@@ -187,7 +207,7 @@ fn a_narrow_page_keeps_one_column_and_still_reaches_every_metric() {
         assert!(window.first + budget.metric_count.max(1) <= DASHBOARD_METRIC_COUNT);
     }
 
-    let tall = DashboardBudget::from_page_layout(constrained_layout(width, 1400.0));
+    let tall = budget(constrained_layout(width, 1400.0));
     assert_eq!(tall.metric_count, 4);
     assert_eq!(tall.metric_window(3).first, 0);
 }
@@ -198,7 +218,7 @@ fn a_narrow_page_keeps_one_column_and_still_reaches_every_metric() {
 /// shape's own card footprint is.
 #[test]
 fn a_tall_reference_frame_spends_its_measured_review_slot() {
-    let budget = DashboardBudget::from_page_layout(constrained_layout(1180.0, 780.0));
+    let budget = budget(constrained_layout(1180.0, 780.0));
     assert_eq!(budget.columns, 2);
     assert_eq!(budget.metric_count, DASHBOARD_METRIC_COUNT);
     assert_cards_stay_inside_the_shared_footprint(budget);
@@ -226,7 +246,7 @@ fn a_compact_frame_charges_the_wrapped_control_row_once() {
         NavOrientation::Vertical,
         FrameChromeBudget::new(32.0, false, false),
     );
-    let budget = DashboardBudget::from_frame(frame);
+    let budget = DashboardBudget::from_frame(frame, UiSize::default(), RowDensity::default());
     assert_eq!(budget.columns, 2);
     assert!(
         budget.metric_count > 0,
@@ -250,11 +270,23 @@ fn the_metric_cards_share_the_measured_row() {
     for width in [
         320.0, 519.0, 520.0, 599.0, 600.0, 900.0, 1148.0, 1180.0, 1600.0,
     ] {
-        let budget = DashboardBudget::from_page_layout(constrained_layout(width, 780.0));
+        let budget = budget(constrained_layout(width, 780.0));
         let expected = (width - CARD_GAP * (budget.columns - 1) as f32) / budget.columns as f32;
         assert_eq!(
             budget.card_width, expected,
             "the card width is the row's share: {budget:?}"
+        );
+        // The share is the SHARED plain-grid admission, not a page-local
+        // fraction: the dashboard metric row and the GPU insight row spend
+        // one arithmetic.
+        let admitted = admit_card_grid_width(
+            width,
+            budget.columns,
+            CardGridWidthSpec::new(CARD_GAP, GRID_COLUMN_CAP),
+        );
+        assert_eq!(
+            budget.card_width, admitted.card_width,
+            "the metric row spends the shared plain-grid admission: {budget:?}"
         );
         let consumed =
             budget.card_width * budget.columns as f32 + CARD_GAP * (budget.columns - 1) as f32;
@@ -270,6 +302,58 @@ fn the_metric_cards_share_the_measured_row() {
     }
 }
 
+/// The chrome rows the budget reserves are the rows the shared chrome-row
+/// contract measures: no page literal stands between the reservation and
+/// the row the page paints.
+#[test]
+fn the_reserved_chrome_is_the_shared_chrome_row_contract() {
+    for width in [320.0, 600.0, 900.0, 1048.0, 1180.0, 1600.0] {
+        let layout = constrained_layout(width, 780.0);
+        let budget = budget(layout);
+        let rows =
+            DashboardChromeRows::from_page_layout(layout, UiSize::default(), RowDensity::default());
+        assert_eq!(budget.chrome_rows, rows);
+        let summary_height = match budget.summaries {
+            DashboardSummaries::Cards => SUMMARY_CARD_HEIGHT,
+            DashboardSummaries::Counts => SUMMARY_COUNT_HEIGHT,
+            DashboardSummaries::None => 0.0,
+        };
+        let row_gaps = match budget.summaries {
+            DashboardSummaries::None => ROOT_ROW_GAP * 2.0,
+            _ => ROOT_ROW_GAP * 3.0,
+        };
+        assert_eq!(
+            budget.review_height,
+            780.0
+                - rows.total()
+                - f32::from(tokens::SPACE_6)
+                - row_gaps
+                - BOTTOM_SAFETY_BAND
+                - summary_height,
+            "the reserved chrome is the contract's rows: {budget:?}"
+        );
+    }
+}
+
+/// The theme axis reaches the chrome rows: a larger UI size spends a taller
+/// control ladder, so the chrome reservation grows with it.
+#[test]
+fn the_chrome_rows_follow_the_theme_axis() {
+    let layout = constrained_layout(1180.0, 780.0);
+    let standard =
+        DashboardBudget::from_page_layout(layout, UiSize::Standard, RowDensity::default());
+    let large = DashboardBudget::from_page_layout(layout, UiSize::Large, RowDensity::default());
+    assert!(
+        large.review_height < standard.review_height,
+        "a taller control ladder reserves a taller chrome: {standard:?} / {large:?}"
+    );
+    assert_eq!(
+        large.chrome_rows.total() - standard.chrome_rows.total(),
+        3.0 * (UiSize::Large.control_height().0 - UiSize::Standard.control_height().0),
+        "every chrome row spends the ladder extent: {standard:?} / {large:?}"
+    );
+}
+
 /// The coverage readout renders INSIDE the window-controls row. A budget
 /// that charged it as a row of its own reserved space the page never paints,
 /// and the mandatory metric cards stopped short of the slot they may spend.
@@ -277,14 +361,10 @@ fn the_metric_cards_share_the_measured_row() {
 fn the_coverage_readout_is_not_charged_as_its_own_row() {
     let width = 1180.0;
     let height = 780.0;
-    let budget = DashboardBudget::from_page_layout(constrained_layout(width, height));
+    let layout = constrained_layout(width, height);
+    let budget = budget(layout);
     assert_eq!(budget.summaries, DashboardSummaries::Cards);
-    let chrome = SECTION_SINGLE_ROW_HEIGHT
-        + WINDOW_CONTROLS_HEIGHT
-        + PAGING_HEIGHT
-        + f32::from(tokens::SPACE_6)
-        + ROOT_ROW_GAP * 3.0
-        + BOTTOM_SAFETY_BAND;
+    let chrome = chrome_of(layout);
     assert_eq!(
         budget.review_height,
         height - chrome - SUMMARY_CARD_HEIGHT,
@@ -298,15 +378,10 @@ fn the_coverage_readout_is_not_charged_as_its_own_row() {
 #[test]
 fn the_summary_row_appears_exactly_when_a_whole_group_still_fits() {
     let width = 1180.0;
-    let chrome = SECTION_SINGLE_ROW_HEIGHT
-        + WINDOW_CONTROLS_HEIGHT
-        + PAGING_HEIGHT
-        + f32::from(tokens::SPACE_6)
-        + ROOT_ROW_GAP * 3.0
-        + BOTTOM_SAFETY_BAND;
+    let chrome = chrome_of(constrained_layout(width, 780.0));
     let cards_at = chrome + SUMMARY_CARD_HEIGHT + CARD_FLOOR;
 
-    let at = DashboardBudget::from_page_layout(constrained_layout(width, cards_at));
+    let at = budget(constrained_layout(width, cards_at));
     assert_eq!(at.summaries, DashboardSummaries::Cards);
     assert!(
         at.metric_count > 0,
@@ -314,7 +389,7 @@ fn the_summary_row_appears_exactly_when_a_whole_group_still_fits() {
     );
     assert!(at.review_height >= CARD_FLOOR);
 
-    let just_below = DashboardBudget::from_page_layout(constrained_layout(width, cards_at - 1.0));
+    let just_below = budget(constrained_layout(width, cards_at - 1.0));
     assert_ne!(
         just_below.summaries,
         DashboardSummaries::Cards,

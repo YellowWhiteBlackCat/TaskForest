@@ -60,11 +60,16 @@ async fn dashboard_cards_stay_inside_the_bounded_review_viewport(cx: &mut TestAp
         .unwrap();
         let layout = win
             .read_with(cx, |view, _| {
-                DashboardBudget::from_frame(FrameBudget::for_root(
-                    size(px(width), px(height)),
-                    view.nav_orientation,
-                    FrameChromeBudget::new(titlebar_height(&view.theme), false, false),
-                ))
+                let appearance = view.presentation_snapshot().appearance;
+                DashboardBudget::from_frame(
+                    FrameBudget::for_root(
+                        size(px(width), px(height)),
+                        view.nav_orientation,
+                        FrameChromeBudget::new(titlebar_height(&view.theme), false, false),
+                    ),
+                    appearance.ui_size,
+                    appearance.density,
+                )
             })
             .unwrap();
         let mut reached = HashSet::new();

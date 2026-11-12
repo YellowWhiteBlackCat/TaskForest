@@ -62,14 +62,30 @@ Geometry and slot budgets are unchanged.
 The Dashboard metric grid is one shared adaptive grid whose item basis is
 the budget's derived card width, so the row fills the measured page slot
 exactly: the cards share the content width minus the shared `SPACE_8` gaps
-between them, and no dead band survives at the row's right edge. The column
-count and that width belong to `DashboardBudget`; the page keeps no local
-column fraction. The grid's basis is rounded down to a whole pixel so a
-fractional window width can never push the second card onto a row of its own,
-and the grid grows the cards back into the row afterwards. The budget also
-charges the coverage readout as part of the window-controls row it renders
-inside, and charges the summary row's own gap when that row is visible, so
-the mandatory metric groups reach the slot they may spend.
+between them, and no dead band survives at the row's right edge. That share
+is the shared plain-grid admission `card_width::admit_card_grid_width`, which
+the GPU insight row spends too — one arithmetic owns both grid rows. The
+column count and that width belong to `DashboardBudget`; the page keeps no
+local column fraction. The grid's basis is rounded down to a whole pixel so
+a fractional window width can never push the second card onto a row of its
+own, and the grid grows the cards back into the row afterwards.
+
+The page's chrome rows — the section tabs, the window controls and the paging
+row — are measured from the shared control ladder through
+`presentation::chrome_rows::ChromeRowSpec`, not page-local literals. The
+page paints each row with its reserved height as a minimum, and the budget
+reserves that same height, so the painted row and the reserved row are one
+fact. The two label-width wrap points stay in `DashboardBudget` because the
+groups that wrap are localized copy; the height a line spends is shared.
+The budget also charges the coverage readout as part of the window-controls
+row it renders inside, and charges the summary row's own gap when that row is
+visible, so the mandatory metric groups reach the slot they may spend.
+
+`card_flow`'s `card_height` is a FLOOR: the grid stretches its lines into
+the review slot, and each card spends the budgeted height as a minimum so it
+grows into its line instead of leaving dead space below it. Headless bounds
+prove the painted chrome rows equal their reservations and the last card
+reaches the bottom of its stretched line.
 Durable History shows the shared 1h/24h/7d replay projections; live process
 rings never become its authority. Recorded curves keep gaps and signed ranges
 with separate per-window scrolling.

@@ -26,6 +26,8 @@
 //!    ↓
 //! card_width   whole-column admission + header fact group (one arithmetic)
 //!    ↓
+//! chrome_rows  the fixed chrome-row heights from the control ladder
+//!    ↓
 //! control_ink  one interaction-ink precedence fold (paint only)
 //!    ↓
 //! dashboard    the product metric count + the paged metric window
@@ -44,6 +46,7 @@
 pub mod budget;
 pub mod card_flow;
 pub mod card_width;
+pub mod chrome_rows;
 pub mod control_ink;
 pub mod dashboard;
 pub mod load_tiers;

@@ -109,6 +109,9 @@ fn dashboard_paging(props: &DashboardViewProps<'_>) -> Div {
         .flex_row()
         .gap(definite_length(tokens::SPACE_6))
         .flex_shrink_0()
+        // The reserved chrome-row height is the row's MINIMUM, so the row
+        // the page paints is the row the budget reserved.
+        .min_h(px(props.layout.chrome_rows.paging.height()))
         .debug_selector(|| "tm-dashboard-paging".to_owned());
     for (previous, id, key, enabled) in [
         (
@@ -177,6 +180,61 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
             |_, _, _| {},
         ));
     }
+    // The window-controls row is a CHROME ROW: the shared contract owns its
+    // height and the page paints exactly what the budget reserved. Its
+    // title, range pills and coverage readout share one line while the slot
+    // is wide enough for their labels; below that the readout drops to its
+    // own line and the reserved height follows.
+    let window_controls = props.layout.chrome_rows.window_controls;
+    let title = div()
+        .debug_selector(|| "tm-dashboard-window-title".to_owned())
+        .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
+        .child(i18n::t("dashboard.history"));
+    let coverage = div()
+        .debug_selector(|| "tm-dashboard-window-coverage".to_owned())
+        .text_size(font_size(tokens::FONT_11))
+        .text_color(hsla(props.theme.fg_dim))
+        .child(
+            i18n::t("dashboard.coverage").replace("{minutes}", &format!("{coverage_minutes:.1}")),
+        );
+    let window_row = if window_controls.lines > 1 {
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_between()
+            .flex_shrink_0()
+            .gap(definite_length(tokens::SPACE_6))
+            .min_h(px(window_controls.height()))
+            .debug_selector(|| "tm-dashboard-window-controls".to_owned())
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .w_full()
+                    .gap(definite_length(tokens::SPACE_6))
+                    .child(title)
+                    .child(windows.debug_selector(|| "tm-dashboard-window-pills".to_owned())),
+            )
+            .child(coverage)
+    } else {
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .justify_between()
+            .flex_shrink_0()
+            .gap(definite_length(tokens::SPACE_6))
+            .min_h(px(window_controls.height()))
+            .debug_selector(|| "tm-dashboard-window-controls".to_owned())
+            .child(title)
+            .child(windows.debug_selector(|| "tm-dashboard-window-pills".to_owned()))
+            .child(coverage)
+    };
     let mut root = div()
         .flex()
         .flex_col()
@@ -187,34 +245,7 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
     if props.layout.summaries != DashboardSummaries::None {
         root = root.child(dashboard_summaries(&props, &series));
     }
-    root = root
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .items_center()
-                .justify_between()
-                .flex_shrink_0()
-                .gap(definite_length(tokens::SPACE_6))
-                .debug_selector(|| "tm-dashboard-window-controls".to_owned())
-                .child(
-                    div()
-                        .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
-                        .child(i18n::t("dashboard.history")),
-                )
-                .child(windows)
-                .child(
-                    div()
-                        .text_size(font_size(tokens::FONT_11))
-                        .text_color(hsla(props.theme.fg_dim))
-                        .child(
-                            i18n::t("dashboard.coverage")
-                                .replace("{minutes}", &format!("{coverage_minutes:.1}")),
-                        ),
-                ),
-        )
-        .child(dashboard_paging(&props));
+    root = root.child(window_row).child(dashboard_paging(&props));
     let mut body = div()
         .flex()
         .flex_col()

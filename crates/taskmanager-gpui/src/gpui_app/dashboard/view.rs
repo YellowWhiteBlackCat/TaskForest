@@ -20,6 +20,7 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui::theme_binding::rgba;
 use taskmanager_ui_contract::IconId;
+use taskmanager_ui_contract::presentation::chrome_rows::ChromeRowSpec;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{
@@ -147,6 +148,7 @@ pub fn render_system_header(
     state: &DashboardState,
     events: &[AlertEvent],
     layout: SystemPageBudget,
+    chrome: ChromeRowSpec,
     entity: Entity<RootView>,
 ) -> Div {
     let open_panel = |panel: DashboardPanel, entity: Entity<RootView>| {
@@ -158,78 +160,96 @@ pub fn render_system_header(
         }
     };
     let unread = state.events.unread_count(events);
-    div()
+    // The header is a CHROME ROW: the shared contract owns its height, and
+    // the page paints exactly what the budget reserved. The row's two
+    // groups share one line while the slot is wide enough for their labels;
+    // below that the row stacks them, and the reserved height follows.
+    let tabs = div()
         .flex()
         .flex_row()
         .flex_wrap()
-        .items_center()
-        .justify_between()
-        .gap(definite_length(tokens::SPACE_8))
+        .gap(definite_length(tokens::SPACE_6))
+        .debug_selector(|| "tm-dashboard-section-pills".to_owned())
+        .child(section_pill(
+            theme,
+            SystemPageSection::Dashboard,
+            state.section,
+            &entity,
+        ))
+        .child(section_pill(
+            theme,
+            SystemPageSection::Hardware,
+            state.section,
+            &entity,
+        ))
+        .child(section_pill(
+            theme,
+            SystemPageSection::Health,
+            state.section,
+            &entity,
+        ));
+    let actions = div()
+        .flex()
+        .flex_row()
+        .flex_wrap()
+        .debug_selector(|| "tm-dashboard-section-actions".to_owned())
+        .gap(definite_length(match layout.surfaces {
+            SystemSurfacePresentation::SingleColumn => tokens::SPACE_4,
+            SystemSurfacePresentation::MultiColumn => tokens::SPACE_6,
+        }))
         .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .gap(definite_length(tokens::SPACE_6))
-                .child(section_pill(
-                    theme,
-                    SystemPageSection::Dashboard,
-                    state.section,
-                    &entity,
-                ))
-                .child(section_pill(
-                    theme,
-                    SystemPageSection::Hardware,
-                    state.section,
-                    &entity,
-                ))
-                .child(section_pill(
-                    theme,
-                    SystemPageSection::Health,
-                    state.section,
-                    &entity,
-                )),
+            elements::Pill::new(
+                "open-alert-rules",
+                i18n::t("alerts.manage"),
+                open_panel(DashboardPanel::AlertRules, entity.clone()),
+                |_, _, _| {},
+            )
+            .semantic_icon(IconId::Alert)
+            .render(theme),
         )
         .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .gap(definite_length(match layout.surfaces {
-                    SystemSurfacePresentation::SingleColumn => tokens::SPACE_4,
-                    SystemSurfacePresentation::MultiColumn => tokens::SPACE_6,
-                }))
-                .child(
-                    elements::Pill::new(
-                        "open-alert-rules",
-                        i18n::t("alerts.manage"),
-                        open_panel(DashboardPanel::AlertRules, entity.clone()),
-                        |_, _, _| {},
-                    )
-                    .semantic_icon(IconId::Alert)
-                    .render(theme),
-                )
-                .child(
-                    elements::Pill::new(
-                        "open-event-center",
-                        format!("{} ({unread})", i18n::t("events.title")),
-                        open_panel(DashboardPanel::Events, entity.clone()),
-                        |_, _, _| {},
-                    )
-                    .semantic_icon(IconId::Alert)
-                    .render(theme),
-                )
-                .child(
-                    elements::Pill::new(
-                        "open-saved-views",
-                        i18n::t("saved_views.title"),
-                        open_panel(DashboardPanel::SavedViews, entity),
-                        |_, _, _| {},
-                    )
-                    .semantic_icon(IconId::Applications)
-                    .render(theme),
-                ),
+            elements::Pill::new(
+                "open-event-center",
+                format!("{} ({unread})", i18n::t("events.title")),
+                open_panel(DashboardPanel::Events, entity.clone()),
+                |_, _, _| {},
+            )
+            .semantic_icon(IconId::Alert)
+            .render(theme),
         )
+        .child(
+            elements::Pill::new(
+                "open-saved-views",
+                i18n::t("saved_views.title"),
+                open_panel(DashboardPanel::SavedViews, entity),
+                |_, _, _| {},
+            )
+            .semantic_icon(IconId::Applications)
+            .render(theme),
+        );
+    let row = if chrome.lines > 1 {
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(definite_length(tokens::SPACE_8))
+            .child(tabs)
+            .child(actions)
+    } else {
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .gap(definite_length(tokens::SPACE_8))
+            .child(tabs)
+            .child(actions)
+    };
+    row.debug_selector(|| "tm-dashboard-section-tabs".to_owned())
+        // The reserved height is the row's MINIMUM: the painted row is
+        // never shorter than the row the budget reserved, and the row the
+        // budget reserved is never taller than the row the page paints.
+        .min_h(px(chrome.height()))
 }
 
 fn summary_card(
@@ -393,7 +413,12 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         // column fraction here.
         .w_full()
         .min_w(px(0.0))
-        .h(px(layout.card_height))
+        // The budgeted card height is a FLOOR, not a ceiling: the shared
+        // grid stretches its lines into the slot the cards were admitted
+        // into, and a card that keeps only its budgeted height leaves dead
+        // space below it. The card grows into its line instead.
+        .min_h(px(layout.card_height))
+        .h_full()
         .flex_shrink_0()
         .flex()
         .flex_col()

@@ -37,8 +37,10 @@ use taskmanager_ui_contract::presentation::vocabulary::{
 
 use super::RootView;
 
+mod chrome_rows;
 mod dashboard;
 pub(crate) mod device_strip;
+pub(crate) use chrome_rows::DashboardChromeRows;
 pub(crate) use dashboard::{DashboardBudget, DashboardSummaries};
 
 // The window floor is a per-shape band (the terminal and Bevy spend none), so

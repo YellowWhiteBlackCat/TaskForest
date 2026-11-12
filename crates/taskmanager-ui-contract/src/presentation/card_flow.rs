@@ -80,7 +80,15 @@ pub struct CardFlowBudget {
     /// The number of COMPLETE groups admitted. Zero means the caller must
     /// degrade to its dense form.
     pub groups: usize,
-    /// The height one card takes inside the admitted groups.
+    /// The height one admitted card KEEPS.
+    ///
+    /// The admitted groups share the measured slot equally, so this is the
+    /// height a card takes when the groups fill the slot exactly. It is a
+    /// FLOOR, not a ceiling: a renderer whose cards sit in elastic lines
+    /// spends it as the card's minimum height, and the line grows the card
+    /// into whatever the slot still holds. A slot larger than the
+    /// measurement — a conservative chrome budget, a theme difference — then
+    /// fills the card instead of leaving a dead band under the last row.
     pub card_height: f32,
 }
 
