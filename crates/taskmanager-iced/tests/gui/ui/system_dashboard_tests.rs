@@ -188,3 +188,98 @@ fn dashboard_metric_groups_fit_allocated_viewports_with_measured_fonts() {
         }
     }
 }
+
+/// The shared card-flow verdict is a FLOOR: every admitted card fills the
+/// elastic line it was admitted into, so the last card reaches the bottom
+/// of the measured slot minus the bottom safety band instead of leaving a
+/// dead band. The painted card bounds, not a field assertion, prove it.
+#[test]
+fn admitted_cards_fill_their_stretched_lines() {
+    use iced::advanced::{
+        layout::{Layout, Limits},
+        renderer::Headless,
+        widget::{Id, Operation, Tree},
+    };
+    use iced::{Font, Pixels, Rectangle, Size};
+    use taskmanager_application::system_timeline::TimelineMetric;
+    use taskmanager_shell::fixture::dashboard_history::seed_shell_system_dashboard_history;
+    #[derive(Default)]
+    struct Cards(Vec<(TimelineMetric, Rectangle)>);
+    impl Operation for Cards {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation)) {
+            operate(self);
+        }
+        fn container(&mut self, id: Option<&Id>, bounds: Rectangle) {
+            for metric in TimelineMetric::ALL {
+                if id == Some(&Id::from(format!("system-dashboard-card-{}", metric.id()))) {
+                    self.0.push((metric, bounds));
+                }
+            }
+        }
+    }
+    let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+        Font::DEFAULT,
+        Pixels(16.0),
+        Some("tiny-skia"),
+    ))
+    .expect("software renderer");
+    for (width, height) in [
+        (1280.0, 720.0),
+        (720.0, 480.0),
+        (480.0, 960.0),
+        (1600.0, 360.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        assert!(seed_shell_system_dashboard_history(
+            &mut app.shell,
+            7_200_000
+        ));
+        let budget = DashboardBudget::resolve(width, height);
+        assert!(budget.count > 0);
+        let mut view = render_system_dashboard(&app, SystemHistoryWindow::SixtyMinutes);
+        let mut tree = Tree::new(&view);
+        let node = view.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(width, height)),
+        );
+        let mut cards = Cards::default();
+        view.as_widget_mut()
+            .operate(&mut tree, Layout::new(&node), &renderer, &mut cards);
+        assert_eq!(cards.0.len(), budget.count);
+
+        for (_, bounds) in &cards.0 {
+            assert!(
+                bounds.height >= budget.card_height_floor,
+                "card {bounds:?} must at least spend the shared floor {}",
+                budget.card_height_floor
+            );
+            assert!(
+                bounds.height > budget.chart_height,
+                "card {bounds:?} must grow beyond its fixed chart"
+            );
+        }
+        let last_bottom = cards
+            .0
+            .iter()
+            .map(|(_, bounds)| bounds.y + bounds.height)
+            .fold(0.0_f32, f32::max);
+        // The elastic lines fill the slot; the bottom safety band and the
+        // column's own gap before it are the only space the last card does
+        // not paint.
+        let bottom_dead_band = BOTTOM_SAFETY_BAND + 8.0;
+        assert!(
+            (last_bottom - (height - bottom_dead_band)).abs() <= 0.5,
+            "last card ends at {last_bottom}, expected {} at {width}x{height}",
+            height - bottom_dead_band
+        );
+        // Every line is equal, so no group keeps a shorter exact height.
+        let line_heights: Vec<f32> = cards.0.iter().map(|(_, r)| r.height).collect();
+        assert!(
+            line_heights
+                .iter()
+                .all(|h| (h - line_heights[0]).abs() <= 0.5),
+            "admitted cards must share the stretched lines evenly: {line_heights:?}"
+        );
+    }
+}

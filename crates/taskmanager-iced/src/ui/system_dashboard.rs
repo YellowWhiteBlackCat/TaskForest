@@ -13,7 +13,7 @@
 use super::components::dashboard_budget::DashboardBudget;
 use super::device_chart::{DeviceChart, DeviceMetricScale, series_max};
 use iced::Length;
-use iced::widget::{canvas, column, container, responsive, row, text};
+use iced::widget::{Space, canvas, column, container, responsive, row, text};
 use taskmanager_application::i18n::t;
 use taskmanager_application::system_timeline::{
     SystemHistoryWindow, SystemPageSection, TimelineMetric, TimelineSeries, TimelineStatistic,
@@ -21,6 +21,7 @@ use taskmanager_application::system_timeline::{
 use taskmanager_shell::presentation::health_review::HealthReviewSection;
 use taskmanager_shell::presentation::system_timeline::{coverage, readout};
 use taskmanager_ui_contract::presentation::dashboard::{DashboardMetricWindow, MetricPaging};
+use taskmanager_ui_contract::presentation::vocabulary::BOTTOM_SAFETY_BAND;
 
 use crate::app::{FocusTarget, Message};
 use crate::focus;
@@ -119,10 +120,19 @@ pub(crate) fn render_system_dashboard(
                     .map(|metric| history_card(app, &series, *metric, budget.chart_height))
                     .collect::<Vec<_>>())
                 .spacing(8)
-                .width(Length::Fill),
+                .width(Length::Fill)
+                // The shared card-flow verdict is a FLOOR: every admitted
+                // group takes one elastic line, so the cards grow into the
+                // slot they were admitted into instead of leaving a dead
+                // band below the last row.
+                .height(Length::FillPortion(1)),
             );
         }
-        body.into()
+        // The bottom safety band is a fixed obligation the elastic lines
+        // must not consume: the budget charges it before admission, and the
+        // view reserves the identical extent at the end of the column.
+        body.push(Space::new().height(Length::Fixed(BOTTOM_SAFETY_BAND)))
+            .into()
     })
     .into()
 }
@@ -176,9 +186,17 @@ fn history_card<'a>(
             graph,
             text(coverage(series, metric)).size(f32::from(tokens::FONT_11))
         ]
-        .spacing(4),
+        .spacing(4)
+        // The card's content column grows into the line too: the chart
+        // keeps its fixed measured plot height, and the leftover line
+        // space lands inside the card surface below the caption instead
+        // of as an unpainted band outside the card.
+        .height(Length::Fill),
     ))
     .width(Length::Fill)
+    // The card's visual surface fills the whole elastic line, so the last
+    // card reaches the bottom of the stretched row.
+    .height(Length::Fill)
     .id(format!("system-dashboard-card-{}", metric.id()))
     .into()
 }

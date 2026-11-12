@@ -121,6 +121,26 @@ lower process table never loses a vertical row to a wrapped toolbar. GPUI
 keeps the same vocabulary in an anchored overflow menu; this is a toolkit
 presentation execution, not a new capability.
 
+The System dashboard's metric cards now spend the shared card-flow
+`card_height` as a FLOOR, exactly as GPUI does: one `FillPortion(1)` line per
+admitted group and `Length::Fill` per card grow the card into its stretched
+line, with the shared `BOTTOM_SAFETY_BAND` charged before admission and
+reserved at the end of the column. Headless rendered bounds prove the last
+card reaches the bottom of its line and every admitted card has an equal
+height greater than its fixed chart. Before this change the exact-height
+cards left an unpainted band below the last row at every tall viewport.
+
+`CARD_CONTENT_FURNITURE_HEIGHT` (formerly `CARD_CHROME_HEIGHT`) is the
+card's own internal title/readout/caption/padding footprint. It is NOT a
+`presentation::chrome_rows::ChromeRowSpec`: that contract measures the fixed
+rows a PAGE paints above its content slot (section tabs, window controls,
+paging) from the shared `ControlRole` ladder, while these lines live INSIDE
+one card, are text-sized rather than control-ladder-sized, and have no
+`ChromeRowRole`. The classification driver is the contract's own scope, not
+a convenience: binding it would invent a chrome row that the page never
+paints. The literal is renamed and documented so no reader mistakes card
+content for page chrome.
+
 <!-- iced-capability-divergences: text-selection -->
 
 Below is the complementary PAGE-LEVEL registry: Performance-page skin

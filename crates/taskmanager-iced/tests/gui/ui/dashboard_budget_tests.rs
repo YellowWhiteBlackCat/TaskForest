@@ -17,6 +17,7 @@ fn available(height: f32, compact_summary: bool) -> f32 {
             SUMMARY_CARD_HEIGHT
         }
         - GROUP_GAP
+        - BOTTOM_SAFETY_BAND
 }
 
 /// The dashboard's group count, card height and zero-group degrade all come
@@ -44,12 +45,17 @@ fn dashboard_budget_spends_the_shared_card_flow_verdict() {
         assert_eq!(budget.columns, admitted.columns);
         assert_eq!(budget.count, admitted.cards().min(DASHBOARD_METRIC_COUNT));
         assert!(budget.count <= DASHBOARD_METRIC_COUNT);
+        assert_eq!(
+            budget.card_height_floor, admitted.card_height,
+            "the shared card height binds as a floor, never an exact extent"
+        );
         if admitted.groups == 0 {
             assert_eq!(budget.chart_height, 0.0);
+            assert_eq!(budget.card_height_floor, 0.0);
         } else {
             assert_eq!(
                 budget.chart_height,
-                (admitted.card_height - CARD_CHROME_HEIGHT)
+                (admitted.card_height - CARD_CONTENT_FURNITURE_HEIGHT)
                     .clamp(CHART_HEIGHT_FLOOR, CHART_HEIGHT_CEILING)
             );
         }
@@ -63,6 +69,7 @@ fn short_slot_degrades_to_zero_complete_groups() {
     let budget = DashboardBudget::resolve(720.0, 200.0);
     assert_eq!(budget.count, 0);
     assert_eq!(budget.chart_height, 0.0);
+    assert_eq!(budget.card_height_floor, 0.0);
     assert!(budget.compact_summary);
 }
 

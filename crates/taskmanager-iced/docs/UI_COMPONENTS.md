@@ -118,8 +118,18 @@ native selection and renderer caches; all shared types use their defining module
 - `src/ui/components/dashboard_budget.rs` spends the shared card-flow
   admission verdict (`taskmanager_ui_contract::presentation::card_flow`):
   the whole-group admission and the card floor..ceiling clamp are the shared
-  arithmetic, while Iced keeps only its own compact-summary decision and the
-  chart/chrome split inside one admitted card.
+  arithmetic. The shared `card_height` is a FLOOR: `render_system_dashboard`
+  gives each admitted group one `FillPortion(1)` elastic line and every card
+  `Length::Fill`, so the cards grow into the stretched line instead of
+  leaving a dead band below the last row. The shared
+  `BOTTOM_SAFETY_BAND` is charged before admission and reserved in the view
+  as a fixed trailing space, so the stretched lines never consume it.
+  Iced keeps only its own compact-summary decision and the chart/content
+  split inside one admitted card. `CARD_CONTENT_FURNITURE_HEIGHT` is the
+  card's INTERNAL text-and-padding footprint, deliberately NOT a
+  `ChromeRowSpec`: that contract owns fixed PAGE chrome rows above the
+  content slot measured from the control ladder, while a card's inner title,
+  readout and caption lines are card content, not a page chrome row.
 - `src/focus.rs` owns keyboard-reachable activation shells and draws the shared
   `palette().ring` focus ring gated by the shared input modality
   (`taskmanager_ui_contract::InputModality`: only keyboard focus paints the
