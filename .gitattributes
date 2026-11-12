@@ -11,3 +11,6 @@
 *.exe binary
 *.zip binary
 *.gz binary
+# TSV evidence tables carry a trailing empty `platform` column by schema;
+# a tab before the newline is data, not trailing whitespace.
+*.tsv whitespace=-trailing-space

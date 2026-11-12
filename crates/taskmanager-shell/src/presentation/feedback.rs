@@ -12,7 +12,7 @@
 //!
 //! The binding now has two halves with two owners:
 //!
-//! - [`FeedbackSeverity::status_kind`] projects the product severity onto the
+//! - [`crate::app::FeedbackSeverity::status_kind`] projects the severity onto the
 //!   shared transient-status vocabulary, so every frontend resolves the ink
 //!   through one ladder (`StatusColors::resolve`).
 //! - `taskmanager_icons::status_icon` answers the semantic glyph for that

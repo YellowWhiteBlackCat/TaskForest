@@ -153,7 +153,7 @@ interaction	bev-input-gate-priority	bevy	P0-MC-06	lib	input::tests::navigation_c
 interaction	bev-input-escape-dismiss	bevy	P0-MC-06	lib	input::tests::escape_dismisses_the_gate_without_an_effect	keyboard|confirmation|failure	-	keyboard	
 interaction	bev-input-quit-once	bevy	-	lib	input::tests::quit_reason_forwards_app_exit_exactly_once	lifecycle|success	-	lifecycle	
 interaction	bev-confirm-loop	bevy	P0-MC-06	lib	confirmation::tests::delete_arms_the_modal_and_confirm_completes_the_submission_loop	confirmation|success	-	confirmation	
-interaction	bev-confirm-dismiss	bevy	P0-MC-06	lib	confirmation::tests::dismiss_never_submits_and_confirm_reports_through_the_feedback_line	confirmation|failure|success	-	confirmation	
+interaction	bev-confirm-dismiss	bevy	P0-MC-06	lib	confirmation::tests::dismiss_never_submits_and_confirm_keeps_notice_separate_from_footer_activity	confirmation|failure|success	-	confirmation	
 interaction	bev-confirm-echo	bevy	P0-MC-06	lib	confirmation::tests::the_armed_view_echoes_the_frozen_target	confirmation|identity	-	confirmation	
 interaction	bev-a11y-row-identity	bevy	P0-MC-03	lib	semantic::tests::rows_keep_stable_identity_while_selected_state_follows_the_cursor	accessibility|identity|navigation	-	accessibility	
 interaction	bev-a11y-values	bevy	P0-MC-03	lib	semantic::tests::unavailable_shares_are_announced_unavailable_and_real_values_are_announced	accessibility|failure|success	-	accessibility	
