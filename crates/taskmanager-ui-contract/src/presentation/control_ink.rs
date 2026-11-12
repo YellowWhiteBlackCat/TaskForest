@@ -126,9 +126,10 @@ impl ControlInkPriority {
     /// it would hide the selection while the pointer merely rested there.
     ///
     /// So this fold ranks the selection above the hover and leaves every
-    /// other precedence untouched: `Disabled > Pressed > Focused > Selected
-    /// > Hovered > Idle`. Both frontends that ship a segmented control
-    /// resolve it here, so the rule has one address.
+    /// other precedence untouched. In order from strongest to weakest:
+    /// `Disabled`, `Pressed`, `Focused`, `Selected`, `Hovered`, `Idle`.
+    /// Both frontends that ship a segmented control resolve it here, so the
+    /// rule has one address.
     #[must_use]
     pub const fn resolve_selection_dominant(
         hovered: bool,

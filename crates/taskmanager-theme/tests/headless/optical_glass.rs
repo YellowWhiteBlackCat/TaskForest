@@ -376,6 +376,9 @@ fn a_degraded_tier_keeps_its_own_material() {
                 assert_eq!(opaque.fill.a, 1.0, "{skin:?}/{mode:?}/{tier:?}");
                 assert_eq!(opaque.edge, layer.edge, "{skin:?}/{mode:?}/{tier:?}");
                 assert!(!opaque.sheen, "an opaque fallback drops the sheen");
+                let sheen_expected = tier != GlassTier::Scrim;
+                assert_eq!(painted.sheen, sheen_expected, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(frosted.sheen, sheen_expected, "{skin:?}/{mode:?}/{tier:?}");
                 assert_eq!(
                     opaque.backdrop,
                     GlassFallbackBackdrop::None,
