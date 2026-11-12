@@ -8,9 +8,9 @@ use std::rc::Rc;
 
 use gpui::{
     App, ElementId, InteractiveElement, ParentElement, SharedString, Stateful, Styled, Window, div,
-    px,
+    px, rems,
 };
-use taskmanager_theme::Palette;
+use taskmanager_theme::{GlassTier, Palette};
 
 use crate::overlays::dropdown_menu::DropdownMenu;
 use crate::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
@@ -70,10 +70,19 @@ pub fn select(
         .px(crate::theme_binding::definite_length(tokens::SPACE_10))
         .h(px(26.0))
         .rounded(crate::theme_binding::absolute(palette.control_radius))
-        .border_1()
-        .border_color(crate::theme_binding::hsla(palette.border))
-        .bg(crate::theme_binding::fill(palette.surface))
-        .hover(|style| style.bg(crate::theme_binding::fill(hover_fill(palette.surface))))
+        .border(rems(GlassTier::Card.edge_width_rem()))
+        .border_color(crate::theme_binding::hsla(
+            palette.theme.glass_layer(GlassTier::Card).edge,
+        ))
+        .bg(crate::theme_binding::glass_fill(
+            &palette.theme,
+            GlassTier::Card,
+        ))
+        .hover(|style| {
+            style.bg(crate::theme_binding::fill(hover_fill(
+                palette.theme.glass_layer(GlassTier::Card).fill,
+            )))
+        })
         .cursor_pointer()
         .text_sm()
         .text_color(crate::theme_binding::hsla(palette.fg))
