@@ -36,7 +36,9 @@ pub struct CardSurface {
 }
 
 impl CardSurface {
-    /// Build an elevated surface using the palette's canonical card tokens.
+    /// Build the default primary page card. The role owns the tier and
+    /// floating elevation; this entry point exists only for callers that
+    /// have not named their role yet.
     pub fn new(palette: Palette) -> Self {
         Self {
             children: Vec::new(),
@@ -45,9 +47,9 @@ impl CardSurface {
             radius: palette.panel_radius,
             bordered: true,
             border_bottom_only: false,
-            elevation: SurfaceElevation::Floating,
+            elevation: GlassSurfaceRole::PageCard.elevation(),
             palette,
-            glass: Some(GlassTier::Card),
+            glass: Some(GlassSurfaceRole::PageCard.tier()),
         }
     }
 

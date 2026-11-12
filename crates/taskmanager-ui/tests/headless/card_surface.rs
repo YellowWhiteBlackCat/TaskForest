@@ -39,6 +39,18 @@ fn every_overlay_role_uses_the_shared_surface_contract() {
     }
 }
 
+/// The unnamed card constructor is the shared floating PageCard role, not a
+/// private tier/elevation default that can drift away from `for_role`.
+#[test]
+fn the_default_card_is_the_floating_page_card_role() {
+    let theme = theme();
+    let default = CardSurface::new(theme.palette());
+    let role = CardSurface::for_role(theme.palette(), GlassSurfaceRole::PageCard);
+    assert_eq!(default.tier(), role.tier());
+    assert_eq!(default.elevation(), role.elevation());
+    assert_eq!(default.fill(&theme.palette()), role.fill(&theme.palette()));
+}
+
 /// The elevated surface paints exactly the shared layered shadow.
 #[test]
 fn an_elevated_surface_paints_the_shared_layered_shadow() {
