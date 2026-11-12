@@ -21,6 +21,19 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   `tests/headless/pages/settings.rs` and `settings_widgets_parity.rs` prove
   activation, read-back, rem scaling, high contrast, unavailable permission
   data, and the focused switch.
+- **Slider keyboard control**: the shared slider skin is a tab stop that
+  wears the product's one focus ring, so the keyboard reaches it at all. A
+  focused slider owns GPUI's key set — the arrows step, Home/End jump to the
+  range ends — and those keys never reach the shell's routers, so the page's
+  selection movement cannot run underneath a slider the user is adjusting.
+  The vertical axis rides the official widget's own relative-step entry, so
+  the step size and the range clamp stay the widget's authority. Every
+  change reaches the canonical authority exactly like a drag, the widget's
+  own value follows it (so a second step composes on the accepted value),
+  and the keyboard focus follows the control across the page rebuild its own
+  change triggers. `tests/headless/pages/settings_slider_keyboard.rs` proves
+  the tab stop, the key ownership, the cadence write-back, and the value
+  write-back.
 - **Startup status filter**: the Startup page offers GPUI's `All`, `Enabled`,
   and `Disabled` choices through the shared shell filter vocabulary. Filtering
   preserves provider identity for selection, keyboard movement, and the

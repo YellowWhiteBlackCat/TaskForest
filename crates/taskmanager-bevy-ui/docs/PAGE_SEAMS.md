@@ -18,7 +18,11 @@ inventory tables (services/startup/sessions), settings, and the alert center.
   change reduces through the canonical rule edit, and a successful export
   raises one clipboard-success toast. The Settings refresh cadence and every
   alert threshold bind the same product-owned slider skin in `widgets/slider`;
-  only their typed value identities and shell effects remain page-local.
+  only their typed value identities and shell effects remain page-local. That
+  skin is a tab stop with the shared focus ring, and a focused slider owns
+  its navigation keys: the arrows step, Home/End jump to the range ends, and
+  the shell's routers never see them, so the page's selection movement cannot
+  run underneath a slider the user is adjusting.
 - The alert center paints severity through the theme's own severity palette
   (the frontend resolves the owner's palette, it never assembles a severity
   table), and the firing rule's banner opens through a spring reveal. A paused

@@ -18,7 +18,7 @@
 
 use bevy::app::{App, PostUpdate, Update};
 use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
+use bevy::ecs::entity::{Entities, Entity};
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::message::MessageReader;
 use bevy::ecs::message::MessageWriter;
@@ -30,13 +30,14 @@ use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::keyboard::{Key, KeyCode};
+use bevy::input_focus::InputFocusSystems;
 use bevy::input_focus::tab_navigation::{TabGroup, TabIndex, TabNavigationPlugin};
 use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::picking::hover::PickingInteraction;
 use bevy::ui::{CalculatedClip, ComputedNode, UiGlobalTransform};
 use bevy::ui::{Node, Outline, Val};
 use bevy::ui_widgets::ScrollIntoView;
-use bevy::ui_widgets::{Button, Checkbox, RadioButton};
+use bevy::ui_widgets::{Button, Checkbox, RadioButton, Slider};
 use bevy::window::PrimaryWindow;
 
 use crate::confirmation::ConfirmationOverlay;
@@ -81,6 +82,22 @@ pub(crate) struct FocusRing;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct FocusRingVisible;
 
+/// A stable identity for a focusable control.
+///
+/// The toolkit focus points at an *entity*, but a page rebuild spawns a new
+/// entity for the same control — so a focus that lived on the entity would
+/// be lost at the first rebuild, while GPUI's focus handle survives it. The
+/// identity lets the focus follow the control instead of the entity.
+#[derive(Component, Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct FocusIdentity(pub(crate) String);
+
+/// The control that owned the keyboard focus, remembered across a rebuild.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct FocusedControl {
+    entity: Option<Entity>,
+    identity: Option<String>,
+}
+
 type UndecoratedControls<'w, 's> = Query<
     'w,
     's,
@@ -88,7 +105,12 @@ type UndecoratedControls<'w, 's> = Query<
     (
         With<Node>,
         Without<FocusRing>,
-        Or<(With<Button>, With<Checkbox>, With<RadioButton>)>,
+        Or<(
+            With<Button>,
+            With<Checkbox>,
+            With<RadioButton>,
+            With<Slider>,
+        )>,
     ),
 >;
 
@@ -153,6 +175,44 @@ fn decorate_groups(
             insert_into(&mut commands, first, AutoFocus);
         }
     }
+}
+
+/// Follow the keyboard focus across a page rebuild.
+///
+/// A rebuild replaces the focused control's *entity*, not the control: the
+/// focus is restored to the control that carries the remembered identity, so
+/// a keyboard-driven change (a slider step) does not strand the keyboard.
+/// A focus the user moved elsewhere is never overridden — only a focus
+/// whose entity no longer exists is restored.
+fn follow_focus_across_rebuild(
+    mut focus: ResMut<InputFocus>,
+    mut remembered: ResMut<FocusedControl>,
+    controls: Query<(Entity, &FocusIdentity)>,
+    entities: &Entities,
+) {
+    if let Some(entity) = focus.get()
+        && entities.contains(entity)
+    {
+        remembered.entity = Some(entity);
+        remembered.identity = controls.get(entity).ok().map(|(_, id)| id.0.clone());
+        return;
+    }
+    let Some(previous) = remembered.entity else {
+        return;
+    };
+    if entities.contains(previous) {
+        // The remembered control is still mounted: the focus moved on its
+        // own, so nothing is restored.
+        return;
+    }
+    let Some(identity) = remembered.identity.clone() else {
+        return;
+    };
+    let Some((entity, _)) = controls.iter().find(|(_, id)| id.0 == identity) else {
+        return;
+    };
+    focus.set(entity, bevy::input_focus::FocusCause::Navigated);
+    remembered.entity = Some(entity);
 }
 
 /// Demo-only capture arm for the `settings-switch-focus` scenario: name the
@@ -304,9 +364,16 @@ pub(crate) fn focus_visible_pointer_system(
 pub(crate) fn register(app: &mut App) {
     app.init_resource::<InputModalityState>();
     app.init_resource::<InputFocus>();
+    app.init_resource::<FocusedControl>();
     if !app.is_plugin_added::<TabNavigationPlugin>() {
         app.add_plugins(TabNavigationPlugin);
     }
+    // The focus follows the control across a rebuild, so the restore lands
+    // before the toolkit routes this frame's keys to the focused entity.
+    app.add_systems(
+        bevy::app::PreUpdate,
+        follow_focus_across_rebuild.before(InputFocusSystems::Dispatch),
+    );
     app.add_systems(
         PostUpdate,
         arm_settings_switch_focus.chain().after(ScenePaint),

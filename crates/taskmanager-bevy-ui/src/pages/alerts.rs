@@ -65,9 +65,6 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     banner::register(app);
     toast::register(app);
     pause::register(app);
-    // The slider widget keeps its own value in step with the drag; the page
-    // observer turns that value into the canonical rule edit.
-    app.add_observer(bevy::ui_widgets::slider_self_update);
 }
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the

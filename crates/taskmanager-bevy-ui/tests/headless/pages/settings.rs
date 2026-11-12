@@ -252,7 +252,7 @@ fn scripted_runtime() -> &'static crate::runtime::SharedRuntime {
         .expect("the scripted runtime always starts")
 }
 
-fn headless_shell_app() -> App {
+pub(super) fn headless_shell_app() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     app.add_plugins(HeadlessFrontendPlugins);
@@ -264,7 +264,7 @@ fn headless_shell_app() -> App {
     app
 }
 
-fn mount_settings(app: &mut App) {
+pub(super) fn mount_settings(app: &mut App) {
     // Set the route BEFORE the first update so the page mounts directly —
     // no intermediate page ever mounts in this fixture.
     app.world_mut().resource_mut::<Route>().page = Page::Settings;
@@ -312,7 +312,7 @@ fn activate(app: &mut App, entity: Entity) {
     app.update();
 }
 
-fn refresh_slider_entity(world: &mut World) -> Entity {
+pub(super) fn refresh_slider_entity(world: &mut World) -> Entity {
     world
         .query_filtered::<Entity, With<RefreshSlider>>()
         .single(world)

@@ -813,3 +813,7 @@ mod config_sync;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/settings_widgets_parity.rs"]
 mod widgets_parity;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/settings_slider_keyboard.rs"]
+mod slider_keyboard;

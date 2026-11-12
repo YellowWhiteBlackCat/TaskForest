@@ -490,6 +490,7 @@ impl Plugin for FrontendWindowPlugin {
         crate::semantic::register(app);
         crate::tooltip::register(app);
         crate::text_selection::register(app);
+        crate::widgets::slider::register(app);
         crate::focus_visible::register(app);
         crate::spatial_focus::register(app);
         app.add_systems(

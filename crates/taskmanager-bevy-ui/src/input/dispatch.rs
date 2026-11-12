@@ -16,6 +16,7 @@ use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
 use bevy::input_focus::InputFocus;
+use bevy::ui_widgets::Slider;
 use taskmanager_application::{Modifiers, PlatformEffect};
 
 use taskmanager_shell::{InputDispatch, SearchSlot, ShellApp, ShellKeyEvent, StartupStatusFilter};
@@ -51,6 +52,8 @@ mod diagnostics;
 mod search_line;
 #[path = "dispatch/system_about.rs"]
 mod system_about;
+#[path = "dispatch/table_motion.rs"]
+mod table_motion;
 
 use search_line::edit_search_line;
 
@@ -118,6 +121,9 @@ struct DispatchFrame<'a, 'w, 's, 'm, 'n, 't> {
     /// Whether a native read-only text input owns the keyboard, so page
     /// bindings and the product copy arm stay out of its way.
     native_text_focused: bool,
+    /// Whether a mounted slider owns the keyboard, so its navigation keys
+    /// are answered by the widget and never by the shell.
+    slider_focused: bool,
     /// Whether any press this frame mutated shell state.
     applied: bool,
 }
@@ -182,6 +188,15 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         }
         self.table_motion(press);
         self.shared_key(press);
+    }
+
+    /// Whether the focused slider owns this press.
+    ///
+    /// GPUI's slider stops the propagation of its own keys, so the shell's
+    /// selection movement never runs underneath a slider the user is
+    /// adjusting: the widget answers the key and the shell never sees it.
+    fn slider_owns(&self, press: KeyPress) -> bool {
+        self.slider_focused && crate::widgets::slider::owns_key(press.key_code)
     }
 
     fn help_toggle(&mut self, press: KeyPress) -> bool {
@@ -625,41 +640,15 @@ impl DispatchFrame<'_, '_, '_, '_, '_, '_> {
         false
     }
 
-    /// Arm 3a — table row selection motion for non-process inventory tables.
-    /// Additive: it runs after the char router declined the press and always
-    /// falls through to the fixed-key router below.
-    fn table_motion(&mut self, press: KeyPress) {
-        if !matches!(press.context, KeyboardOwner::Free) || press.modifiers != Modifiers::NONE {
-            return;
-        }
-        match (press.page, press.key_code) {
-            (Page::Startup, KeyCode::ArrowUp) => self
-                .commands
-                .trigger(crate::pages::startup::StartupSelectionMoved(-1)),
-            (Page::Startup, KeyCode::ArrowDown) => self
-                .commands
-                .trigger(crate::pages::startup::StartupSelectionMoved(1)),
-            (Page::Sessions, KeyCode::ArrowUp) => self
-                .commands
-                .trigger(crate::pages::sessions::SessionSelectionMoved(-1)),
-            (Page::Sessions, KeyCode::ArrowDown) => self
-                .commands
-                .trigger(crate::pages::sessions::SessionSelectionMoved(1)),
-            (Page::Services, KeyCode::ArrowUp) => self
-                .commands
-                .trigger(crate::pages::services::ServiceSelectionMoved(-1)),
-            (Page::Services, KeyCode::ArrowDown) => self
-                .commands
-                .trigger(crate::pages::services::ServiceSelectionMoved(1)),
-            _ => return,
-        }
-        self.applied = true;
-    }
-
     /// Arm 4 — fixed-key router (arrows, Delete, Escape, F5, F9, chorded letters).
     fn shared_key(&mut self, press: KeyPress) {
         use taskmanager_application::KeyCode;
 
+        // A focused slider owns its navigation keys: the widget answers
+        // them, so the shell's routers never see them (GPUI parity).
+        if self.slider_owns(press) {
+            return;
+        }
         let Some(shared) = shared_key(press.key_code) else {
             return;
         };
@@ -702,6 +691,8 @@ pub(crate) struct KeyboardDispatchInputs<'w, 's> {
     /// Native search editors; a focused member owns its character keys when
     /// the composition installed the text-input plugin.
     search_editors: Query<'w, 's, (), With<SearchEditor>>,
+    /// Mounted sliders; a focused member owns its navigation keys.
+    sliders: Query<'w, 's, (), With<Slider>>,
     /// Whether the toolkit text-input plugin is installed.
     native_editing: Option<Res<'w, NativeTextEditing>>,
 }
@@ -780,6 +771,11 @@ pub(crate) fn keyboard_dispatch_system(
                     .is_some_and(|entity| {
                         inputs.readouts.contains(entity) || inputs.search_editors.contains(entity)
                     }),
+            slider_focused: inputs
+                .focus
+                .as_deref()
+                .and_then(InputFocus::get)
+                .is_some_and(|entity| inputs.sliders.contains(entity)),
             applied: false,
         };
         frame.run(&events, modifiers);
