@@ -167,9 +167,8 @@ fn input_status_folds_through_shared_control_ink() {
         text_input_ink(iced::widget::text_input::Status::Focused { is_hovered: true }),
         ControlVisualState::Focused
     );
-    assert_eq!(
-        ControlInkState::Focused.changes_measurement(),
-        false,
+    assert!(
+        !ControlInkState::Focused.changes_measurement(),
         "control ink only reweights paint"
     );
     assert_ne!(

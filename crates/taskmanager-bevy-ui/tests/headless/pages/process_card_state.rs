@@ -208,7 +208,7 @@ fn the_state_overlay_bounds_and_theme_material_are_one_rounded_card() {
         let computed = world
             .get::<ComputedNode>(overlay)
             .expect("the state overlay is measured");
-        (node.clone(), *fill, *edge, computed.clone())
+        (node.clone(), *fill, *edge, *computed)
     };
     let panel_radius = Val::Rem(palette.panel_radius_rem());
     assert_eq!(card_node.border_radius, BorderRadius::all(panel_radius));

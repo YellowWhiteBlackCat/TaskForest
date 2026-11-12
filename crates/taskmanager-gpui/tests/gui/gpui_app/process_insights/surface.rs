@@ -58,10 +58,7 @@ async fn gpu_insight_slots_admit_two_groups_only_at_the_two_column_budget(cx: &m
     cx.update(init);
 
     let draw_at = |cx: &mut TestAppContext, width: f32| {
-        let window = cx.add_window(|_window, _cx| GpuSlotsView {
-            theme: theme.clone(),
-            width,
-        });
+        let window = cx.add_window(|_window, _cx| GpuSlotsView { theme, width });
         cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear(cx))
             .unwrap();
         window

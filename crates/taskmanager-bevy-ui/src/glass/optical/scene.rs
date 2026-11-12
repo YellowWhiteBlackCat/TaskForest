@@ -285,10 +285,10 @@ pub(crate) fn sync_optical_backdrop_paint(
                 *border = BorderColor::all(paint.edge);
             }
         }
-        if let Ok(mut shadows) = shadows.get_mut(card_entity) {
-            if shadows.0 != paint.shadow {
-                shadows.0 = paint.shadow.clone();
-            }
+        if let Ok(mut shadows) = shadows.get_mut(card_entity)
+            && shadows.0 != paint.shadow
+        {
+            shadows.0 = paint.shadow.clone();
         }
         if let Ok(card_children) = children.get(card_entity) {
             let next_vis = if paint.grain_visible {
