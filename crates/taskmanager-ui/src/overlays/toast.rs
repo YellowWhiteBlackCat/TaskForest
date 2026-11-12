@@ -13,18 +13,10 @@ use gpui::{
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Task, Window, div, px,
 };
+use taskmanager_icons::status_icon;
 use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::{Palette, tokens};
-use taskmanager_ui_contract::IconId;
 use zhuge_ui_tokens::{StatusColors, StatusKind};
-
-/// A product semantic icon for this kind.
-fn status_icon(kind: StatusKind) -> IconId {
-    match kind {
-        StatusKind::Info | StatusKind::Success => IconId::Health,
-        StatusKind::Warning | StatusKind::Danger => IconId::Alert,
-    }
-}
 
 /// Typed toast event payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

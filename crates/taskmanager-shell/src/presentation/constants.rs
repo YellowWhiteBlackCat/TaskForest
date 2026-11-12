@@ -21,3 +21,13 @@ pub const MISSING_VALUE: &str = "—";
 /// purpose: a surface that may not hold a decoration codepoint paints an icon
 /// plate, so the FORM differs by shape while the meaning does not.
 pub const ALERT_MARKER: &str = "⚠";
+
+/// The success marker a surface that paints text wears on a positive
+/// reading.
+///
+/// The marker's SEMANTIC identity belongs to the shared icon registry
+/// ([`taskmanager_ui_contract::IconId::CircleCheck`]); this is its TEXT
+/// form, for the surfaces that may carry a decoration codepoint — the same
+/// FORM/meaning split [`ALERT_MARKER`] documents, with the shared status
+/// ladder owning which severity wears which marker.
+pub const SUCCESS_MARKER: &str = "✓";

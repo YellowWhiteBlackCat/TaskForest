@@ -23,6 +23,11 @@ if a registry entry points at a component that does not exist.
 - `overlays/` — layer_stack, dialog, popup, context_menu, dropdown_menu, toast
 - `styled.rs` — palette-driven style helpers (no hand-written colors)
 
+The toast overlay wears the shared transient-status glyph: the status kind
+resolves through `taskmanager_icons::status_icon` and the ink through the
+theme's `StatusColors` ladder. This crate keeps no local severity→icon or
+severity→ink table.
+
 `primitives/card_surface.rs` adapts the theme's shared glass roles to GPUI's
 translucent gradient fill, hairline edge and two-layer shadow. The
 toolkit-neutral `GlassSurfaceRole` tier/elevation mapping is owned by

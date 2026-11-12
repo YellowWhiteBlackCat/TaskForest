@@ -45,25 +45,35 @@ fn cursor_refresh_is_coalesced_until_the_next_frame() {
 }
 
 #[test]
-fn shell_feedback_severity_keeps_a_semantic_icon() {
-    use taskmanager_shell::FeedbackSeverity;
+fn shell_feedback_severity_wears_the_shared_status_glyph() {
+    use taskmanager_icons::status_icon;
+    use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
-    assert_eq!(
-        super::transients::feedback_severity_icon(FeedbackSeverity::Info),
-        IconId::Health
-    );
-    assert_eq!(
-        super::transients::feedback_severity_icon(FeedbackSeverity::Success),
-        IconId::CircleCheck
-    );
-    assert_eq!(
-        super::transients::feedback_severity_icon(FeedbackSeverity::Warning),
-        IconId::TriangleAlert
-    );
-    assert_eq!(
-        super::transients::feedback_severity_icon(FeedbackSeverity::Error),
-        IconId::Alert
-    );
+    // The surface answers the glyph question by DELEGATING: the icon
+    // registry owns which severity wears which glyph and the shell owns the
+    // severity → status projection. A local mapping here would be the fork
+    // this contract forbids.
+    for (severity, glyph) in [
+        (FeedbackSeverity::Info, IconId::Health),
+        (FeedbackSeverity::Success, IconId::CircleCheck),
+        (FeedbackSeverity::Warning, IconId::TriangleAlert),
+        (FeedbackSeverity::Error, IconId::Alert),
+    ] {
+        let mut shell = ShellApp::new();
+        shell.report_notice(
+            FeedbackSource::Interaction,
+            severity,
+            FeedbackLifecycle::UntilReplaced,
+            "status",
+        );
+        let notice = shell.feedback_notice().expect("a notice is mounted");
+        assert_eq!(
+            super::transients::feedback_status_icon(notice),
+            status_icon(severity.status_kind()),
+            "{severity:?} wears the shared status glyph"
+        );
+        assert_eq!(super::transients::feedback_status_icon(notice), glyph);
+    }
 }
 
 #[test]

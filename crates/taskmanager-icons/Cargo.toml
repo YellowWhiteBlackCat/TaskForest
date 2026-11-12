@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 # Neutral on every target (ADR-051): path table + embedded bytes only; each
 # frontend owns its toolkit rendering adapter in its own crate.
+zhuge-ui-tokens.workspace = true
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 

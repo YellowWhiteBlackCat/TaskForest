@@ -31,6 +31,7 @@ use taskmanager_theme::theme::{
     WindowChromeState,
 };
 use taskmanager_theme::tokens::{DURATION_FAST, DURATION_MEDIUM, MotionPolicy};
+use zhuge_ui_tokens::StatusColors;
 
 // ── token → gpui value conversions (one function per target type) ──────────
 
@@ -60,6 +61,23 @@ pub fn rgba(color: Color) -> Rgba {
 #[must_use]
 pub fn hsla(color: Color) -> Hsla {
     Hsla::from(rgba(color))
+}
+
+/// The theme's four semantic status inks as gpui colours.
+///
+/// The shared status ladder owns which severity takes which ink and the
+/// theme owns the inks; this function is the GPUI half of that binding —
+/// the one place a gpui surface turns a status kind into a paintable
+/// colour. A surface never re-matches the severity itself.
+#[must_use]
+pub fn status_colors(theme: &Theme) -> StatusColors<Hsla> {
+    let status = theme.status_colors();
+    StatusColors {
+        accent: hsla(status.accent),
+        success: hsla(status.success),
+        warning: hsla(status.warning),
+        danger: hsla(status.danger),
+    }
 }
 
 /// Map a neutral color onto gpui's fill vocabulary.

@@ -7,7 +7,8 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, deferred, div, prelude::FluentBuilder,
     px,
 };
-use taskmanager_shell::FeedbackSeverity;
+use taskmanager_icons::status_icon;
+use taskmanager_shell::FeedbackNotice;
 use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Theme, WindowControls};
@@ -25,6 +26,7 @@ use taskmanager_ui::theme_binding::font_weight;
 use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui::theme_binding::rem_value;
+use taskmanager_ui::theme_binding::status_colors;
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::navigation::NavOrientation;
 
@@ -40,6 +42,16 @@ const FEEDBACK_VIEWPORT_WIDTH_FRACTION: f32 = 0.36;
 /// glass tier and floating elevation have one owner.
 pub(super) fn feedback_notice_surface(theme: &Theme) -> CardSurface {
     CardSurface::for_role(theme.palette(), GlassSurfaceRole::Toast)
+}
+
+/// The shared status glyph the notice wears.
+///
+/// This is a delegation, not a second mapping: the icon registry owns which
+/// severity wears which glyph, and the shell owns the severity → status
+/// projection. The surface contributes nothing of its own, so a frontend can
+/// never answer the glyph question differently from its neighbours.
+pub(super) fn feedback_status_icon(notice: &FeedbackNotice) -> IconId {
+    status_icon(notice.severity().status_kind())
 }
 
 /// The frame facts the transient overlay layer reads: live viewport width and
@@ -165,12 +177,11 @@ fn compose_shell_feedback(
     if view.capture_evidence.feedback_overlay_requested() {
         view.capture_evidence.mark_feedback_overlay_ready(true);
     }
-    let severity_color = match notice.severity() {
-        FeedbackSeverity::Info => theme.accent,
-        FeedbackSeverity::Success => theme.success,
-        FeedbackSeverity::Warning => theme.warning,
-        FeedbackSeverity::Error => theme.danger,
-    };
+    // The notice's ink and glyph are both resolved from their owners: the
+    // shared status ladder picks the ink, the icon registry picks the glyph.
+    // This frontend contributes only its own colour type.
+    let status = notice.severity().status_kind();
+    let severity_color = status_colors(theme).resolve(status);
     let weak = cx.entity().downgrade();
     let message = div()
         .flex_1()
@@ -205,26 +216,14 @@ fn compose_shell_feedback(
         .items_center()
         .gap(definite_length(tokens::SPACE_8))
         .child(
-            icon(feedback_severity_icon(notice.severity()))
+            icon(feedback_status_icon(notice))
                 .size(rem_value(16.0))
-                .text_color(hsla(severity_color)),
+                .text_color(severity_color),
         )
         .when(!compact_indicator, |card| {
             card.child(message).child(dismiss)
         });
     compose_feedback_overlay(root, card, frame, theme)
-}
-
-/// Keep the notice's severity visible without tinting the whole glass card.
-/// The icon and its theme ink carry the semantic tone; the material stays the
-/// shared neutral card tier.
-pub(super) fn feedback_severity_icon(severity: FeedbackSeverity) -> IconId {
-    match severity {
-        FeedbackSeverity::Info => IconId::Health,
-        FeedbackSeverity::Success => IconId::CircleCheck,
-        FeedbackSeverity::Warning => IconId::TriangleAlert,
-        FeedbackSeverity::Error => IconId::Alert,
-    }
 }
 
 /// Compose feedback as a bounded, deferred corner layer. The wrapper is

@@ -81,8 +81,7 @@ pub use self::input_mode::{SearchSlot, ShellInputMode};
 use self::lifecycle::ShellLifecycleState;
 pub use self::lifecycle::{
     FeedbackBatchLifetime, FeedbackLifecycle, FeedbackNotice, FeedbackPresentation,
-    FeedbackSeverity, FeedbackSource, FeedbackState, FeedbackTone, QuitReason, QuitRequestOutcome,
-    QuitState,
+    FeedbackSeverity, FeedbackSource, FeedbackState, QuitReason, QuitRequestOutcome, QuitState,
 };
 pub use self::platform_feedback::process_control_notice_text;
 pub use self::process_control::{

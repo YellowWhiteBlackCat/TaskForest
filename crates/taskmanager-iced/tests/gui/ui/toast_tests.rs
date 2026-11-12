@@ -7,10 +7,10 @@ use iced::advanced::widget::{Id, Tree};
 use iced::{Element, Rectangle, Size};
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_assets::embedded_fonts;
+use taskmanager_icons::status_icon;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::IconId;
-use zhuge_ui_tokens::StatusColors;
 
 use crate::Message;
 use crate::app::FocusTarget;
@@ -104,13 +104,7 @@ fn toast_status_uses_the_shared_status_colors_and_icon_identity() {
                 HighContrast::Off,
                 ResolvedFonts::system_for(skin),
             );
-            let palette = theme.palette();
-            let colors = StatusColors {
-                accent: crate::theme_binding::color(palette.accent),
-                success: crate::theme_binding::color(palette.success),
-                warning: crate::theme_binding::color(palette.warning),
-                danger: crate::theme_binding::color(palette.danger),
-            };
+            let colors = crate::theme_binding::status_colors(&theme);
 
             let shells = [
                 FeedbackSeverity::Info,
@@ -130,15 +124,15 @@ fn toast_status_uses_the_shared_status_colors_and_icon_identity() {
                     shell
                 };
                 let notice = shell.feedback_presentation().expect("a notice is mounted");
-                let kind = super::status_kind(notice.tone());
+                let kind = notice.status_kind();
                 let accent = colors.resolve(kind);
                 assert_eq!(
                     accent,
-                    colors.resolve(super::status_kind(severity.tone())),
+                    colors.resolve(severity.status_kind()),
                     "{skin:?}/{mode:?}/{severity:?} must resolve through the shared ink owner"
                 );
                 assert_eq!(
-                    super::icon_for(kind),
+                    status_icon(kind),
                     severity_icon(severity),
                     "{skin:?}/{mode:?}/{severity:?} keeps the shared icon identity"
                 );
@@ -149,8 +143,10 @@ fn toast_status_uses_the_shared_status_colors_and_icon_identity() {
 
 fn severity_icon(severity: FeedbackSeverity) -> IconId {
     match severity {
-        FeedbackSeverity::Info | FeedbackSeverity::Success => IconId::Health,
-        FeedbackSeverity::Warning | FeedbackSeverity::Error => IconId::Alert,
+        FeedbackSeverity::Info => IconId::Health,
+        FeedbackSeverity::Success => IconId::CircleCheck,
+        FeedbackSeverity::Warning => IconId::TriangleAlert,
+        FeedbackSeverity::Error => IconId::Alert,
     }
 }
 

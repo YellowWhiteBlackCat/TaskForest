@@ -3,12 +3,15 @@ use crate::app::{FrontendTrack, Page, Route};
 use crate::window::FeedbackActivityLine;
 use bevy::app::App;
 use bevy::ecs::entity::Entity;
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::query::With;
 use bevy::input_focus::InputFocus;
 use bevy::picking::Pickable;
 use bevy::ui::widget::Text;
 use std::sync::{Arc, Mutex};
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, FeedbackTone};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_ui_contract::IconId;
+use zhuge_ui_tokens::StatusKind;
 
 fn mounted_notice(app: &mut App) -> Option<String> {
     let world = app.world_mut();
@@ -33,6 +36,25 @@ fn overlay_entity(app: &mut App) -> Entity {
         .query_filtered::<Entity, With<FeedbackToast>>()
         .single(world)
         .expect("one feedback overlay is mounted")
+}
+
+fn overlay_icon(app: &mut App, overlay: Entity) -> Option<IconId> {
+    let world = app.world_mut();
+    let mut descendants: Vec<Entity> = Vec::new();
+    let mut frontier = vec![overlay];
+    while let Some(current) = frontier.pop() {
+        let children = world
+            .get::<Children>(current)
+            .map(|children| children.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        descendants.extend(children.iter().copied());
+        frontier.extend(children);
+    }
+    descendants
+        .iter()
+        .filter_map(|entity| world.get::<crate::icons::IconPlate>(*entity))
+        .map(|plate| plate.0)
+        .next()
 }
 
 fn set_route(app: &mut App, page: Page) {
@@ -142,7 +164,7 @@ fn overlay_closes_when_the_shell_notice_is_replaced_by_activity() {
 }
 
 #[test]
-fn same_notice_text_with_a_new_tone_repaints_the_overlay() {
+fn same_notice_text_with_a_new_status_repaints_the_overlay() {
     let mut app = crate::window::tests::scripted_frontend_app();
     set_route(&mut app, Page::Performance);
 
@@ -160,8 +182,8 @@ fn same_notice_text_with_a_new_tone_repaints_the_overlay() {
     assert_eq!(
         app.world()
             .get::<FeedbackToast>(first)
-            .and_then(|toast| toast.tone),
-        Some(FeedbackTone::Positive)
+            .and_then(|toast| toast.status),
+        Some(StatusKind::Success)
     );
 
     app.world_mut()
@@ -180,10 +202,44 @@ fn same_notice_text_with_a_new_tone_repaints_the_overlay() {
     assert_eq!(
         app.world()
             .get::<FeedbackToast>(updated)
-            .and_then(|toast| toast.tone),
-        Some(FeedbackTone::Danger),
-        "a changed visual tone is not hidden by identical feedback copy"
+            .and_then(|toast| toast.status),
+        Some(StatusKind::Danger),
+        "a changed visual status is not hidden by identical feedback copy"
     );
+}
+
+/// The Bevy card wears the SAME semantic glyph the other three frontends
+/// wear: the shared icon registry owns which severity wears which glyph, so
+/// the notice reads the same way here as it does in GPUI, Iced and the TUI.
+#[test]
+fn the_overlay_wears_the_shared_status_glyph() {
+    let mut app = crate::window::tests::scripted_frontend_app();
+    set_route(&mut app, Page::Performance);
+
+    for (severity, glyph) in [
+        (FeedbackSeverity::Info, IconId::Health),
+        (FeedbackSeverity::Success, IconId::CircleCheck),
+        (FeedbackSeverity::Warning, IconId::TriangleAlert),
+        (FeedbackSeverity::Error, IconId::Alert),
+    ] {
+        app.world_mut()
+            .non_send_mut::<FrontendTrack>()
+            .shell
+            .report_notice(
+                FeedbackSource::Interaction,
+                severity,
+                FeedbackLifecycle::UntilReplaced,
+                "Status notice",
+            );
+        app.update();
+
+        let overlay = overlay_entity(&mut app);
+        assert_eq!(
+            overlay_icon(&mut app, overlay),
+            Some(glyph),
+            "{severity:?} wears the shared status glyph"
+        );
+    }
 }
 
 #[test]

@@ -58,7 +58,7 @@ pub use app::process_rows::{
 pub use app::{
     BatchFoldChanges, BatchFoldOutput, DirectTrackState, FeedbackBatchLifetime, FeedbackLifecycle,
     FeedbackNotice, FeedbackPresentation, FeedbackSeverity, FeedbackSource, FeedbackState,
-    FeedbackTone, FrameCommit, InfoSortCol, InfoTable, PAGE_STEP, ProcessControlAvailability,
+    FrameCommit, InfoSortCol, InfoTable, PAGE_STEP, ProcessControlAvailability,
     ProcessControlFeedback, ProcessControlKind, ProcessControlScope, ProcessSelection,
     ProcessViewing, QuitReason, QuitRequestOutcome, QuitState, SearchSlot, ShellApp,
     ShellInputMode, SortCol, SortDir, SystemProjectionStore, TelemetryFrameState,

@@ -13,6 +13,8 @@ owns the semantic mapping in between:
 
 - [`path`] — resolve an `IconId` to its embedded SVG asset path.
 - [`asset_bytes`] — retrieve the embedded SVG bytes for an `IconId`.
+- [`status_icon`] — the one semantic glyph a transient status severity wears,
+  shared by every frontend.
 
 Toolkit rendering adapters are frontend-owned (ADR-051): the GPUI SVG/image
 builders live in [`taskmanager-ui::icons_binding`](../taskmanager-ui); the
@@ -35,6 +37,7 @@ toolkit. Neutrality checks and the verification route are specified in
 
 ```text
 src/path.rs                    IconId → asset path + embedded bytes table
+src/status.rs                  the shared transient-status → IconId binding
 ```
 
 IconId → shared SVG → per-toolkit materialization; text glyphs never fake icons.

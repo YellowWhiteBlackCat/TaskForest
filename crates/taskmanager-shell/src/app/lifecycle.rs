@@ -9,6 +9,7 @@ use taskmanager_application::window_capture::{
 use taskmanager_application::{
     ServiceControlOutcome, SessionControlOutcome, StartupControlOutcome,
 };
+use zhuge_ui_tokens::StatusKind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum QuitState {
@@ -59,29 +60,21 @@ pub enum FeedbackSeverity {
     Error,
 }
 
-/// The renderer-neutral visual tone of one feedback notice. Every frontend
-/// maps this tone onto its own palette; the severity→tone decision itself has
-/// exactly one authority here.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FeedbackTone {
-    /// Ordinary information; the frontend's normal ink.
-    Neutral,
-    /// A completed action; the frontend's positive ink.
-    Positive,
-    /// A caution or degraded outcome; the frontend's warning ink.
-    Caution,
-    /// A failed action; the frontend's danger ink.
-    Danger,
-}
-
 impl FeedbackSeverity {
+    /// The shared transient-status severity this product severity projects
+    /// onto.
+    ///
+    /// The two vocabularies are the same four states under different names:
+    /// the shell speaks of an *error*, the shared status ladder of a *danger*.
+    /// Folding them here means a frontend never spells that correspondence,
+    /// and the shared ink ladder resolves every notice identically.
     #[must_use]
-    pub const fn tone(self) -> FeedbackTone {
+    pub const fn status_kind(self) -> StatusKind {
         match self {
-            Self::Info => FeedbackTone::Neutral,
-            Self::Success => FeedbackTone::Positive,
-            Self::Warning => FeedbackTone::Caution,
-            Self::Error => FeedbackTone::Danger,
+            Self::Info => StatusKind::Info,
+            Self::Success => StatusKind::Success,
+            Self::Warning => StatusKind::Warning,
+            Self::Error => StatusKind::Danger,
         }
     }
 }
@@ -170,8 +163,8 @@ impl FeedbackNotice {
 }
 
 /// The shared presentation projection of one feedback notice: the notice's
-/// copy and lifecycle plus the one derived visual tone. Frontends paint this
-/// instead of re-matching severity themselves.
+/// copy and lifecycle plus the one derived status severity. Frontends paint
+/// this instead of re-matching severity themselves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FeedbackPresentation<'a> {
     notice: &'a FeedbackNotice,
@@ -199,8 +192,8 @@ impl<'a> FeedbackPresentation<'a> {
     }
 
     #[must_use]
-    pub const fn tone(&self) -> FeedbackTone {
-        self.notice.severity().tone()
+    pub const fn status_kind(&self) -> StatusKind {
+        self.notice.severity().status_kind()
     }
 
     #[must_use]

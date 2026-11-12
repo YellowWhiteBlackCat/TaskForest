@@ -17,6 +17,7 @@ use taskmanager_theme::fonts::FONT_MISANS_VF;
 use taskmanager_theme::optical_glass::OpticalGlassCapability;
 use taskmanager_theme::platform::{WeightCompensationAxis, effective_weight};
 use taskmanager_theme::theme::Theme;
+use zhuge_ui_tokens::StatusColors;
 
 /// The optical-glass capability of the locked Iced renderer.
 ///
@@ -34,6 +35,23 @@ pub fn optical_glass_capability() -> OpticalGlassCapability {
 #[must_use]
 pub fn color(c: Color) -> iced::Color {
     iced::Color::from_rgba(c.r, c.g, c.b, c.a)
+}
+
+/// The theme's four semantic status inks as iced colours.
+///
+/// The shared status ladder owns which severity takes which ink and the
+/// theme owns the inks; this function is the iced half of that binding —
+/// the one place an iced surface turns a status kind into a paintable
+/// colour. A surface never re-matches the severity itself.
+#[must_use]
+pub fn status_colors(theme: &Theme) -> StatusColors<iced::Color> {
+    let status = theme.status_colors();
+    StatusColors {
+        accent: color(status.accent),
+        success: color(status.success),
+        warning: color(status.warning),
+        danger: color(status.danger),
+    }
 }
 
 /// The bundled UI face as an iced font. The composition edge registers the

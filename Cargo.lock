@@ -10643,6 +10643,7 @@ version = "0.5.1"
 dependencies = [
  "taskmanager-assets",
  "taskmanager-ui-contract",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -10865,6 +10866,7 @@ dependencies = [
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
  "taskmanager-ui-contract",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]
@@ -10934,6 +10936,7 @@ dependencies = [
  "taskmanager-theme",
  "taskmanager-ui-contract",
  "zhuge-ui-core",
+ "zhuge-ui-tokens",
 ]
 
 [[package]]

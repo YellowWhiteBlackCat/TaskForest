@@ -18,6 +18,7 @@
 
 use crate::color::{Color, Length};
 use crate::theme::{RadiusScale, Theme, with_alpha};
+use zhuge_ui_tokens::StatusColors;
 
 /// How far a two-series graph lifts the secondary series' ink toward white —
 /// a tint of the SAME color (solid "read" vs light "write"), never a new
@@ -235,6 +236,23 @@ impl Theme {
     #[must_use]
     pub fn severity_palette(self) -> SeverityPalette {
         severity_palette(&self)
+    }
+
+    /// The theme's four semantic status inks, projected onto the shared
+    /// transient-status ladder.
+    ///
+    /// The shared ladder owns the *resolution* — which severity takes which
+    /// ink — and the theme owns the *inks*. A frontend binds the resolved
+    /// colour onto its own toolkit type; it never re-matches the severity
+    /// itself, so the same notice reads the same way in every frontend.
+    #[must_use]
+    pub fn status_colors(&self) -> StatusColors<Color> {
+        StatusColors {
+            accent: self.accent,
+            success: self.success,
+            warning: self.warning,
+            danger: self.danger,
+        }
     }
 }
 

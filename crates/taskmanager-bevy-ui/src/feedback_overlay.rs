@@ -2,7 +2,7 @@
 
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
 use crate::drain::{FeedbackChanged, feedback_changed};
-use crate::palette::{UiPalette, space_12};
+use crate::palette::{UiPalette, space_8, space_12};
 use crate::scene_attach::attach_child;
 use crate::window::overlay_root::OverlayRoot;
 use crate::window::{CustomTextInk, FeedbackLine, Role, TextRole, WindowPalette};
@@ -18,13 +18,14 @@ use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::text::{LineBreak, TextColor, TextLayout};
 use bevy::ui::BorderColor;
 use bevy::ui::prelude::{
-    BackgroundColor, BorderRadius, BoxShadow, FlexDirection, Node, PositionType, UiRect, percent,
-    px, rem,
+    AlignItems, BackgroundColor, BorderRadius, BoxShadow, FlexDirection, Node, PositionType,
+    UiRect, percent, px, rem,
 };
 use bevy::ui::widget::Text;
+use taskmanager_icons::status_icon;
 use taskmanager_shell::FeedbackSource;
-use taskmanager_shell::FeedbackTone;
 use taskmanager_theme::GlassSurfaceRole;
+use zhuge_ui_tokens::StatusKind;
 
 /// Renderer bookkeeping for the one mounted shell notice.
 ///
@@ -34,7 +35,7 @@ use taskmanager_theme::GlassSurfaceRole;
 pub(crate) struct FeedbackToast {
     pub(crate) text: String,
     pub(crate) source: Option<FeedbackSource>,
-    pub(crate) tone: Option<FeedbackTone>,
+    pub(crate) status: Option<StatusKind>,
 }
 
 impl FeedbackToast {
@@ -42,17 +43,8 @@ impl FeedbackToast {
         Self {
             text: projection.text.clone(),
             source: projection.notice.map(|notice| notice.source),
-            tone: projection.notice.map(|notice| notice.tone),
+            status: projection.notice.map(|notice| notice.status),
         }
-    }
-}
-
-fn tone_ink(tone: FeedbackTone, palette: &UiPalette) -> bevy::color::Color {
-    match tone {
-        FeedbackTone::Neutral => palette.body_color,
-        FeedbackTone::Positive => palette.success_color,
-        FeedbackTone::Caution => palette.warning_color,
-        FeedbackTone::Danger => palette.danger_color,
     }
 }
 
@@ -157,17 +149,21 @@ pub(crate) fn register(app: &mut App) {
 }
 
 fn toast_scene(projection: FeedbackChanged, palette: &UiPalette) -> Box<dyn Scene> {
-    let tone = projection
+    let status = projection
         .notice
-        .map_or(FeedbackTone::Neutral, |notice| notice.tone);
-    let ink = tone_ink(tone, palette);
+        .map_or(StatusKind::Info, |notice| notice.status);
+    // The ink and the glyph are both resolved from their owners: the shared
+    // status ladder picks the ink, the icon registry picks the glyph. This
+    // frontend contributes only its own colour type.
+    let ink = palette.status.resolve(status);
+    let icon = crate::icons::icon_scene(status_icon(status), palette, ink);
     let role = GlassSurfaceRole::Toast;
     let tier = role.tier();
     let material = crate::glass::surface_material(role, palette);
     let message_text = projection.text.clone();
     let notice = projection.notice;
     let source = notice.map(|value| value.source);
-    let tone = notice.map(|value| value.tone);
+    let status = notice.map(|value| value.status);
     let inset = palette.control_height_rem * 0.5;
     Box::new(bsn! {
         Node {
@@ -182,7 +178,7 @@ fn toast_scene(projection: FeedbackChanged, palette: &UiPalette) -> Box<dyn Scen
             border: UiRect::all(rem(material.edge_width_rem)),
             border_radius: BorderRadius::all(rem(material.radius_rem)),
         }
-        FeedbackToast { text: message_text, source, tone }
+        FeedbackToast { text: message_text, source, status }
         BackgroundColor({ material.fill })
         BorderColor::all(ink)
         BoxShadow({ material.shadows })
@@ -190,9 +186,17 @@ fn toast_scene(projection: FeedbackChanged, palette: &UiPalette) -> Box<dyn Scen
         Pickable::IGNORE
         Children [
             @{ material.grain } --
-            Text({ projection.text.clone() }) TextRole(Role::Body) TextColor(ink) CustomTextInk
-            TextLayout { linebreak: LineBreak::WordOrCharacter }
-            FeedbackLine Pickable::IGNORE
+            Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: px(space_8()),
+            }
+            Children [
+                @{ icon } --
+                Text({ projection.text.clone() }) TextRole(Role::Body) TextColor(ink) CustomTextInk
+                TextLayout { linebreak: LineBreak::WordOrCharacter }
+                FeedbackLine Pickable::IGNORE
+            ]
         ]
     })
 }

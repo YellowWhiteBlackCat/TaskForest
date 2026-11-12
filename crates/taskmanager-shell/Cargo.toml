@@ -17,6 +17,7 @@ publish = false
 # mapping concern).
 
 [dependencies]
+zhuge-ui-tokens.workspace = true
 taskforest-core = { path = "../taskforest-core" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskforest-contract = { path = "../taskforest-contract" }

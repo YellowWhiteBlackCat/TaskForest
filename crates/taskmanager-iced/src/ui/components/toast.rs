@@ -10,10 +10,9 @@ use std::rc::Rc;
 use iced::widget::{container, row, text};
 use iced::{Alignment, Background, Length, Padding};
 use taskmanager_application::i18n::t;
-use taskmanager_shell::{FeedbackPresentation, FeedbackTone};
+use taskmanager_icons::status_icon;
+use taskmanager_shell::FeedbackPresentation;
 use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
-use taskmanager_ui_contract::IconId;
-use zhuge_ui_tokens::{StatusColors, StatusKind};
 
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::{ContentButtonOptions, IcedElement, content_button};
@@ -28,15 +27,10 @@ pub(crate) fn toast<'a>(
     viewport_width: f32,
 ) -> IcedElement<'a> {
     let palette = theme_snapshot.palette();
-    let status_colors = StatusColors {
-        accent: crate::theme_binding::color(palette.accent),
-        success: crate::theme_binding::color(palette.success),
-        warning: crate::theme_binding::color(palette.warning),
-        danger: crate::theme_binding::color(palette.danger),
-    };
-    let status = status_kind(notice.tone());
+    let status_colors = crate::theme_binding::status_colors(theme_snapshot);
+    let status = notice.status_kind();
     let accent = status_colors.resolve(status);
-    let icon = crate::icons::icon_tinted(icon_for(status), ICON_EXTENT, accent);
+    let icon = crate::icons::icon_tinted(status_icon(status), ICON_EXTENT, accent);
     let message = text(notice.text().to_owned())
         .size(f32::from(tokens::FONT_12))
         .width(Length::Fill)
@@ -111,25 +105,6 @@ pub(crate) fn toast_body<'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
-}
-
-fn icon_for(kind: StatusKind) -> IconId {
-    match kind {
-        StatusKind::Info | StatusKind::Success => IconId::Health,
-        StatusKind::Warning | StatusKind::Danger => IconId::Alert,
-    }
-}
-
-/// The one shared transient-status severity for this shell tone; the product
-/// owns the tone fold, while `StatusColors::resolve` owns the ink choice.
-#[must_use]
-pub(crate) const fn status_kind(tone: FeedbackTone) -> StatusKind {
-    match tone {
-        FeedbackTone::Neutral => StatusKind::Info,
-        FeedbackTone::Positive => StatusKind::Success,
-        FeedbackTone::Caution => StatusKind::Warning,
-        FeedbackTone::Danger => StatusKind::Danger,
-    }
 }
 
 fn card_width(viewport_width: f32) -> f32 {

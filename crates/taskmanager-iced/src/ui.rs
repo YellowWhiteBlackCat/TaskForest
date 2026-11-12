@@ -26,7 +26,7 @@ use taskmanager_ui_contract::IconId;
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::focus;
 use crate::theme;
-use taskmanager_shell::{FeedbackPresentation, FeedbackTone};
+use taskmanager_shell::FeedbackPresentation;
 use taskmanager_theme::Theme;
 
 mod about;
@@ -140,12 +140,10 @@ pub(crate) fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Them
     let status_color = if shell.should_quit() {
         crate::theme_binding::color(theme_snapshot.palette().warning)
     } else if let Some(feedback) = shell.feedback_presentation() {
-        match feedback.tone() {
-            FeedbackTone::Neutral => crate::theme_binding::color(theme_snapshot.palette().fg),
-            FeedbackTone::Positive => crate::theme_binding::color(theme_snapshot.palette().success),
-            FeedbackTone::Caution => crate::theme_binding::color(theme_snapshot.palette().warning),
-            FeedbackTone::Danger => crate::theme_binding::color(theme_snapshot.palette().danger),
-        }
+        // The notice's severity resolves through the shared status ladder —
+        // the same projection the floating toast card uses, so the footer
+        // and the card can never disagree about one notice's ink.
+        crate::theme_binding::status_colors(theme_snapshot).resolve(feedback.status_kind())
     } else {
         crate::theme_binding::color(theme_snapshot.palette().fg)
     };

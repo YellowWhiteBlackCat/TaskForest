@@ -19,6 +19,7 @@ taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+zhuge-ui-tokens.workspace = true
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskforest-ipc = { path = "../taskforest-ipc" }
 crossbeam-channel = "0.5"

@@ -27,8 +27,10 @@ inventing renderer-neutral state.
 Toast is a real non-modal Card-glass card over the root view: the shared shell
 `FeedbackPresentation` owns the copy, tone and lifetime, while Iced owns only
 the floating presentation, the shared `content_button` dismiss stop and the
-local dismissal receipt. Its status icon and tint resolve `FeedbackTone`
-through the shared `StatusKind`/`StatusColors` owner before native rendering.
+local dismissal receipt. Its status icon and tint resolve the shell's
+`FeedbackSeverity` through the shared `StatusKind`/`StatusColors` owner and
+the shared `taskmanager_icons::status_icon` glyph before native rendering —
+no local severity→ink or severity→icon fold survives in this frontend.
 Only `FeedbackLifecycle::Timed` expires a toast;
 `UntilReplaced` and `PlatformBatches` remain visible until the shared shell
 replaces or clears the notice. The footer activity line remains a durable

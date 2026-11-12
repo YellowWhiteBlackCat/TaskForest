@@ -18,6 +18,10 @@ bash scripts/capture-tui.sh                            # real Niri/Alacritty evi
 
 The TUI consumes `taskmanager-shell` projections and owns terminal geometry,
 events, menus and TestBackend behavior. It never reads platform sources.
+The footer's transient notice resolves its severity through the shell's
+`FeedbackSeverity::status_kind` and wears the shared text marker
+(`taskmanager_shell::presentation::status_marker`); the terminal colour
+quantization is the TUI's own, the marker and the severity projection are not.
 `ShellApp` privately owns the canonical `SystemProjectionStore`; TUI rendering and input receive
 only `projection()`. Demo/capture/tests inject typed shell fixture facts and cannot borrow or
 assign the store directly.

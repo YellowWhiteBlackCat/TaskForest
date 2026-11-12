@@ -21,7 +21,8 @@ use taskforest_core::core::time::unix_millis;
 use taskforest_ipc::DaemonMessage;
 use taskmanager_app_host::DaemonSubscriptionWorker;
 use taskmanager_application::first_run::{FirstRunCompletion, FirstRunController};
-use taskmanager_shell::{FeedbackPresentation, FeedbackSource, FeedbackTone};
+use taskmanager_shell::{FeedbackPresentation, FeedbackSource};
+use zhuge_ui_tokens::StatusKind;
 
 use bevy::ecs::event::Event;
 use bevy::ecs::resource::Resource;
@@ -69,14 +70,14 @@ pub(crate) struct ShellProjectionFolded;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct FeedbackNoticeProjection {
     pub(crate) source: FeedbackSource,
-    pub(crate) tone: FeedbackTone,
+    pub(crate) status: StatusKind,
 }
 
 impl From<FeedbackPresentation<'_>> for FeedbackNoticeProjection {
     fn from(feedback: FeedbackPresentation<'_>) -> Self {
         Self {
             source: feedback.source(),
-            tone: feedback.tone(),
+            status: feedback.status_kind(),
         }
     }
 }

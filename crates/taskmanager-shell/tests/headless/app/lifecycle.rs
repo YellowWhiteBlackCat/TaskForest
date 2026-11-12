@@ -5,6 +5,7 @@ use taskforest_contract::{
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::identity::ProviderId;
 use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ProcessEvent};
+use zhuge_ui_tokens::StatusKind;
 
 fn process_snapshot_batch(sequence: u64) -> PlatformEventBatch {
     let mut batch = PlatformEventBatch::default();
@@ -167,10 +168,10 @@ fn timed_notice_expires_when_time_advances_past_duration() {
     assert!(app.feedback_notice().is_none());
 }
 
-/// One severity→tone authority: every frontend paints the same projection
+/// One severity→status authority: every frontend paints the same projection
 /// instead of re-matching severity, and the notice keeps its typed metadata.
 #[test]
-fn feedback_presentation_derives_one_tone_and_carries_the_notice_fields() {
+fn feedback_presentation_derives_one_status_and_carries_the_notice_fields() {
     let mut app = ShellApp::new();
     assert_eq!(
         app.feedback_presentation(),
@@ -178,11 +179,11 @@ fn feedback_presentation_derives_one_tone_and_carries_the_notice_fields() {
         "background activity alone is not a notice"
     );
 
-    for (severity, tone) in [
-        (FeedbackSeverity::Info, FeedbackTone::Neutral),
-        (FeedbackSeverity::Success, FeedbackTone::Positive),
-        (FeedbackSeverity::Warning, FeedbackTone::Caution),
-        (FeedbackSeverity::Error, FeedbackTone::Danger),
+    for (severity, status) in [
+        (FeedbackSeverity::Info, StatusKind::Info),
+        (FeedbackSeverity::Success, StatusKind::Success),
+        (FeedbackSeverity::Warning, StatusKind::Warning),
+        (FeedbackSeverity::Error, StatusKind::Danger),
     ] {
         app.report_notice(
             FeedbackSource::Interaction,
@@ -191,7 +192,7 @@ fn feedback_presentation_derives_one_tone_and_carries_the_notice_fields() {
             "shared feedback",
         );
         let feedback = app.feedback_presentation().expect("the notice is present");
-        assert_eq!(feedback.tone(), tone);
+        assert_eq!(feedback.status_kind(), status);
         assert_eq!(feedback.severity(), severity);
         assert_eq!(feedback.source(), FeedbackSource::Interaction);
         assert_eq!(feedback.lifecycle(), FeedbackLifecycle::UntilReplaced);

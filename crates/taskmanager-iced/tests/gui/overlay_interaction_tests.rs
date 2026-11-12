@@ -209,11 +209,17 @@ fn window_deactivation_removes_the_real_user_context_menu_without_submitting_an_
             .expect("the open Users row menu mounts through the overlay channel");
         let mut overlay = Nested::new(overlay);
         let overlay_node = overlay.layout(&renderer, size);
+        // The demo fixture's sessions deliberately carry no incarnation: a
+        // provider that cannot revalidate a trusted lifecycle token yields a
+        // displayable row with no control target. The row menu therefore
+        // mounts its CLOSE action only — the session actions stay gated. The
+        // menu is still the REAL user context menu, which is what this test
+        // is about: deactivation must remove it without submitting anything.
         focus_overlay_target_bounds(
             &mut overlay,
             &overlay_node,
             &renderer,
-            FocusTarget::UserRowMenuDisconnect,
+            FocusTarget::UserRowMenuClose,
         )
         .is_some()
     };

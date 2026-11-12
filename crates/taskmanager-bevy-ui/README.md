@@ -103,6 +103,10 @@ headless suite and capture flow live in
 - `src/drain.rs`, `palette.rs`, `glass.rs` (+ `src/glass/`), `runtime.rs`,
   `tray.rs` — event drain, theme adapter, painted-fallback/optical-material
   glass bridge, platform client and tray adapter.
+- `src/feedback_overlay.rs` — the non-modal shell notice card. Its ink
+  resolves through the theme's `StatusColors` ladder carried on `UiPalette`,
+  and its glyph through `taskmanager_icons::status_icon`; the card keeps no
+  local severity→ink or severity→icon table.
 - `src/capabilities.rs`, `functional.rs`, `bindings.rs`, `feature_coverage.rs` — capability and surface parity declarations.
 - `src/saved_views.rs`, `export.rs`, `snapshot_export.rs`, `event_center.rs` — saved views, typed data exports and event center tracking.
 - `src/demo_fixture.rs` (+ `src/demo_fixture/`), `capture.rs` — deterministic demo fixtures and window capture seams.

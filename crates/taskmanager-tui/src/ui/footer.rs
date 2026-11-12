@@ -9,8 +9,9 @@ use taskmanager_application::i18n::t;
 
 use crate::{TuiApp, TuiInputScope, TuiSurfaceKind, TuiTheme};
 use taskforest_core::core::alerts::AlertSeverity;
-use taskmanager_shell::presentation::ALERT_MARKER;
-use taskmanager_shell::{FeedbackSource, FeedbackTone};
+use taskmanager_shell::FeedbackSource;
+use taskmanager_shell::presentation::status_marker;
+use zhuge_ui_tokens::StatusKind;
 
 pub(super) fn render(
     frame: &mut Frame<'_>,
@@ -50,21 +51,23 @@ pub(super) fn render(
             Style::new().fg(theme.color(Color::Black)).bg(color),
         )
     });
-    // The tone table owns which marker a tone wears and in which ink; the
-    // space between the marker and the sentence is composed here so the
-    // marker itself stays one spelling, not a spelling with punctuation.
+    // The shared status ladder owns which marker a severity wears; this
+    // frontend contributes only its terminal colour quantization. The space
+    // between the marker and the sentence is composed here so the marker
+    // itself stays one spelling, not a spelling with punctuation.
     let (marker, feedback_color) =
         app.shell
             .feedback_presentation()
-            .map_or(
-                (None, theme.color(Color::White)),
-                |feedback| match feedback.tone() {
-                    FeedbackTone::Neutral => (None, theme.color(Color::White)),
-                    FeedbackTone::Positive => (Some("\u{2713}"), theme.good),
-                    FeedbackTone::Caution => (Some(ALERT_MARKER), theme.warn),
-                    FeedbackTone::Danger => (Some(ALERT_MARKER), theme.danger),
-                },
-            );
+            .map_or((None, theme.color(Color::White)), |feedback| {
+                let status = feedback.status_kind();
+                let color = match status {
+                    StatusKind::Info => theme.color(Color::White),
+                    StatusKind::Success => theme.good,
+                    StatusKind::Warning => theme.warn,
+                    StatusKind::Danger => theme.danger,
+                };
+                (status_marker(status), color)
+            });
     let marker = marker.map(|marker| format!("{marker} "));
     let marker = marker.as_deref().unwrap_or("");
     let feedback_width = usize::from(area.width.saturating_sub(30)).max(12);

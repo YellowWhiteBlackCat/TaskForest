@@ -21,6 +21,7 @@ use taskmanager_theme::tokens::{self, RowDensity, UiSize};
 use taskmanager_theme::{Color, GlassShadowProjection, GlassTier, Length, LightDark};
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 use zhuge_ui_core::easing::lerp;
+use zhuge_ui_tokens::StatusColors;
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
@@ -131,6 +132,12 @@ pub(crate) struct UiPalette {
     /// resolves the severity ink from the owner instead of rebuilding a
     /// severity table out of converted channel values.
     pub(crate) severity: SeverityPalette,
+    /// The theme's transient-status inks, carried verbatim for the same
+    /// reason as [`UiPalette::severity`]: the shared status ladder owns
+    /// which severity takes which ink, so this frontend resolves the ink
+    /// from the owner instead of rebuilding a severity table out of
+    /// converted channel values.
+    pub(crate) status: StatusColors<bevy::color::Color>,
     /// Page-title type metrics (size + weight; handle stamped later).
     pub(crate) heading: TextFont,
     /// Body type metrics.
@@ -286,6 +293,7 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
     let glass_card_edge = composite_over(panel_fill, theme_color(theme.glass_card().edge));
     let glass_modal_edge = composite_over(glass_modal_fill, theme_color(theme.glass_modal().edge));
     let glass_sidebar_edge = composite_over(nav_bg, theme_color(theme.glass_chrome().edge));
+    let status = theme.status_colors();
     UiPalette {
         cpu: theme_color(theme.cpu),
         memory: theme_color(theme.memory),
@@ -319,6 +327,12 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
         success_color: theme_color(theme.success),
         card_shadow: theme_color(theme.card_shadow()),
         severity: theme.severity_palette(),
+        status: StatusColors {
+            accent: theme_color(status.accent),
+            success: theme_color(status.success),
+            warning: theme_color(status.warning),
+            danger: theme_color(status.danger),
+        },
         high_contrast: theme.hc,
         glass_modal_fill,
         glass_card_edge,

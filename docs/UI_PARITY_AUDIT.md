@@ -88,7 +88,7 @@
 - `[F]` TUI 的 `FocusVisible` 为 `Divergent`：cursor row 是唯一焦点指示，没有 pointer/keyboard modality ring（`crates/taskmanager-tui/src/capabilities.rs`）。
 - `[V]` TUI 的 vertical nav 是 header-line 模式，不是带图标的垂直导轨（`crates/taskmanager-tui/src/ui/header.rs:44`）。
 - `[E]` TUI 的 sidebar edit 是模态编辑器，不是内联列编辑（`crates/taskmanager-tui/src/ui/sidebar_editor.rs`）。
-- `[O]` TUI 使用 `footer.activity-line`；Bevy 在无 footer 的 Performance 路由以 shell notice 投影非模态玻璃 Toast，其他路由保留 activity footer 且不挂第二张卡；Iced 的 `TransientFeedback` owner 决策为 `Local { route: "root.toast" }`，其非模态 Card-glass Toast 与 GPUI 的场景语义对齐。Bevy 的其余路由差异仍保留为存异。
+- `[O]` TUI 使用 `footer.activity-line`；Bevy 在无 footer 的 Performance 路由以 shell notice 投影非模态玻璃 Toast，其他路由保留 activity footer 且不挂第二张卡；Iced 的 `TransientFeedback` owner 决策为 `Local { route: "root.toast" }`，其非模态 Card-glass Toast 与 GPUI 的场景语义对齐。Bevy 的其余路由差异仍保留为存异。四端的反馈严重度现共用一条状态语义：`FeedbackSeverity::status_kind()` 投影到共享 `StatusKind`，墨色由 `StatusColors::resolve` 解析，字形由 `taskmanager_icons::status_icon` 唯一决定（终端端为 `presentation::status_marker` 文本形式），任何前端都不再自写严重度→墨色或严重度→图标表。
 - `[D]` `DiagnosticBundle` 为 `AcceptedDifference`：Iced 提供 clipboard report，TUI 提供 plain-text report，GPUI 提供 preview/write bundle（四端 `src/functional.rs`）。
 
 ## 组件与意图级存异

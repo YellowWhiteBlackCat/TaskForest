@@ -8,6 +8,8 @@
 //!   embedded SVG asset path.
 //! - [`asset_bytes`] — retrieve the same embedded SVG bytes for any
 //!   frontend's native vector widget.
+//! - [`status_icon`] — the one semantic glyph a transient status severity
+//!   wears, shared by every frontend.
 //!
 //! Toolkit rendering adapters are frontend-owned (ADR-051): the GPUI SVG/
 //! image builders live in `taskmanager-ui::icons_binding`, the Bevy raster
@@ -18,5 +20,7 @@
 #![deny(clippy::wildcard_imports)]
 
 mod path;
+mod status;
 
 pub use path::{asset_bytes, path};
+pub use status::status_icon;
