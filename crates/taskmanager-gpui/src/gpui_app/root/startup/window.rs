@@ -5,7 +5,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use super::{
-    RootStartupFacts, apply_root_startup_config, requested_window_decorations, spawn_update_loop,
+    RootStartupFacts, StartupNotice, apply_root_startup_config, requested_window_decorations,
+    spawn_update_loop,
 };
 use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::root::{RootView, responsive};
@@ -50,7 +51,7 @@ pub(super) struct RootWindowInputs {
     pub service_log_export_client: DiagnosticBundleClient,
     pub instance_guard: Option<Box<dyn InstanceGuard>>,
     pub instance_rx: std::sync::mpsc::Receiver<InstanceEvent>,
-    pub config_bootstrap_notice: Option<String>,
+    pub config_bootstrap_notice: Option<StartupNotice>,
     pub config_client: ConfigClient,
     pub applied_config_revision: Option<ConfigRevision>,
     pub capture_mode: bool,
@@ -124,7 +125,9 @@ pub(super) fn make_root_builder(inputs: RootWindowInputs) -> RootBuilder {
             }
         });
         if let Some(notice) = config_bootstrap_notice {
-            entity.update(cx, |view, cx| view.show_local_feedback(notice, cx));
+            entity.update(cx, |view, cx| {
+                view.show_local_feedback(notice.text, notice.kind, cx);
+            });
         }
         if !capture_mode {
             let tray_available = super::super::tray::spawn_tray_host(&entity, cx);

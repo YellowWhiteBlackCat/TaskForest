@@ -6,6 +6,7 @@ use taskmanager_shell::FeedbackSource;
 use taskmanager_shell::ProcessControlFeedback;
 use taskmanager_shell::ProcessControlKind;
 use taskmanager_theme::Theme;
+use zhuge_ui_tokens::StatusKind;
 
 #[test]
 fn typed_submission_errors_preserve_provider_unavailable_presentation() {
@@ -39,7 +40,7 @@ fn accepted_control_feedback_replaces_local_toast_with_one_shell_notice(
     };
 
     entity.update(cx, |view, cx| {
-        view.show_local_feedback("older local copy notice", cx);
+        view.show_local_feedback("older local copy notice", StatusKind::Info, cx);
         assert!(view.local_feedback_toast.is_some());
         view.accept_shared_process_control_feedback(&feedback);
 

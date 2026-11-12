@@ -17,6 +17,7 @@ use taskmanager_application::i18n;
 use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use zhuge_ui_tokens::StatusKind;
 
 fn transfer_entries(rules: &[ManagedAlertRule]) -> Vec<AlertRuleTransferEntry> {
     rules
@@ -46,7 +47,15 @@ fn record_feedback(
     } else {
         i18n::t("feedback.action_failed")
     };
-    view.show_local_feedback(action_feedback(template, action), cx);
+    view.show_local_feedback(
+        action_feedback(template, action),
+        if succeeded {
+            StatusKind::Success
+        } else {
+            StatusKind::Danger
+        },
+        cx,
+    );
 }
 
 pub(super) fn render_transfer_actions(

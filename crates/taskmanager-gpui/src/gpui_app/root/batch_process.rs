@@ -29,6 +29,7 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_shell::{ProcessControlScope, ShellApp, process_batch_action_label};
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
+use zhuge_ui_tokens::StatusKind;
 
 fn result_summary(result: &ProcessBatchResult) -> String {
     let (applied, skipped, failed) = result_counts(result);
@@ -56,6 +57,23 @@ fn result_summary(result: &ProcessBatchResult) -> String {
     uniform_failure.map_or(summary.clone(), |failure| {
         format!("{summary}: {}", i18n::control_error_detail(failure))
     })
+}
+
+/// The severity a completed batch's receipt wears.
+///
+/// A batch whose targets failed did not do what it was asked, so it wears the
+/// failure severity. A batch that applied at least one target completed its
+/// work. A batch that only skipped its targets changed nothing, so it stays
+/// informational.
+fn batch_result_kind(result: &ProcessBatchResult) -> StatusKind {
+    let (_, _, failed) = result_counts(result);
+    if failed > 0 {
+        StatusKind::Danger
+    } else if result.applied_count() > 0 {
+        StatusKind::Success
+    } else {
+        StatusKind::Info
+    }
 }
 
 fn result_counts(result: &ProcessBatchResult) -> (usize, usize, usize) {
@@ -200,12 +218,17 @@ impl RootView {
         match result {
             Ok(request_id) => {
                 self.shell.accept_process_batch(attempt, request_id);
-                self.show_local_feedback(i18n::t("proc.batch_queued").to_string(), cx);
+                self.show_local_feedback(
+                    i18n::t("proc.batch_queued").to_string(),
+                    StatusKind::Success,
+                    cx,
+                );
             }
             Err(kind) => {
                 self.shell.reject_process_batch(attempt, kind);
                 self.show_local_feedback(
                     i18n::t("health.failure_provider_unavailable").to_string(),
+                    StatusKind::Danger,
                     cx,
                 );
             }
@@ -217,12 +240,13 @@ impl RootView {
         result: ProcessBatchResult,
         cx: &mut Context<Self>,
     ) {
+        let kind = batch_result_kind(&result);
         let feedback = record_completed_process_batch(
             &mut self.process_batch_history,
             unix_millis(SystemTime::now()),
             result,
         );
-        self.show_local_feedback(feedback, cx);
+        self.show_local_feedback(feedback, kind, cx);
         self.request_refresh(RefreshRequest::Processes);
     }
 
@@ -234,17 +258,21 @@ impl RootView {
             ProcessBatchHistoryFormat::Json,
             |payload| cx.write_to_clipboard(ClipboardItem::new_string(payload)),
         );
-        self.show_local_feedback(
-            match result {
-                Ok(_) => format!(
+        let (copy, kind) = match result {
+            Ok(_) => (
+                format!(
                     "{}: {}",
                     i18n::t("hint.copied"),
                     i18n::t("proc.batch_history")
                 ),
-                Err(error) => format!("{}: {error}", i18n::t("proc.batch_history_export_failed")),
-            },
-            cx,
-        );
+                StatusKind::Success,
+            ),
+            Err(error) => (
+                format!("{}: {error}", i18n::t("proc.batch_history_export_failed")),
+                StatusKind::Danger,
+            ),
+        };
+        self.show_local_feedback(copy, kind, cx);
         cx.notify();
     }
 }

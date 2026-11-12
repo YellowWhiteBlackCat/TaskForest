@@ -14,6 +14,7 @@ use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
 use crate::gpui_app::sidebar::SelectedDevice;
 #[cfg(target_os = "linux")]
 use taskforest_core::core::process::ProcessSignal;
+use zhuge_ui_tokens::StatusKind;
 
 /// Initial top-level page, overridable via `TM_PAGE` (values: `performance`, `apps`/
 /// `processes`, `services`, `system`, `startup`, `users`, `app-history`). Useful for
@@ -218,7 +219,7 @@ pub fn apply_search_online(
         return;
     };
     if name.trim().is_empty() {
-        v.show_local_feedback(t("hint.no_process_name"), cx);
+        v.show_local_feedback(t("hint.no_process_name"), StatusKind::Info, cx);
         return;
     }
     v.request_open_url(search_url_for(&name), cx);

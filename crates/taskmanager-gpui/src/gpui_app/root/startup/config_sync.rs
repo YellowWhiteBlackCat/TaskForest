@@ -11,8 +11,8 @@ use super::super::{
 };
 use super::{
     AsyncApp, ConfigClient, Duration, RootView, SharedString, WeakEntity, apply_process_config,
-    config_from_view, i18n, normalize_graph_data_points, startup_page_from_token,
-    text_rendering_from_token, text_rendering_mode_from_token,
+    config_from_view, config_recovery_kind, i18n, normalize_graph_data_points,
+    startup_page_from_token, text_rendering_from_token, text_rendering_mode_from_token,
 };
 use taskforest_core::core::config::Config;
 use taskforest_core::core::units::UnitPreferences;
@@ -22,6 +22,7 @@ use taskmanager_application::ConfigRevision;
 use taskmanager_application::TelemetryInterval;
 use taskmanager_application::TelemetryRefreshPolicyChange;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
+use zhuge_ui_tokens::StatusKind;
 
 pub(super) fn apply_root_persisted_projection(
     view: &mut RootView,
@@ -133,6 +134,7 @@ pub(super) fn persist_config_if_due(
                 }
                 view.show_local_feedback(
                     i18n::t("settings.config_not_queued").replace("{error}", &error.to_string()),
+                    StatusKind::Danger,
                     cx,
                 );
             });
@@ -178,6 +180,7 @@ pub(super) fn drain_config_publications(
                 view.show_local_feedback(
                     i18n::t("settings.config_resynchronised")
                         .replace("{count}", &missed_publications.to_string()),
+                    StatusKind::Info,
                     cx,
                 );
             });
@@ -196,17 +199,21 @@ pub(super) fn drain_config_publications(
             *applied_revision = Some(publication.revision());
         }
         let feedback = match publication.outcome() {
-            ConfigPublicationOutcome::SaveFailed { error, .. } => Some(
+            ConfigPublicationOutcome::SaveFailed { error, .. } => Some((
                 i18n::t("settings.config_not_saved").replace("{kind}", error.kind().stable_code()),
-            ),
-            ConfigPublicationOutcome::RefreshFailed(recovery) => {
-                Some(recovery.message_with_prefix(i18n::t("settings.config_refresh_failed")))
-            }
-            ConfigPublicationOutcome::Refreshed(recovery) => recovery.initial_message(),
+                StatusKind::Danger,
+            )),
+            ConfigPublicationOutcome::RefreshFailed(recovery) => Some((
+                recovery.message_with_prefix(i18n::t("settings.config_refresh_failed")),
+                StatusKind::Danger,
+            )),
+            ConfigPublicationOutcome::Refreshed(recovery) => recovery
+                .initial_message()
+                .map(|text| (text, config_recovery_kind(recovery.initial_notice()))),
             _ => None,
         };
-        if let Some(feedback) = feedback {
-            let _ = weak.update(cx, |view, cx| view.show_local_feedback(feedback, cx));
+        if let Some((feedback, kind)) = feedback {
+            let _ = weak.update(cx, |view, cx| view.show_local_feedback(feedback, kind, cx));
         }
     }
 }

@@ -7,7 +7,7 @@ use taskforest_core::core::process::{
 };
 use taskmanager_application::ProcessControlRequest;
 use taskmanager_application::ProcessDetailsSection;
-use taskmanager_shell::presentation::ALERT_MARKER;
+use zhuge_ui_tokens::StatusKind;
 
 use super::{Hover, ProcMenuAction, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
@@ -40,21 +40,23 @@ fn menu_control_submission(
 }
 
 impl RootView {
-    pub(crate) fn show_local_feedback(&mut self, msg: impl Into<String>, cx: &mut Context<Self>) {
+    /// Show one transient local notice.
+    ///
+    /// The severity is a TYPED fact carried by the caller, not something the
+    /// renderer reads back out of the copy. The old design prefixed a
+    /// failure notice with the alert marker and let the toast strip it again
+    /// to guess the severity: the severity then depended on a decoration
+    /// codepoint surviving a round trip through a string, and the notice
+    /// showed its marker twice — once as the icon the severity selects and
+    /// once as text. The caller already knows the outcome, so it says so.
+    pub(crate) fn show_local_feedback(
+        &mut self,
+        msg: impl Into<String>,
+        kind: StatusKind,
+        cx: &mut Context<Self>,
+    ) {
         use taskmanager_ui::overlays::toast::{ToastEvent, ToastState};
-        use zhuge_ui_tokens::StatusKind;
         let msg = msg.into();
-        // The marker plus one space is the prefix a failure notice is written
-        // with; the space is part of the routing, so it is matched rather than
-        // folded into the marker's own spelling.
-        let kind = if msg
-            .strip_prefix(ALERT_MARKER)
-            .is_some_and(|rest| rest.starts_with(' '))
-        {
-            StatusKind::Danger
-        } else {
-            StatusKind::Info
-        };
         self.local_feedback_seq += 1;
         let toast = cx.new(|cx| ToastState::new(self.local_feedback_seq, msg, kind, cx));
         toast.update(cx, |toast, cx| {

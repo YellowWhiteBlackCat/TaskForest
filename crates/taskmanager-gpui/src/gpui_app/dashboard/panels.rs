@@ -32,6 +32,7 @@ use taskmanager_shell::saved_views::{
 
 mod alerts;
 use alerts::render_alert_rules;
+use zhuge_ui_tokens::StatusKind;
 
 pub struct DashboardPanelOverlayProps<'a> {
     pub theme: &'a Theme,
@@ -394,7 +395,11 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                                 &mut view.dashboard.next_saved_view_id,
                                 preset,
                             ) {
-                                view.show_local_feedback(format!("View not saved: {error}"), cx);
+                                view.show_local_feedback(
+                                    format!("View not saved: {error}"),
+                                    StatusKind::Danger,
+                                    cx,
+                                );
                             }
                             cx.notify();
                         });

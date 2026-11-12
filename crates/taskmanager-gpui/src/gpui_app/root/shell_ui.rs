@@ -18,6 +18,7 @@ use taskmanager_application::i18n;
 use super::RootView;
 use super::clipboard::process_failure_message;
 use gpui::Context;
+use zhuge_ui_tokens::StatusKind;
 
 impl RootView {
     fn finish_shell_submission(
@@ -71,6 +72,7 @@ impl RootView {
                     "{}: process identity unavailable",
                     i18n::t("hint.could_not_open_location")
                 ),
+                StatusKind::Danger,
                 cx,
             );
             return false;
@@ -178,12 +180,14 @@ impl RootView {
             ShellUiActionIntent::Reveal(_) => {
                 self.show_local_feedback(
                     format!("{}: {error}", i18n::t("hint.could_not_open_location")),
+                    StatusKind::Danger,
                     cx,
                 );
             }
             ShellUiActionIntent::OpenUrl(_) => {
                 self.show_local_feedback(
                     format!("{}: {error}", i18n::t("hint.could_not_open_browser")),
+                    StatusKind::Danger,
                     cx,
                 );
             }

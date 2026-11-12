@@ -4,9 +4,11 @@ use gpui::{
     Styled, TestAppContext, VisualTestContext, Window, div,
 };
 use taskforest_core::core::metrics::MemoryMetrics;
+use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::InputModality;
+use zhuge_ui_tokens::StatusKind;
 
 struct FocusTargetHarness {
     focus_handle: Option<FocusHandle>,
@@ -378,6 +380,28 @@ async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut 
         );
         assert!(v.decoration_outcome_reported, "the notice must latch");
         assert_eq!(v.local_feedback_seq, 1);
+    });
+
+    // The severity is a TYPED fact the caller declared, and the copy carries
+    // no marker: the compositor refused the frame but the app adapted, so
+    // the notice is a caution, not a failure — and the icon the severity
+    // selects is the only marker the user sees.
+    view.read_with(cx, |v, _| {
+        let toast = v
+            .local_feedback_toast
+            .as_ref()
+            .expect("the refused preference raised a notice");
+        assert_eq!(
+            toast.read_with(cx, |toast, _| toast.kind()),
+            StatusKind::Warning,
+            "a refused frame preference is a caution, not a failure"
+        );
+        assert!(
+            !toast
+                .read_with(cx, |toast, _| toast.message().to_string())
+                .starts_with(ALERT_MARKER),
+            "the copy must not repeat the marker the icon already carries"
+        );
     });
 
     // The latch holds: subsequent renders do not re-notify (no toast churn).

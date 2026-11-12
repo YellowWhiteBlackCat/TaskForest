@@ -25,6 +25,7 @@ use taskmanager_app_host::WindowPresentation;
 use taskmanager_app_host::acquire_single_instance;
 use taskmanager_application::ConfigBootstrap;
 use taskmanager_application::ConfigPublicationOutcome;
+use taskmanager_application::ConfigRecoveryNotice;
 use taskmanager_application::ConfigRevision;
 use taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT;
 use taskmanager_application::TelemetryInterval;
@@ -68,6 +69,7 @@ use window::{RootWindowInputs, make_root_builder, open_main_window, prepare_wind
 
 mod ui_bootstrap;
 use ui_bootstrap::bootstrap_owned_ui;
+use zhuge_ui_tokens::StatusKind;
 
 /// Window-frame policy: the persisted preference picks the mode we REQUEST.
 /// `System` (the default) and `Native` both ask for server-side decorations
@@ -130,7 +132,30 @@ struct RootStartupFacts {
 struct InitialConfig {
     config: Config,
     revision: Option<ConfigRevision>,
-    notice: Option<String>,
+    notice: Option<StartupNotice>,
+}
+
+/// One typed startup notice: the copy AND the severity it wears.
+///
+/// The severity is a fact the configuration layer already knows — a fallback
+/// source is a caution, a failed load is a failure — so the notice carries it
+/// instead of letting the renderer guess from the text.
+pub(super) struct StartupNotice {
+    text: String,
+    kind: StatusKind,
+}
+
+/// The severity a configuration recovery notice wears.
+///
+/// A configuration that was recovered from the backup is a caution: the app
+/// runs, but the settings in force were not the ones the user saved. A
+/// configuration that could not be loaded at all is a failure.
+pub(super) fn config_recovery_kind(notice: ConfigRecoveryNotice) -> StatusKind {
+    match notice {
+        ConfigRecoveryNotice::None => StatusKind::Info,
+        ConfigRecoveryNotice::Recovered => StatusKind::Warning,
+        ConfigRecoveryNotice::Failed => StatusKind::Danger,
+    }
 }
 
 type StartupInstance = (
@@ -142,7 +167,12 @@ fn read_initial_config(config_client: &mut ConfigClient) -> InitialConfig {
     match config_client.wait_for_initial(DEFAULT_CONFIG_INITIAL_WAIT) {
         ConfigBootstrap::Published(publication) => {
             let notice = match publication.outcome() {
-                ConfigPublicationOutcome::Loaded(recovery) => recovery.initial_message(),
+                ConfigPublicationOutcome::Loaded(recovery) => {
+                    recovery.initial_message().map(|text| StartupNotice {
+                        text,
+                        kind: config_recovery_kind(recovery.initial_notice()),
+                    })
+                }
                 _ => None,
             };
             InitialConfig {
@@ -154,9 +184,13 @@ fn read_initial_config(config_client: &mut ConfigClient) -> InitialConfig {
         ConfigBootstrap::Fallback { snapshot, source } => InitialConfig {
             config: snapshot.as_ref().clone(),
             revision: None,
-            notice: Some(
-                i18n::t("settings.config_fallback").replace("{source}", &format!("{source:?}")),
-            ),
+            notice: Some(StartupNotice {
+                text: i18n::t("settings.config_fallback")
+                    .replace("{source}", &format!("{source:?}")),
+                // The configuration in force came from a FALLBACK source: the
+                // app runs, but not with the settings the user saved.
+                kind: StatusKind::Warning,
+            }),
         },
     }
 }

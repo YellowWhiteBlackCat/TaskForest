@@ -5,6 +5,7 @@ use gpui::{ClipboardItem, Context};
 use taskforest_core::core::failure::FailureKind;
 use taskforest_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_application::i18n;
+use zhuge_ui_tokens::StatusKind;
 
 impl RootView {
     /// Look up the process captured by the menu action and apply `f` to its
@@ -40,11 +41,16 @@ impl RootView {
         match text {
             Some(t) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(t.clone()));
-                self.show_local_feedback(format!("{} {what}: {t}", i18n::t("hint.copied")), cx);
+                self.show_local_feedback(
+                    format!("{} {what}: {t}", i18n::t("hint.copied")),
+                    StatusKind::Success,
+                    cx,
+                );
             }
             None => {
                 self.show_local_feedback(
                     i18n::t("hint.no_process_to_copy").replace("{}", what),
+                    StatusKind::Info,
                     cx,
                 );
             }

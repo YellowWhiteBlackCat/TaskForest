@@ -36,11 +36,11 @@ use gpui::{
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
 use taskforest_core::core::SystemSnapshot;
-use taskmanager_shell::presentation::ALERT_MARKER;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 use taskmanager_theme::tokens;
 use taskmanager_ui::theme_binding::window_chrome_state;
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
+use zhuge_ui_tokens::StatusKind;
 mod context_menu_capture;
 mod overlays;
 mod pages;
@@ -392,13 +392,12 @@ impl Render for RootView {
             )
         {
             self.decoration_outcome_reported = true;
-            // The alert-marker prefix routes the toast to the Danger kind (see
-            // `RootView::show_local_feedback`).
+            // The compositor refused the requested frame, but the app adapted
+            // and stays fully usable: this is a CAUTION, and the icon the
+            // severity selects carries the marker — the copy needs none.
             self.show_local_feedback(
-                format!(
-                    "{ALERT_MARKER} {}",
-                    crate::gpui_app::chrome::decoration_outcome_label(notice)
-                ),
+                crate::gpui_app::chrome::decoration_outcome_label(notice),
+                StatusKind::Warning,
                 cx,
             );
         }
