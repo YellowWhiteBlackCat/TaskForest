@@ -94,7 +94,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
     // dispatch, so the animation never wraps the shell (same pattern as
     // the process-row selection rail: absolute child, paints beneath).
     let base = t.sidebar_card_bg;
-    let hover = t.accent.with_alpha(0.12);
+    let hover = t.hover_bg();
     let accent = t.accent;
     div()
         .id(label)
@@ -218,7 +218,7 @@ pub fn gear_btn(
     // on hover) — a descendant of the focusable shell, never wrapping it (see
     // `tab` to preserve focus-path key dispatch).
     let transparent = Color::TRANSPARENT;
-    let hover_bg = t.accent.with_alpha(0.12);
+    let hover_bg = t.hover_bg();
     div()
         .id("settings-btn")
         // Zero-cost debug tag (no-op in release) so render tests can confirm the
@@ -286,7 +286,7 @@ pub fn nav_orientation_btn(
     let is_hov = hovered == Some(&Hover::Static("nav-orientation-btn"));
     let color = if is_hov { t.accent } else { t.fg_dim };
     let transparent = Color::TRANSPARENT;
-    let hover_bg = t.accent.with_alpha(0.12);
+    let hover_bg = t.hover_bg();
     div()
         .id("nav-orientation-btn")
         .debug_selector(|| "nav-orientation-btn".to_string())
@@ -343,3 +343,7 @@ pub fn nav_orientation_btn(
                 .text_color(hsla(color)),
         )
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/root/nav_hover_tests.rs"]
+mod tests;

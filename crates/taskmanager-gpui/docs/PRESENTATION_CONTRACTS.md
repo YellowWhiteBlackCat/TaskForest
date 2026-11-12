@@ -88,6 +88,10 @@ and sensor-row insets as well as the gap between stacked sections, while the
 multi-column grid keeps the regular gap; compact windows retain more readable
 facts without shrinking labels or splitting groups.
 
+Root navigation controls spend the theme's derived `hover_bg()` token, not a
+private accent-alpha blend. Tabs, the settings gear and the orientation
+affordance share the same hover ink the sidebar, rows and other frontends use.
+
 When a tray exists, window close minimizes while root/runtime/singleton remain
 alive; tray Quit terminates. Secondary launch activates the existing window.
 Capture-only and tray-unavailable sessions may close without leaving a
