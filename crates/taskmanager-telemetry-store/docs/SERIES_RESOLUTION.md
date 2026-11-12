@@ -14,13 +14,10 @@ the other domain.
 The legacy `series`/`*_for` accessors remain as thin wrappers over the same
 dispatch; the infallible legacy `series` reports a device-only series as an
 empty host window, and `MetricSeries::slot` derives storage ordinals from
-`MetricSeries::ALL` so slot-keyed caches stop hand-maintaining numeric
-tables.
+`MetricSeries::ALL` so slot-keyed caches stop hand-maintaining numeric tables.
 
-Disk active time is a device-only series: the persisted
-`storage-activity-pct` per-device ring is the authority, and no host mean is
-fabricated (the interim host mean ring was removed when the scope model made
-the per-device resolution the single path).
+Disk active time is a device-only series: there is no host mean, and the
+persisted `storage-activity-pct` per-device ring is the authority.
 
 ## Timestamped reads
 

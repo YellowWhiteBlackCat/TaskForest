@@ -27,6 +27,10 @@
   fabricated zero. The spellings themselves live in the shared floor
   (`taskforest_core::core::percent`), so the four frontends, the export, the
   accessibility snapshot and the desktop notification cannot disagree.
+- `src/presentation/feedback.rs` owns the shared transient-status text form:
+  `FeedbackSeverity::status_kind()` projects onto `StatusKind`, `status_marker`
+  maps that kind to the terminal's text marker, and
+  `taskmanager_icons::status_icon` owns the graphical glyph separately.
 - `src/presentation/chart_slots.rs` owns the sample-window → pixel-slot grid
   every chart draws and hovers through: the newest sample pins to the right
   edge, each sample owns one fixed slot, and the drawn x and the hover

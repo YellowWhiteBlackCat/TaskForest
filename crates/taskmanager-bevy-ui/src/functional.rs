@@ -1,9 +1,8 @@
 //! Bevy's explicit CORE-04 product-intent surface declaration.
 //!
-//! Bevy is a supported source-build shape but is still below GPUI maturity.
-//! Every product intent is therefore declared here: implemented surfaces name
-//! their route, while unfinished surfaces remain typed `Unsupported` instead
-//! of disappearing from the four-frontend matrix.
+//! Every product intent is declared here with its route and, where applicable,
+//! the reason for a deliberate difference. The declaration contains no
+//! `Unsupported` arm.
 
 use taskmanager_ui_contract::{
     FrontendFunctionalDeclaration, FrontendShape, FunctionalEntry, ProductIntent, SurfaceDecision,

@@ -20,8 +20,10 @@ native selection and renderer caches; all shared types use their defining module
   `CommandLaunchRequest::from_draft` owner, which alone canonicalizes line
   endings and trims the draft; `ui/components/toast.rs` paints the shared
   shell feedback notice as a non-modal Card-glass toast whose visibility
-  follows the shell's `FeedbackLifecycle`; its transient status ink resolves
-  through the shared `StatusColors` owner rather than a private tone fold.
+  follows the shell's `FeedbackLifecycle`. `FeedbackSeverity::status_kind()`
+  projects the severity onto `StatusKind`, `StatusColors::resolve` maps that
+  kind to the status ink, and `taskmanager_icons::status_icon` supplies the
+  status marker.
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero); tooltip
@@ -54,7 +56,7 @@ native selection and renderer caches; all shared types use their defining module
   Card glass gradient, its specular edge, and the single-quad projection of
   the theme's two-layer glass shadow (the same projection the floating
   panels consume). The switch, slider, select, search field and the
-  segmented track, plus the new activation/text family, all read it, so no
+  segmented track, plus the activation/text family, all read it, so no
   control owns a second palette, radius ladder or shadow ladder.
   The Applications empty table body spends the shared inset
   `GlassSurfaceRole::PageHeader`: it keeps the Card-tier fill and hairline
@@ -75,18 +77,18 @@ native selection and renderer caches; all shared types use their defining module
   and the statistics rail all resolve `GlassSurfaceRole::PageCard` through
   `glass_surface_style`; `card_style` adds only Iced's `snap` rasterization
   hint, never a second fill, edge or elevation shadow.
-  The shared fold is the ONLY status-to-ink table in this frontend:
-  `ui/components/controls/state.rs` holds no private state fold, it only
-  PROJECTS each toolkit status into a `ControlInkPriority` and resolves it
-  through `theme::ControlVisualState::from_priority`. The same rule covers
-  the device-rail card, the table header cell, the table row, the menu cursor
-  row, the toast dismiss affordance and the focus shell's row hover layer,
-  so no control spells its own hover/pressed/selected ink.
-  A control that paints its selection as its OWN surface (the device-rail
-  card, the active sort column, the selected table row, the active
-  segmented segment) resolves the shared SELECTION-DOMINANT fold, so the
-  durable selection survives a pointer resting on it; every other control
-  resolves the general fold, where a transient hover outranks a selection.
+  The two shared `ControlInkPriority` folds are the only status-to-ink
+  precedence owners here. The general fold (`ControlInkPriority::resolve`
+  through `theme::ControlVisualState::from_priority`) lets a transient hover
+  outrank a selection; `ui/components/controls/state.rs`, the toast dismiss
+  affordance and the focus shell's row hover layer project into it. The
+  selection-dominant fold (`ControlInkPriority::resolve_selection_dominant`
+  through `theme::ControlVisualState::from_selection_dominant_priority`)
+  keeps a durable selection visible under the pointer; the device-rail card,
+  active sort column, selected table row and active segmented segment
+  resolve it.
+  `ui/components/controls/state.rs` holds no private verdict table; the menu
+  cursor row binds the shared `Hovered` ink from `theme::hover_ink`.
   `theme::hover_ink` is the single address for the shared hover surface, and
   the segmented segment's press signal is projected for idle segments only
   (the GPUI twin's active segment carries no press ink, so the accent that

@@ -13,13 +13,9 @@ pub const MISSING_VALUE: &str = "—";
 /// differs by shape while the meaning does not.
 ///
 /// One spelling, because a marker every surface spells for itself is a marker
-/// that can drift. Measured at R138: nineteen live sites in three frontends
-/// (GPUI eight, Iced six, TUI five) — the SMART wear-critical row, the spare-
-/// pool row, the temperature label, the capability line, the source-notice
-/// banner, the footer tone table, the toast prefix, and the parser that read
-/// that prefix back into a severity. The fourth frontend carries none on
-/// purpose: a surface that may not hold a decoration codepoint paints an icon
-/// plate, so the FORM differs by shape while the meaning does not.
+/// that can drift. Graphical surfaces that cannot hold a decoration codepoint
+/// paint an icon plate; the FORM differs by shape while the shared semantic
+/// identity does not.
 pub const ALERT_MARKER: &str = "⚠";
 
 /// The success marker a surface that paints text wears on a positive

@@ -2,11 +2,11 @@ use super::{DeviceStatus, SourceStateKind, source_state_color, state_color};
 use taskmanager_theme::Theme;
 
 /// Parity: the badge's render input is exactly the neutral VM's kind. The
-/// reroute through `SourceStateKind` must reproduce the historical tone
+/// reroute through `SourceStateKind` preserves the status ink
 /// for every device status — healthy=cpu, stale/missing-tool=disk,
 /// denied=danger, unsupported=dim.
 #[test]
-fn badge_colors_follow_the_neutral_kind_without_changing_tone() {
+fn badge_colors_follow_the_neutral_kind_without_changing_status_ink() {
     let theme = Theme::dark();
     let cases = [
         (DeviceStatus::Healthy, theme.cpu, SourceStateKind::Ok),
@@ -29,7 +29,11 @@ fn badge_colors_follow_the_neutral_kind_without_changing_tone() {
     ];
     for (status, expected, kind) in cases {
         assert_eq!(SourceStateKind::from_device_status(status), kind);
-        assert_eq!(state_color(&theme, status), expected, "tone for {status:?}");
+        assert_eq!(
+            state_color(&theme, status),
+            expected,
+            "status ink for {status:?}"
+        );
         assert_eq!(
             source_state_color(&theme, kind),
             expected,

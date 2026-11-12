@@ -592,8 +592,8 @@ The `parity-evidence` gate stage passes `--requirements` **and**
 `--require-requirement-coverage`, so the requirement axis is a fail-closed
 8/8 x 4 check: every frontend carries a real success-path anchor for all eight
 requirements, and a new uncovered `(frontend, requirement)` pair fails the
-stage. The flag landed once the two formerly-exempt Bevy pairs gained real
-success-path anchors (below).
+stage. All eight Bevy requirement pairs carry real success-path anchors
+(below); the two Performance-page pairs were the final two to be proven.
 
 ### Bevy `p0_id` (D1 resolved: 8/8)
 
@@ -870,8 +870,8 @@ Remaining, in order, each requiring its own decision:
    the accept chain, so nothing but the per-target receipt's matrix source
    blocks the deletion.
 2. **D1 (resolved: 8/8)**: every genuine Bevy row is declared and the two
-   formerly-exempt pairs (`P0-MC-01/04`) are closed by real Performance-page
-   fan-history and GPU metric-selector surfaces with behavior anchors.
+   Performance-page pairs (`P0-MC-01/04`) are closed by real fan-history and
+   GPU metric-selector surfaces with behavior anchors.
    `--require-requirement-coverage` is now wired into the `parity-evidence`
    stage fail-closed.
 3. **D3**: decide whether the GPUI stable case-prefix channel stays or the 39

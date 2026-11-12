@@ -5,11 +5,9 @@
 //! address here: the icon registry owns the [`IconId`] vocabulary, and the
 //! shared status ladder owns the severity it projects from.
 //!
-//! The four frontends used to answer this question three different ways. GPUI
-//! matched the severity directly, Iced matched the shared status kind but
-//! through a private copy of this table, and Bevy and the TUI had no glyph
-//! answer at all. The same notice therefore read as a different picture per
-//! frontend.
+//! Graphical frontends bind the same [`IconId`] from this table; a text
+//! surface uses the shell owner's marker form. No frontend owns a second
+//! severity-to-glyph correspondence.
 
 use taskmanager_ui_contract::IconId;
 use zhuge_ui_tokens::StatusKind;

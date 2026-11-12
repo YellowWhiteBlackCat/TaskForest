@@ -95,8 +95,8 @@
 
 本表不重复登记组件级差异；权威在以下声明：
 
-- 组件能力：`crates/taskmanager-ui-contract/src/capabilities.rs` 与四端 `src/capabilities.rs` 声明 19 个非 `Ported` 单元格（Iced 4、TUI 9、Bevy 6），其中 1 个为 `Unsupported`（TUI Tooltip）。
-- 产品意图：四端 `src/functional.rs` 声明 9 个非 `Reference` 意图单元格（含 7 个 `AcceptedDifference`：Iced 3、TUI 3、Bevy 1；以及 TUI 2 个 `Unsupported`）。
+- 组件能力：`crates/taskmanager-ui-contract/src/capabilities.rs` 与四端 `src/capabilities.rs` 的并行前端声明 15 个非 `Ported` 单元格：Iced 2（`Native` 1、`Divergent` 1、`Unsupported` 0）、Bevy 4（`Native` 3、`Divergent` 1、`Unsupported` 0）、TUI 9（`Native` 1、`Divergent` 7、`Unsupported` 1）；唯一的 `Unsupported` 是 TUI Tooltip。
+- 产品意图：四端 `src/functional.rs` 的并行前端声明 48 个功能决策：Iced 为 `AcceptedDifference` 2、`Local` 12、`Shared` 2，Bevy 为 `AcceptedDifference` 1、`Local` 15，TUI 为 `AcceptedDifference` 3、`Unsupported` 2、`Local` 11；差异/拒绝单元格合计 8（6 个 `AcceptedDifference`、2 个 `Unsupported`），其中 Iced 2 个 `AcceptedDifference`。
 - 特性账本：`crates/taskmanager-ui-contract/src/feature_coverage.rs` 注册 225 个 `FeatureId`，覆盖全部 15 个功能区（每区 15 项），完整对应 225 项四端平权蓝图（含 10 个 Wave 3/4 核心交付），另有 1 个额外的 `memory.process-swap-charge`（不占蓝图槽位）；`pressure.memory-thrashing-health` 额外作为 slot 179 的声明别名。
 - 蓝图处置：完整 225 槽产品 census 由 `scripts/parity/blueprint_dispositions.tsv` + `BlueprintDispositionTable` 拥有（ADR-059）：225 个 `Adopted(FeatureId)`、0 个 `Unsupported`、0 个未处置。
 - 特性证据：`scripts/parity/feature_evidence.tsv` 的 220 个特性格已全部锚定（0 pending、0 dangling），由四端真实行为测试闭环。
