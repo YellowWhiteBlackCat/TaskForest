@@ -14,6 +14,8 @@
 //! feature's blast radius into the root view. These strings follow the same
 //! stable-English-for-capture convention as the capture fixture.
 
+#[cfg(any(test, feature = "test-support"))]
+use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px};
 use taskforest_core::core::process_telemetry::ProcessGpuSnapshot;
 use taskmanager_ui::theme_binding::definite_length;
@@ -76,7 +78,7 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
                 .child(super::status_label(engines.state.status, labels).to_string()),
         );
     }
-    let mut content = super::card(theme, TITLE, width);
+    let content = super::card(theme, TITLE, width).w_full();
     if engines.engines.is_empty() {
         return content.child(
             div()
@@ -85,6 +87,10 @@ pub(in crate::gpui_app::process_insights::view) fn gpu_engines_card(
                 .child(NO_ENGINES.to_string()),
         );
     }
+    #[cfg(any(test, feature = "test-support"))]
+    let mut content = content.debug_selector(|| "tm-insights-gpu-engines".to_owned());
+    #[cfg(not(any(test, feature = "test-support")))]
+    let mut content = content;
     content = content.child(
         div()
             .text_size(font_size(tokens::FONT_11))

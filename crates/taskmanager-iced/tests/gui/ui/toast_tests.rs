@@ -9,6 +9,8 @@ use taskmanager_application::{AppAction, AppPage};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_ui_contract::IconId;
+use zhuge_ui_tokens::StatusColors;
 
 use crate::Message;
 use crate::app::FocusTarget;
@@ -87,6 +89,69 @@ fn notice_shell(text: &str) -> ShellApp {
         text,
     );
     shell
+}
+
+/// The Iced toast resolves transient severity through the shared
+/// `StatusColors` projection rather than a private tone-to-color fold, and
+/// every severity still has an explicit semantic icon identity.
+#[test]
+fn toast_status_uses_the_shared_status_colors_and_icon_identity() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = Theme::build(
+                skin,
+                mode,
+                HighContrast::Off,
+                ResolvedFonts::system_for(skin),
+            );
+            let palette = theme.palette();
+            let colors = StatusColors {
+                accent: crate::theme_binding::color(palette.accent),
+                success: crate::theme_binding::color(palette.success),
+                warning: crate::theme_binding::color(palette.warning),
+                danger: crate::theme_binding::color(palette.danger),
+            };
+
+            let shells = [
+                FeedbackSeverity::Info,
+                FeedbackSeverity::Success,
+                FeedbackSeverity::Warning,
+                FeedbackSeverity::Error,
+            ];
+            for severity in shells {
+                let shell = {
+                    let mut shell = ShellApp::new();
+                    shell.report_notice(
+                        FeedbackSource::Interaction,
+                        severity,
+                        FeedbackLifecycle::UntilReplaced,
+                        "status",
+                    );
+                    shell
+                };
+                let notice = shell.feedback_presentation().expect("a notice is mounted");
+                let kind = super::status_kind(notice.tone());
+                let accent = colors.resolve(kind);
+                assert_eq!(
+                    accent,
+                    colors.resolve(super::status_kind(severity.tone())),
+                    "{skin:?}/{mode:?}/{severity:?} must resolve through the shared ink owner"
+                );
+                assert_eq!(
+                    super::icon_for(kind),
+                    severity_icon(severity),
+                    "{skin:?}/{mode:?}/{severity:?} keeps the shared icon identity"
+                );
+            }
+        }
+    }
+}
+
+fn severity_icon(severity: FeedbackSeverity) -> IconId {
+    match severity {
+        FeedbackSeverity::Info | FeedbackSeverity::Success => IconId::Health,
+        FeedbackSeverity::Warning | FeedbackSeverity::Error => IconId::Alert,
+    }
 }
 
 #[test]

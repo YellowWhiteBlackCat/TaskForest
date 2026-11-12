@@ -4,8 +4,8 @@
 //! backdrop root carries an explicit `UiTargetCamera`, so Bevy UI can render
 //! it into an image without stealing pointer routing from the shell. The
 //! invalidation controller renders the offscreen target for exactly one frame
-//! per lower-composite change while a live optical surface exists; with the
-//! capability unsupported it stays dormant.
+//! per lower-composite change while an attached optical material exists; a
+//! typed fallback surface leaves the optical camera dormant.
 
 use bevy::app::App;
 use bevy::asset::Assets;
@@ -32,7 +32,7 @@ use bevy::window::{PrimaryWindow, Window, WindowRef};
 
 use crate::app::Route;
 use crate::drain::ShellProjectionFolded;
-use crate::glass::optical::{OpticalGlassSurface, OpticalNestingDepths};
+use crate::glass::optical::{OpticalGlassBinding, OpticalGlassSurface, OpticalNestingDepths};
 use crate::palette::UiPalette;
 use crate::window::WindowPalette;
 
@@ -141,7 +141,7 @@ impl BackdropRevision {
 }
 
 /// The revision the offscreen image last captured. `None` until the first
-/// capture, so the first live optical surface always triggers one frame.
+/// attached material always triggers one frame.
 #[derive(Resource, Clone, Copy, Debug, Default)]
 pub(crate) struct BackdropCaptureState {
     pub(crate) captured: Option<u64>,
@@ -407,11 +407,11 @@ pub(super) fn bump_backdrop_revision(
 }
 
 /// The backdrop invalidation controller: render the offscreen target for
-/// exactly one frame whenever a live optical surface exists and the lower
-/// composite may have changed — a fold, a palette or route change, a window
-/// resize, or the first-ever surface. Without a live surface (the current
-/// `UNSUPPORTED` capability report) the controller stays dormant and the
-/// camera never renders.
+/// exactly one frame whenever an attached optical material exists and the
+/// lower composite may have changed — a fold, a palette or route change, a
+/// window resize, or the first-ever surface. A fallback surface has no
+/// material for the shader to sample, so the controller stays dormant and
+/// the camera never renders.
 pub(super) fn drive_backdrop_capture(access: BackdropDriveAccess<'_, '_>) {
     let BackdropDriveAccess {
         revision,
@@ -429,7 +429,10 @@ pub(super) fn drive_backdrop_capture(access: BackdropDriveAccess<'_, '_>) {
     let stale = state.captured != Some(revision.0)
         || palette.is_some_and(|palette| palette.is_changed())
         || route.is_some_and(|route| route.is_changed());
-    let capture = stale && !surfaces.is_empty();
+    let capture = stale
+        && surfaces
+            .iter()
+            .any(|(_, binding)| matches!(binding, OpticalGlassBinding::Attached(_)));
     if capture {
         state.captured = Some(revision.0);
     }
@@ -458,7 +461,7 @@ pub(super) struct BackdropDriveAccess<'w, 's> {
     palette: Option<Res<'w, WindowPalette>>,
     route: Option<Res<'w, Route>>,
     depths: Option<Res<'w, OpticalNestingDepths>>,
-    surfaces: Query<'w, 's, Entity, With<OpticalGlassSurface>>,
+    surfaces: Query<'w, 's, (Entity, &'static OpticalGlassBinding), With<OpticalGlassSurface>>,
     cameras: Query<'w, 's, &'static mut Camera, With<BackdropCaptureCamera>>,
     chain_cameras: Query<
         'w,

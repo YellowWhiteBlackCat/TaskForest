@@ -13,6 +13,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_shell::{FeedbackPresentation, FeedbackTone};
 use taskmanager_theme::{GlassSurfaceRole, Theme, tokens};
 use taskmanager_ui_contract::IconId;
+use zhuge_ui_tokens::{StatusColors, StatusKind};
 
 use crate::app::{FocusTarget, Message};
 use crate::ui::components::{ContentButtonOptions, IcedElement, content_button};
@@ -27,13 +28,15 @@ pub(crate) fn toast<'a>(
     viewport_width: f32,
 ) -> IcedElement<'a> {
     let palette = theme_snapshot.palette();
-    let accent = crate::theme_binding::color(match notice.tone() {
-        FeedbackTone::Neutral => palette.accent,
-        FeedbackTone::Positive => palette.success,
-        FeedbackTone::Caution => palette.warning,
-        FeedbackTone::Danger => palette.danger,
-    });
-    let icon = crate::icons::icon_tinted(icon_for(notice), ICON_EXTENT, accent);
+    let status_colors = StatusColors {
+        accent: crate::theme_binding::color(palette.accent),
+        success: crate::theme_binding::color(palette.success),
+        warning: crate::theme_binding::color(palette.warning),
+        danger: crate::theme_binding::color(palette.danger),
+    };
+    let status = status_kind(notice.tone());
+    let accent = status_colors.resolve(status);
+    let icon = crate::icons::icon_tinted(icon_for(status), ICON_EXTENT, accent);
     let message = text(notice.text().to_owned())
         .size(f32::from(tokens::FONT_12))
         .width(Length::Fill)
@@ -110,10 +113,22 @@ pub(crate) fn toast_body<'a>(
         .into()
 }
 
-fn icon_for(notice: FeedbackPresentation<'_>) -> IconId {
-    match notice.tone() {
-        FeedbackTone::Caution | FeedbackTone::Danger => IconId::Alert,
-        FeedbackTone::Neutral | FeedbackTone::Positive => IconId::Health,
+fn icon_for(kind: StatusKind) -> IconId {
+    match kind {
+        StatusKind::Info | StatusKind::Success => IconId::Health,
+        StatusKind::Warning | StatusKind::Danger => IconId::Alert,
+    }
+}
+
+/// The one shared transient-status severity for this shell tone; the product
+/// owns the tone fold, while `StatusColors::resolve` owns the ink choice.
+#[must_use]
+pub(crate) const fn status_kind(tone: FeedbackTone) -> StatusKind {
+    match tone {
+        FeedbackTone::Neutral => StatusKind::Info,
+        FeedbackTone::Positive => StatusKind::Success,
+        FeedbackTone::Caution => StatusKind::Warning,
+        FeedbackTone::Danger => StatusKind::Danger,
     }
 }
 

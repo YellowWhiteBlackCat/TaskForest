@@ -1,21 +1,25 @@
 //! Independent application facet states, with bounded current-data pages.
 
 use super::{
-    MAX_INSIGHT_CARD_ROWS, ProcessInsightsViewProps, controls, environment_card,
-    escalation_control, gpu_card, gpu_engines, isolation_card, message_panel, network_card,
-    open_files, resource_card, threads,
+    MAX_INSIGHT_CARD_ROWS, ProcessInsightsLabels, ProcessInsightsViewProps, controls,
+    environment_card, escalation_control, gpu_card, gpu_engines, isolation_card, message_panel,
+    network_card, open_files, resource_card, threads,
 };
 #[cfg(any(test, feature = "test-support"))]
 use gpui::InteractiveElement;
-use gpui::{Div, ParentElement, Styled, div};
+use gpui::{Div, ParentElement, Styled, div, px};
 use taskforest_contract::SubmissionErrorKind;
 use taskforest_core::core::FailureKind;
+use taskforest_core::core::ProcessGpuSnapshot;
+use taskforest_core::core::units::UnitPreferences;
 use taskmanager_application::ProcessInsightFacet;
 use taskmanager_application::project_process_resources;
 use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, ProjectedProcessInsights,
 };
+use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_ui::layout::AdaptiveGrid;
 use taskmanager_ui::theme_binding::definite_length;
 use zhuge_ui_core::row_page::{RowPage, page_of, rows_per_page};
 
@@ -36,15 +40,7 @@ pub(super) fn render_projection(
             props,
             &projection.gpu,
             |_| 0,
-            |gpu, width, _| {
-                div()
-                    .flex()
-                    .flex_col()
-                    .w_full()
-                    .gap(definite_length(tokens::SPACE_8))
-                    .child(gpu_card(theme, gpu, labels, width, props.units))
-                    .child(gpu_engines::gpu_engines_card(theme, gpu, labels, width))
-            },
+            |gpu, width, _| gpu_layout(theme, gpu, labels, width, props.units),
         ),
         ProcessInsightFacet::Resources => facet(
             props,
@@ -94,6 +90,38 @@ pub(super) fn render_projection(
             |environment| environment.entries.len(),
             |environment, width, first| environment_card(theme, environment, labels, width, first),
         ),
+    }
+}
+
+pub(in crate::gpui_app::process_insights::view) fn gpu_layout(
+    theme: &Theme,
+    gpu: &ProcessGpuSnapshot,
+    labels: &ProcessInsightsLabels,
+    width: f32,
+    units: UnitPreferences,
+) -> Div {
+    let card_width = if width >= 650.0 {
+        (width - tokens::SPACE_8.0) / 2.0
+    } else {
+        width
+    };
+    let cards = [
+        gpu_card(theme, gpu, labels, card_width, units),
+        gpu_engines::gpu_engines_card(theme, gpu, labels, card_width),
+    ];
+    if width >= 650.0 {
+        AdaptiveGrid::new(px(card_width))
+            .gap(tokens::SPACE_8)
+            .debug_selector("tm-insights-gpu-grid")
+            .children(cards)
+            .render()
+    } else {
+        div()
+            .flex()
+            .flex_col()
+            .w_full()
+            .gap(definite_length(tokens::SPACE_8))
+            .children(cards)
     }
 }
 

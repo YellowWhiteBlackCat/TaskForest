@@ -20,7 +20,8 @@ native selection and renderer caches; all shared types use their defining module
   `CommandLaunchRequest::from_draft` owner, which alone canonicalizes line
   endings and trims the draft; `ui/components/toast.rs` paints the shared
   shell feedback notice as a non-modal Card-glass toast whose visibility
-  follows the shell's `FeedbackLifecycle`.
+  follows the shell's `FeedbackLifecycle`; its transient status ink resolves
+  through the shared `StatusColors` owner rather than a private tone fold.
   `src/ui/components/primitives.rs` adds the token-styled
   badge/divider/progress/tooltip primitives (colors only from the palette
   snapshot, unavailable progress never renders as a measured zero); tooltip

@@ -45,7 +45,7 @@ use taskmanager_application::{
     SystemFacets,
 };
 
-use taskmanager_theme::optical_glass::OpticalGlassContext;
+use taskmanager_theme::optical_glass::{OpticalGlassContext, OpticalGlassUnavailableReason};
 use taskmanager_theme::{AppearanceOverride, GlassTier, LightDark, Skin, Theme};
 
 use super::appearance::resolve_demo_theme;
@@ -58,7 +58,9 @@ use super::{
     WindowPalette,
 };
 use crate::drain::ShellProjectionFolded;
-use crate::glass::optical::{OpticalGlassRaster, OpticalGlassSurface};
+use crate::glass::optical::{
+    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassSurface,
+};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 use taskmanager_shell::FeedbackLifecycle;
@@ -704,9 +706,8 @@ fn timed_feedback_notice_mounts_and_retires_the_performance_overlay() {
     );
 }
 
-/// One live optical surface: the shared spec resolved into physical
-/// geometry, bound to the offscreen target the controller mirrors.
-fn live_optical_surface() -> OpticalGlassSurface {
+/// The shared optical surface's measured physical geometry.
+fn optical_surface() -> OpticalGlassSurface {
     let spec = Theme::dark()
         .optical_glass_spec(GlassTier::Card)
         .expect("card optical spec");
@@ -724,6 +725,14 @@ fn live_optical_surface() -> OpticalGlassSurface {
         },
         backdrop: Handle::<Image>::default(),
     }
+}
+
+/// One attached optical surface: the material the controller actually samples.
+fn attached_optical_surface() -> impl bevy::ecs::bundle::Bundle {
+    (
+        optical_surface(),
+        OpticalGlassBinding::Attached(Handle::<OpticalGlassMaterial>::default()),
+    )
 }
 
 /// The invalidation controller on a minimal app: the offscreen camera, the
@@ -767,7 +776,7 @@ fn the_backdrop_capture_stays_dormant_without_a_live_optical_surface() {
 #[test]
 fn a_live_optical_surface_captures_exactly_one_frame_per_revision() {
     let (mut app, camera) = backdrop_controller_app();
-    app.world_mut().spawn(live_optical_surface());
+    app.world_mut().spawn(attached_optical_surface());
 
     app.update();
     assert!(
@@ -806,9 +815,29 @@ fn a_live_optical_surface_captures_exactly_one_frame_per_revision() {
 }
 
 #[test]
+fn a_fallback_surface_does_not_wake_the_offscreen_optical_camera() {
+    let (mut app, camera) = backdrop_controller_app();
+    app.world_mut().spawn((
+        optical_surface(),
+        OpticalGlassBinding::Fallback(OpticalGlassUnavailableReason::Headless),
+    ));
+
+    for _ in 0..3 {
+        app.update();
+        assert!(
+            !app.world()
+                .get::<Camera>(camera)
+                .expect("capture camera")
+                .is_active,
+            "the shader never samples a fallback surface, so its camera stays dormant"
+        );
+    }
+}
+
+#[test]
 fn a_palette_change_rearms_the_capture_for_a_live_surface() {
     let (mut app, camera) = backdrop_controller_app();
-    app.world_mut().spawn(live_optical_surface());
+    app.world_mut().spawn(attached_optical_surface());
     app.update();
     app.update();
     assert!(

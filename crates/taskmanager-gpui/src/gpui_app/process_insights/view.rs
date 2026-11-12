@@ -303,7 +303,7 @@ fn gpu_card(
     width: f32,
     units: UnitPreferences,
 ) -> Div {
-    let mut content = card(theme, labels.gpu, width);
+    let content = card(theme, labels.gpu, width).w_full();
     if gpu.devices.is_empty() {
         return content.child(
             div()
@@ -316,6 +316,10 @@ fn gpu_card(
                 }),
         );
     }
+    #[cfg(any(test, feature = "test-support"))]
+    let mut content = content.debug_selector(|| "tm-insights-gpu-summary".to_owned());
+    #[cfg(not(any(test, feature = "test-support")))]
+    let mut content = content;
     for device in &gpu.devices {
         content = content.child(
             div()

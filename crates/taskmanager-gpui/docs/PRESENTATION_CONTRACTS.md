@@ -74,6 +74,12 @@ peak readouts with honest recent samples. Long values and all insight rows
 remain reachable in one bounded body. Closing or losing the frozen process
 cannot retarget the window through the table selection.
 
+The GPU insight facet's summary and engine cards are two mandatory whole
+groups. At a 650px post-rail content slot they spend two equal 321px columns
+with the shared `SPACE_8` gap; below that budget they stack as complete groups
+inside the same bounded scroll owner. Card widths follow the admitted slot, so
+long device IDs and engine lines cannot push content past the right edge.
+
 SMBIOS uses shared inventory rows, configured units and wrapped selectable
 values. Permission entry stays in Settings. The shared scrollbar uses
 viewport/max-offset geometry, keyed drag state and paint-safe invalidation
