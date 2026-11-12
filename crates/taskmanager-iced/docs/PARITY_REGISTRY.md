@@ -66,6 +66,14 @@ Native Iced status values from the activation and input families pass through
 theme tokens. Slider drag, opened select and focused text input therefore keep
 the same precedence as GPUI buttons instead of owning local status folds.
 
+The select's dropdown panel wears the shared `GlassSurfaceRole::Menu` material
+and its cursor row spends the shared hover ink with the normal foreground, so
+the open menu matches GPUI's dropdown menu and Iced's own context menus. The
+toolkit menu paints the panel and its cursor row from one border, so the
+cursor row inherits the panel's corner radius; that rounding, and the menu's
+own scrollbar, stay toolkit rendering details rather than a second material
+decision.
+
 The bounded horizontal action strip (`controls/strip.rs::bounded_toolbar`)
 keeps complete groups at intrinsic width and uses the caller's declared
 control role for its viewport height, without adding internal control

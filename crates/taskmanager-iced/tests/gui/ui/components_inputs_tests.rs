@@ -14,7 +14,7 @@ use iced::{Element, Event, Rectangle, Size, mouse};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_theme::ResolvedFonts;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
-use taskmanager_theme::{HighContrast, LightDark, Skin};
+use taskmanager_theme::{GlassSurfaceRole, HighContrast, LightDark, Skin};
 use taskmanager_ui_contract::presentation::control_ink::ControlInkState;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
@@ -540,6 +540,58 @@ fn input_styles_consume_the_shared_control_glass() {
         search_disabled.placeholder,
         crate::theme_binding::color(theme.palette().fg_muted)
     );
+}
+
+/// The select's dropdown menu wears the shared `Menu` glass role — the same
+/// Card-tier fill, hairline edge, panel radius and elevation the GPUI
+/// dropdown paints — and its cursor row spends the shared hover ink with the
+/// normal foreground instead of the toolkit's default accent highlight.
+#[test]
+fn the_select_dropdown_wears_the_shared_menu_role_and_hover_ink() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = theme_for(skin, mode);
+            let palette = theme.palette();
+            let menu = select_menu_style(&theme);
+            let surface = crate::theme::glass_surface_style(&theme, GlassSurfaceRole::Menu);
+
+            assert_eq!(
+                menu.background,
+                surface
+                    .background
+                    .expect("the shared Menu role paints a fill"),
+                "{skin:?}/{mode:?}: the dropdown panel spends the shared Menu glass fill"
+            );
+            assert_eq!(
+                menu.border, surface.border,
+                "{skin:?}/{mode:?}: the dropdown panel keeps the shared hairline edge and radius"
+            );
+            assert_eq!(
+                menu.shadow, surface.shadow,
+                "{skin:?}/{mode:?}: the dropdown panel keeps the shared elevation"
+            );
+            assert_ne!(
+                menu.shadow,
+                iced::Shadow::default(),
+                "{skin:?}/{mode:?}: a floating menu panel must not lose its elevation"
+            );
+            assert_eq!(
+                menu.selected_background,
+                Background::Color(crate::theme_binding::color(palette.hover)),
+                "{skin:?}/{mode:?}: the cursor row spends the shared hover ink"
+            );
+            assert_eq!(
+                menu.selected_text_color,
+                crate::theme_binding::color(palette.fg),
+                "{skin:?}/{mode:?}: the cursor row keeps the normal foreground"
+            );
+            assert_eq!(
+                menu.text_color,
+                crate::theme_binding::color(palette.fg),
+                "{skin:?}/{mode:?}: the option text keeps the normal foreground"
+            );
+        }
+    }
 }
 
 /// The segmented control paints connected glass segments with hairline

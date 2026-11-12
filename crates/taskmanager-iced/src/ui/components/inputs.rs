@@ -25,7 +25,7 @@ use std::rc::Rc;
 use iced::widget::{Space, button, container, row, text};
 use iced::{Background, Border, Color, Length};
 use taskmanager_theme::color::{self, mix};
-use taskmanager_theme::{GlassTier, Theme, tokens};
+use taskmanager_theme::{GlassSurfaceRole, GlassTier, Theme, tokens};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
@@ -296,12 +296,14 @@ where
     };
     let extent = theme::control_extent(theme_snapshot, ControlRole::Input);
     let padding_y = theme::control_padding_y(theme_snapshot, ControlRole::Input);
+    let menu_theme = *theme_snapshot;
     let pick = iced::widget::container(
         iced::widget::pick_list(options, selected, move |picked: T| on_change(&picked))
             .placeholder(placeholder)
             .width(Length::Fill)
             .padding([padding_y, f32::from(tokens::SPACE_10)])
-            .style(move |_theme, status| select_style(theme_snapshot, status)),
+            .style(move |_theme, status| select_style(theme_snapshot, status))
+            .menu_style(move |_theme| select_menu_style(&menu_theme)),
     )
     .height(Length::Fixed(extent))
     .center_y(Length::Fixed(extent))
@@ -324,6 +326,27 @@ fn select_style(
         handle_color: crate::theme_binding::color(palette.fg_muted),
         background,
         border: glass.border,
+    }
+}
+
+/// The dropdown menu panel wears the shared `Menu` glass role: the same
+/// Card-tier fill, hairline edge, panel radius and elevation the GPUI
+/// dropdown menu paints, instead of the toolkit's default opaque, square
+/// menu surface. The cursor row spends the shared hover ink with the normal
+/// foreground, exactly like the GPUI popup menu's cursor row.
+#[must_use]
+pub(crate) fn select_menu_style(theme_snapshot: &Theme) -> iced::widget::overlay::menu::Style {
+    let palette = theme_snapshot.palette();
+    let surface = theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Menu);
+    iced::widget::overlay::menu::Style {
+        background: surface
+            .background
+            .unwrap_or_else(|| Background::Color(crate::theme_binding::color(palette.surface))),
+        border: surface.border,
+        text_color: crate::theme_binding::color(palette.fg),
+        selected_text_color: crate::theme_binding::color(palette.fg),
+        selected_background: Background::Color(crate::theme_binding::color(palette.hover)),
+        shadow: surface.shadow,
     }
 }
 

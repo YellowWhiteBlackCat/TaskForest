@@ -39,6 +39,11 @@ native selection and renderer caches; all shared types use their defining module
   other consumers. Users keeps every
   session visible and applies GPUI's shared-process-query highlight to matching
   name text without filtering the session inventory.
+  The select's dropdown panel spends the shared `GlassSurfaceRole::Menu`
+  material — the same Card-tier fill, hairline edge, panel radius and
+  elevation the GPUI dropdown menu and Iced's own context menus paint —
+  instead of the toolkit's default opaque, square menu surface; its cursor
+  row spends the shared hover ink with the normal foreground.
 - `controls/strip.rs` owns the bounded horizontal action strip: all action
   groups keep their measured width, and the caller declares the tallest
   `ControlRole` whose shared extent sizes the viewport. Control padding stays
