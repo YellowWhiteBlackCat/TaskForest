@@ -80,9 +80,13 @@ viewport/max-offset geometry, keyed drag state and paint-safe invalidation
 with one edge inset.
 
 System Health keeps storage and sensor sections as complete surfaces under one
-page-owned bounded scroll rail. The typed single-column layout reduces section,
-filesystem-row, sensor-group and sensor-row insets so compact windows retain
-more readable facts without shrinking labels or splitting groups.
+page-owned bounded scroll rail. Section cards spend one floating
+`GlassSurfaceRole::PageCard`; filesystem rows, sensor groups and sensor rows
+spend the same owner as insets, so nested surfaces never stack a second shadow.
+The typed single-column layout reduces section, filesystem-row, sensor-group
+and sensor-row insets as well as the gap between stacked sections, while the
+multi-column grid keeps the regular gap; compact windows retain more readable
+facts without shrinking labels or splitting groups.
 
 When a tray exists, window close minimizes while root/runtime/singleton remain
 alive; tray Quit terminates. Secondary launch activates the existing window.

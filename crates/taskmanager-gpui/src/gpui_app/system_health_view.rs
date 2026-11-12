@@ -42,7 +42,7 @@ mod stats;
 use self_test::self_test_card;
 use stats::{filesystem_capacity, sensor_rows};
 use taskforest_core::core::percent::percent_text;
-use taskmanager_theme::Theme;
+use taskmanager_theme::{GlassSurfaceRole, Theme};
 
 /// Copy identifiers are resolved by the caller so this isolated component can
 /// land before its final RootView/i18n integration without embedding production
@@ -130,6 +130,28 @@ pub(crate) fn state_color(theme: &Theme, status: DeviceStatus) -> Color {
     source_state_color(theme, SourceStateKind::from_device_status(status))
 }
 
+/// Every primary health card uses the Dashboard's semantic page-card owner.
+fn section_surface(theme: &Theme, layout: SystemPageBudget) -> CardSurface {
+    CardSurface::for_role(theme.palette(), GlassSurfaceRole::PageCard)
+        .padding(surface_inset(layout, tokens::SPACE_7, tokens::SPACE_12))
+        .radius(tokens::card_radius(theme))
+}
+
+/// Rows and sensor groups are nested inside a page card and must not stack a
+/// second shadow; they reuse the same semantic owner with the shared inset.
+fn inset_surface(
+    theme: &Theme,
+    layout: SystemPageBudget,
+    compact: Length,
+    regular: Length,
+    radius: Length,
+) -> CardSurface {
+    CardSurface::for_role(theme.palette(), GlassSurfaceRole::PageCard)
+        .inset()
+        .padding(surface_inset(layout, compact, regular))
+        .radius(radius)
+}
+
 /// Kind → tone color for every source-state badge on this page. The neutral
 /// fold (`SourceStateKind::from_device_status`) owns status→kind; this map is
 /// the page's only kind→palette decision, so the section badge, the SMART
@@ -188,6 +210,13 @@ fn surface_inset(layout: SystemPageBudget, compact: Length, regular: Length) -> 
     }
 }
 
+/// The section gap follows the same System-page fold as the surface columns:
+/// one stacked card stream spends less inter-card blank space than the
+/// two-column grid, without touching the shared surface rhythm elsewhere.
+fn section_gap(layout: SystemPageBudget) -> Length {
+    surface_inset(layout, tokens::SPACE_7, tokens::SPACE_10)
+}
+
 fn format_bytes(units: UnitPreferences, bytes: u64) -> String {
     units.format_quantity(bytes, QuantityFamily::Drive, false)
 }
@@ -229,56 +258,60 @@ fn filesystem_row(
         .inode_usage_percent
         .filter(|value| value.is_finite())
         .map_or_else(unavailable, percent_text);
-    CardSurface::new(theme.palette())
-        .radius(tokens::control_radius(theme))
-        .padding(surface_inset(layout, tokens::SPACE_7, tokens::SPACE_9))
-        .inset()
-        .render()
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .items_center()
-                .justify_between()
-                .gap(definite_length(tokens::SPACE_6))
-                .child(
-                    div()
-                        .min_w(px(0.0))
-                        .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
-                        .child(filesystem.mount_point.display().to_string()),
-                )
-                .child(badge(
-                    theme,
-                    copy(SystemHealthText::FilesystemStatus(filesystem.status)),
-                    filesystem_color(theme, filesystem.status),
-                )),
-        )
-        .child(
-            div()
-                .mt(length(tokens::SPACE_3))
-                .text_size(font_size(tokens::FONT_10))
-                .text_color(hsla(theme.fg_dim))
-                .child(format!(
-                    "{}: {} · {} · {}",
-                    copy(SystemHealthText::Source),
-                    source,
-                    filesystem.fs_type,
-                    filesystem_backing_label(filesystem.backing_kind)
-                )),
-        )
-        .child(
-            div()
-                .mt(length(tokens::SPACE_7))
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .gap(definite_length(tokens::SPACE_8))
-                .child(metric(theme, copy(SystemHealthText::Space), capacity))
-                .child(metric(theme, copy(SystemHealthText::Inodes), inodes))
-                .child(metric(theme, copy(SystemHealthText::ReadOnly), read_only))
-                .child(metric(theme, copy(SystemHealthText::Errors), errors)),
-        )
+    inset_surface(
+        theme,
+        layout,
+        tokens::SPACE_7,
+        tokens::SPACE_9,
+        tokens::control_radius(theme),
+    )
+    .render()
+    .debug_selector(|| "tm-health-filesystem-row".to_owned())
+    .child(
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .justify_between()
+            .gap(definite_length(tokens::SPACE_6))
+            .child(
+                div()
+                    .min_w(px(0.0))
+                    .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+                    .child(filesystem.mount_point.display().to_string()),
+            )
+            .child(badge(
+                theme,
+                copy(SystemHealthText::FilesystemStatus(filesystem.status)),
+                filesystem_color(theme, filesystem.status),
+            )),
+    )
+    .child(
+        div()
+            .mt(length(tokens::SPACE_3))
+            .text_size(font_size(tokens::FONT_10))
+            .text_color(hsla(theme.fg_dim))
+            .child(format!(
+                "{}: {} · {} · {}",
+                copy(SystemHealthText::Source),
+                source,
+                filesystem.fs_type,
+                filesystem_backing_label(filesystem.backing_kind)
+            )),
+    )
+    .child(
+        div()
+            .mt(length(tokens::SPACE_7))
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap(definite_length(tokens::SPACE_8))
+            .child(metric(theme, copy(SystemHealthText::Space), capacity))
+            .child(metric(theme, copy(SystemHealthText::Inodes), inodes))
+            .child(metric(theme, copy(SystemHealthText::ReadOnly), read_only))
+            .child(metric(theme, copy(SystemHealthText::Errors), errors)),
+    )
 }
 
 /// Storage-section data bundle: the health snapshot with its optional
@@ -363,60 +396,64 @@ fn sensor_group(
                 .child(copy(SystemHealthText::NoReadings)),
         );
     } else {
-        for row in folded {
+        for (index, row) in folded.into_iter().enumerate() {
             rows = rows.child(
-                CardSurface::new(theme.palette())
-                    .radius(tokens::control_radius(theme))
-                    .padding(surface_inset(layout, tokens::SPACE_6, tokens::SPACE_8))
-                    .inset()
-                    .render()
-                    .flex()
-                    .flex_row()
-                    .flex_wrap()
-                    .items_center()
-                    .justify_between()
-                    .gap(definite_length(tokens::SPACE_6))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w(px(120.0))
-                            .text_size(font_size(tokens::FONT_12))
-                            .child(row.label),
-                    )
-                    .child(
-                        div()
-                            .text_size(font_size(tokens::FONT_12))
-                            .text_color(hsla(if row.present {
-                                theme.fg
-                            } else {
-                                state_color(theme, row.status)
-                            }))
-                            .child(row.value),
-                    )
-                    .child(badge(
-                        theme,
-                        copy(SystemHealthText::DeviceStatus(row.status)),
-                        state_color(theme, row.status),
-                    )),
+                inset_surface(
+                    theme,
+                    layout,
+                    tokens::SPACE_6,
+                    tokens::SPACE_8,
+                    tokens::control_radius(theme),
+                )
+                .render()
+                .debug_selector(|| format!("tm-health-sensor-row:{index}"))
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .items_center()
+                .justify_between()
+                .gap(definite_length(tokens::SPACE_6))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(px(120.0))
+                        .text_size(font_size(tokens::FONT_12))
+                        .child(row.label),
+                )
+                .child(
+                    div()
+                        .text_size(font_size(tokens::FONT_12))
+                        .text_color(hsla(if row.present {
+                            theme.fg
+                        } else {
+                            state_color(theme, row.status)
+                        }))
+                        .child(row.value),
+                )
+                .child(badge(
+                    theme,
+                    copy(SystemHealthText::DeviceStatus(row.status)),
+                    state_color(theme, row.status),
+                )),
             );
         }
     }
-    div()
-        .p(definite_length(surface_inset(
-            layout,
-            tokens::SPACE_6,
-            tokens::SPACE_8,
-        )))
-        .rounded(absolute(tokens::control_radius(theme)))
-        .border_1()
-        .border_color(hsla(theme.border))
-        .child(
-            div()
-                .text_size(font_size(tokens::FONT_12))
-                .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
-                .child(copy(SystemHealthText::SensorGroup(group))),
-        )
-        .child(rows)
+    inset_surface(
+        theme,
+        layout,
+        tokens::SPACE_6,
+        tokens::SPACE_8,
+        tokens::control_radius(theme),
+    )
+    .render()
+    .debug_selector(|| format!("tm-health-sensor-group:{group:?}"))
+    .child(
+        div()
+            .text_size(font_size(tokens::FONT_12))
+            .font_weight(font_weight(tokens::FONT_WEIGHT_HEADER))
+            .child(copy(SystemHealthText::SensorGroup(group))),
+    )
+    .child(rows)
 }
 
 fn sensor_section(
@@ -465,10 +502,7 @@ fn section_shell(
     content: Div,
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
-    CardSurface::new(theme.palette())
-        .padding(surface_inset(layout, tokens::SPACE_7, tokens::SPACE_12))
-        .radius(tokens::card_radius(theme))
-        .bordered(true)
+    section_surface(theme, layout)
         .child(
             div()
                 .debug_selector(|| selectors.title.to_owned())
@@ -551,7 +585,7 @@ pub fn render_system_health(props: SystemHealthViewProps<'_>) -> Stateful<Div> {
             .flex_row()
             .flex_wrap()
             .items_start()
-            .gap(definite_length(tokens::SPACE_10))
+            .gap(definite_length(section_gap(layout)))
             .child(storage_section(
                 theme,
                 StorageSectionData {
