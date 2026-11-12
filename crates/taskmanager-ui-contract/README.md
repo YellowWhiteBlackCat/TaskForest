@@ -65,9 +65,9 @@ src/feature_coverage/            delivery semantic specs, per-feature platform
 src/accessibility/               neutral accessibility model and snapshots
 src/conformance.rs               conformance suite contracts and test helpers
 src/presentation.rs              ADR-064: vocabulary → thresholds → budget →
-                                 card_flow → card_width → dashboard → parity;
-                                 sizes/motion/resolution/load_tiers/dashboard
-                                 in src/presentation/
+                                 card_flow → card_width → control_ink →
+                                 dashboard → parity; sizes/motion/resolution/
+                                 load_tiers/dashboard in src/presentation/
 ```
 
 ## Docs
