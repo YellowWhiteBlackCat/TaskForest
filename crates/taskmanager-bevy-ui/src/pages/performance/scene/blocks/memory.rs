@@ -130,18 +130,14 @@ pub(crate) fn segment_bar_layout(segments: &[MemSegment]) -> Vec<SegmentSpan> {
 }
 
 fn segment_color(kind: MemSegmentKind, palette: &UiPalette) -> bevy::color::Color {
-    match kind {
+    let base = match kind {
         MemSegmentKind::Active | MemSegmentKind::InUse => palette.memory,
-        // The cache wears a tinted disk fill and the ARC a dimmer one, so the
-        // two reclaimable legends never blur into a single entry.
-        MemSegmentKind::Cache => crate::palette::with_alpha(palette.disk, 0.85),
-        MemSegmentKind::ZfsArc => crate::palette::with_alpha(palette.disk, 0.55),
-        MemSegmentKind::Inactive => crate::palette::with_alpha(palette.accent, 0.55),
-        MemSegmentKind::Free | MemSegmentKind::Available => {
-            crate::palette::with_alpha(palette.dim_color, 0.30)
-        }
+        MemSegmentKind::Inactive => palette.accent,
+        MemSegmentKind::Cache | MemSegmentKind::ZfsArc => palette.disk,
+        MemSegmentKind::Free | MemSegmentKind::Available => palette.dim_color,
         MemSegmentKind::Other => palette.shade,
-    }
+    };
+    crate::palette::with_alpha(base, kind.ink_weight())
 }
 
 pub(crate) fn segment_bar_scene(memory: &MemoryMetrics, palette: &UiPalette) -> impl Scene + use<> {

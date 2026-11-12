@@ -17,8 +17,8 @@
 //! - [`history`] — the rolling per-metric sample window behind the alert
 //!   threshold suggestions.
 //! - [`presentation`] — shared formatting and icon-glyph mapping.
-//! - [`memory`] — the shared memory-composition segment breakdown every
-//!   frontend renders as the composition bar.
+//! - [`memory`] — the shared memory-composition segment breakdown and ink
+//!   ladder every frontend renders as the composition bar.
 //! - [`viewmodel`] — the typed stat-panel ViewModel contract (one fold,
 //!   four renderers; ARCH.md §8.1).
 

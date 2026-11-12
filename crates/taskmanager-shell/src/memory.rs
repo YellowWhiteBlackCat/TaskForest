@@ -48,6 +48,23 @@ pub enum MemSegmentKind {
     Available,
 }
 
+impl MemSegmentKind {
+    /// The shared ink weight for one composition segment: `1.0` means the
+    /// frontend paints its base token unchanged, while a smaller weight
+    /// tints that token for a reclaimable or idle band. The shell owns this
+    /// ladder once; GPUI, Iced and Bevy bind the same weight onto their own
+    /// color types instead of restating `0.55` / `0.85` / `0.30`.
+    #[must_use]
+    pub const fn ink_weight(self) -> f32 {
+        match self {
+            Self::Active | Self::InUse | Self::Other => 1.0,
+            Self::Cache => 0.85,
+            Self::Inactive | Self::ZfsArc => 0.55,
+            Self::Free | Self::Available => 0.30,
+        }
+    }
+}
+
 /// One colorless segment of the memory-composition bar: its semantic role,
 /// byte count, and the resolved localized label.
 #[derive(Clone, Copy, Debug)]

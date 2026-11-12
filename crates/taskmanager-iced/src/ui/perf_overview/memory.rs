@@ -70,21 +70,15 @@ pub(super) fn memory_composition_block(
 /// gpui/tui composition bar.
 pub(crate) fn segment_color(kind: MemSegmentKind, theme: &Theme) -> iced::Color {
     let token = match kind {
-        MemSegmentKind::ZfsArc => {
-            // Reclaimable like the page cache, dimmed so the ARC legend
-            // entry never blurs into "Cache + Buffers" (gpui renders the
-            // same tint).
-            let mut arc = crate::theme_binding::color(theme.disk);
-            arc.a = 0.55;
-            return arc;
-        }
+        MemSegmentKind::ZfsArc | MemSegmentKind::Cache => theme.disk,
         MemSegmentKind::Active | MemSegmentKind::InUse => theme.memory,
         MemSegmentKind::Inactive => theme.accent,
-        MemSegmentKind::Cache => theme.disk,
         MemSegmentKind::Free | MemSegmentKind::Available => theme.fg_dim,
         MemSegmentKind::Other => theme.shade,
     };
-    crate::theme_binding::color(token)
+    let mut color = crate::theme_binding::color(token);
+    color.a *= kind.ink_weight();
+    color
 }
 
 /// Horizontal stacked proportion bar: a shade track with one fill per non-zero

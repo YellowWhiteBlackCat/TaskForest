@@ -49,16 +49,14 @@ fn memory_segments(memory: &MemoryMetrics, theme: &Theme) -> Vec<CompositionSegm
 
 /// Map a shared semantic segment kind onto the composition-bar theme color.
 fn segment_color(kind: MemSegmentKind, theme: &Theme) -> Color {
-    match kind {
+    let base = match kind {
         MemSegmentKind::Active | MemSegmentKind::InUse => theme.memory,
-        MemSegmentKind::Inactive => with_alpha(theme.accent, 0.55),
-        MemSegmentKind::Cache => with_alpha(theme.disk, 0.85),
-        // Reclaimable like the page cache, but rendered as its own dimmer
-        // tint so the ARC legend entry never blurs into "Cache + Buffers".
-        MemSegmentKind::ZfsArc => with_alpha(theme.disk, 0.55),
-        MemSegmentKind::Free | MemSegmentKind::Available => with_alpha(theme.fg_dim, 0.30),
+        MemSegmentKind::Inactive => theme.accent,
+        MemSegmentKind::Cache | MemSegmentKind::ZfsArc => theme.disk,
+        MemSegmentKind::Free | MemSegmentKind::Available => theme.fg_dim,
         MemSegmentKind::Other => theme.shade,
-    }
+    };
+    with_alpha(base, kind.ink_weight())
 }
 
 fn stacked_bar(theme: &Theme, segments: &[(Color, f32)], label: &str, height: f32) -> Div {

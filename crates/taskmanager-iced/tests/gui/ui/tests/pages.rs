@@ -47,7 +47,7 @@ use taskmanager_shell::page_help;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_test_support::ProcessItemFixtureBuilder;
 use taskmanager_test_support::pin_english;
-use taskmanager_theme::Theme;
+use taskmanager_theme::{Color, Theme};
 
 #[test]
 fn byte_and_duration_formatting_matches_the_other_frontends() {
@@ -202,34 +202,27 @@ fn unavailable_performance_metrics_do_not_become_zero_percent() {
 fn segment_color_maps_each_kind_to_its_theme_token() {
     use taskmanager_shell::memory::MemSegmentKind;
     let theme = Theme::dark();
-    assert_eq!(
-        segment_color(MemSegmentKind::Active, &theme),
-        crate::theme_binding::color(theme.memory)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::InUse, &theme),
-        crate::theme_binding::color(theme.memory)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::Inactive, &theme),
-        crate::theme_binding::color(theme.accent)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::Cache, &theme),
-        crate::theme_binding::color(theme.disk)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::Free, &theme),
-        crate::theme_binding::color(theme.fg_dim)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::Available, &theme),
-        crate::theme_binding::color(theme.fg_dim)
-    );
-    assert_eq!(
-        segment_color(MemSegmentKind::Other, &theme),
-        crate::theme_binding::color(theme.shade)
-    );
+    let weighted = |token: Color, kind: MemSegmentKind| {
+        let mut color = crate::theme_binding::color(token);
+        color.a *= kind.ink_weight();
+        color
+    };
+    for (kind, token) in [
+        (MemSegmentKind::Active, theme.memory),
+        (MemSegmentKind::InUse, theme.memory),
+        (MemSegmentKind::Inactive, theme.accent),
+        (MemSegmentKind::Cache, theme.disk),
+        (MemSegmentKind::ZfsArc, theme.disk),
+        (MemSegmentKind::Free, theme.fg_dim),
+        (MemSegmentKind::Available, theme.fg_dim),
+        (MemSegmentKind::Other, theme.shade),
+    ] {
+        assert_eq!(
+            segment_color(kind, &theme),
+            weighted(token, kind),
+            "{kind:?} spends the shared theme token and ink weight"
+        );
+    }
 }
 
 #[test]

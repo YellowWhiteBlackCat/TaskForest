@@ -1,4 +1,18 @@
 use super::*;
+
+/// The shell owns one ink ladder for every memory segment so no frontend
+/// restates the cache/ARC/free alpha weights.
+#[test]
+fn memory_segment_ink_weights_are_one_shared_ladder() {
+    assert_eq!(MemSegmentKind::Active.ink_weight(), 1.0);
+    assert_eq!(MemSegmentKind::InUse.ink_weight(), 1.0);
+    assert_eq!(MemSegmentKind::Other.ink_weight(), 1.0);
+    assert_eq!(MemSegmentKind::Cache.ink_weight(), 0.85);
+    assert_eq!(MemSegmentKind::Inactive.ink_weight(), 0.55);
+    assert_eq!(MemSegmentKind::ZfsArc.ink_weight(), 0.55);
+    assert_eq!(MemSegmentKind::Free.ink_weight(), 0.30);
+    assert_eq!(MemSegmentKind::Available.ink_weight(), 0.30);
+}
 use taskforest_core::core::metrics::{
     MemoryCompositionObservations, MemoryCompressionObservations, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation,
