@@ -115,9 +115,11 @@ pub(crate) fn panel_material(tier: GlassTier, palette: &UiPalette) -> GlassPanel
     }
 }
 
-/// Resolve the shared floating-card tier.
+/// Resolve a primary page card through the shared floating `PageCard` role.
+/// Inset surfaces must call [`surface_material`] with their own role so they
+/// do not inherit this elevation behind their parent card.
 pub(crate) fn card_material(palette: &UiPalette) -> GlassPanelMaterial {
-    panel_material(GlassTier::Card, palette)
+    surface_material(GlassSurfaceRole::PageCard, palette)
 }
 
 /// Resolve one semantic surface role through the shared theme mapping.

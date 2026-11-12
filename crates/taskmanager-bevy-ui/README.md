@@ -23,7 +23,9 @@ authority. Glass surfaces project the shared `taskmanager-theme` tiers; the
 frontend-owned `glass` bridge resolves each panel tier's fill, gradient sheen,
 outline, REM radius, `Layered` two-layer shadow and tiled embedded grain into one
 `GlassPanelMaterial`. Focus dashboards and atomic process cards consume that
-bridge; atomic cards add one rounded state overlay above the glass for
+bridge; primary page cards bind `GlassSurfaceRole::PageCard`, while inset
+surfaces bind their own role so nested panels do not stack a second shadow.
+Atomic cards add one rounded state overlay above the glass for
 hover, pressed, selected and keyboard-press ink resolved through the shared
 `ControlInkPriority` fold; dense rows, controls,
 chart tracks and device sub-blocks stay on opaque content tokens for
