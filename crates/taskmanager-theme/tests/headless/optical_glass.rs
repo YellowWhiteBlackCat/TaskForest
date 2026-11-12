@@ -341,3 +341,74 @@ fn the_complete_matrix_never_labels_hc_or_unsupported_renderers_as_optical() {
         }
     }
 }
+
+/// A degraded pipeline still has to LOOK like the tier it belongs to. The
+/// theme owns that answer, so a renderer never decides for itself what an
+/// opaque Card is — and two frontends cannot degrade the same tier
+/// differently.
+#[test]
+fn a_degraded_tier_keeps_its_own_material() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = theme(skin, mode, HighContrast::Off);
+            for tier in GlassTier::ALL {
+                let layer = theme.glass_layer(tier);
+
+                let painted = theme.glass_fallback_surface(tier, OpticalGlassFallback::Painted);
+                assert_eq!(painted.fill, layer.fill, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(painted.edge, layer.edge, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(painted.shadow, layer.shadow, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(
+                    painted.backdrop,
+                    GlassFallbackBackdrop::None,
+                    "a painted fallback samples nothing behind it"
+                );
+
+                let frosted = theme.glass_fallback_surface(tier, OpticalGlassFallback::Frosted);
+                assert_eq!(frosted.fill, layer.fill, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(
+                    frosted.backdrop,
+                    GlassFallbackBackdrop::Blurred,
+                    "a frosted fallback keeps the backdrop, blurred"
+                );
+
+                let opaque = theme.glass_fallback_surface(tier, OpticalGlassFallback::Opaque);
+                assert_eq!(opaque.fill.a, 1.0, "{skin:?}/{mode:?}/{tier:?}");
+                assert_eq!(opaque.edge, layer.edge, "{skin:?}/{mode:?}/{tier:?}");
+                assert!(!opaque.sheen, "an opaque fallback drops the sheen");
+                assert_eq!(
+                    opaque.backdrop,
+                    GlassFallbackBackdrop::None,
+                    "an opaque fallback samples nothing behind it"
+                );
+            }
+        }
+    }
+}
+
+/// High contrast is the reason an opaque fallback exists, so a high-contrast
+/// theme must never ask for the optical treatment in the first place — and
+/// the fallback it would degrade to must already be opaque and flat.
+#[test]
+fn a_high_contrast_theme_degrades_to_a_flat_opaque_surface() {
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            let theme = theme(skin, mode, HighContrast::On);
+            let tier = GlassTier::Card;
+            let decision = theme.optical_glass_decision(
+                tier,
+                OpticalGlassCapability::UNSUPPORTED,
+                OpticalGlassContext::new(theme.root_rem_size, 1.0),
+            );
+            let OpticalGlassDecision::Fallback { material, .. } = decision else {
+                panic!("high contrast must not ask for optical glass");
+            };
+            assert_eq!(material, OpticalGlassFallback::Opaque);
+
+            let surface = theme.glass_fallback_surface(tier, material);
+            assert_eq!(surface.fill.a, 1.0, "{skin:?}/{mode:?}");
+            assert!(!surface.sheen, "{skin:?}/{mode:?}");
+            assert_eq!(surface.backdrop, GlassFallbackBackdrop::None);
+        }
+    }
+}

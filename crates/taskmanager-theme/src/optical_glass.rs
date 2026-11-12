@@ -359,6 +359,40 @@ pub enum OpticalGlassFallback {
     Painted,
 }
 
+/// How a degraded glass surface treats the content behind it.
+///
+/// Optical glass samples the backdrop and refracts it. A fallback may keep
+/// the sampling — blurred, without the refraction or the dispersion — or drop
+/// it entirely and paint its own fill.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GlassFallbackBackdrop {
+    /// The surface paints its own fill; nothing behind it is sampled.
+    None,
+    /// The backdrop is sampled and blurred, without refraction.
+    Blurred,
+}
+
+/// The paint contract a degraded glass surface wears.
+///
+/// Optical glass is a rendering technique, not a material: when the pipeline
+/// is unavailable the surface still has to LOOK like the tier it belongs to.
+/// The theme owns that answer here, so a renderer that cannot run the
+/// pipeline never has to decide for itself what "an opaque Card" means, and
+/// two frontends cannot degrade the same tier differently.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct GlassFallbackSurface {
+    /// The panel fill to paint.
+    pub fill: Color,
+    /// The hairline edge.
+    pub edge: Color,
+    /// The two-layer elevation shadow ink.
+    pub shadow: Color,
+    /// Whether the tier's specular sheen survives this fallback.
+    pub sheen: bool,
+    /// How the surface treats the content behind it.
+    pub backdrop: GlassFallbackBackdrop,
+}
+
 /// Why the optical pipeline could not be used.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OpticalGlassUnavailableReason {
@@ -406,6 +440,48 @@ impl OpticalGlassDecision {
 }
 
 impl Theme {
+    /// The paint contract one glass tier wears under a degraded pipeline.
+    ///
+    /// The TIER still decides the material — fill, edge and shadow — because
+    /// a fallback Card is still a Card. The fallback decides only how much of
+    /// the optical treatment survives: a frosted fallback keeps the tier's
+    /// painted material and blurs the backdrop, a painted fallback keeps the
+    /// material and samples nothing, and an opaque fallback flattens the fill
+    /// and drops the sheen while keeping the tier's edge, so the surface
+    /// still reads as its tier.
+    #[must_use]
+    pub fn glass_fallback_surface(
+        self,
+        tier: GlassTier,
+        fallback: OpticalGlassFallback,
+    ) -> GlassFallbackSurface {
+        let layer = self.glass_layer(tier);
+        let sheen = !self.hc && tier != GlassTier::Scrim;
+        match fallback {
+            OpticalGlassFallback::Painted => GlassFallbackSurface {
+                fill: layer.fill,
+                edge: layer.edge,
+                shadow: layer.shadow,
+                sheen,
+                backdrop: GlassFallbackBackdrop::None,
+            },
+            OpticalGlassFallback::Frosted => GlassFallbackSurface {
+                fill: layer.fill,
+                edge: layer.edge,
+                shadow: layer.shadow,
+                sheen,
+                backdrop: GlassFallbackBackdrop::Blurred,
+            },
+            OpticalGlassFallback::Opaque => GlassFallbackSurface {
+                fill: layer.fill.with_alpha(1.0),
+                edge: layer.edge,
+                shadow: layer.shadow,
+                sheen: false,
+                backdrop: GlassFallbackBackdrop::None,
+            },
+        }
+    }
+
     /// Resolve one panel tier into optical-glass design intent.
     ///
     /// `Scrim` is not a glass panel and returns `None`. All lengths remain in
