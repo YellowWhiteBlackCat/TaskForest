@@ -31,7 +31,9 @@ use taskmanager_theme::optical_glass::{
 use taskmanager_theme::{GlassTier, Theme};
 
 use super::capability::{OPTICAL_GLASS_MAX_BLUR_PX, OPTICAL_GLASS_MAX_NESTED_LAYERS};
-use super::{OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassUniform};
+use super::{
+    OpticalGlassMaterial, OpticalGlassMaterialKind, OpticalGlassRaster, OpticalGlassUniform,
+};
 
 const WIDTH: u32 = 192;
 const HEIGHT: u32 = 144;
@@ -316,8 +318,13 @@ fn setup(
                 device_scale_factor: 1.0,
             };
             materials.add(OpticalGlassMaterial {
-                uniform: OpticalGlassUniform::project(spec, geometry, raster)
-                    .expect("valid material placement"),
+                uniform: OpticalGlassUniform::project(
+                    spec,
+                    geometry,
+                    raster,
+                    OpticalGlassMaterialKind::Optical,
+                )
+                .expect("valid material placement"),
                 backdrop: backdrop.clone(),
                 grain: grain.clone(),
             })
@@ -410,8 +417,13 @@ fn setup(
                 },
                 MaterialNode(
                     materials.add(OpticalGlassMaterial {
-                        uniform: OpticalGlassUniform::project(spec, geometry, raster)
-                            .expect("valid first-layer material placement"),
+                        uniform: OpticalGlassUniform::project(
+                            spec,
+                            geometry,
+                            raster,
+                            OpticalGlassMaterialKind::Optical,
+                        )
+                        .expect("valid first-layer material placement"),
                         backdrop: backdrop.clone(),
                         grain: grain.clone(),
                     }),
@@ -503,6 +515,7 @@ fn setup(
                             nested_spec,
                             nested_geometry,
                             nested_raster,
+                            OpticalGlassMaterialKind::Optical,
                         )
                         .expect("valid nested material placement"),
                         backdrop: chain.clone(),

@@ -86,11 +86,11 @@ impl NestedGlassCapture<'_, '_> {
     pub(super) fn attached_pair(&self) -> Option<(u8, u8)> {
         let depths = self.depths.as_deref()?;
         let top_level = self.surfaces.iter().any(|(entity, binding, _)| {
-            matches!(binding, OpticalGlassBinding::Attached(_)) && depths.depth_of(entity) == 0
+            matches!(binding, OpticalGlassBinding::Optical(_)) && depths.depth_of(entity) == 0
         });
         let nested_menu = self.menus.iter().any(|menu| {
             self.surfaces.iter().any(|(entity, binding, _)| {
-                matches!(binding, OpticalGlassBinding::Attached(_))
+                matches!(binding, OpticalGlassBinding::Optical(_))
                     && depths.depth_of(entity) == 1
                     && is_descendant(entity, menu, &self.parents)
             })
@@ -163,7 +163,7 @@ pub(super) fn attached_help_surface(glass: &HelpGlassCapture<'_, '_>) -> bool {
         return false;
     };
     glass.surfaces.iter().any(|(entity, binding)| {
-        matches!(binding, OpticalGlassBinding::Attached(_))
+        matches!(binding, OpticalGlassBinding::Optical(_))
             && is_descendant(entity, overlay, &glass.parents)
     })
 }

@@ -21,13 +21,14 @@ use bevy::ui_render::prelude::MaterialNode;
 use taskmanager_assets::{GLASS_NOISE_RGBA_SIZE, glass_noise_rgba};
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{
-    GlassTier, OpticalGlassContext, OpticalGlassFeature, OpticalGlassGeometry, OpticalGlassQuality,
-    OpticalGlassSpec, OpticalGlassUnavailableReason, Theme,
+    GlassTier, OpticalGlassContext, OpticalGlassFallback, OpticalGlassFeature,
+    OpticalGlassGeometry, OpticalGlassQuality, OpticalGlassSpec, OpticalGlassUnavailableReason,
+    Theme,
 };
 
 use super::optical::{
-    OPTICAL_GLASS_MAX_BLUR_PX, OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster,
-    OpticalGlassSurface, OpticalGlassUniform,
+    OPTICAL_GLASS_MAX_BLUR_PX, OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassMaterialKind,
+    OpticalGlassRaster, OpticalGlassSurface, OpticalGlassUniform,
 };
 use super::optical_wesl::OpticalGlassParams;
 use super::{
@@ -223,8 +224,13 @@ fn card_raster() -> OpticalGlassRaster {
 #[test]
 fn optical_uniform_projects_the_shared_spec_without_private_constants() {
     let (spec, geometry) = card_spec_and_geometry();
-    let uniform = OpticalGlassUniform::project(spec, geometry, card_raster())
-        .expect("valid placement projects");
+    let uniform = OpticalGlassUniform::project(
+        spec,
+        geometry,
+        card_raster(),
+        OpticalGlassMaterialKind::Optical,
+    )
+    .expect("valid placement projects");
 
     assert_eq!(
         uniform.optics,
@@ -285,7 +291,15 @@ fn optical_uniform_rejects_invalid_physical_placement() {
             ..card_raster()
         },
     ] {
-        assert!(OpticalGlassUniform::project(spec, geometry, raster).is_none());
+        assert!(
+            OpticalGlassUniform::project(
+                spec,
+                geometry,
+                raster,
+                OpticalGlassMaterialKind::Optical,
+            )
+            .is_none()
+        );
     }
 }
 
@@ -311,6 +325,7 @@ fn optical_surface_observer_attaches_the_real_material_and_textures() {
         .spawn((
             Node::default(),
             OpticalGlassSurface {
+                kind: OpticalGlassMaterialKind::Optical,
                 spec,
                 geometry,
                 raster: card_raster(),
@@ -321,7 +336,7 @@ fn optical_surface_observer_attaches_the_real_material_and_textures() {
     app.update();
 
     let world = app.world();
-    let OpticalGlassBinding::Attached(handle) = world
+    let OpticalGlassBinding::Optical(handle) = world
         .get::<OpticalGlassBinding>(entity)
         .expect("binding state is observable")
     else {
@@ -346,7 +361,13 @@ fn optical_surface_observer_attaches_the_real_material_and_textures() {
     );
     assert_eq!(
         material.uniform,
-        OpticalGlassUniform::project(spec, geometry, card_raster()).unwrap()
+        OpticalGlassUniform::project(
+            spec,
+            geometry,
+            card_raster(),
+            OpticalGlassMaterialKind::Optical,
+        )
+        .unwrap()
     );
 }
 
@@ -369,6 +390,7 @@ fn optical_surface_without_the_shared_grain_stays_on_the_fallback() {
         .spawn((
             Node::default(),
             OpticalGlassSurface {
+                kind: OpticalGlassMaterialKind::Optical,
                 spec,
                 geometry,
                 raster: card_raster(),
@@ -381,9 +403,10 @@ fn optical_surface_without_the_shared_grain_stays_on_the_fallback() {
     let world = app.world();
     assert_eq!(
         world.get::<OpticalGlassBinding>(entity),
-        Some(&OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain)
-        ))
+        Some(&OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain),
+            material: OpticalGlassFallback::Painted,
+        })
     );
     assert!(
         world

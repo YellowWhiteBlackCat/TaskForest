@@ -477,7 +477,7 @@ fn the_focus_dashboard_keeps_the_typed_painted_fallback_without_an_adapter() {
     use crate::glass::OpticalGlassCard;
     use crate::glass::optical::{OpticalGlassBinding, OpticalGlassMaterial};
     use bevy::ui_render::prelude::MaterialNode;
-    use taskmanager_theme::{GlassTier, OpticalGlassUnavailableReason};
+    use taskmanager_theme::{GlassTier, OpticalGlassFallback, OpticalGlassUnavailableReason};
 
     let items = vec![process(10, "alpha", "Running")];
     let mut app = measured_process_app(1180, 780, items);
@@ -498,9 +498,10 @@ fn the_focus_dashboard_keeps_the_typed_painted_fallback_without_an_adapter() {
         .expect("the focus dashboard asks for the real optical tier");
     assert_eq!(
         world.get::<OpticalGlassBinding>(dashboard),
-        Some(&OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::Headless
-        )),
+        Some(&OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::Headless,
+            material: OpticalGlassFallback::Painted,
+        }),
         "a headless renderer keeps the typed painted fallback"
     );
     assert!(

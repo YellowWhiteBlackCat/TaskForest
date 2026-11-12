@@ -50,7 +50,11 @@ Detail behind the README module map:
   pipeline, and records whether a material was attached or a typed fallback
   applies. Attachment is a main-world fact, not GPU readiness. The Performance
   hero card is marked as a candidate; headless renders and high-contrast
-  themes keep their painted or opaque fallback visible.
+  themes keep their painted or opaque fallback visible. The binding carries
+  the theme's `OpticalGlassFallback` material, so a Frosted fallback keeps a
+  sampled-and-blurred backdrop while Painted and Opaque sample nothing. The
+  degraded material zeroes the refraction, dispersion, rim and grain lanes
+  and bounds its blur to the proven ceiling.
 - `src/glass/optical_wesl.rs` — the typed optical parameter projection between
   the shared spec and the WESL uniform. `OpticalGlassParams` clamps what the
   shader is allowed to read: index of refraction into the admitted glass band,

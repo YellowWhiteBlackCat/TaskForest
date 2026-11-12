@@ -409,9 +409,10 @@ pub(super) fn bump_backdrop_revision(
 /// The backdrop invalidation controller: render the offscreen target for
 /// exactly one frame whenever an attached optical material exists and the
 /// lower composite may have changed — a fold, a palette or route change, a
-/// window resize, or the first-ever surface. A fallback surface has no
-/// material for the shader to sample, so the controller stays dormant and
-/// the camera never renders.
+/// window resize, or the first-ever surface. A FROSTED material samples the
+/// backdrop exactly like the complete one, so it wakes the camera too; a
+/// painted or opaque fallback has no material for the shader to sample, so
+/// the controller stays dormant and the camera never renders.
 pub(super) fn drive_backdrop_capture(access: BackdropDriveAccess<'_, '_>) {
     let BackdropDriveAccess {
         revision,
@@ -432,7 +433,7 @@ pub(super) fn drive_backdrop_capture(access: BackdropDriveAccess<'_, '_>) {
     let capture = stale
         && surfaces
             .iter()
-            .any(|(_, binding)| matches!(binding, OpticalGlassBinding::Attached(_)));
+            .any(|(_, binding)| binding.attached_material().is_some());
     if capture {
         state.captured = Some(revision.0);
     }

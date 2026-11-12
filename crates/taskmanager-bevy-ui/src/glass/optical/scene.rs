@@ -7,6 +7,7 @@
 //! lower composite.
 
 use bevy::app::{App, PostUpdate};
+use bevy::asset::Handle;
 use bevy::camera::visibility::Visibility;
 use bevy::color::Color;
 use bevy::ecs::component::Component;
@@ -15,27 +16,29 @@ use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::query::{Changed, Has, With, Without};
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::system::{Commands, Query, Res, ResMut, SystemParam};
+use bevy::image::Image;
 use bevy::picking::Pickable;
 use bevy::render::renderer::{RenderAdapterInfo, RenderDevice};
 use bevy::scene::{CommandsSceneExt, bsn};
 use bevy::ui::UiTargetCamera;
 use bevy::ui::{
-    BackgroundColor, BorderColor, BoxShadow, ComputedNode, Node, PositionType, ShadowStyle,
-    UiGlobalTransform, UiSystems, Val,
+    BackgroundColor, BackgroundGradient, BorderColor, BoxShadow, ComputedNode, Node, PositionType,
+    ShadowStyle, UiGlobalTransform, UiSystems, Val,
 };
 use bevy::ui_render::prelude::MaterialNode;
-use taskmanager_theme::GlassTier;
 use taskmanager_theme::optical_glass::{
-    OpticalGlassContext, OpticalGlassDecision, OpticalGlassUnavailableReason,
+    GlassFallbackBackdrop, OpticalGlassContext, OpticalGlassDecision, OpticalGlassFallback,
+    OpticalGlassGeometry, OpticalGlassSpec, OpticalGlassUnavailableReason,
 };
+use taskmanager_theme::{GlassTier, Theme};
 
 use super::nesting::{OpticalNestingDepths, sync_optical_nesting_depths};
 use super::{
-    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassSurface,
-    OpticalGlassUniform, optical_glass_capability,
+    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassMaterialKind, OpticalGlassRaster,
+    OpticalGlassSurface, OpticalGlassUniform, optical_glass_capability,
 };
 use crate::glass::GlassNoiseLayer;
-use crate::palette::UiPalette;
+use crate::palette::{ResolvedGlassFallback, UiPalette};
 use crate::widgets::chart::canvas::CanvasGrid;
 use crate::widgets::chart::painter::paint_chart_canvases;
 use crate::widgets::chart::{ChartCanvas, ChartPaintState, ChartStyle};
@@ -154,7 +157,105 @@ pub(crate) struct OpticalPaintAccess<'w, 's> {
     children: Query<'w, 's, &'static Children>,
     background: Query<'w, 's, (&'static mut BackgroundColor, &'static mut BorderColor)>,
     shadows: Query<'w, 's, &'static mut BoxShadow>,
-    grain_layers: Query<'w, 's, &'static mut Visibility, With<GlassNoiseLayer>>,
+    grain_layers: Query<
+        'w,
+        's,
+        (
+            &'static mut Visibility,
+            Option<&'static mut BackgroundGradient>,
+        ),
+        With<GlassNoiseLayer>,
+    >,
+}
+
+/// What one card's painted surface wears this frame.
+///
+/// The theme owns the material; this struct only states what the frontend
+/// paints for it.
+struct CardPaint {
+    /// The panel fill. `Color::NONE` lets an attached material paint it.
+    fill: Color,
+    /// The hairline edge.
+    edge: Color,
+    /// The elevation shadow.
+    shadow: Vec<ShadowStyle>,
+    /// Whether the tier's painted sheen survives.
+    sheen: bool,
+    /// Whether the painted grain layer stays visible.
+    grain_visible: bool,
+}
+
+/// Resolve the theme's degradation into the surface one card paints.
+///
+/// The theme decides the material, and the binding states it:
+/// - the complete pipeline paints its own fill, edge and rim;
+/// - the degraded material samples the backdrop it is given, so the tier's
+///   hairline, sheen and grain stay visible above it;
+/// - the painted and opaque materials sample nothing, so the tier paints
+///   the theme's fallback surface — the opaque one flattens the fill and
+///   drops the sheen, the painted one keeps the tier's own material.
+fn card_paint(
+    palette: &UiPalette,
+    tier: GlassTier,
+    binding: Option<&OpticalGlassBinding>,
+) -> CardPaint {
+    match binding {
+        // The complete material paints its own fill, its own edge and its
+        // own rim, so the painted tier steps aside.
+        Some(OpticalGlassBinding::Optical(_)) => CardPaint {
+            fill: Color::NONE,
+            edge: Color::NONE,
+            shadow: optical_shadow(palette, tier, true),
+            sheen: false,
+            grain_visible: false,
+        },
+        // The degraded material has no rim to replace the tier's hairline
+        // and no specular to replace the tier's sheen, so both stay.
+        Some(OpticalGlassBinding::Frosted { .. }) => {
+            let surface = palette.glass_fallback_surface(tier, OpticalGlassFallback::Frosted);
+            CardPaint {
+                fill: fallback_fill(&surface),
+                edge: surface.edge,
+                shadow: optical_shadow(palette, tier, false),
+                sheen: surface.sheen,
+                grain_visible: true,
+            }
+        }
+        // The painted fallback wears the theme's fallback surface.
+        Some(OpticalGlassBinding::Fallback { material, .. }) => {
+            let surface = palette.glass_fallback_surface(tier, *material);
+            CardPaint {
+                fill: fallback_fill(&surface),
+                edge: surface.edge,
+                shadow: surface.shadow,
+                sheen: surface.sheen,
+                grain_visible: true,
+            }
+        }
+        // An unresolved card keeps the painted tier material.
+        None => {
+            let surface = palette.glass_fallback_surface(tier, OpticalGlassFallback::Painted);
+            CardPaint {
+                fill: fallback_fill(&surface),
+                edge: surface.edge,
+                shadow: surface.shadow,
+                sheen: surface.sheen,
+                grain_visible: true,
+            }
+        }
+    }
+}
+
+/// The fill a fallback surface paints.
+///
+/// The theme's own answer decides: a surface that still samples the
+/// backdrop lets the material behind it paint the fill, and a surface that
+/// samples nothing paints the theme's own fill.
+fn fallback_fill(surface: &ResolvedGlassFallback) -> Color {
+    match surface.backdrop {
+        GlassFallbackBackdrop::None => surface.fill,
+        GlassFallbackBackdrop::Blurred => Color::NONE,
+    }
 }
 
 /// Preserve the painted card until GPU readiness can be observed.
@@ -175,40 +276,37 @@ pub(crate) fn sync_optical_backdrop_paint(
         ..
     } = access;
     for (card_entity, card, binding) in &cards {
-        let is_attached = matches!(binding, Some(OpticalGlassBinding::Attached(_)));
+        let paint = card_paint(&palette.inner, card.tier, binding);
         if let Ok((mut fill, mut border)) = background.get_mut(card_entity) {
-            let (next_fill, next_edge) = if is_attached {
-                (Color::NONE, Color::NONE)
-            } else {
-                (
-                    palette.inner.glass_fill(card.tier),
-                    palette.inner.glass_edge(card.tier),
-                )
-            };
-            if fill.0 != next_fill {
-                fill.0 = next_fill;
+            if fill.0 != paint.fill {
+                fill.0 = paint.fill;
             }
-            if !border_matches(&border, next_edge) {
-                *border = BorderColor::all(next_edge);
+            if !border_matches(&border, paint.edge) {
+                *border = BorderColor::all(paint.edge);
             }
         }
         if let Ok(mut shadows) = shadows.get_mut(card_entity) {
-            let next_shadows = optical_shadow(&palette.inner, card.tier, is_attached);
-            if shadows.0 != next_shadows {
-                shadows.0 = next_shadows;
+            if shadows.0 != paint.shadow {
+                shadows.0 = paint.shadow.clone();
             }
         }
         if let Ok(card_children) = children.get(card_entity) {
-            let next_vis = if is_attached {
-                Visibility::Hidden
-            } else {
+            let next_vis = if paint.grain_visible {
                 Visibility::Visible
+            } else {
+                Visibility::Hidden
             };
+            let next_gradient = palette.inner.glass_sheen_gradient(card.tier, paint.sheen);
             for child in card_children.iter() {
-                if let Ok(mut visibility) = grain_layers.get_mut(*child)
-                    && *visibility != next_vis
-                {
-                    *visibility = next_vis;
+                if let Ok((mut visibility, mut gradient)) = grain_layers.get_mut(*child) {
+                    if *visibility != next_vis {
+                        *visibility = next_vis;
+                    }
+                    if let Some(gradient) = gradient.as_mut()
+                        && gradient.0 != next_gradient.0
+                    {
+                        gradient.0 = next_gradient.0.clone();
+                    }
                 }
             }
         }
@@ -371,25 +469,29 @@ fn sync_optical_glass_layout(access: OpticalLayoutAccess<'_, '_>) {
             0 => target.as_ref().map(|target| target.image.clone()),
             _ => chain.as_ref().map(|chain| chain.image.clone()),
         };
-        let (spec, geometry, raster, backdrop) = match (decision, raster, backdrop) {
-            (OpticalGlassDecision::Optical { spec, geometry }, Some(raster), Some(backdrop))
-                if raster.is_valid() =>
-            {
-                (spec, geometry, raster, backdrop)
-            }
-            (decision, _, _) => {
-                let reason = match decision {
-                    OpticalGlassDecision::Fallback { reason, .. } => reason,
-                    OpticalGlassDecision::Optical { .. } => {
-                        OpticalGlassUnavailableReason::InvalidSpec
-                    }
-                };
+        let plan = plan_surface(
+            palette.inner.optical_theme,
+            card.tier,
+            decision,
+            context,
+            raster,
+            backdrop,
+        );
+        let (kind, spec, geometry, raster, backdrop) = match plan {
+            SurfacePlan::Material {
+                kind,
+                spec,
+                geometry,
+                raster,
+                backdrop,
+            } => (kind, spec, geometry, raster, backdrop),
+            SurfacePlan::Painted { reason, material } => {
                 if surface.is_some() || has_material {
                     commands
                         .entity(entity)
                         .try_remove::<(OpticalGlassSurface, MaterialNode<OpticalGlassMaterial>)>();
                 }
-                let fallback = OpticalGlassBinding::Fallback(reason);
+                let fallback = OpticalGlassBinding::Fallback { reason, material };
                 if binding != Some(&fallback) {
                     commands.entity(entity).try_insert(fallback);
                 }
@@ -398,12 +500,14 @@ fn sync_optical_glass_layout(access: OpticalLayoutAccess<'_, '_>) {
         };
         match surface {
             Some(mut surface) => {
-                if surface.spec != spec
+                if surface.kind != kind
+                    || surface.spec != spec
                     || surface.geometry != geometry
                     || surface.raster != raster
                     || surface.backdrop != backdrop
                 {
                     *surface = OpticalGlassSurface {
+                        kind,
                         spec,
                         geometry,
                         raster,
@@ -413,6 +517,7 @@ fn sync_optical_glass_layout(access: OpticalLayoutAccess<'_, '_>) {
             }
             None => {
                 commands.entity(entity).try_insert(OpticalGlassSurface {
+                    kind,
                     spec,
                     geometry,
                     raster,
@@ -423,6 +528,96 @@ fn sync_optical_glass_layout(access: OpticalLayoutAccess<'_, '_>) {
     }
 }
 
+/// The surface one card resolves to.
+enum SurfacePlan {
+    /// A material is attached to the card.
+    Material {
+        kind: OpticalGlassMaterialKind,
+        spec: OpticalGlassSpec,
+        geometry: OpticalGlassGeometry,
+        raster: OpticalGlassRaster,
+        backdrop: Handle<Image>,
+    },
+    /// No material: the tier paints the theme's fallback surface.
+    Painted {
+        reason: OpticalGlassUnavailableReason,
+        material: OpticalGlassFallback,
+    },
+}
+
+/// Resolve the theme's decision into the surface this card wears.
+///
+/// The theme owns the degradation, and this resolver keeps its answer: a
+/// frosted fallback still samples the backdrop and blurs it, while the
+/// painted and opaque fallbacks sample nothing. A surface that cannot be
+/// placed — no measured raster, no backdrop image, a spec that does not
+/// resolve — paints the tier's own material instead of claiming a backdrop
+/// it cannot show.
+fn plan_surface(
+    theme: Theme,
+    tier: GlassTier,
+    decision: OpticalGlassDecision,
+    context: OpticalGlassContext,
+    raster: Option<OpticalGlassRaster>,
+    backdrop: Option<Handle<Image>>,
+) -> SurfacePlan {
+    let measured = match (raster, backdrop) {
+        (Some(raster), Some(backdrop)) if raster.is_valid() => Some((raster, backdrop)),
+        _ => None,
+    };
+    match decision {
+        OpticalGlassDecision::Optical { spec, geometry } => match measured {
+            Some((raster, backdrop)) => SurfacePlan::Material {
+                kind: OpticalGlassMaterialKind::Optical,
+                spec,
+                geometry,
+                raster,
+                backdrop,
+            },
+            None => SurfacePlan::Painted {
+                reason: OpticalGlassUnavailableReason::InvalidSpec,
+                material: OpticalGlassFallback::Painted,
+            },
+        },
+        OpticalGlassDecision::Fallback { material, reason } => match material {
+            // The frosted material keeps the backdrop: it samples it and
+            // blurs it, and only the refraction, the dispersion, the rim
+            // and the grain are gone.
+            OpticalGlassFallback::Frosted => {
+                let Some(spec) = theme.optical_glass_spec(tier) else {
+                    return SurfacePlan::Painted {
+                        reason,
+                        material: OpticalGlassFallback::Painted,
+                    };
+                };
+                let Some(geometry) = spec.resolve(context) else {
+                    return SurfacePlan::Painted {
+                        reason,
+                        material: OpticalGlassFallback::Painted,
+                    };
+                };
+                match measured {
+                    Some((raster, backdrop)) => SurfacePlan::Material {
+                        kind: OpticalGlassMaterialKind::Frosted { reason },
+                        spec,
+                        geometry,
+                        raster,
+                        backdrop,
+                    },
+                    None => SurfacePlan::Painted {
+                        reason,
+                        material: OpticalGlassFallback::Painted,
+                    },
+                }
+            }
+            // The painted and the opaque materials sample nothing.
+            OpticalGlassFallback::Painted | OpticalGlassFallback::Opaque => {
+                SurfacePlan::Painted { reason, material }
+            }
+        },
+    }
+}
+
 /// Refresh the material asset when layout or DPI changes the surface.
 fn sync_optical_glass_materials(
     surfaces: Query<(Entity, &OpticalGlassSurface), Changed<OpticalGlassSurface>>,
@@ -430,12 +625,18 @@ fn sync_optical_glass_materials(
     mut materials: ResMut<bevy::asset::Assets<OpticalGlassMaterial>>,
 ) {
     for (entity, surface) in &surfaces {
-        let Ok(OpticalGlassBinding::Attached(handle)) = bindings.get(entity) else {
+        let Ok(binding) = bindings.get(entity) else {
             continue;
         };
-        let Some(uniform) =
-            OpticalGlassUniform::project(surface.spec, surface.geometry, surface.raster)
-        else {
+        let Some(handle) = binding.attached_material() else {
+            continue;
+        };
+        let Some(uniform) = OpticalGlassUniform::project(
+            surface.spec,
+            surface.geometry,
+            surface.raster,
+            surface.kind,
+        ) else {
             continue;
         };
         if let Some(mut material) = materials.get_mut(handle) {
@@ -489,3 +690,7 @@ fn is_descendant(entity: Entity, ancestor: Entity, parents: &Query<&ChildOf>) ->
 #[cfg(test)]
 #[path = "../../../tests/headless/optical_scene.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/headless/optical_fallback.rs"]
+mod fallback_tests;

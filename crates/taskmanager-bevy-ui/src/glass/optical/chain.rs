@@ -130,7 +130,7 @@ pub(crate) fn sync_backdrop_chain(access: BackdropChainAccess<'_, '_>) {
         Handle<OpticalGlassMaterial>,
     )> = Vec::new();
     for (source, node, transform, stack, binding) in &sources {
-        let super::OpticalGlassBinding::Attached(handle) = binding else {
+        let Some(handle) = binding.attached_material() else {
             continue;
         };
         if depths.depth_of(source) > 0 {

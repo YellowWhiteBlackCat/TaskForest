@@ -18,8 +18,8 @@ use bevy::picking::Pickable;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::scene::{EntityWorldMutSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
-    BackgroundColor, BackgroundGradient, BorderRadius, ColorStop, LinearGradient, Node,
-    PositionType, ShadowStyle, Val, percent,
+    BackgroundColor, BackgroundGradient, BorderRadius, Node, PositionType, ShadowStyle, Val,
+    percent,
 };
 use bevy::ui::widget::{ImageNode, NodeImageMode};
 use taskmanager_assets::{GLASS_NOISE_RGBA_SIZE, glass_noise_rgba};
@@ -147,15 +147,10 @@ pub(crate) fn noise_overlay_scene(
 ) -> impl Scene + use<> {
     let strength = tier.noise_strength();
     let ink = palette.card_shadow;
-    let sheen = if tier == GlassTier::Scrim {
-        Color::NONE
-    } else {
-        palette.glass_sheen
-    };
-    let gradient = BackgroundGradient::from(LinearGradient::to_bottom(vec![
-        ColorStop::auto(sheen),
-        ColorStop::auto(sheen.with_alpha(0.0)),
-    ]));
+    // The sheen gradient is the palette's one authority: the painted tier
+    // wears it, and the optical paint system replaces it with the theme's
+    // own answer when a material refuses the sheen.
+    let gradient = palette.glass_sheen_gradient(tier, true);
     bsn! {
         Node {
             width: percent(100),

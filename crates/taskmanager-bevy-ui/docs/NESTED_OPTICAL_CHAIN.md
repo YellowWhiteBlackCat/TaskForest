@@ -38,7 +38,11 @@ the development adapter (Intel Arc B390, Vulkan) the standard gate records
 `OPTICAL_GLASS_MAX_NESTED_LAYERS` is therefore `2`: depth `0` samples the
 painted lower composite, depth `1` samples the chain target, and depth `2`
 or deeper still fails closed with `NestedLayerLimitExceeded` and paints its
-typed Frosted fallback.
+typed Frosted fallback. That fallback is a real degraded material here: the
+backdrop is still sampled and blurred (its blur stays inside the proven
+ceiling), while the refraction, dispersion, specular rim and shader grain
+are off. A Frosted surface with no backdrop to sample paints the tier
+instead of claiming a blur it cannot show.
 
 The production WESL now adds a themed Fresnel rim without raising that
 ceiling. `OpticalGlassParams` derives Schlick F0 from the shared theme's

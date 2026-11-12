@@ -21,8 +21,8 @@ use bevy::ui::{ComputedNode, UiGlobalTransform};
 use bevy::ui_render::prelude::{MaterialNode, UiMaterial, UiMaterialPlugin};
 use taskmanager_theme::color::Color;
 use taskmanager_theme::optical_glass::{
-    OpticalGlassFeature, OpticalGlassGeometry, OpticalGlassQuality, OpticalGlassSpec,
-    OpticalGlassUnavailableReason,
+    OpticalGlassFallback, OpticalGlassFeature, OpticalGlassGeometry, OpticalGlassQuality,
+    OpticalGlassSpec, OpticalGlassUnavailableReason,
 };
 
 use super::GlassNoise;
@@ -138,26 +138,68 @@ impl OpticalGlassUniform {
     /// The spec/geometry are produced by
     /// [`OpticalGlassSpec::resolve`](taskmanager_theme::OpticalGlassSpec::resolve)
     /// and remain the only source of material values.
+    ///
+    /// The material kind decides how much of the optical treatment survives:
+    /// the complete pipeline bends, disperses and rims the sampled backdrop,
+    /// while the degraded one keeps ONLY the sampling and the blur. The
+    /// shader is the same either way — a frosted surface is the same
+    /// material with the refraction, the dispersion, the specular rim and
+    /// the grain switched off, so no lane can pretend to be more than the
+    /// theme allowed.
+    ///
+    /// The complete pipeline keeps the theme's exact blur claim, and an
+    /// over-ceiling radius fails closed. The degraded material already lost
+    /// its exact treatment, so the renderer's own proven ceiling bounds the
+    /// frost instead of dropping the whole material: the theme asked for a
+    /// sampled and blurred backdrop, and a blur inside the proved ceiling
+    /// is still a blurred backdrop. Dropping the material would be a
+    /// different answer than the theme gave.
     pub(crate) fn project(
         spec: OpticalGlassSpec,
         geometry: OpticalGlassGeometry,
         raster: OpticalGlassRaster,
+        kind: OpticalGlassMaterialKind,
     ) -> Option<Self> {
         if !raster.is_valid() {
             return None;
         }
+        let geometry = match kind {
+            OpticalGlassMaterialKind::Optical => geometry,
+            OpticalGlassMaterialKind::Frosted { .. } => OpticalGlassGeometry {
+                blur_radius_px: geometry
+                    .blur_radius_px
+                    .min(OPTICAL_GLASS_MAX_BLUR_PX as f32),
+                ..geometry
+            },
+        };
         let params =
             OpticalGlassParams::from_spec(spec, geometry).admitted(OPTICAL_GLASS_MAX_BLUR_PX)?;
+        let (refraction, dispersion, specular, grain) = match kind {
+            OpticalGlassMaterialKind::Optical => (
+                geometry.refraction_strength_px,
+                params.dispersion,
+                spec.specular_intensity,
+                spec.grain_strength,
+            ),
+            OpticalGlassMaterialKind::Frosted { .. } => (0.0, 0.0, 0.0, 0.0),
+        };
+        // The refraction band only steers the refraction and the rim, and a
+        // degraded material has neither: the lane is zeroed so a uniform
+        // cannot carry an optical claim the shader will not honour.
+        let refraction_width = match kind {
+            OpticalGlassMaterialKind::Optical => geometry.refraction_width_px,
+            OpticalGlassMaterialKind::Frosted { .. } => 0.0,
+        };
         Some(Self {
             optics: Vec4::new(
                 geometry.blur_radius_px,
-                geometry.refraction_strength_px,
-                geometry.refraction_width_px,
-                params.dispersion,
+                refraction,
+                refraction_width,
+                dispersion,
             ),
             finish: Vec4::new(
                 geometry.specular_width_px,
-                spec.specular_intensity,
+                specular,
                 spec.frost_opacity,
                 quality_lane(spec.quality),
             ),
@@ -166,7 +208,7 @@ impl OpticalGlassUniform {
                 linear_rgba(spec.grain_ink).x,
                 linear_rgba(spec.grain_ink).y,
                 linear_rgba(spec.grain_ink).z,
-                spec.grain_strength,
+                grain,
             ),
             element: Vec4::new(
                 raster.origin_px.x,
@@ -209,15 +251,63 @@ pub(crate) struct OpticalGlassSurface {
     pub(crate) geometry: OpticalGlassGeometry,
     pub(crate) raster: OpticalGlassRaster,
     pub(crate) backdrop: Handle<Image>,
+    /// How much of the optical treatment this surface's material carries.
+    pub(crate) kind: OpticalGlassMaterialKind,
+}
+
+/// How much of the optical treatment a surface's material carries.
+///
+/// The theme owns the degradation: it decides whether a surface keeps the
+/// complete pipeline or falls back to a material that still samples the
+/// backdrop. The binding never invents a third treatment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OpticalGlassMaterialKind {
+    /// The complete pipeline: the backdrop is sampled, blurred, refracted,
+    /// dispersed, rimmed and grained.
+    Optical,
+    /// The degraded pipeline: the backdrop is sampled and blurred, and the
+    /// refraction, the dispersion, the specular rim and the grain do not
+    /// survive. `reason` says why the complete pipeline was refused.
+    Frosted {
+        reason: OpticalGlassUnavailableReason,
+    },
 }
 
 /// Observable result of materializing an [`OpticalGlassSurface`].
 #[derive(Component, Clone, Debug, PartialEq)]
 pub(crate) enum OpticalGlassBinding {
-    /// The main world attached a material; GPU readiness is not implied.
-    Attached(Handle<OpticalGlassMaterial>),
-    /// The material is unavailable; the painted fallback remains.
-    Fallback(OpticalGlassUnavailableReason),
+    /// The main world attached the complete material; GPU readiness is not
+    /// implied.
+    Optical(Handle<OpticalGlassMaterial>),
+    /// The main world attached the degraded material: the backdrop is
+    /// sampled and blurred, and the refraction, the dispersion, the
+    /// specular rim and the grain do not survive.
+    Frosted {
+        handle: Handle<OpticalGlassMaterial>,
+        reason: OpticalGlassUnavailableReason,
+    },
+    /// No material is attached: the tier paints the theme's fallback surface
+    /// for `material`, the theme's own choice for this degradation.
+    Fallback {
+        reason: OpticalGlassUnavailableReason,
+        material: OpticalGlassFallback,
+    },
+}
+
+impl OpticalGlassBinding {
+    /// The attached material, when the surface carries one.
+    ///
+    /// A frosted material samples the backdrop exactly like the complete
+    /// one, so every consumer that needs a material to render — the
+    /// backdrop capture, the chain compositor — reads it here instead of
+    /// matching the variants.
+    pub(crate) fn attached_material(&self) -> Option<&Handle<OpticalGlassMaterial>> {
+        match self {
+            Self::Optical(handle) => Some(handle),
+            Self::Frosted { handle, .. } => Some(handle),
+            Self::Fallback { .. } => None,
+        }
+    }
 }
 
 impl UiMaterial for OpticalGlassMaterial {
@@ -261,19 +351,24 @@ fn materialize_optical_glass(
     let Some(grain) = noise.as_deref().and_then(GlassNoise::handle) else {
         commands
             .entity(entity)
-            .try_insert(OpticalGlassBinding::Fallback(
-                OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain),
-            ));
+            .try_insert(OpticalGlassBinding::Fallback {
+                reason: OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain),
+                // The renderer cannot honour the sampled backdrop without the
+                // shared grain, so the surface paints the tier's own
+                // material instead of claiming a backdrop it cannot show.
+                material: OpticalGlassFallback::Painted,
+            });
         return;
     };
     let Some(uniform) =
-        OpticalGlassUniform::project(surface.spec, surface.geometry, surface.raster)
+        OpticalGlassUniform::project(surface.spec, surface.geometry, surface.raster, surface.kind)
     else {
         commands
             .entity(entity)
-            .try_insert(OpticalGlassBinding::Fallback(
-                OpticalGlassUnavailableReason::InvalidSpec,
-            ));
+            .try_insert(OpticalGlassBinding::Fallback {
+                reason: OpticalGlassUnavailableReason::InvalidSpec,
+                material: OpticalGlassFallback::Painted,
+            });
         return;
     };
     let material = materials.add(OpticalGlassMaterial {
@@ -281,10 +376,16 @@ fn materialize_optical_glass(
         backdrop: surface.backdrop.clone(),
         grain,
     });
-    commands.entity(entity).try_insert((
-        MaterialNode(material.clone()),
-        OpticalGlassBinding::Attached(material),
-    ));
+    let binding = match surface.kind {
+        OpticalGlassMaterialKind::Optical => OpticalGlassBinding::Optical(material.clone()),
+        OpticalGlassMaterialKind::Frosted { reason } => OpticalGlassBinding::Frosted {
+            handle: material.clone(),
+            reason,
+        },
+    };
+    commands
+        .entity(entity)
+        .try_insert((MaterialNode(material), binding));
 }
 
 fn quality_lane(quality: OpticalGlassQuality) -> f32 {

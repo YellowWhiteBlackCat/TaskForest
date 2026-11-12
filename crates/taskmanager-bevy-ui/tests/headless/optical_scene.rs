@@ -19,7 +19,7 @@ use bevy::ui::widget::Text;
 use bevy::ui::{
     BackgroundColor, BorderColor, BoxShadow, ComputedNode, Node, UiGlobalTransform, UiTargetCamera,
 };
-use taskmanager_theme::optical_glass::OpticalGlassFeature;
+use taskmanager_theme::optical_glass::{OpticalGlassFallback, OpticalGlassFeature};
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{GlassTier, OpticalGlassUnavailableReason, Theme};
 
@@ -181,7 +181,7 @@ fn an_attached_material_does_not_hide_the_painted_fallback() {
             BackgroundColor(palette.glass_fill(GlassTier::Card)),
             BorderColor::all(palette.glass_edge(GlassTier::Card)),
             BoxShadow(palette.glass_shadow(GlassTier::Card)),
-            OpticalGlassBinding::Attached(Handle::default()),
+            OpticalGlassBinding::Optical(Handle::default()),
         ))
         .id();
     let grain = app
@@ -255,9 +255,10 @@ fn an_attached_material_does_not_hide_the_painted_fallback() {
 
     app.world_mut()
         .entity_mut(card)
-        .insert(OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain),
-        ));
+        .insert(OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::MissingFeature(OpticalGlassFeature::Grain),
+            material: OpticalGlassFallback::Painted,
+        });
     app.world_mut()
         .run_system_once(sync_optical_backdrop_paint)
         .expect("fallback ownership sync runs");

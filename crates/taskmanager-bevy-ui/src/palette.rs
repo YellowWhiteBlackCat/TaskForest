@@ -11,10 +11,12 @@
 //! (nav rail, tables, dialogs) consume `UiPalette` — never the official
 //! Feathers skin system, which this frontend does not adopt.
 
+use bevy::color::Alpha;
 use bevy::text::{FontSize, FontWeight, TextFont};
-use bevy::ui::prelude::{ShadowStyle, Val};
+use bevy::ui::prelude::{BackgroundGradient, ColorStop, LinearGradient, ShadowStyle, Val};
 use taskmanager_theme::Theme;
 use taskmanager_theme::Weight;
+use taskmanager_theme::optical_glass::{GlassFallbackBackdrop, OpticalGlassFallback};
 use taskmanager_theme::palette::SeverityPalette;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
 use taskmanager_theme::tokens::{self, RowDensity, UiSize};
@@ -257,6 +259,75 @@ impl UiPalette {
             GlassTier::Scrim => bevy::color::Color::NONE,
         }
     }
+
+    /// The theme's fallback surface for one tier, resolved into the paint
+    /// contract this frontend paints with.
+    ///
+    /// The theme owns the degraded material: the tier still decides the
+    /// fill, the edge and the shadow, and the fallback decides how much of
+    /// the optical treatment survives. This adapter only moves the theme's
+    /// sRGB values into this frontend's blend space (the BEVY-183
+    /// colour-space contract): a translucent tier fill is pre-composited
+    /// over the page canvas, while an opaque fallback fill is the tier's
+    /// own colour.
+    #[must_use]
+    pub(crate) fn glass_fallback_surface(
+        &self,
+        tier: GlassTier,
+        material: OpticalGlassFallback,
+    ) -> ResolvedGlassFallback {
+        let surface = self.optical_theme.glass_fallback_surface(tier, material);
+        let fill = composite_over(self.canvas, theme_color(surface.fill));
+        let edge = composite_over(fill, theme_color(surface.edge));
+        ResolvedGlassFallback {
+            fill,
+            edge,
+            // The theme's fallback shadow ink is the SAME ink the tier's
+            // projected shadow derives from, so the elevation keeps the
+            // theme's own two-layer geometry instead of a second ladder.
+            shadow: self.glass_shadow(tier),
+            sheen: surface.sheen,
+            backdrop: surface.backdrop,
+        }
+    }
+
+    /// The painted sheen gradient a glass panel wears above its fill.
+    ///
+    /// `visible` is the theme's own answer for this material: a degraded
+    /// surface that keeps no sheen paints the same gradient with every stop
+    /// transparent, so the highlight never survives a material the theme
+    /// refused.
+    #[must_use]
+    pub(crate) fn glass_sheen_gradient(
+        &self,
+        tier: GlassTier,
+        visible: bool,
+    ) -> BackgroundGradient {
+        let sheen = if visible && tier != GlassTier::Scrim {
+            self.glass_sheen
+        } else {
+            bevy::color::Color::NONE
+        };
+        BackgroundGradient::from(LinearGradient::to_bottom(vec![
+            ColorStop::auto(sheen),
+            ColorStop::auto(sheen.with_alpha(0.0)),
+        ]))
+    }
+}
+
+/// The theme's fallback surface, resolved into this frontend's paint
+/// contract.
+pub(crate) struct ResolvedGlassFallback {
+    /// The panel fill, pre-composited over the page canvas.
+    pub(crate) fill: bevy::color::Color,
+    /// The hairline edge, pre-composited over the fill.
+    pub(crate) edge: bevy::color::Color,
+    /// The tier's elevation shadow.
+    pub(crate) shadow: Vec<ShadowStyle>,
+    /// Whether the tier's specular sheen survives this material.
+    pub(crate) sheen: bool,
+    /// How the surface treats the content behind it.
+    pub(crate) backdrop: GlassFallbackBackdrop,
 }
 
 /// Resolve the window palette from a theme snapshot and the UI-size axis.

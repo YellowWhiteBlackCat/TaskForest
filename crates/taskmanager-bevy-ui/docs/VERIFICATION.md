@@ -45,6 +45,11 @@ Testing follows a strict three-tier verification contract:
    uniform projection, invalid placement, material attachment and typed
    fallback. Attachment does not prove GPU readiness. The capture camera
    remains inactive while the capability is unsupported.
+   `tests/headless/optical_fallback.rs` proves the degraded surfaces: the
+   binding carries the theme's material, and the painted ink/geometry differ
+   per kind — Painted keeps the tier fill/edge/sheen, Opaque flattens the
+   fill and drops the sheen, and Frosted attaches a material whose uniform
+   keeps the blur but zeroes refraction, dispersion, rim and grain.
 3. **Real Window Wayland Capture (`scripts/capture-bevy.sh`)**:
    Executes the real `taskforest-b` binary inside a nested private Wayland
    compositor (KWin + Niri). Provides authoritative pixel, DPI, font

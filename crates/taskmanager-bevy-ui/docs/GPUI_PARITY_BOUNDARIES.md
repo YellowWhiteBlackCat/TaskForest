@@ -68,6 +68,14 @@ score or a work plan; behavior proofs stay in the mounted headless trees.
   glass surface is Attached, the chain camera is active, and lane bounds fit.
   The compact companion capture proves menu/card bounds; Painted fallback
   pixels are not recorded as optical proof.
+- **Degraded glass surfaces**: the shared theme owns the fallback material
+  (`Painted`, `Frosted`, `Opaque`) and this frontend paints it. A high-contrast
+  card is a crisp opaque panel with its tier edge, no sheen and no backdrop
+  sampling; a headless card keeps its tier material and sheen; a Frosted card
+  still samples and blurs the backdrop with no refraction. The binding carries
+  the material, `src/palette.rs` resolves the theme's surface, and
+  `tests/headless/optical_fallback.rs` asserts the fill, edge, shadow,
+  sheen gradient, grain and uniform lanes for each kind.
 - **Keyboard help**: bare `F1` opens the shell-owned help mode; `?` / Escape /
   the footer Close action leave it. `?` types into an active search field,
   and a learned page chord closes help while still moving the route.

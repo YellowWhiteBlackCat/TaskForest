@@ -34,7 +34,10 @@ values. `glass/optical.rs` projects the shared `OpticalGlassSpec` and resolved
 geometry into an aligned uniform and embeds the WESL material; its capability
 is derived from the live `RenderAdapterInfo`, so headless, no-adapter,
 software-adapter and high-contrast compositions keep the theme's typed
-painted/opaque fallback. `bevy-optical-gpu-gate.sh` discovers and runs the
+painted/opaque fallback. The binding carries the theme's fallback material:
+a Frosted surface keeps a sampled-and-blurred backdrop, a Painted surface
+samples nothing, and an Opaque surface paints a flat tier fill with no
+sheen. `bevy-optical-gpu-gate.sh` discovers and runs the
 ignored production-shader proof, recording hardware proof or an explicit
 `PAINTED` degradation in a source-bound receipt. Performance marks the
 top-level candidate cards, and a second optical layer is admitted through the

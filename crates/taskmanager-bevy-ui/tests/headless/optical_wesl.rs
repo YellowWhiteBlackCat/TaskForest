@@ -15,13 +15,15 @@ use bevy::render::render_resource::TextureFormat;
 use bevy::scene::ScenePlugin;
 use bevy::ui::Node;
 use bevy::ui_render::prelude::MaterialNode;
-use taskmanager_theme::optical_glass::{OpticalGlassContext, OpticalGlassQuality};
+use taskmanager_theme::optical_glass::{
+    OpticalGlassContext, OpticalGlassFallback, OpticalGlassQuality,
+};
 use taskmanager_theme::{GlassTier, OpticalGlassUnavailableReason, Theme};
 
 use super::{OpticalGlassParams, fresnel_f0};
 use crate::glass::optical::{
-    OPTICAL_GLASS_MAX_BLUR_PX, OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster,
-    OpticalGlassSurface, OpticalGlassUniform,
+    OPTICAL_GLASS_MAX_BLUR_PX, OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassMaterialKind,
+    OpticalGlassRaster, OpticalGlassSurface, OpticalGlassUniform,
 };
 use crate::glass::{build_glass_noise, register};
 
@@ -142,7 +144,8 @@ fn the_uniform_carries_the_admitted_refraction_lane() {
         .resolve(OpticalGlassContext::new(theme.root_rem_size, 2.0))
         .expect("the card geometry resolves");
     let uniform =
-        OpticalGlassUniform::project(spec, geometry, raster()).expect("a valid placement projects");
+        OpticalGlassUniform::project(spec, geometry, raster(), OpticalGlassMaterialKind::Optical)
+            .expect("a valid placement projects");
     assert_eq!(uniform.refraction.x, OpticalGlassParams::DEFAULT_IOR);
     assert!(
         uniform.refraction.y > OpticalGlassParams::FRESNEL_F0 && uniform.refraction.y <= 0.1,
@@ -193,6 +196,7 @@ fn an_over_ceiling_geometry_falls_back_before_the_gpu() {
         .spawn((
             Node::default(),
             OpticalGlassSurface {
+                kind: OpticalGlassMaterialKind::Optical,
                 spec,
                 geometry,
                 raster: raster(),
@@ -205,9 +209,10 @@ fn an_over_ceiling_geometry_falls_back_before_the_gpu() {
     let world = app.world();
     assert_eq!(
         world.get::<OpticalGlassBinding>(entity),
-        Some(&OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::InvalidSpec
-        )),
+        Some(&OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::InvalidSpec,
+            material: OpticalGlassFallback::Painted,
+        }),
         "the unproven blur must fall back, never upload"
     );
     assert!(

@@ -19,7 +19,7 @@ use bevy::ui_render::prelude::MaterialNode;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 use taskmanager_shell::demo_app;
 use taskmanager_theme::tokens::UiSize;
-use taskmanager_theme::{GlassTier, OpticalGlassUnavailableReason, Theme};
+use taskmanager_theme::{GlassTier, OpticalGlassFallback, OpticalGlassUnavailableReason, Theme};
 
 use super::{CurveCard, SystemCurve};
 use crate::app::{FrontendTrack, Page, Route};
@@ -83,9 +83,10 @@ fn performance_hero_retains_fallback_without_a_gpu_and_in_high_contrast() {
     let world = app.world_mut();
     assert_eq!(
         world.get::<OpticalGlassBinding>(card),
-        Some(&OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::Headless
-        ))
+        Some(&OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::Headless,
+            material: OpticalGlassFallback::Painted,
+        })
     );
     assert!(
         world
@@ -146,9 +147,10 @@ fn performance_hero_retains_fallback_without_a_gpu_and_in_high_contrast() {
     let world = app.world();
     assert_eq!(
         world.get::<OpticalGlassBinding>(card),
-        Some(&OpticalGlassBinding::Fallback(
-            OpticalGlassUnavailableReason::HighContrast
-        ))
+        Some(&OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::HighContrast,
+            material: OpticalGlassFallback::Opaque,
+        })
     );
     assert!(
         world

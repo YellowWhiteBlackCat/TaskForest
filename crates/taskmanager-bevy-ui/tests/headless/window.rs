@@ -45,7 +45,9 @@ use taskmanager_application::{
     SystemFacets,
 };
 
-use taskmanager_theme::optical_glass::{OpticalGlassContext, OpticalGlassUnavailableReason};
+use taskmanager_theme::optical_glass::{
+    OpticalGlassContext, OpticalGlassFallback, OpticalGlassUnavailableReason,
+};
 use taskmanager_theme::{AppearanceOverride, GlassTier, LightDark, Skin, Theme};
 
 use super::appearance::resolve_demo_theme;
@@ -59,7 +61,8 @@ use super::{
 };
 use crate::drain::ShellProjectionFolded;
 use crate::glass::optical::{
-    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassRaster, OpticalGlassSurface,
+    OpticalGlassBinding, OpticalGlassMaterial, OpticalGlassMaterialKind, OpticalGlassRaster,
+    OpticalGlassSurface,
 };
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
@@ -715,6 +718,7 @@ fn optical_surface() -> OpticalGlassSurface {
         .resolve(OpticalGlassContext::new(1.0, 1.0))
         .expect("valid optical geometry");
     OpticalGlassSurface {
+        kind: OpticalGlassMaterialKind::Optical,
         spec,
         geometry,
         raster: OpticalGlassRaster {
@@ -731,7 +735,7 @@ fn optical_surface() -> OpticalGlassSurface {
 fn attached_optical_surface() -> impl bevy::ecs::bundle::Bundle {
     (
         optical_surface(),
-        OpticalGlassBinding::Attached(Handle::<OpticalGlassMaterial>::default()),
+        OpticalGlassBinding::Optical(Handle::<OpticalGlassMaterial>::default()),
     )
 }
 
@@ -819,7 +823,10 @@ fn a_fallback_surface_does_not_wake_the_offscreen_optical_camera() {
     let (mut app, camera) = backdrop_controller_app();
     app.world_mut().spawn((
         optical_surface(),
-        OpticalGlassBinding::Fallback(OpticalGlassUnavailableReason::Headless),
+        OpticalGlassBinding::Fallback {
+            reason: OpticalGlassUnavailableReason::Headless,
+            material: OpticalGlassFallback::Painted,
+        },
     ));
 
     for _ in 0..3 {
