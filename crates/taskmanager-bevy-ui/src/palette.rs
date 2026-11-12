@@ -17,8 +17,9 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::Weight;
 use taskmanager_theme::palette::SeverityPalette;
 use taskmanager_theme::theme::STANDARD_ROOT_REM_SIZE;
-use taskmanager_theme::tokens::{self, UiSize};
+use taskmanager_theme::tokens::{self, RowDensity, UiSize};
 use taskmanager_theme::{Color, GlassShadowProjection, GlassTier, Length, LightDark};
+use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 use zhuge_ui_core::easing::lerp;
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
@@ -267,6 +268,13 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
     // this frontend divides by the same root the other three use instead of
     // re-deriving the factor here.
     let ratio = |size: Length| f32::from(ui_size.rem_ratio(size));
+    let button_extent = crate::presentation_binding::control_measurement(
+        ControlRole::Button,
+        ControlState::Normal,
+        ui_size,
+        RowDensity::Comfortable,
+    )
+    .extent;
     // The glass ladder, pre-composited over the page canvas in the theme's
     // sRGB space (BEVY-183). Each tier's edge is composited over its OWN
     // tier fill, because an edge is drawn on the panel it belongs to, never
@@ -299,7 +307,7 @@ pub(crate) fn ui_palette(theme: &Theme, ui_size: UiSize) -> UiPalette {
         glass_scrim_fill: theme_color(theme.glass_scrim().fill),
         panel_radius_px: tokens::card_radius(theme).0,
         control_radius_px: tokens::control_radius(theme).0,
-        control_height_rem: ratio(ui_size.control_height()),
+        control_height_rem: button_extent / ui_size.body_font_size().0,
         icon_rem: ratio(ui_size.icon_size()),
         accent: theme_color(theme.accent),
         heading_color: theme_color(theme.fg),

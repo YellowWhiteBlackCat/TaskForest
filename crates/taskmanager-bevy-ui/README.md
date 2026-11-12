@@ -108,6 +108,10 @@ headless suite and capture flow live in
 - `src/demo_fixture.rs` (+ `src/demo_fixture/`), `capture.rs` — deterministic demo fixtures and window capture seams.
 - `src/pages.rs` + `src/pages/` — nine mounted pages plus `process_tree.rs` and `history.rs`; `src/widgets.rs` + `src/widgets/` — the owned component layer; `icons.rs` — icon scenes.
 - `src/presentation_binding.rs` — ADR-064 theme-value lift and Bevy scene-rem / ECS-tween control and motion binding.
+- `src/palette.rs` resolves the shared control-height rem from the presentation
+  binding's `ControlRole::Button` fold; widget call sites keep declaring
+  `rem(palette.control_height_rem)`, while the extent's numeric source stays in
+  `taskmanager-ui-contract`.
 - Per-module detail: [`docs/MODULE_NOTES.md`](docs/MODULE_NOTES.md).
 
 ## Docs

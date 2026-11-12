@@ -11,13 +11,14 @@ use bevy::color::{Luminance, Srgba};
 use bevy::scene::WorldSceneExt;
 use bevy::text::{FontSize, RemSize};
 use bevy::ui::prelude::{ShadowStyle, Val};
-use taskmanager_theme::tokens::{self, UiSize};
+use taskmanager_theme::tokens::{self, RowDensity, UiSize};
 use taskmanager_theme::{
     GlassShadowProjection, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin, Theme,
 };
 
 use super::{UiPalette, composite_over, theme_color, ui_palette};
 use taskmanager_theme::Color;
+use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 /// The light-mode counterpart of `Theme::dark()`'s construction: same skin,
 /// fonts and contrast, opposite mode.
@@ -183,6 +184,20 @@ fn ui_size_axis_rescales_the_rem_ladder() {
     assert_eq!(small.control_height_px(), 32.0);
     assert_eq!(standard.control_height_px(), 38.0);
     assert_eq!(large.control_height_px(), 46.0);
+    for size in UiSize::ALL {
+        let palette = ui_palette(&Theme::dark(), size);
+        assert_eq!(
+            palette.control_height_px(),
+            crate::presentation_binding::control_measurement(
+                ControlRole::Button,
+                ControlState::Normal,
+                size,
+                RowDensity::Comfortable,
+            )
+            .extent,
+            "{size:?} control height comes from the shared role measurement"
+        );
+    }
     // Type roles are rem ratios of the step's body type, so a step switch
     // re-scales them without touching a scene.
     assert_eq!(small.body.font_size, FontSize::Rem(1.0));
