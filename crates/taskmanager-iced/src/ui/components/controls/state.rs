@@ -37,40 +37,56 @@ impl ControlPaintState {
 
     #[must_use]
     pub(crate) const fn from_button(status: button::Status) -> Self {
-        match status {
-            button::Status::Active => Self::Active,
-            button::Status::Hovered => Self::Hovered,
-            button::Status::Pressed => Self::Pressed,
-            button::Status::Disabled => Self::Disabled,
-        }
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, button::Status::Hovered),
+            matches!(status, button::Status::Pressed),
+            false,
+            matches!(status, button::Status::Disabled),
+            false,
+        ))
     }
 
     #[must_use]
     pub(crate) const fn from_text_input(status: text_input::Status) -> Self {
-        match status {
-            text_input::Status::Active => Self::Active,
-            text_input::Status::Hovered => Self::Hovered,
-            text_input::Status::Focused { .. } => Self::Focused,
-            text_input::Status::Disabled => Self::Disabled,
-        }
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, text_input::Status::Hovered),
+            false,
+            matches!(status, text_input::Status::Focused { .. }),
+            matches!(status, text_input::Status::Disabled),
+            false,
+        ))
     }
 
     #[must_use]
     pub(crate) const fn from_checkbox(status: checkbox::Status) -> Self {
-        match status {
-            checkbox::Status::Active { .. } => Self::Active,
-            checkbox::Status::Hovered { .. } => Self::Hovered,
-            checkbox::Status::Disabled { .. } => Self::Disabled,
-        }
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, checkbox::Status::Hovered { .. }),
+            false,
+            false,
+            matches!(status, checkbox::Status::Disabled { .. }),
+            false,
+        ))
     }
 
     #[must_use]
     pub(crate) const fn from_text_editor(status: text_editor::Status) -> Self {
-        match status {
-            text_editor::Status::Active => Self::Active,
-            text_editor::Status::Hovered => Self::Hovered,
-            text_editor::Status::Focused { .. } => Self::Focused,
-            text_editor::Status::Disabled => Self::Disabled,
+        Self::from_visual(ControlVisualState::from_ink_priority(
+            matches!(status, text_editor::Status::Hovered),
+            false,
+            matches!(status, text_editor::Status::Focused { .. }),
+            matches!(status, text_editor::Status::Disabled),
+            false,
+        ))
+    }
+
+    #[must_use]
+    pub(crate) const fn from_visual(visual: ControlVisualState) -> Self {
+        match visual {
+            ControlVisualState::Active => Self::Active,
+            ControlVisualState::Hovered => Self::Hovered,
+            ControlVisualState::Pressed => Self::Pressed,
+            ControlVisualState::Focused => Self::Focused,
+            ControlVisualState::Disabled => Self::Disabled,
         }
     }
 }

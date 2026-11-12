@@ -1,10 +1,12 @@
 use super::*;
 use crate::theme_binding::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use iced::Font;
+use iced::widget::{button, text_editor, text_input};
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{
     FONT_MISANS_VF, GlassSurfaceRole, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin,
 };
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 fn combined_shadow_alpha(ink_alpha: f32, opacity: f32) -> f32 {
@@ -23,6 +25,59 @@ fn gradient_stops(background: Option<iced::Background>) -> Vec<(f32, iced::Color
         .flatten()
         .map(|stop| (stop.offset, stop.color))
         .collect()
+}
+
+/// Iced consumes the one shared interaction-ink precedence before mapping to
+/// its visual vocabulary. Disabled keeps the strongest verdict, press keeps
+/// the pressed ink over hover, and selected-only rows stay at rest.
+#[test]
+fn control_visual_state_consumes_the_shared_ink_priority() {
+    assert_eq!(
+        ControlVisualState::from_ink_priority(true, true, true, true, true),
+        ControlVisualState::Disabled
+    );
+    assert_eq!(
+        ControlVisualState::from_ink_priority(true, true, true, false, true),
+        ControlVisualState::Pressed
+    );
+    assert_eq!(
+        ControlVisualState::from_ink_priority(true, false, true, false, false),
+        ControlVisualState::Focused
+    );
+    assert_eq!(
+        ControlVisualState::from_ink_priority(true, false, false, false, true),
+        ControlVisualState::Hovered
+    );
+    assert_eq!(
+        ControlVisualState::from_ink_priority(false, false, false, false, true),
+        ControlVisualState::Active
+    );
+    assert_eq!(
+        ControlVisualState::from_ink_priority(false, false, false, false, false),
+        ControlVisualState::Active
+    );
+    assert_eq!(ControlInkPriority::IDLE.state(), ControlInkState::Idle);
+    assert_eq!(
+        crate::ui::components::controls::state::ControlPaintState::from_button(
+            button::Status::Pressed
+        )
+        .visual(),
+        ControlVisualState::Pressed
+    );
+    assert_eq!(
+        crate::ui::components::controls::state::ControlPaintState::from_text_input(
+            text_input::Status::Focused { is_hovered: true }
+        )
+        .visual(),
+        ControlVisualState::Focused
+    );
+    assert_eq!(
+        crate::ui::components::controls::state::ControlPaintState::from_text_editor(
+            text_editor::Status::Disabled
+        )
+        .visual(),
+        ControlVisualState::Disabled
+    );
 }
 
 /// Font helpers read the resolved family names off the neutral theme, the

@@ -22,6 +22,7 @@ use taskmanager_theme::{
     Color, GlassShadowLayer, GlassShadowProjection, GlassSurfaceRole, GlassTier, Length, Theme,
     tokens,
 };
+use taskmanager_ui_contract::presentation::control_ink;
 use taskmanager_ui_contract::presentation::sizes::{ControlRole, ControlState};
 
 mod control_material;
@@ -53,6 +54,37 @@ impl ControlVisualState {
             ControlState::Active => Self::Hovered,
             ControlState::Disabled => Self::Disabled,
         }
+    }
+
+    /// Bind the shared interaction ink to Iced's visual vocabulary. The
+    /// selected page state keeps the resting visual until this frontend adds
+    /// a dedicated selected ink.
+    #[must_use]
+    pub const fn from_ink(ink: control_ink::ControlInkState) -> Self {
+        match ink {
+            control_ink::ControlInkState::Idle | control_ink::ControlInkState::Selected => {
+                Self::Active
+            }
+            control_ink::ControlInkState::Hovered => Self::Hovered,
+            control_ink::ControlInkState::Pressed => Self::Pressed,
+            control_ink::ControlInkState::Focused => Self::Focused,
+            control_ink::ControlInkState::Disabled => Self::Disabled,
+        }
+    }
+
+    /// Resolve one Iced control ink through the shared interaction
+    /// precedence, then bind it to this frontend's visual vocabulary.
+    #[must_use]
+    pub const fn from_ink_priority(
+        hovered: bool,
+        pressed: bool,
+        focused: bool,
+        disabled: bool,
+        selected: bool,
+    ) -> Self {
+        Self::from_ink(control_ink::ControlInkPriority::resolve(
+            hovered, pressed, focused, disabled, selected,
+        ))
     }
 
     /// The shadow's paint weight for this state. Geometry (offset, blur) is

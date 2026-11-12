@@ -57,10 +57,12 @@ native selection and renderer caches; all shared types use their defining module
   `theme/control_measurement.rs` selects the live `UiSize`/`RowDensity` axis
   and delegates to `presentation_binding::control_measurement`; every control
   spends `ControlRole::{Button, IconButton, Input, Toggle}` through
-  `resolve_size`, never a second size table. Hover/pressed/focus/disabled
-  only reweight paint (the shared `ControlState::changes_measurement`
-  contract). The focus ring reads the shared ring token, so a pointer-driven
-  focus paints no ring on the switch, segmented track, buttons or checkbox.
+  `resolve_size`, never a second size table. Toolkit statuses fold through
+  the shared `ControlInkPriority`, so hover/pressed/focus/disabled resolve
+  to exactly one ink and only reweight paint (the shared
+  `ControlState::changes_measurement` contract). The focus ring reads the
+  shared ring token, so a pointer-driven focus paints no ring on the switch,
+  segmented track, buttons or checkbox.
   All visible copy is an i18n key resolved by `taskmanager-application`;
   `icon_button` uses `IconId` and exposes its localized label as a shared
   tooltip because Iced 0.14 has no accessible-name operation.
