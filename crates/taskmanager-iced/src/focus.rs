@@ -339,13 +339,27 @@ pub(crate) fn dynamic_button_owned(
     on_press: Message,
     destructive: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    dynamic_button_owned_enabled(theme_snapshot, target, label, on_press, destructive, true)
+}
+
+/// Owned, runtime-label button with one availability bit for both pointer and
+/// keyboard activation. Disabled controls keep their shared `ControlRole`
+/// extent and drop only their focus stop and request publication.
+pub(crate) fn dynamic_button_owned_enabled(
+    theme_snapshot: Theme,
+    target: FocusTarget,
+    label: String,
+    on_press: Message,
+    destructive: bool,
+    enabled: bool,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     crate::ui::components::focusable_control_button_owned(
         theme_snapshot,
         target,
         label,
         on_press,
         tone_for(destructive),
-        true,
+        enabled,
     )
 }
 

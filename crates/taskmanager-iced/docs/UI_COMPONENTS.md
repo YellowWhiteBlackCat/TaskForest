@@ -76,6 +76,15 @@ native selection and renderer caches; all shared types use their defining module
   the shared `components::select` — the same `ControlRole::Input` glass,
   geometry and focus stop the Settings selects use, instead of a bare
   `pick_list`.
+- `src/app/user_menu_availability.rs` is the Users row-menu availability
+  authority: the frozen menu target must still have one unique provider
+  identity in the canonical session projection. When it is stale, the menu
+  exposes only `UserRowMenuClose`, arrow traversal keeps only that focus
+  stop, and an open request lands on Close; Disconnect/Lock are disabled,
+  unfocusable and publish no session-control request. A current target keeps
+  Disconnect and Lock in the focus cycle and opens on Disconnect. The
+  availability verdict also keys the rendered menu so a projection refresh
+  remounts the action buttons in the correct state.
 - `src/ui/components/dashboard_budget.rs` spends the shared card-flow
   admission verdict (`taskmanager_ui_contract::presentation::card_flow`):
   the whole-group admission and the card floor..ceiling clamp are the shared

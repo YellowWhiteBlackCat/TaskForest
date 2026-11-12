@@ -3,6 +3,7 @@
 use super::*;
 use taskforest_core::core::session::SessionControlAction;
 use taskmanager_application::{AppPage, KeyCode};
+use user_menu_availability::user_menu_actions_enabled;
 
 impl IcedApp {
     pub(super) fn close_context_menus(&mut self) {
@@ -74,11 +75,17 @@ impl IcedApp {
                     FocusTarget::StartupMenuClose,
                 ]
             }
-            ContextMenuKind::User => vec![
-                FocusTarget::UserRowMenuDisconnect,
-                FocusTarget::UserRowMenuLock,
-                FocusTarget::UserRowMenuClose,
-            ],
+            ContextMenuKind::User => {
+                let mut targets = Vec::with_capacity(3);
+                if self.user_menu_actions_enabled() {
+                    targets.extend([
+                        FocusTarget::UserRowMenuDisconnect,
+                        FocusTarget::UserRowMenuLock,
+                    ]);
+                }
+                targets.push(FocusTarget::UserRowMenuClose);
+                targets
+            }
             ContextMenuKind::ProcessColumns => {
                 let mut targets: Vec<FocusTarget> = crate::ui::applications::apps_columns(true)
                     .into_iter()
@@ -99,6 +106,26 @@ impl IcedApp {
                 }
             }
         }
+    }
+
+    /// The frozen Users-row menu only exposes actions that the shared shell
+    /// can still arm. Close stays reachable even when the target is stale.
+    fn user_menu_actions_enabled(&self) -> bool {
+        user_menu_actions_enabled(
+            self.user_menu_session(),
+            self.shell.projection().sessions.as_deref(),
+        )
+    }
+
+    /// Resolve availability before the opening reducer freezes the session.
+    fn user_menu_actions_enabled_for_visual_index(&self, visual_index: usize) -> bool {
+        let sessions = self.shell.projection().sessions.as_deref();
+        let menu_session = self
+            .shell
+            .sorted_session_indices()
+            .get(visual_index)
+            .and_then(|source_index| sessions.and_then(|sessions| sessions.get(*source_index)));
+        user_menu_actions_enabled(menu_session, sessions)
     }
 
     /// Open a Users row menu from the current canonical visual order and
@@ -225,7 +252,12 @@ impl IcedApp {
             }
             Message::AuthorizeRaplPower => Some(FocusTarget::AuthorizeRaplPower),
             Message::AuthorizeMsrReadouts => Some(FocusTarget::AuthorizeMsrReadouts),
-            Message::OpenUserRowMenu(_) => Some(FocusTarget::UserRowMenuDisconnect),
+            Message::OpenUserRowMenu(visual_index)
+                if self.user_menu_actions_enabled_for_visual_index(*visual_index) =>
+            {
+                Some(FocusTarget::UserRowMenuDisconnect)
+            }
+            Message::OpenUserRowMenu(_) => Some(FocusTarget::UserRowMenuClose),
             Message::OpenStartupRowMenu { visual_index } => Some(FocusTarget::StartupMenuAction {
                 index: self
                     .startup_source_index(*visual_index)

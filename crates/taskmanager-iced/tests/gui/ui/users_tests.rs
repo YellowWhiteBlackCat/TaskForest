@@ -4,7 +4,7 @@ use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::operation::Focusable;
 use iced::advanced::widget::{Id, Operation, Tree};
-use iced::{Element, Event, Rectangle, Size};
+use iced::{Element, Event, Point, Rectangle, Size, mouse};
 use taskforest_core::core::session::{
     SessionControlAction, SessionFamilyFact, SessionIncarnation, SessionItem,
 };
@@ -257,6 +257,112 @@ fn press_enter(
         );
     }
     messages
+}
+
+/// Deliver one pointer click to the widget tree and collect what it published.
+fn click(
+    element: &mut Element<'_, Message, iced::Theme, iced::Renderer>,
+    tree: &mut Tree,
+    node: &iced::advanced::layout::Node,
+    renderer: &iced::Renderer,
+    viewport: &Rectangle,
+    point: Point,
+) -> Vec<Message> {
+    let mut messages = Vec::new();
+    {
+        let mut shell = iced::advanced::Shell::new(&mut messages);
+        let mut clipboard = iced::advanced::clipboard::Null;
+        for event in [
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+        ] {
+            element.as_widget_mut().update(
+                tree,
+                &event,
+                Layout::new(node),
+                mouse::Cursor::Available(point),
+                renderer,
+                &mut clipboard,
+                &mut shell,
+                viewport,
+            );
+        }
+    }
+    messages
+}
+
+fn menu_button(
+    actions_enabled: bool,
+    target: crate::app::FocusTarget,
+    action: SessionControlAction,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    crate::focus::dynamic_button_owned_enabled(
+        Theme::dark(),
+        target,
+        action_label(action).to_owned(),
+        Message::RequestUserRowSessionControl(action),
+        false,
+        actions_enabled,
+    )
+}
+
+fn action_label(action: SessionControlAction) -> &'static str {
+    match action {
+        SessionControlAction::Disconnect => "Disconnect",
+        SessionControlAction::Lock => "Lock",
+    }
+}
+
+#[test]
+fn users_row_menu_actions_are_real_disabled_controls_when_the_frozen_target_is_stale() {
+    set_language(Language::En);
+    let renderer = headless_renderer();
+    let size = Size::new(240.0, 64.0);
+    let viewport = Rectangle::with_size(size);
+    let action = SessionControlAction::Disconnect;
+    let target = crate::app::FocusTarget::UserRowMenuDisconnect;
+
+    for actions_enabled in [true, false] {
+        let mut element = menu_button(actions_enabled, target, action);
+        let mut tree = Tree::new(&element);
+        let node =
+            element
+                .as_widget_mut()
+                .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+        let focusable = focus_target(&mut element, &mut tree, &node, &renderer, target);
+        let keyboard = press_enter(&mut element, &mut tree, &node, &renderer, &viewport);
+        let pointer = click(
+            &mut element,
+            &mut tree,
+            &node,
+            &renderer,
+            &viewport,
+            Point::new(node.bounds().center_x(), node.bounds().center_y()),
+        );
+        let mut published = keyboard.iter().chain(&pointer);
+        if actions_enabled {
+            assert!(
+                focusable,
+                "a controllable session action is a real focus stop"
+            );
+            assert!(
+                published
+                    .clone()
+                    .any(|message| matches!(message, Message::RequestUserRowSessionControl(observed) if *observed == action)),
+                "the enabled menu action publishes its typed request"
+            );
+        } else {
+            assert!(
+                !focusable,
+                "a stale session action must not be a keyboard focus stop"
+            );
+            assert!(
+                !published
+                    .any(|message| matches!(message, Message::RequestUserRowSessionControl(_))),
+                "a disabled menu action publishes no keyboard or pointer request"
+            );
+        }
+    }
 }
 
 /// The session action buttons run through ONE shared control in both

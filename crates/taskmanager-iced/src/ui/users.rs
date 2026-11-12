@@ -20,6 +20,7 @@ use taskmanager_application::i18n::{
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
 
+use crate::app::user_menu_availability::user_menu_actions_enabled;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
@@ -176,9 +177,11 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let selected = shell.selected;
             // The open Users-row menu re-hosts its row, so its session id is
             // both the lazy-invalidation marker and the mount condition.
-            let open_menu_session = app
-                .user_menu_session()
-                .map(|session| session.id.to_string());
+            let menu_session = app.user_menu_session();
+            let actions_enabled =
+                user_menu_actions_enabled(menu_session, shell.projection().sessions.as_deref());
+            let open_menu_session =
+                menu_session.map(|session| (session.id.to_string(), actions_enabled));
             let query = shell.query.trim();
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
@@ -191,7 +194,11 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                 selected,
                 row_count: rows.len(),
                 compact,
-                open_menu: open_menu_session.clone(),
+                open_menu: open_menu_session
+                    .as_ref()
+                    .map(|(session_id, actions_enabled)| {
+                        format!("{session_id}:{}", u8::from(*actions_enabled))
+                    }),
             });
             let body_rows = Rc::clone(&rows);
             let body_open_menu = open_menu_session.clone();
@@ -285,7 +292,7 @@ struct UserRowStyle {
 
 fn user_rows_in_window(
     rows: Rc<Vec<UserRow>>,
-    open_menu_session: Option<String>,
+    open_menu_session: Option<(String, bool)>,
     query: &str,
     window: std::ops::Range<usize>,
     selected: usize,
@@ -340,10 +347,14 @@ fn user_rows_in_window(
                     .into(),
                 Message::OpenUserRowMenu(index),
             );
-            let row = if open_menu_session.as_deref() == Some(session.id.as_str()) {
+            let open_menu = open_menu_session
+                .as_ref()
+                .filter(|(session_id, _)| session_id == &session.id)
+                .map(|(_, actions_enabled)| *actions_enabled);
+            let row = if let Some(actions_enabled) = open_menu {
                 // The open menu floats on its own row: anchored by the
                 // popover primitive and dismissed by an outside press.
-                let panel = user_menu_panel(table_theme, session.id.to_string());
+                let panel = user_menu_panel(table_theme, session.id.to_string(), actions_enabled);
                 crate::ui::components::Popover::context_menu(row, panel, Message::CloseUserRowMenu)
                     .into()
             } else {
@@ -360,6 +371,7 @@ fn user_rows_in_window(
 fn user_menu_panel(
     theme_snapshot: Theme,
     session_id: String,
+    actions_enabled: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let label = text(format!("{} {session_id}", t("hint.selected_session")))
         .size(f32::from(tokens::FONT_12))
@@ -368,20 +380,22 @@ fn user_menu_panel(
         column![
             label,
             row![
-                focus::dynamic_button_owned(
+                focus::dynamic_button_owned_enabled(
                     theme_snapshot,
                     FocusTarget::UserRowMenuDisconnect,
                     i18n::session_control_action_label(SessionControlAction::Disconnect)
                         .to_string(),
                     Message::RequestUserRowSessionControl(SessionControlAction::Disconnect),
                     false,
+                    actions_enabled,
                 ),
-                focus::dynamic_button_owned(
+                focus::dynamic_button_owned_enabled(
                     theme_snapshot,
                     FocusTarget::UserRowMenuLock,
                     i18n::session_control_action_label(SessionControlAction::Lock).to_string(),
                     Message::RequestUserRowSessionControl(SessionControlAction::Lock),
                     false,
+                    actions_enabled,
                 ),
                 focus::dynamic_button_owned(
                     theme_snapshot,

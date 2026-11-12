@@ -93,6 +93,7 @@ pub(crate) mod subscription;
 mod surface;
 pub(crate) mod toast;
 mod update;
+pub(crate) mod user_menu_availability;
 mod viewport_state;
 mod window_capture;
 mod window_time;

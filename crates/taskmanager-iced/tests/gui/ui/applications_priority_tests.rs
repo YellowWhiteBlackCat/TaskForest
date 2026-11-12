@@ -8,6 +8,7 @@
 use super::*;
 use crate::app::IcedApp;
 use crate::text_metrics::measured_text_width;
+use crate::theme;
 use iced::advanced::layout::{Layout, Limits, Node};
 use iced::advanced::overlay::Nested;
 use iced::advanced::renderer::Headless;

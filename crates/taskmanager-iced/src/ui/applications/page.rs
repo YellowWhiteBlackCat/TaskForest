@@ -4,19 +4,19 @@ use super::*;
 use crate::IcedApp;
 use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::column;
-use iced::{Alignment, Element, Length, Padding, Renderer, Theme};
+use iced::{Alignment, Element, Length, Padding, Renderer};
 use taskforest_core::core::process::ProcessBatchAction;
 use zhuge_ui_core::virtual_list::VirtualWindow;
 use zhuge_ui_kit_iced::surface::{self, StatePanelGeometry};
 use zhuge_ui_kit_iced::virtual_list::{virtual_table, virtual_table_body};
 
+use crate::theme::{glass_surface_style, muted_text_color};
 use crate::ui::virtual_list::resolve_table_window;
 use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visible};
 use taskmanager_shell::{ProcessControlScope, SortDir};
-use taskmanager_theme::GlassSurfaceRole;
-use taskmanager_theme::theme;
 use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION};
+use taskmanager_theme::{GlassSurfaceRole, Theme};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
@@ -43,7 +43,9 @@ fn applications_virtual_table_key(
     virtual_table_key(applications_table_key(generation, render), window)
 }
 
-fn render_table_body(model: &ApplicationsTableModel) -> Element<'static, Message, Theme, Renderer> {
+fn render_table_body(
+    model: &ApplicationsTableModel,
+) -> Element<'static, Message, iced::Theme, Renderer> {
     let width = Length::Fixed(apps_table_width_with(
         model.render.swap_visible,
         model.render.hidden_columns.as_ref(),
@@ -56,7 +58,7 @@ fn render_table_body(model: &ApplicationsTableModel) -> Element<'static, Message
 
 /// The applications page: search field + the shared filtered/sorted process
 /// table.
-pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Renderer> {
+pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, Renderer> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
     let visible_indices = shell.visible_process_indices();
@@ -65,7 +67,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
     // values are not mistaken for confirmed absence.
     let swap_visible = swap_column_visible(shell.projection().snapshot.as_ref());
 
-    let search: Element<'_, Message, Theme, Renderer> = if shell.search_active() {
+    let search: Element<'_, Message, iced::Theme, Renderer> = if shell.search_active() {
         row![
             crate::ui::components::plain_text_input(
                 theme_snapshot,
@@ -174,7 +176,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
     let window = resolve_table_window(projection.len(), scroll_y, viewport_height, row_height)
         .materialized();
 
-    let table_body: Element<'_, Message, Theme, Renderer> = if projection.is_empty() {
+    let table_body: Element<'_, Message, iced::Theme, Renderer> = if projection.is_empty() {
         // GPUI-parity empty state: a centered message instead of a blank
         // header + scrollable (render.rs: `proc.no_processes` /
         // `proc.no_processes_match`).
@@ -226,7 +228,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         Message::ApplicationsScrolled,
     );
 
-    let action_bar: Element<'_, Message, Theme, Renderer> = if let Some(intent) =
+    let action_bar: Element<'_, Message, iced::Theme, Renderer> = if let Some(intent) =
         shell.pending_batch()
     {
         tables::confirm_batch_bar(theme_snapshot, intent)
@@ -261,7 +263,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                 focus::button_enabled(theme_snapshot, target, label, message, destructive, enabled)
             }
         };
-        let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
+        let mut actions: Vec<Element<'_, Message, iced::Theme, Renderer>> = Vec::new();
         if !tree_selected {
             actions.push(process_action(
                 FocusTarget::EndTask,
@@ -369,7 +371,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             t("proc.run_new_task"),
             Message::OpenRunTask,
         ));
-        let priority_picker: Element<'_, Message, Theme, Renderer> = if control.is_ready() {
+        let priority_picker: Element<'_, Message, iced::Theme, Renderer> = if control.is_ready() {
             // The shared select owns the trigger paint (the ONE glass
             // material), the `ControlRole::Input` geometry and the
             // keyboard stop; this adapter only supplies the typed
@@ -385,11 +387,11 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         } else {
             text(t("proc.choose_priority")).into()
         };
-        let priority_group: Element<'_, Message, Theme, Renderer> = iced::widget::container(
+        let priority_group: Element<'_, Message, iced::Theme, Renderer> = iced::widget::container(
             row![
                 text(t("proc.priority"))
                     .size(f32::from(FONT_CAPTION))
-                    .color(theme::muted_text_color(theme_snapshot)),
+                    .color(muted_text_color(theme_snapshot)),
                 priority_picker,
             ]
             .spacing(4)
@@ -397,7 +399,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         )
         .width(Length::Fixed(priority_group_width(theme_snapshot)))
         .into();
-        let hint: Element<'_, Message, Theme, Renderer> = iced::widget::container(
+        let hint: Element<'_, Message, iced::Theme, Renderer> = iced::widget::container(
             text(selection_hint(selected_target_count))
                 .wrapping(iced::widget::text::Wrapping::None),
         )
@@ -427,28 +429,27 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         let overflow_panel = column![
             text(t("common.actions"))
                 .size(f32::from(FONT_13))
-                .color(theme::muted_text_color(theme_snapshot)),
+                .color(muted_text_color(theme_snapshot)),
             priority_group,
             hint,
         ]
         .spacing(6);
-        let overflow: Element<'_, Message, Theme, Renderer> = if app.process_actions_menu_open() {
-            let panel: Element<'_, Message, Theme, Renderer> =
-                iced::widget::container(overflow_panel)
-                    .style(move |_| {
-                        theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::Menu)
-                    })
-                    .padding(8)
-                    .into();
-            crate::ui::components::Popover::new(
-                overflow_trigger,
-                panel,
-                Message::CloseProcessActionsMenu,
-            )
-            .into()
-        } else {
-            overflow_trigger
-        };
+        let overflow: Element<'_, Message, iced::Theme, Renderer> =
+            if app.process_actions_menu_open() {
+                let panel: Element<'_, Message, iced::Theme, Renderer> =
+                    iced::widget::container(overflow_panel)
+                        .style(move |_| glass_surface_style(theme_snapshot, GlassSurfaceRole::Menu))
+                        .padding(8)
+                        .into();
+                crate::ui::components::Popover::new(
+                    overflow_trigger,
+                    panel,
+                    Message::CloseProcessActionsMenu,
+                )
+                .into()
+            } else {
+                overflow_trigger
+            };
         actions.push(overflow);
         // The full action vocabulary is one bounded horizontal group.
         // A plain Fill row squeezed the last groups into half-painted
@@ -503,8 +504,8 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
 /// not another floating card. The shared `PageHeader` role keeps the Card-tier
 /// fill and hairline while dropping the elevation shadow.
 #[must_use]
-fn empty_table_body_style(theme_snapshot: &theme::Theme) -> iced::widget::container::Style {
-    theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::PageHeader)
+fn empty_table_body_style(theme_snapshot: &Theme) -> iced::widget::container::Style {
+    glass_surface_style(theme_snapshot, GlassSurfaceRole::PageHeader)
 }
 
 #[cfg(test)]
