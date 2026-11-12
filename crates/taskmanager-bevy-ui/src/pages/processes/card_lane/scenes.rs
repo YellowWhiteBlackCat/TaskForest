@@ -427,7 +427,7 @@ pub(crate) fn empty_card_scene(message: String, palette: &UiPalette) -> Box<dyn 
 /// An optical card has no painted fill to tint, so the hover, pressed and
 /// selected ink rides this overlay above the glass instead of replacing the
 /// surface the material owns.
-fn state_overlay_scene() -> Box<dyn Scene> {
+fn state_overlay_scene(palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node {
             width: percent(100),
@@ -435,6 +435,7 @@ fn state_overlay_scene() -> Box<dyn Scene> {
             position_type: PositionType::Absolute,
             left: percent(0),
             top: percent(0),
+            border_radius: BorderRadius::all(Val::Rem(palette.panel_radius_rem())),
         }
         BackgroundColor(Color::NONE)
         ProcessCardStateOverlay
@@ -467,11 +468,16 @@ pub(crate) fn atomic_card_scene(
     let selected = row.selected;
     let accessibility_node = crate::semantic::process_row_node(&row.name, &row.semantic_id);
     let semantic = SemanticAddress(stable_semantic_address("process-row", &row.semantic_id));
-    let fill = palette.glass_fill(GlassTier::Card);
-    let shadows = palette.glass_shadow(GlassTier::Card);
+    let GlassPanelMaterial {
+        fill,
+        edge,
+        shadows,
+        radius_rem,
+        ..
+    } = card_material(palette);
     let label = t_label;
     let _ = query;
-    let overlay = state_overlay_scene();
+    let overlay = state_overlay_scene(palette);
     let vertical_padding = if compact_focus { space_4() } else { space_8() };
     let card_basis = if compact_focus {
         px(card_height_px)
@@ -489,10 +495,12 @@ pub(crate) fn atomic_card_scene(
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::axes(Val::Px(space_8()), Val::Px(vertical_padding)),
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+            border: UiRect::all(Val::Rem(GlassTier::Card.edge_width_rem())),
+            border_radius: BorderRadius::all(Val::Rem(radius_rem)),
             overflow: Overflow::clip(),
         }
         BackgroundColor({ fill })
+        BorderColor::all(edge)
         BoxShadow({ shadows })
         OpticalGlassCard { tier: GlassTier::Card, enabled: true }
         BackdropMirror { tier: GlassTier::Card }

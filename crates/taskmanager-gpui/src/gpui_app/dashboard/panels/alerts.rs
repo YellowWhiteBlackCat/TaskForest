@@ -10,38 +10,28 @@ use taskmanager_ui::theme_binding::hsla;
 use taskmanager_ui::theme_binding::length;
 use taskmanager_ui::theme_binding::rem_value;
 
+use crate::gpui_app::dashboard::surfaces::{inset_page_card_with, page_card_with};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
 use taskforest_core::core::metrics::DiskMetrics;
 use taskforest_core::core::{AlertMetric, AlertRule, AlertRuleId, AlertSeverity};
 use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
-use taskmanager_theme::Length;
-use taskmanager_theme::{GlassTier, Theme, tokens};
-use taskmanager_ui::primitives::card_surface::CardSurface;
+use taskmanager_theme::{Length, Theme, tokens};
 
 mod transfer;
 use transfer::render_transfer_actions;
 
 const MAX_DURATION_SECS: u64 = 3_600;
+const ALERT_CONTROL_MIN_WIDTH: f32 = 128.0;
 
 fn glass_surface(theme: &Theme, radius: Length, padding: Length) -> Div {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
-        .radius(radius)
-        .padding(padding)
-        .render()
+    page_card_with(theme.palette(), radius, padding).render()
 }
 
-/// A dense control surface inside an already-elevated rule card: the same
-/// shared glass material, without stacking a second shadow on the card.
 fn inset_glass_surface(theme: &Theme, radius: Length, padding: Length) -> Div {
-    CardSurface::new(theme.palette())
-        .glass(GlassTier::Card)
-        .radius(radius)
-        .padding(padding)
-        .inset()
-        .render()
+    // Nested controls stay within the outer PageCard's elevation.
+    inset_page_card_with(theme.palette(), radius, padding).render()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -196,9 +186,9 @@ fn adjustment_control(props: AdjustmentControlProps<'_>) -> Div {
     let less = entity.clone();
     let more = entity.clone();
     let less_rule_id = rule_id.clone();
-    inset_glass_surface(theme, tokens::control_radius(theme), tokens::SPACE_7)
+    inset_glass_surface(theme, tokens::control_radius(theme), tokens::SPACE_6)
         .flex_1()
-        .min_w(rem_value(142.0))
+        .min_w(rem_value(ALERT_CONTROL_MIN_WIDTH))
         .child(
             div()
                 .flex()
@@ -265,10 +255,10 @@ fn target_control(
         .text_size(font_size(tokens::FONT_11))
         .text_color(hsla(theme.fg_dim))
         .child(i18n::t("alerts.target"));
-    let mut control = inset_glass_surface(theme, tokens::control_radius(theme), tokens::SPACE_7)
+    let mut control = inset_glass_surface(theme, tokens::control_radius(theme), tokens::SPACE_6)
         .child(label)
         .flex_1()
-        .min_w(rem_value(142.0));
+        .min_w(rem_value(ALERT_CONTROL_MIN_WIDTH));
     if supports_target {
         let target = entity.clone();
         let rule_id = managed.rule.id.clone();
@@ -311,10 +301,10 @@ fn rule_row(
     let toggle_rule_id = managed.rule.id.clone();
     let severity_rule_id = managed.rule.id.clone();
     let remove_rule_id = managed.rule.id.clone();
-    glass_surface(theme, tokens::card_radius(theme), tokens::SPACE_8)
+    glass_surface(theme, tokens::card_radius(theme), tokens::SPACE_7)
         .flex()
         .flex_col()
-        .gap(definite_length(tokens::SPACE_7))
+        .gap(definite_length(tokens::SPACE_6))
         .child(
             div()
                 .flex()
@@ -322,7 +312,7 @@ fn rule_row(
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(definite_length(tokens::SPACE_6))
+                .gap(definite_length(tokens::SPACE_5))
                 .child(
                     div()
                         .font_weight(font_weight(tokens::FONT_WEIGHT_SEMIBOLD))
@@ -333,7 +323,7 @@ fn rule_row(
                         .flex()
                         .flex_row()
                         .flex_wrap()
-                        .gap(definite_length(tokens::SPACE_4))
+                        .gap(definite_length(tokens::SPACE_3))
                         .child(elements::pill(
                             theme,
                             ("alert-toggle", index),
@@ -399,7 +389,7 @@ fn rule_row(
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(definite_length(tokens::SPACE_6))
+                .gap(definite_length(tokens::SPACE_5))
                 .child(adjustment_control(AdjustmentControlProps {
                     theme,
                     index,
@@ -448,7 +438,7 @@ pub(super) fn render_alert_rules(
     let mut rows = div()
         .flex()
         .flex_col()
-        .gap(definite_length(tokens::SPACE_7));
+        .gap(definite_length(tokens::SPACE_6));
     for (index, managed) in rules.iter().enumerate() {
         rows = rows.child(rule_row(theme, index, managed, &entity));
     }
@@ -456,7 +446,7 @@ pub(super) fn render_alert_rules(
     div()
         .flex()
         .flex_col()
-        .gap(definite_length(tokens::SPACE_10))
+        .gap(definite_length(tokens::SPACE_8))
         .child(
             div()
                 .text_size(font_size(tokens::FONT_12))
@@ -499,5 +489,9 @@ pub(super) fn render_alert_rules(
 mod tests;
 
 #[cfg(test)]
-#[path = "../../../../tests/gui/gpui_gpui_app_dashboard_panels_alerts_surface_tests.rs"]
+#[path = "../../../../tests/gui/gpui_app/dashboard/alert_rule_surface_tests.rs"]
 mod surface_tests;
+
+#[cfg(test)]
+#[path = "../../../../tests/gui/gpui_app/dashboard/alert_rule_density_bounds_tests.rs"]
+mod density_bounds_tests;

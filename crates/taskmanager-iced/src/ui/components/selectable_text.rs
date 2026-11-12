@@ -96,7 +96,7 @@ struct State {
     /// machine the shell search and Bevy readouts use), cleared whenever the
     /// text changes.
     edit: TextEditState,
-    dragging: bool,
+    pub(super) dragging: bool,
 }
 
 impl State {
@@ -281,6 +281,12 @@ impl Widget<Message, iced::Theme, iced::Renderer> for SelectableText {
                 {
                     clipboard.write(iced::advanced::clipboard::Kind::Primary, selected);
                 }
+            }
+            Event::Mouse(iced::mouse::Event::CursorLeft) if state.dragging => {
+                // A pointer release outside the window never reaches this
+                // widget. Closing the session here keeps the one active
+                // selection from following later frame events forever.
+                state.finish();
             }
             _ => {}
         }

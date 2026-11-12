@@ -205,6 +205,10 @@ impl Harness {
     fn selected_text(&self) -> Option<String> {
         self.tree.state.downcast_ref::<State>().selected_text()
     }
+
+    fn dragging(&self) -> bool {
+        self.tree.state.downcast_ref::<State>().dragging
+    }
 }
 
 fn selectable_element(app: &IcedApp, id: iced::advanced::widget::Id, content: &str) -> TestElement {
@@ -412,5 +416,58 @@ fn pointer_drag_selects_across_a_line_break() {
             "pha\nbeta".to_owned()
         )],
         "the multi-line fragment reaches the primary clipboard intact"
+    );
+}
+
+#[test]
+fn leaving_the_window_closes_a_drag_session_without_changing_its_selection() {
+    let content = "prefix chosen suffix";
+    let mut harness = Harness::new(content);
+    let start = content.find("chosen").expect("selected word");
+    let range = start..start + "chosen".len();
+    let start_point = harness.point_at_caret(range.start);
+    let end_point = harness.point_at_caret(range.end);
+
+    harness.dispatch(
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+        mouse::Cursor::Available(start_point),
+    );
+    harness.dispatch(
+        Event::Mouse(mouse::Event::CursorMoved {
+            position: end_point,
+        }),
+        mouse::Cursor::Available(end_point),
+    );
+    assert!(harness.dragging(), "the measured drag session is open");
+
+    harness.dispatch(
+        Event::Mouse(mouse::Event::CursorLeft),
+        mouse::Cursor::Unavailable,
+    );
+    assert!(
+        !harness.dragging(),
+        "a pointer that leaves the window cannot leave a live drag session behind"
+    );
+    assert_eq!(
+        harness.selection(),
+        range,
+        "the last measured selection survives the window exit"
+    );
+    assert!(
+        harness.clipboard.writes.is_empty(),
+        "leaving the window is not a drag-finish clipboard write"
+    );
+
+    let later_point = harness.point_at_caret(content.len());
+    harness.dispatch(
+        Event::Mouse(mouse::Event::CursorMoved {
+            position: later_point,
+        }),
+        mouse::Cursor::Available(later_point),
+    );
+    assert_eq!(
+        harness.selection(),
+        range,
+        "a later frame event cannot extend the closed session"
     );
 }

@@ -1,11 +1,25 @@
 //! Shared Dashboard surface roles.
 
-use taskmanager_theme::{GlassSurfaceRole, Palette};
+use taskmanager_theme::{GlassSurfaceRole, Length, Palette};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 #[must_use]
 pub(super) fn page_card(palette: Palette) -> CardSurface {
     CardSurface::for_role(palette, GlassSurfaceRole::PageCard)
+}
+
+#[must_use]
+pub(super) fn page_card_with(palette: Palette, radius: Length, padding: Length) -> CardSurface {
+    page_card(palette).radius(radius).padding(padding)
+}
+
+#[must_use]
+pub(super) fn inset_page_card_with(
+    palette: Palette,
+    radius: Length,
+    padding: Length,
+) -> CardSurface {
+    page_card_with(palette, radius, padding).inset()
 }
 
 #[cfg(test)]

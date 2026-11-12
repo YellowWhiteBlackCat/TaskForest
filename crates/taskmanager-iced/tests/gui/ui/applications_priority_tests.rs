@@ -17,7 +17,9 @@ use iced::{Element, Rectangle, Size, Vector};
 use taskmanager_assets::embedded_fonts;
 use taskmanager_shell::presentation::priority_tier_label;
 use taskmanager_theme::tokens::{FONT_CAPTION, SPACE_8};
-use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+use taskmanager_theme::{
+    GlassSurfaceRole, GlassTier, HighContrast, LightDark, ResolvedFonts, Skin, Theme,
+};
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
 
 type TestElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
@@ -37,6 +39,38 @@ fn renderer() -> iced::Renderer {
         Some("tiny-skia"),
     ))
     .expect("software renderer")
+}
+
+#[test]
+fn applications_empty_body_spends_the_inset_page_header_surface() {
+    assert_eq!(GlassSurfaceRole::PageHeader.tier(), GlassTier::Card);
+    for skin in Skin::ALL {
+        for mode in LightDark::ALL {
+            for high_contrast in [HighContrast::Off, HighContrast::On] {
+                let theme =
+                    Theme::build(skin, mode, high_contrast, ResolvedFonts::system_for(skin));
+                let inset = empty_table_body_style(&theme);
+                let floating = theme::panel_style(&theme);
+                assert_eq!(
+                    inset.background, floating.background,
+                    "the inset role keeps the shared Card glass fill"
+                );
+                assert_eq!(
+                    inset.border, floating.border,
+                    "the inset role keeps the shared Card hairline and radius"
+                );
+                assert!(
+                    floating.shadow.color.a > 0.0,
+                    "the floating panel style must still carry its shadow for this contrast"
+                );
+                assert_eq!(
+                    inset.shadow,
+                    iced::Shadow::default(),
+                    "the empty Applications body must not stack a floating elevation shadow"
+                );
+            }
+        }
+    }
 }
 
 #[derive(Default)]

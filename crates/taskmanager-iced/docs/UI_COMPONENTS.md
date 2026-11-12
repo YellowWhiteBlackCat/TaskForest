@@ -50,6 +50,10 @@ native selection and renderer caches; all shared types use their defining module
   panels consume). The switch, slider, select, search field and the
   segmented track, plus the new activation/text family, all read it, so no
   control owns a second palette, radius ladder or shadow ladder.
+  The Applications empty table body spends the shared inset
+  `GlassSurfaceRole::PageHeader`: it keeps the Card-tier fill and hairline
+  without stacking the floating elevation shadow that the GPUI control-band
+  owner removed.
   `theme/control_measurement.rs` selects the live `UiSize`/`RowDensity` axis
   and delegates to `presentation_binding::control_measurement`; every control
   spends `ControlRole::{Button, IconButton, Input, Toggle}` through

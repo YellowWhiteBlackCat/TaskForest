@@ -15,6 +15,7 @@ use taskmanager_shell::presentation::uninterruptible_process_summary;
 use taskmanager_shell::presentation::{process_anomaly_summary, swap_column_visible};
 use taskmanager_shell::{ProcessControlScope, SortDir};
 use taskmanager_theme::GlassSurfaceRole;
+use taskmanager_theme::theme;
 use taskmanager_theme::tokens::{FONT_13, FONT_CAPTION};
 use taskmanager_ui_contract::IconId;
 use taskmanager_ui_contract::presentation::sizes::ControlRole;
@@ -193,7 +194,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         .center_y(Length::Fill)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(move |_| theme::panel_style(theme_snapshot))
+        .style(move |_| empty_table_body_style(theme_snapshot))
         .into()
     } else {
         let key = applications_virtual_table_key(projection_generation, &row_context, window);
@@ -496,6 +497,14 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         .height(Length::Fill)
         .into()
     }
+}
+
+/// The Applications empty-state table body is page chrome inset in the page,
+/// not another floating card. The shared `PageHeader` role keeps the Card-tier
+/// fill and hairline while dropping the elevation shadow.
+#[must_use]
+fn empty_table_body_style(theme_snapshot: &theme::Theme) -> iced::widget::container::Style {
+    theme::glass_surface_style(theme_snapshot, GlassSurfaceRole::PageHeader)
 }
 
 #[cfg(test)]

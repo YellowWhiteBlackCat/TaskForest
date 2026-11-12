@@ -22,7 +22,8 @@ official skin system) is not adopted — theme tokens are the only skin
 authority. Glass surfaces project the shared `taskmanager-theme` tiers; the
 frontend-owned `glass` bridge resolves each panel tier's fill, gradient sheen,
 outline, REM radius, `Layered` two-layer shadow and tiled embedded grain into one
-`GlassPanelMaterial`. Page cards consume that bridge; dense rows, controls,
+`GlassPanelMaterial`. Focus dashboards and atomic process cards consume that
+bridge; dense rows, controls,
 chart tracks and device sub-blocks stay on opaque content tokens for
 legibility and frame cost. The bridge never re-derives the theme's material
 values. `glass/optical.rs` projects the shared `OpticalGlassSpec` and resolved

@@ -31,6 +31,10 @@ projection:
   surfaces, their edges and their shared layered shadows instead of a flat
   canvas. The shared capability decision still owns headless, high-contrast,
   software-adapter, and no-adapter fallbacks.
+- Atomic cards consume the full shared `GlassPanelMaterial` — fill, specular
+  edge, REM panel radius and `Layered` shadow — rather than reprojecting a
+  subset through control geometry. Hover/pressed/selected ink remains on the
+  state overlay above the glass, with the same rounded boundary.
 - The mirror alone is a painted lower composite; the RECURSIVE optical chain
   lives beside it in
   [`NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): the chain target holds
@@ -109,6 +113,9 @@ projection:
   whole-group and focus-card admission, focus facts, dense-mode seams,
   compact selected-card bounds, measured bounds, overflow activation, the
   GPUI-parity command hint, and the typed painted fallback without an adapter.
+- `tests/headless/pages/process_card_glass.rs` proves that an atomic card and
+  its interaction overlay consume the same shared Card-tier fill, edge,
+  shadow, panel radius, optical marker and backdrop mirror.
 - `tests/headless/pages/process_menu.rs` proves the card popover freezes the
   identity of the visible row it is anchored to.
 - `tests/headless/pages/card_lane_width_admission.rs` asserts the capped

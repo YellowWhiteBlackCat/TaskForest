@@ -669,6 +669,10 @@ mod table_parity_tests;
 mod card_lane_tests;
 
 #[cfg(test)]
+#[path = "../../tests/headless/pages/process_card_glass.rs"]
+mod process_card_glass_tests;
+
+#[cfg(test)]
 #[path = "../../tests/headless/pages/process_card_focus_group.rs"]
 mod process_card_focus_group_tests;
 
