@@ -39,6 +39,11 @@ selected bit; a selected verdict folds to its resting paint. The focus path
 stays registered and reads `Palette::ring`, so pointer-driven focus and a
 disabled button still draw no ring. State changes only paint, never extent.
 
+`inputs/select.rs` binds the select trigger to the same shared Card-tier glass
+fill and edge the floating panels and Iced control glass wear; its popup stays
+on the shared menu role. A hover overlay re-derives from that same tier fill,
+so trigger states do not drift back to an opaque surface literal.
+
 ## Boundary
 
 This crate owns reusable GPUI presentation only; page-specific state remains in
