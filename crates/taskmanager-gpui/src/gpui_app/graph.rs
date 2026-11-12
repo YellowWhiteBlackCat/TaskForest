@@ -15,6 +15,7 @@ use taskforest_core::core::percent::MAX_PERCENT;
 use taskmanager_shell::presentation::{ChartSlots, graph_window_samples, latest_samples};
 use taskmanager_telemetry_store::live_graph::{MAX_HISTORY_CAPACITY, MIN_HISTORY_CAPACITY};
 use taskmanager_theme::palette::tint_channel_toward_white;
+use taskmanager_theme::tokens::CHART_AREA_TOP_ALPHA;
 use zhuge_ui_core::curve::catmull_rom_windows;
 use zhuge_ui_core::value::interval_fraction;
 
@@ -321,7 +322,7 @@ pub(crate) fn graph_fill_background(base: Rgba, opts: GraphOpts) -> Background {
     if opts.gradient_fill {
         linear_gradient(
             180.0,
-            linear_color_stop(Hsla::from(base).opacity(0.35), 0.0),
+            linear_color_stop(Hsla::from(base).opacity(CHART_AREA_TOP_ALPHA), 0.0),
             linear_color_stop(Hsla::from(base).opacity(0.0), 1.0),
         )
     } else {

@@ -1,9 +1,16 @@
 use std::time::Duration;
 
 use super::{
-    DURATION_FAST, DURATION_HOVER, DURATION_MEDIUM, LINE_HEIGHT_NORMAL, Length, MotionPolicy,
-    RowDensity, UiSize, rounded_content_inset,
+    CHART_AREA_TOP_ALPHA, DURATION_FAST, DURATION_HOVER, DURATION_MEDIUM, LINE_HEIGHT_NORMAL,
+    Length, MotionPolicy, RowDensity, UiSize, rounded_content_inset,
 };
+
+/// The chart area wash starts at one toolkit-neutral weight, then fades to
+/// transparent. Frontends bind this token instead of restating a literal.
+#[test]
+fn chart_area_top_alpha_is_one_shared_weight() {
+    assert_eq!(CHART_AREA_TOP_ALPHA, 0.35);
+}
 
 #[test]
 fn rounded_surface_inset_keeps_rectangular_content_inside_the_arc() {

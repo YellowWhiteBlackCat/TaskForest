@@ -11,10 +11,11 @@
 use crate::widgets::chart::geometry::ChartRun;
 use bevy::color::Color;
 use bevy::math::Vec2;
+use taskmanager_theme::tokens::CHART_AREA_TOP_ALPHA;
 
 /// The alpha the wash under a curve starts at: the line's own ink at 35%,
 /// fading to nothing at the floor — the reference surface's gradient.
-pub(crate) const CANVAS_FILL_ALPHA: f32 = 0.35;
+pub(crate) const CANVAS_FILL_ALPHA: f32 = CHART_AREA_TOP_ALPHA;
 
 /// The vertical wash under the curve: the line's own ink, fading from
 /// `alpha` at the area's top edge to nothing at the floor.

@@ -15,6 +15,12 @@ use std::time::Duration;
 use crate::color::{FontSize, Length, Ratio, Weight};
 use crate::theme::{RadiusScale, Theme};
 
+/// Alpha at the top edge of a chart's area-fill gradient: the series ink at
+/// this weight fades to transparent at the baseline. Every graphical frontend
+/// binds this one token, so the reference "Mission-Center" wash stays one
+/// design fact rather than three literals.
+pub const CHART_AREA_TOP_ALPHA: f32 = 0.35;
+
 /// Card / graph / panel corner radius for the active skin — the scale's
 /// [`RadiusScale::Large`] tier.
 pub fn card_radius(t: &Theme) -> Length {

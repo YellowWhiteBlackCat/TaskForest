@@ -67,8 +67,9 @@ use taskforest_core::core::percent::percent_text;
 const SERIES_STROKE_WIDTH: f32 = 1.6;
 
 /// Alpha of the area-fill gradient at the top edge, directly under the
-/// polyline (Mission-Center-style fade: category color at ~0.35 → transparent).
-const AREA_FILL_TOP_ALPHA: f32 = 0.35;
+/// polyline (Mission-Center-style fade). The shared theme token owns the
+/// weight; the local alias keeps the existing gradient docs/tests readable.
+const AREA_FILL_TOP_ALPHA: f32 = tokens::CHART_AREA_TOP_ALPHA;
 
 /// Alpha of the area-fill gradient at the bottom edge (fully transparent).
 const AREA_FILL_BOTTOM_ALPHA: f32 = 0.0;
