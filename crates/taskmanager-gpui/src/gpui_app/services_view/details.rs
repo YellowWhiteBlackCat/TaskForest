@@ -23,8 +23,9 @@ use taskforest_core::core::services::{
     ServiceRelationKind,
 };
 use taskmanager_application::i18n;
+use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::Theme;
-use taskmanager_theme::{GlassTier, tokens};
+use taskmanager_theme::tokens;
 
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -330,11 +331,17 @@ fn with_log_line_selector(row: Div, _index: usize) -> Div {
 }
 
 pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div {
-    let panel = CardSurface::new(theme.palette())
+    // The journal viewport is NESTED inside the modal dialog's floating
+    // panel. The shared inset role keeps the Card-tier glass material and
+    // hairline but drops the second two-layer shadow: a floating Card shadow
+    // here draws a second rim inside the dialog and darkens its edge.
+    let panel = CardSurface::unpadded_for_role(theme.palette(), GlassSurfaceRole::InlinePlot)
         .padding(tokens::SPACE_8)
         .radius(tokens::card_radius(theme))
-        .glass(GlassTier::Card)
-        .render()
+        .render();
+    #[cfg(any(test, feature = "test-support"))]
+    let panel = panel.debug_selector(|| "tm-svc-log-panel".to_owned());
+    let panel = panel
         .flex()
         .flex_col()
         .gap(definite_length(tokens::SPACE_3))

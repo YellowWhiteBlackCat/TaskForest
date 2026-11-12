@@ -571,3 +571,7 @@ mod log_stream_tests;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/services_view/tests.rs"]
 mod services_view_page_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/services_view/shadow_surface_tests.rs"]
+mod shadow_surface_tests;

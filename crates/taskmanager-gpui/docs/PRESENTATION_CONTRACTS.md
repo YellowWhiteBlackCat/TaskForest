@@ -113,6 +113,15 @@ values. Permission entry stays in Settings. The shared scrollbar uses
 viewport/max-offset geometry, keyed drag state and paint-safe invalidation
 with one edge inset.
 
+Service Details renders its bounded journal viewport INSIDE the modal dialog.
+The dialog itself is the shared Modal-tier floating surface; the nested
+journal spends the shared inset `GlassSurfaceRole::InlinePlot`, so it keeps
+the Card-tier glass material and radius without stacking a second two-layer
+shadow on the dialog's edge. A headless style assertion proves the nested
+panel paints no shadow while the parent keeps exactly its shared Modal-tier
+projection, and a render-path bounds assertion proves the panel's geometry
+is unchanged.
+
 System Health keeps storage and sensor sections as complete surfaces under one
 page-owned bounded scroll rail. Section cards spend one floating
 `GlassSurfaceRole::PageCard`; filesystem rows, sensor groups and sensor rows
