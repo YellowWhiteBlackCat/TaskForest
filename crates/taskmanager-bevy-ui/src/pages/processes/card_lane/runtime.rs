@@ -6,6 +6,7 @@
 //! seam so the same virtual window rebuilds in the active presentation.
 
 use bevy::app::{App, PostUpdate};
+use bevy::color::Color;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::ChildOf;
 use bevy::ecs::observer::On;
@@ -15,7 +16,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::picking::hover::PickingInteraction;
 use bevy::ui::Pressed;
 use bevy::ui::UiSystems;
-use bevy::ui::prelude::{BackgroundColor, ComputedNode};
+use bevy::ui::prelude::{BackgroundColor, BorderColor, ComputedNode};
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 use taskmanager_theme::GlassTier;
@@ -192,16 +193,41 @@ pub(crate) fn sync_card_flow_budget(
     }
 }
 
+/// Resolve one card's state ink and edge from the shared control verdict.
+///
+/// The state overlay is transparent while idle; every active state receives
+/// one theme-owned wash plus a stronger selected accent on its border. The
+/// edge adds a bounded, opaque reading of the state without replacing the
+/// glass material or introducing a second palette.
+#[must_use]
+pub(crate) fn card_state_ink(
+    visual: &ControlVisual,
+    interaction: PickingInteraction,
+    pressed: bool,
+    palette: &UiPalette,
+) -> (Color, Color) {
+    let wash = control_background(visual, interaction, pressed, palette);
+    if wash == palette.glass_fill(GlassTier::Card) {
+        return (Color::NONE, Color::NONE);
+    }
+    let edge = if pressed || interaction == PickingInteraction::Pressed || visual.1 {
+        palette.focus_ring
+    } else {
+        palette.accent
+    };
+    (wash, edge)
+}
+
 /// Repaint the card's state tint overlay.
 ///
 /// An optical card owns no painted fill, so the hover, pressed and selected
 /// ink cannot replace its surface. The overlay rides ABOVE the glass instead,
 /// which keeps the state cue visible without taking the material's job.
-fn sync_card_state_overlays(
+pub(crate) fn sync_card_state_overlays(
     palette: Option<Res<WindowPalette>>,
     cards: Query<(&ControlVisual, Option<&PickingInteraction>, Has<Pressed>)>,
     overlays: Query<(Entity, &ProcessCardStateOverlay, &ChildOf)>,
-    mut fills: Query<&mut BackgroundColor>,
+    mut fills: Query<(&mut BackgroundColor, &mut BorderColor)>,
 ) {
     let Some(palette) = palette else {
         return;
@@ -210,22 +236,21 @@ fn sync_card_state_overlays(
         let Ok((visual, interaction, pressed)) = cards.get(parent.parent()) else {
             continue;
         };
-        let Ok(mut fill) = fills.get_mut(overlay) else {
+        let Ok((mut fill, mut border)) = fills.get_mut(overlay) else {
             continue;
         };
-        let next = control_background(
+        let (next_fill, next_edge) = card_state_ink(
             visual,
             interaction.copied().unwrap_or_default(),
             pressed,
             &palette.inner,
         );
-        let next = if next == palette.inner.glass_fill(GlassTier::Card) {
-            bevy::color::Color::NONE
-        } else {
-            next
-        };
-        if fill.0 != next {
-            fill.0 = next;
+        if fill.0 != next_fill {
+            fill.0 = next_fill;
+        }
+        let next_border = BorderColor::all(next_edge);
+        if *border != next_border {
+            *border = next_border;
         }
     }
 }

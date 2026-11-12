@@ -673,6 +673,10 @@ mod card_lane_tests;
 mod process_card_glass_tests;
 
 #[cfg(test)]
+#[path = "../../tests/headless/pages/process_card_state.rs"]
+mod process_card_state_tests;
+
+#[cfg(test)]
 #[path = "../../tests/headless/pages/process_card_focus_group.rs"]
 mod process_card_focus_group_tests;
 

@@ -33,8 +33,14 @@ projection:
   software-adapter, and no-adapter fallbacks.
 - Atomic cards consume the full shared `GlassPanelMaterial` — fill, specular
   edge, REM panel radius and `Layered` shadow — rather than reprojecting a
-  subset through control geometry. Hover/pressed/selected ink remains on the
-  state overlay above the glass, with the same rounded boundary.
+  subset through control geometry. Hover/pressed/selected ink remains on
+  each card's one `ProcessCardStateOverlay` above the glass. The overlay is
+  a full-bounds child with the card's border width and panel radius, so the
+  state cue and glass read as one rounded card. It is transparent and
+  borderless while idle; hover paints the shared hover wash and accent edge,
+  while an official press or selected `ControlVisual` paints the stronger
+  selection wash and focus-ring edge. The post-layout system writes only the
+  overlay fill and border, preserving the card's material, shadow and layout.
 - The mirror alone is a painted lower composite; the RECURSIVE optical chain
   lives beside it in
   [`NESTED_OPTICAL_CHAIN.md`](NESTED_OPTICAL_CHAIN.md): the chain target holds
@@ -93,9 +99,12 @@ projection:
   group floors.
 - Atom cards keep the same `ProcessRowLink`, semantic address, AccessKit node,
   official `Button`, pointer activation, and secondary-press seam as dense
-  rows. Keyboard/focus routing remains the shell's single authority. The
-  optical card's hover, pressed and selected ink rides a state overlay above
-  the glass, because an optical surface owns no painted fill to replace.
+  rows. Keyboard/focus routing remains the shell's single authority: a
+  keyboard-focused card resolves through the same official `Button` state,
+  so navigated focus plus `Pressed` receives the same selection wash and
+  focus-ring edge as a pointer press. The optical card's hover, pressed and
+  selected ink rides the state overlay above the glass, because an optical
+  surface owns no painted fill to replace.
 - Atom-card hover hints expose the provider-owned command line when it is
   longer than the displayed process name, matching the GPUI process-row
   tooltip. The tooltip uses the existing shared hover state and glass surface.
@@ -116,6 +125,10 @@ projection:
 - `tests/headless/pages/process_card_glass.rs` proves that an atomic card and
   its interaction overlay consume the same shared Card-tier fill, edge,
   shadow, panel radius, optical marker and backdrop mirror.
+- `tests/headless/pages/process_card_state.rs` proves that the state overlay
+  has the card's rounded bounds and border, stays idle-transparent, resolves
+  distinct hover and pressed/selected ink, and gives keyboard focus with an
+  official press the same official verdict.
 - `tests/headless/pages/process_menu.rs` proves the card popover freezes the
   identity of the visible row it is anchored to.
 - `tests/headless/pages/card_lane_width_admission.rs` asserts the capped

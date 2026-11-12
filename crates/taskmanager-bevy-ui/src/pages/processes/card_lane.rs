@@ -102,11 +102,12 @@ pub(crate) struct ProcessAtomicCard(pub(crate) usize);
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessGroupOverflow(pub(crate) ProcessStatusFilter);
 
-/// The card's state tint overlay.
+/// The card's state tint overlay and its readable state edge.
 ///
 /// An optical card has no painted fill to tint, so the hover, pressed and
 /// selected ink rides a dedicated overlay above the glass instead of
-/// replacing the surface the material owns.
+/// replacing the surface the material owns. Its border shares the same
+/// state verdict, so a light glass panel keeps an active card legible.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessCardStateOverlay;
 
@@ -691,5 +692,5 @@ pub(crate) fn card_bucket_of_selection(shell: &ShellApp) -> Option<usize> {
 
 mod scenes;
 pub(crate) use scenes::{atomic_card_scene, card_lane_scene, empty_card_scene, group_scene};
-mod runtime;
+pub(crate) mod runtime;
 pub(crate) use runtime::register;

@@ -422,12 +422,15 @@ pub(crate) fn empty_card_scene(message: String, palette: &UiPalette) -> Box<dyn 
     })
 }
 
-/// The card's state tint overlay.
+/// The card's state tint overlay and its readable state edge.
 ///
 /// An optical card has no painted fill to tint, so the hover, pressed and
 /// selected ink rides this overlay above the glass instead of replacing the
-/// surface the material owns.
+/// surface the material owns. The overlay also owns a state border above the
+/// glass: a translucent tint alone is too quiet on a light glass panel, while
+/// the border keeps the active card legible without changing its size.
 fn state_overlay_scene(palette: &UiPalette) -> Box<dyn Scene> {
+    let edge_width = GlassTier::Card.edge_width_rem();
     Box::new(bsn! {
         Node {
             width: percent(100),
@@ -435,9 +438,11 @@ fn state_overlay_scene(palette: &UiPalette) -> Box<dyn Scene> {
             position_type: PositionType::Absolute,
             left: percent(0),
             top: percent(0),
+            border: UiRect::all(Val::Rem(edge_width)),
             border_radius: BorderRadius::all(Val::Rem(palette.panel_radius_rem())),
         }
         BackgroundColor(Color::NONE)
+        BorderColor::DEFAULT
         ProcessCardStateOverlay
         Pickable::IGNORE
     })
