@@ -2,7 +2,7 @@
 
 The shared layer ADR-064 adds above the semantic contracts. It answers "求同存异"
 for measurement and motion: which facts all four frontends must agree on, and
-which facts each frontend owns. Current state; no history.
+which facts each frontend owns.
 
 ## One-way layering
 
@@ -43,12 +43,16 @@ by a second count.
 
 `card_flow` owns the arithmetic every graphical shape needs when a page
 paints cards instead of rows: how many COMPLETE groups fit in a measured
-slot, and how tall one card may become inside it. A group is admitted only
-when the whole group fits; an admitted group's height is the leftover space
-shared out and clamped into the card's own floor and ceiling. Shapes with a
-compact focus presentation use `admit_card_flow`: after whole groups stop
-fitting, it admits one complete focus card only when that card's own floor
-fits; otherwise the caller degrades to its dense form. The shape supplies its
+slot, and the minimum height one card keeps inside it. A group is admitted
+only when the whole group fits; an admitted group's height is the leftover
+space shared out and clamped into the card's own floor and ceiling. The
+resulting `card_height` is a FLOOR, not an exact admitted height: GPUI and
+Iced give each admitted group an elastic line and spend `card_height` as the
+card's minimum, so the card grows into the remaining slot instead of leaving
+an unpainted band below the last row. Shapes with a compact focus
+presentation use `admit_card_flow`: after whole groups stop fitting, it
+admits one complete focus card only when that card's own floor fits;
+otherwise the caller degrades to its dense form. The shape supplies its
 measured adaptive slot, optional leading chrome, and card footprints. The
 contract owns the rung order and never squeezes a card. A shape that caps the
 group count (a page that shows at most four metrics) says so with
@@ -124,8 +128,9 @@ scaffold's page padding already separates rail from body), and names what
 stands in for the three bands it does not spend: the flex-composed chrome row
 behind a declared scroll owner, the pinned scroll-owned statistics rail with
 no stacked form, and the layout engine's own chrome spending instead of a
-subtracted reserve. Bevy now resolves the same measured page slot through
-`ContentSlot` / `PageLayoutBudget` / `PerformancePageBudget`: the shared
+subtracted reserve.
+Bevy now resolves the same measured page slot through `ContentSlot` /
+`PageLayoutBudget` / `PerformancePageBudget`: the shared
 Constrained/Generous buckets decide its vertical whole-group admission and the
 Charts rung decides the extended chart inventory, so those three axes are
 `Shared` instead of `unrecorded:`. The frame's typed verdict is the only input

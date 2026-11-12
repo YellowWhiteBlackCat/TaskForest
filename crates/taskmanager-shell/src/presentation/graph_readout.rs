@@ -1,15 +1,18 @@
 //! The product's graph readout: which statistics a graph window reports, in
 //! which order, and the words that name them.
 //!
-//! The reduction itself belongs to [`super::graph_summary`]. What every
-//! frontend used to spell out again was the *readout*: the same three
-//! statistics, in the same order, named by the same catalog words. GPUI, Iced,
-//! TUI and Bevy each joined "latest / average / peak" into their own line, so
-//! a new frontend (or a new statistic) had four places to keep in step.
+//! The reduction belongs to [`super::graph_summary`]. This module owns the
+//! readout: [`GraphSummaryItem`] declares the canonical latest / average /
+//! peak order, its `i18n_key` names each statistic through `i18n::t`, and
+//! [`graph_summary_items`] pairs every item with its value. A line readout uses
+//! [`graph_summary_text`] to join those pairs in that order; an optional
+//! leading label names the graph and the separator carries its own spacing.
+//! A surface that paints separate items spends the same item list, labels, and
+//! values without defining another order.
 //!
-//! This module owns the list, the order, the words and the join. A frontend
-//! supplies only what it alone knows: the value spelling (its own unit
-//! ladder) and, for the terminal, the separator glyph.
+//! A frontend supplies only what it alone knows: the value spelling (its own
+//! unit ladder) and the separator for a joined line. The statistics, their
+//! order, their catalog keys, and the join stay owned here.
 
 use taskmanager_application::i18n;
 

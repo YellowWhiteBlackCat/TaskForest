@@ -2,24 +2,23 @@
 //!
 //! A transient notice carries one severity. What that severity MEANS — which
 //! semantic status colour and which semantic icon — is a product fact, so it
-//! has exactly one address. The four frontends used to spell this binding
-//! three different ways: GPUI matched the theme's accent/success/warning/
-//! danger inks and answered the icon question from the product severity, Iced
-//! answered the ink question through the shared status ladder but mapped the
-//! icon from a *different* severity vocabulary, and Bevy matched the palette
-//! directly. The three answers disagreed, so the same notice read as a
-//! different colour and a different glyph per frontend.
+//! has exactly one address. The binding has one owner chain and one shape
+//! split:
 //!
-//! The binding now has two halves with two owners:
+//! - [`crate::app::FeedbackSeverity::status_kind`] projects the severity onto
+//!   `StatusKind`; `StatusColors::resolve` selects the semantic ink for a
+//!   graphical surface from that shared kind.
+//! - `taskmanager_icons::status_icon` selects the semantic glyph from the same
+//!   `StatusKind` for graphical surfaces. For text surfaces, [`status_marker`]
+//!   owns the text decoration that carries that glyph's meaning: an
+//!   informational notice has none, a successful one uses the success marker,
+//!   and a warning or danger uses the alert marker.
 //!
-//! - [`crate::app::FeedbackSeverity::status_kind`] projects the severity onto the
-//!   shared transient-status vocabulary, so every frontend resolves the ink
-//!   through one ladder (`StatusColors::resolve`).
-//! - `taskmanager_icons::status_icon` answers the semantic glyph for that
-//!   shared status kind.
-//!
-//! The frontend keeps only what is genuinely its own: the toolkit type it
-//! projects the resolved colour onto, and the shape it draws the glyph in.
+//! The frontend keeps only what is genuinely its own: the toolkit colour type,
+//! and the shape it draws the glyph in. A terminal surface binds its theme
+//! colour and `status_marker`; a graphical surface binds `status_icon`. No
+//! frontend defines the severity projection, the graphical glyph mapping, or
+//! the text-marker table.
 
 use zhuge_ui_tokens::StatusKind;
 

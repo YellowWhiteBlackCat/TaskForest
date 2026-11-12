@@ -73,16 +73,14 @@ pub fn endurance_used_readout(percent_used: Option<f32>, rated_life_note: Option
 /// The judgment and the threshold are core's
 /// ([`taskforest_core::core::metrics::DiskMetrics::smart_spare_pool_needs_warning`],
 /// [`taskforest_core::core::metrics::DiskMetrics::smart_spare_warning_threshold_pct`]);
-/// this owns the ONE composition, because five surfaces used to write it and
-/// each of them wrote the marker codepoint for itself.
+/// this module owns the ONE composition, including the marker codepoint.
 ///
 /// `warning_clause` is the localized clause a surface with room for a sentence
 /// prints beside the marker — the catalog's `disk.spare_warning_clause`, whose
 /// `{threshold}` slot this fills. A compact row passes `None` and keeps the
 /// bare symbol clause, which carries no words and therefore needs no catalog.
-/// The clause is copy, so it belongs to the catalogs: two surfaces used to
-/// spell the English word "warning" inside their source, printing English to
-/// every user regardless of language.
+/// The clause is copy, so it belongs to the catalogs and is resolved through
+/// their localized key before a surface prints it.
 #[must_use]
 pub fn spare_pool_readout(disk: &DiskMetrics, warning_clause: Option<&str>) -> String {
     let spare = disk.smart_available_spare_pct;

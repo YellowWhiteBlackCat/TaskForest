@@ -4,14 +4,15 @@ Status: accepted
 
 ## Context
 
-The application crate had accumulated a model facade that forwarded core facts,
-platform contracts and source-status vocabulary. Frontends and adapters then
-imported the same fact through multiple public addresses. This obscured the
-authority route and made a new facade easy to add accidentally.
+A cross-crate fact has one public address: its owner module. A model facade that
+forwards core facts, platform contracts and source-status vocabulary gives
+frontends and adapters multiple public addresses for the same fact, obscures
+the authority route and allows another facade to be added accidentally.
 
-The root package and GPUI crate also carried local `core`/`i18n` forwarding
-modules, while composition crates forwarded tray and instance contract types.
-Those paths were historical convenience surfaces, not independent owners.
+The root package and GPUI crate must not expose local `core`/`i18n` forwarding
+modules, and composition crates must not re-export tray or instance contract
+types. The owner-direct rule excludes local forwarding modules and re-exports;
+the owner module is the only address.
 
 ## Decision
 
@@ -19,7 +20,7 @@ Those paths were historical convenience surfaces, not independent owners.
    `taskforest-core` for domain facts and `taskforest-contract` for
    capability, request, event, failure and port contracts.
 2. `taskmanager-application` exposes only application-owned commands, reducers,
-   lifecycles and projections. Its former model module is retired.
+   lifecycles and projections. A cross-layer model facade is forbidden.
 3. UI crates may depend directly on the two owner crates. They must not create
    a local `core` module or re-export an owner type under a frontend path.
 4. `taskmanager-app-host` may expose composition functions, but it does not
@@ -34,7 +35,7 @@ Those paths were historical convenience surfaces, not independent owners.
 - Type authority is visible at every import site and dependency edges reflect
   actual use.
 - Removing or changing an owner type has one compiler-visible consumer set;
-  compatibility aliases cannot silently preserve a retired facade.
+  compatibility aliases cannot create a second public address.
 - Frontend crates carry direct `taskforest-core` and, where needed,
   `taskforest-contract` edges. Their write sets remain independent.
 - Composition code still owns OS selection and lifecycle wiring, but shared
@@ -44,5 +45,5 @@ Those paths were historical convenience surfaces, not independent owners.
 
 The workspace dependency firewall records the direct owner edges. Its frontend
 checks reject cross-layer forwarding re-exports and reject native adapter
-imports. The workspace all-target check and the scoped crate gates verify that
-the migration preserves behavior and contract coverage.
+imports. The workspace all-target check and the scoped crate gates verify the
+owner-direct boundary and its contract coverage.

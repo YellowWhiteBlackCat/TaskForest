@@ -66,7 +66,7 @@ src/presentation/history_replay.rs  shared metric/device/core replay headings
 │                     constants.rs → MISSING_VALUE + ALERT_MARKER（告警标记的文本形式，唯一拼写）
 │                     constants.rs → SUCCESS_MARKER（成功标记的文本形式，唯一拼写）
 │                     smart.rs → SMART 读数装配（耐久 / 备用块 / 温度标签，四端共用，前端只调不写）
-├── feedback.rs        the one transient-status binding：严重度 → StatusKind 投影 + 文本标记表
+├── feedback.rs        shared transient-status text markers for projected StatusKind values
 ├── percent.rs           the absence-aware percent readouts (the shared dash)
 ├── memory.rs            the shared used-rate visibility floor
 ├── chart_slots.rs       the sample-window → pixel-slot grid (one owner for the charts)

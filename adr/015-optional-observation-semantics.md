@@ -13,11 +13,11 @@ Portable telemetry contains facts that are not universal:
   independent capabilities;
 - a provider may have reported a value previously and then fail.
 
-One `Option<T>` cannot distinguish these states. `None` has historically meant
-all of “old payload”, “not applicable”, “confirmed absent”, “provider does not
-support this”, and “the current refresh failed”. `ScalarObservation<Option<T>>`
-does not repair the wire contract: an outer missing value and an observed inner
-`None` both serialize as JSON `null`, so a round trip can erase the distinction.
+A single `Option<T>`/`None` collapses distinct states: “old payload”, “not
+applicable”, “confirmed absent”, “provider does not support this”, and “the
+current refresh failed”. `ScalarObservation<Option<T>>` does not repair the
+wire contract: an outer missing value and an observed inner `None` both
+serialize as JSON `null`, so a round trip can erase the distinction.
 
 Treating every missing optional fact as `Unsupported` is also incorrect. An
 unassociated Wi-Fi interface is a successful observation, not a provider
@@ -51,7 +51,7 @@ The following rules apply to every migration:
   state, but current accessors hide it.
 - `Partial(failure)` requires a current semantic state and records failure of a
   contributing source.
-- legacy `Option<T>` fields remain serialization projections while schema-v1
+- schema-v1 `Option<T>` fields remain serialization projections while wire
   compatibility is required. They are consulted only while typed truth is
   `Unknown` and never override typed absent, not-applicable, stale, or failed
   states.
@@ -76,11 +76,11 @@ states rather than importing Linux terminology.
 
 Frontends can render “not applicable”, “not connected”, “unsupported” and
 “temporarily unavailable” honestly. History and export code can distinguish a
-measured empty state from a gap. Retained values no longer look current after a
-provider failure.
+measured empty state from a gap. Current accessors hide retained stale values
+after a provider failure.
 
 The contract adds explicit state handling to provider assemblers and consumers.
 That cost is intentional: collapsing the states would recreate ambiguity at
-every UI and export boundary. Existing schema-v1 fields remain until their
-compatibility window closes, so migrations must keep typed truth as the sole
-new authority and test the legacy projection separately.
+every UI and export boundary. Schema-v1 fields remain as wire-compatibility
+projections; typed truth is the sole authority, and typed consumers test the
+serialization projection separately.
