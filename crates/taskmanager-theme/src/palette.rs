@@ -247,12 +247,38 @@ impl Theme {
     /// itself, so the same notice reads the same way in every frontend.
     #[must_use]
     pub fn status_colors(&self) -> StatusColors<Color> {
-        StatusColors {
-            accent: self.accent,
-            success: self.success,
-            warning: self.warning,
-            danger: self.danger,
-        }
+        status_colors(self.accent, self.success, self.warning, self.danger)
+    }
+}
+
+impl Palette {
+    /// The palette's four semantic status inks, projected onto the shared
+    /// transient-status ladder.
+    ///
+    /// A surface that holds the resolved [`Palette`] resolves a notice's ink
+    /// through this, exactly as a surface that holds the [`Theme`] resolves
+    /// it through [`Theme::status_colors`]. Both entries are the same owner:
+    /// a frontend that spells the four-field mapping itself owns a second
+    /// address for one fact.
+    #[must_use]
+    pub fn status_colors(&self) -> StatusColors<Color> {
+        status_colors(self.accent, self.success, self.warning, self.danger)
+    }
+}
+
+/// The one severity→ink mapping: the shared ladder owns the resolution, the
+/// theme owns the inks, and this is the only place the two meet.
+const fn status_colors(
+    accent: Color,
+    success: Color,
+    warning: Color,
+    danger: Color,
+) -> StatusColors<Color> {
+    StatusColors {
+        accent,
+        success,
+        warning,
+        danger,
     }
 }
 

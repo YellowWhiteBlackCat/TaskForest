@@ -115,6 +115,42 @@ impl ControlInkPriority {
             self.selected,
         )
     }
+
+    /// The selection-dominant verdict, for a control whose selection IS a
+    /// distinct ink.
+    ///
+    /// Most controls show their selection through something other than their
+    /// own fill — a table row's accent, a tab's underline — so the general
+    /// precedence above lets a transient hover win. A segmented control's
+    /// active segment paints the accent as its OWN fill: a hover that erased
+    /// it would hide the selection while the pointer merely rested there.
+    ///
+    /// So this fold ranks the selection above the hover and leaves every
+    /// other precedence untouched: `Disabled > Pressed > Focused > Selected
+    /// > Hovered > Idle`. Both frontends that ship a segmented control
+    /// resolve it here, so the rule has one address.
+    #[must_use]
+    pub const fn resolve_selection_dominant(
+        hovered: bool,
+        pressed: bool,
+        focused: bool,
+        disabled: bool,
+        selected: bool,
+    ) -> ControlInkState {
+        if disabled {
+            ControlInkState::Disabled
+        } else if pressed {
+            ControlInkState::Pressed
+        } else if focused {
+            ControlInkState::Focused
+        } else if selected {
+            ControlInkState::Selected
+        } else if hovered {
+            ControlInkState::Hovered
+        } else {
+            ControlInkState::Idle
+        }
+    }
 }
 
 #[cfg(test)]

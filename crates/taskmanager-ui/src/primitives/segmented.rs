@@ -28,6 +28,7 @@ use gpui::{
 };
 use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
+use taskmanager_ui_contract::presentation::control_ink::{ControlInkPriority, ControlInkState};
 
 use taskmanager_theme::color::on_accent;
 
@@ -35,8 +36,6 @@ type ClickHandler = dyn Fn(&mut Window, &mut App);
 type HoverHandler = dyn Fn(&bool, &mut Window, &mut App);
 
 /// Resolved per-segment fill family (palette-derived, no hardcoded hues).
-/// `active` wins over `hovered` — a selected segment stays accent-filled even
-/// while also hovered.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SegmentFill {
     /// Accent fill + max-contrast `on_accent` text.
@@ -47,13 +46,18 @@ enum SegmentFill {
     Idle,
 }
 
+/// The fill family one segment wears.
+///
+/// The precedence is the shared contract's selection-dominant fold: this
+/// control paints its selection as the segment's OWN accent fill, so a
+/// transient hover must not erase it while the pointer rests there. The rule
+/// lives in the shared fold so the GPUI and Iced segmented controls cannot
+/// disagree about it.
 fn fill_for(active: bool, hovered: bool) -> SegmentFill {
-    if active {
-        SegmentFill::Active
-    } else if hovered {
-        SegmentFill::Hovered
-    } else {
-        SegmentFill::Idle
+    match ControlInkPriority::resolve_selection_dominant(hovered, false, false, false, active) {
+        ControlInkState::Selected => SegmentFill::Active,
+        ControlInkState::Hovered => SegmentFill::Hovered,
+        _ => SegmentFill::Idle,
     }
 }
 

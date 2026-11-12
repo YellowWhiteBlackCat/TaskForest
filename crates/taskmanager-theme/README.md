@@ -11,9 +11,10 @@ size or weight (ADR-063). `GlassLayer` is the painted frosted fallback; the sepa
 capabilities and fail-closed fallback decisions.
 The `surface` module owns the semantic glass-surface role to tier/elevation
 mapping consumed by the frontend adapters.
-`Theme::status_colors` projects the theme's four semantic status inks onto the
-shared transient-status ladder, so a frontend resolves a notice's colour
-through one owner instead of re-matching the severity itself.
+`Theme::status_colors` (and its `Palette` twin) project the theme's four
+semantic status inks onto the shared transient-status ladder, so a frontend
+resolves a notice's colour through one owner instead of re-matching the
+severity itself.
 `Theme::glass_fallback_surface` resolves a degraded glass tier into the
 material it still wears — fill, edge, shadow, sheen and whether the backdrop
 is still sampled — so a renderer that cannot run the optical pipeline never

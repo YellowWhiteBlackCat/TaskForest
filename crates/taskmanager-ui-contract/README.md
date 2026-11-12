@@ -70,6 +70,11 @@ src/presentation.rs              ADR-064: vocabulary → thresholds → budget �
                                  load_tiers/dashboard in src/presentation/
 ```
 
+`control_ink` owns the interaction-ink precedence every control resolves:
+`Disabled > Pressed > Focused > Hovered > Selected > Idle`, plus the
+selection-dominant variant a control whose selection IS its own ink (a
+segmented control's active segment) resolves instead.
+
 ## Docs
 
 - [`docs/CAPABILITY_REGISTRY.md`](docs/CAPABILITY_REGISTRY.md) — capability semantic specs,

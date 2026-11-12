@@ -16,7 +16,7 @@ use gpui::{
 use taskmanager_icons::status_icon;
 use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::{Palette, tokens};
-use zhuge_ui_tokens::{StatusColors, StatusKind};
+use zhuge_ui_tokens::StatusKind;
 
 /// Typed toast event payload.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -139,13 +139,10 @@ impl RenderOnce for Toast {
             (state.message(), state.kind(), state.dismiss_focus.clone())
         });
         let palette = self.palette;
-        let accent = StatusColors {
-            accent: palette.accent,
-            success: palette.success,
-            warning: palette.warning,
-            danger: palette.danger,
-        }
-        .resolve(kind);
+        // The ink is resolved through the theme's own status ladder: the
+        // shared ladder owns which severity takes which ink, so this crate
+        // keeps no private copy of that mapping.
+        let accent = palette.status_colors().resolve(kind);
         let on_dismiss = self.on_dismiss.clone();
         let single_line = self.single_line;
         let indicator = self.indicator;

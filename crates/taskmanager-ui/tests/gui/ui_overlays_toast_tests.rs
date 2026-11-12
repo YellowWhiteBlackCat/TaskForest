@@ -11,7 +11,7 @@ use std::time::Duration;
 use taskmanager_theme::GlassSurfaceRole;
 use taskmanager_theme::GlassTier;
 use taskmanager_theme::Theme;
-use zhuge_ui_tokens::{StatusColors, StatusKind};
+use zhuge_ui_tokens::StatusKind;
 
 /// The toast card's material is the shared floating Card-tier surface, not a
 /// local fill + border + shadow recipe.
@@ -31,15 +31,13 @@ fn the_toast_card_paints_the_shared_surface_contract() {
     );
 }
 
+/// The toast's ink is resolved through the theme's own status ladder: the
+/// shared ladder owns which severity takes which ink, so this crate keeps no
+/// private copy of that mapping.
 #[test]
 fn toast_kind_colors_are_palette_derived() {
     let palette = Theme::dark().palette();
-    let colors = StatusColors {
-        accent: palette.accent,
-        success: palette.success,
-        warning: palette.warning,
-        danger: palette.danger,
-    };
+    let colors = palette.status_colors();
     assert_eq!(colors.resolve(StatusKind::Success), palette.success);
     assert_eq!(colors.resolve(StatusKind::Warning), palette.warning);
     assert_eq!(colors.resolve(StatusKind::Danger), palette.danger);
